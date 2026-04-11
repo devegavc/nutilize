@@ -3,12 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>NUtilize | Profile</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/db-profile.css" />
 </head>
 <body>
+  @php
+    $authUser = auth()->user();
+    $fullName = trim((string) ($authUser->full_name ?? $authUser->username ?? ''));
+    $nameParts = preg_split('/\s+/', $fullName) ?: [];
+    $firstName = $authUser->first_name ?? ($nameParts[0] ?? '');
+    $lastName = $authUser->last_name ?? (count($nameParts) > 1 ? $nameParts[count($nameParts) - 1] : '');
+    $middleInitial = $authUser->middle_initial ?? '';
+
+    $authUserPayload = [
+      'id' => $authUser->user_id ?? null,
+      'username' => $authUser->username ?? 'User',
+      'email' => $authUser->email ?? '',
+      'first_name' => $authUser->first_name ?? null,
+      'middle_initial' => $authUser->middle_initial ?? null,
+      'last_name' => $authUser->last_name ?? null,
+      'full_name' => $authUser->full_name ?? $authUser->username ?? 'User',
+      'role' => $authUser->role ?? 'user',
+      'suffix' => $authUser->suffix ?? '',
+      'contact_number' => $authUser->contact_number ?? '',
+      'phone_number' => $authUser->phone_number ?? '',
+      'profile_update_url' => route('dashboard.profile.update'),
+    ];
+  @endphp
+  <script>
+    window.authUser = @json($authUserPayload);
+  </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
       <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
@@ -55,16 +82,16 @@
 
                 <div class="profile-fields">
                   <label for="profile-first-name">First Name</label>
-                  <input id="profile-first-name" type="text" value="Juan" readonly />
+                  <input id="profile-first-name" type="text" value="{{ $firstName !== '' ? $firstName : ($authUser->username ?? '') }}" readonly />
 
-                  <label for="profile-middle-name">Middle Name</label>
-                  <input id="profile-middle-name" type="text" value="Aguncilio" readonly />
+                  <label for="profile-middle-name">Middle Initial</label>
+                  <input id="profile-middle-name" type="text" value="{{ $middleInitial }}" readonly />
 
                   <label for="profile-last-name">Last Name</label>
-                  <input id="profile-last-name" type="text" value="Dela Cruz" readonly />
+                  <input id="profile-last-name" type="text" value="{{ $lastName }}" readonly />
 
                   <label for="profile-suffix">Suffix</label>
-                  <input id="profile-suffix" type="text" value="Not Applicable" readonly />
+                  <input id="profile-suffix" type="text" value="{{ $authUser->suffix ?? 'Not Set' }}" readonly />
                 </div>
               </div>
             </article>
@@ -74,13 +101,13 @@
               <div class="profile-admin-grid">
                 <label for="profile-admin-id">Admin ID</label>
                 <label for="profile-email">Email</label>
-                <input id="profile-admin-id" type="text" value="ADM-001" readonly />
-                <input id="profile-email" type="text" value="delacruzj@nu-lipa.edu.ph" readonly />
+                <input id="profile-admin-id" type="text" value="{{ $authUser->user_id ?? '' }}" readonly />
+                <input id="profile-email" type="text" value="{{ $authUser->email ?? '' }}" readonly />
 
                 <label for="profile-contact">Contact Number</label>
                 <label for="profile-phone">Phone Number</label>
-                <input id="profile-contact" type="text" value="+63 | 912 345 6789" readonly />
-                <input id="profile-phone" type="text" value="+63 | 42 373 0003" readonly />
+                <input id="profile-contact" type="text" value="{{ $authUser->contact_number ?? 'Not Set' }}" readonly />
+                <input id="profile-phone" type="text" value="{{ $authUser->phone_number ?? 'Not Set' }}" readonly />
               </div>
             </article>
           </div>

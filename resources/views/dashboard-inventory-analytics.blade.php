@@ -3,12 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>NUtilize | Inventory Analytics</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/db-inventory.css" />
 </head>
 <body>
+  <script>
+    window.authUser = {
+      id: {{ auth()->user()->user_id ?? 'null' }},
+      username: '{{ auth()->user()->username ?? 'User' }}',
+      email: '{{ auth()->user()->email ?? '' }}',
+      full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
+      role: '{{ auth()->user()->role ?? 'user' }}'
+    };
+  </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
       <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />

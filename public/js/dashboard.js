@@ -1325,8 +1325,11 @@ function positionProfilePopover(button) {
 function buildProfilePopover() {
   const panel = document.createElement('div');
   panel.className = 'profile-popover';
+  const userName = (window.authUser && (window.authUser.full_name || window.authUser.username))
+    ? (window.authUser.full_name || window.authUser.username)
+    : 'User';
   panel.innerHTML = `
-    <button type="button" class="profile-action" data-profile-action="account">Juan Dela Cruz</button>
+    <button type="button" class="profile-action" data-profile-action="account">${userName}</button>
     <button type="button" class="profile-action logout" data-profile-action="logout">Logout</button>
   `;
 
@@ -1353,7 +1356,19 @@ function buildProfilePopover() {
     }
 
     if (action === 'logout') {
-      window.location.href = '/';
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/logout';
+      const token = document.querySelector('meta[name="csrf-token"]');
+      if (token) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = '_token';
+        input.value = token.content;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
     }
   });
 
@@ -1574,47 +1589,104 @@ if (profileEditCancelButton) {
 }
 
 if (profileEditSaveButton) {
-  profileEditSaveButton.addEventListener('click', () => {
-    if (profileFirstNameInput && profileModalFirstNameInput) {
-      profileFirstNameInput.value = profileModalFirstNameInput.value.trim() || profileFirstNameInput.value;
-    }
+  profileEditSaveButton.addEventListener('click', async () => {
+    const token = document.querySelector('meta[name="csrf-token"]');
+    const updateUrl = window.authUser && window.authUser.profile_update_url
+      ? window.authUser.profile_update_url
+      : '/dashboard/profile';
 
-    if (profileMiddleNameInput && profileModalMiddleNameInput) {
-      profileMiddleNameInput.value = profileModalMiddleNameInput.value.trim() || profileMiddleNameInput.value;
-    }
+    const payload = {
+      first_name: profileModalFirstNameInput ? profileModalFirstNameInput.value.trim() : '',
+      middle_initial: profileModalMiddleNameInput ? profileModalMiddleNameInput.value.trim().replace(/[^A-Za-z]/g, '').slice(0, 1).toUpperCase() : '',
+      last_name: profileModalLastNameInput ? profileModalLastNameInput.value.trim() : '',
+      suffix: profileModalSuffixInput ? profileModalSuffixInput.value.trim() : '',
+      email: profileModalEmailInput ? profileModalEmailInput.value.trim() : '',
+      contact_number: profileModalContactInput ? profileModalContactInput.value.trim() : '',
+      phone_number: profileModalPhoneInput ? profileModalPhoneInput.value.trim() : '',
+    };
 
-    if (profileLastNameInput && profileModalLastNameInput) {
-      profileLastNameInput.value = profileModalLastNameInput.value.trim() || profileLastNameInput.value;
-    }
+    try {
+      profileEditSaveButton.disabled = true;
 
-    if (profileSuffixInput && profileModalSuffixInput) {
-      profileSuffixInput.value = profileModalSuffixInput.value.trim() || profileSuffixInput.value;
-    }
+      const response = await fetch(updateUrl, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': token ? token.content : '',
+        },
+        body: JSON.stringify(payload),
+      });
 
-    if (profileEmailInput && profileModalEmailInput) {
-      profileEmailInput.value = profileModalEmailInput.value.trim() || profileEmailInput.value;
-    }
+      const result = await response.json();
 
-    if (profileContactInput && profileModalContactInput) {
-      profileContactInput.value = profileModalContactInput.value.trim() || profileContactInput.value;
-    }
-
-    if (profilePhoneInput && profileModalPhoneInput) {
-      profilePhoneInput.value = profileModalPhoneInput.value.trim() || profilePhoneInput.value;
-    }
-
-    if (profileAvatar && profileAvatarImage) {
-      if (pendingProfileAvatarDataUrl) {
-        profileAvatarImage.src = pendingProfileAvatarDataUrl;
-        profileAvatar.classList.add('has-image');
-      } else {
-        profileAvatarImage.removeAttribute('src');
-        profileAvatar.classList.remove('has-image');
+      if (!response.ok) {
+        const message = result && result.message ? result.message : 'Failed to update profile.';
+        throw new Error(message);
       }
-    }
 
-    closeProfileEditModal();
-    window.alert('Personal information updated.');
+      const user = result.user || {};
+      const firstName = user.first_name || payload.first_name;
+      const middleInitial = user.middle_initial || payload.middle_initial;
+      const lastName = user.last_name || payload.last_name;
+      const fullName = user.full_name || [firstName, middleInitial ? `${middleInitial}.` : '', lastName].filter(Boolean).join(' ');
+
+      if (profileFirstNameInput) {
+        profileFirstNameInput.value = firstName || '';
+      }
+
+      if (profileMiddleNameInput) {
+        profileMiddleNameInput.value = middleInitial || '';
+      }
+
+      if (profileLastNameInput) {
+        profileLastNameInput.value = lastName || '';
+      }
+
+      if (profileSuffixInput) {
+        profileSuffixInput.value = user.suffix || payload.suffix || 'Not Set';
+      }
+
+      if (profileEmailInput) {
+        profileEmailInput.value = user.email || payload.email || '';
+      }
+
+      if (profileContactInput) {
+        profileContactInput.value = user.contact_number || payload.contact_number || 'Not Set';
+      }
+
+      if (profilePhoneInput) {
+        profilePhoneInput.value = user.phone_number || payload.phone_number || 'Not Set';
+      }
+
+      if (window.authUser) {
+        window.authUser.first_name = user.first_name || firstName || window.authUser.first_name;
+        window.authUser.middle_initial = user.middle_initial || middleInitial || window.authUser.middle_initial;
+        window.authUser.last_name = user.last_name || lastName || window.authUser.last_name;
+        window.authUser.full_name = user.full_name || fullName || window.authUser.full_name;
+        window.authUser.email = user.email || window.authUser.email;
+        window.authUser.suffix = user.suffix || '';
+        window.authUser.contact_number = user.contact_number || '';
+        window.authUser.phone_number = user.phone_number || '';
+      }
+
+      if (profileAvatar && profileAvatarImage) {
+        if (pendingProfileAvatarDataUrl) {
+          profileAvatarImage.src = pendingProfileAvatarDataUrl;
+          profileAvatar.classList.add('has-image');
+        } else {
+          profileAvatarImage.removeAttribute('src');
+          profileAvatar.classList.remove('has-image');
+        }
+      }
+
+      closeProfileEditModal();
+      window.alert(result.message || 'Profile updated successfully.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Failed to update profile.');
+    } finally {
+      profileEditSaveButton.disabled = false;
+    }
   });
 }
 

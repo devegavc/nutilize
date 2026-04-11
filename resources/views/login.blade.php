@@ -40,7 +40,25 @@
         </p>
       </div>
 
-      <form action="/dashboard/home" method="get">
+      <form action="{{ route('login.authenticate') }}" method="POST">
+        @csrf
+
+        @if (session('status'))
+          <div class="alert alert-success" role="alert">
+            {{ session('status') }}
+          </div>
+        @endif
+
+        @if ($errors->any())
+          <div class="alert alert-danger" role="alert">
+            <ul class="mb-0">
+              @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+              @endforeach
+            </ul>
+          </div>
+        @endif
+
         <!-- Username -->
         <div class="mb-3">
           <div class="input-group input-group-lg">
@@ -48,8 +66,10 @@
               <i class="bi bi-person"></i>
             </span>
             <input type="text" 
+                   name="username"
                    class="form-control" 
                    placeholder="Enter your username"
+                   value="{{ old('username') }}"
                    required>
           </div>
         </div>
@@ -61,6 +81,7 @@
               <i class="bi bi-lock"></i>
             </span>
             <input type="password" 
+                   name="password"
                    class="form-control" 
                    placeholder="Enter your password"
                    required>

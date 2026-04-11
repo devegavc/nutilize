@@ -1,4 +1,12 @@
 const registerForm = document.getElementById("register-form");
+const registerStep1 = document.getElementById("register-step-1");
+const registerStep2 = document.getElementById("register-step-2");
+const stepIndicator = document.getElementById("register-step-indicator");
+const nextStepBtn = document.getElementById("next-step-btn");
+const backStepBtn = document.getElementById("back-step-btn");
+const firstNameInput = document.getElementById("first-name");
+const middleInitialInput = document.getElementById("middle-initial");
+const lastNameInput = document.getElementById("last-name");
 const emailInput = document.getElementById("email");
 const emailWarning = document.getElementById("email-warning");
 const passwordInput = document.getElementById("password");
@@ -9,6 +17,8 @@ const strengthBar = document.getElementById("password-strength-bar");
 const strengthText = document.getElementById("password-strength-text");
 const passwordValidIndicator = document.getElementById("password-valid-indicator");
 const confirmPasswordValidIndicator = document.getElementById("confirm-password-valid-indicator");
+
+let currentStep = registerForm && registerForm.dataset.startStep === "2" ? 2 : 1;
 
 const rules = {
   length: {
@@ -100,6 +110,58 @@ function updateConfirmPasswordMatch() {
   return false;
 }
 
+function validateStepOne() {
+  if (!firstNameInput || !lastNameInput) {
+    return true;
+  }
+
+  const firstNameValid = firstNameInput.value.trim().length > 0;
+  const lastNameValid = lastNameInput.value.trim().length > 0;
+  const middleInitialValid = !middleInitialInput || middleInitialInput.value.trim().length <= 1;
+
+  firstNameInput.classList.toggle("is-invalid", !firstNameValid);
+  lastNameInput.classList.toggle("is-invalid", !lastNameValid);
+
+  if (middleInitialInput) {
+    middleInitialInput.classList.toggle("is-invalid", !middleInitialValid);
+  }
+
+  return firstNameValid && lastNameValid && middleInitialValid;
+}
+
+function showRegisterStep(step) {
+  if (!registerStep1 || !registerStep2 || !stepIndicator) {
+    return;
+  }
+
+  currentStep = step;
+  const onStepOne = step === 1;
+
+  registerStep1.classList.toggle("d-none", !onStepOne);
+  registerStep2.classList.toggle("d-none", onStepOne);
+  stepIndicator.textContent = onStepOne ? "Step 1 of 2" : "Step 2 of 2";
+}
+
+if (nextStepBtn) {
+  nextStepBtn.addEventListener("click", () => {
+    if (validateStepOne()) {
+      showRegisterStep(2);
+    }
+  });
+}
+
+if (backStepBtn) {
+  backStepBtn.addEventListener("click", () => {
+    showRegisterStep(1);
+  });
+}
+
+if (middleInitialInput) {
+  middleInitialInput.addEventListener("input", () => {
+    middleInitialInput.value = middleInitialInput.value.replace(/[^A-Za-z]/g, "").slice(0, 1).toUpperCase();
+  });
+}
+
 passwordInput.addEventListener("focus", () => {
   passwordHelper.classList.add("show");
   updatePasswordStrength();
@@ -119,10 +181,25 @@ emailInput.addEventListener("input", updateEmailWarning);
 emailInput.addEventListener("blur", updateEmailWarning);
 
 registerForm.addEventListener("submit", (event) => {
+  const stepOneValid = validateStepOne();
   const emailIsValid = updateEmailWarning();
   const passwordsMatch = updateConfirmPasswordMatch();
+
+  if (!stepOneValid) {
+    showRegisterStep(1);
+    event.preventDefault();
+    return;
+  }
+
+  if (currentStep !== 2) {
+    showRegisterStep(2);
+    event.preventDefault();
+    return;
+  }
 
   if (!emailIsValid || !passwordsMatch) {
     event.preventDefault();
   }
 });
+
+showRegisterStep(currentStep);
