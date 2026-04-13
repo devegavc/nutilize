@@ -146,55 +146,6 @@
   text-shadow: none;
 }
 
-.request-item.is-rejected .status-dots,
-.request-item.is-rejected .status-dots i,
-.request-item.is-rejected .status-dots .bi-circle-fill {
-  color: #d33535;
-}
-
-.request-item.is-rejected .status-dots .bi-circle-fill {
-  opacity: 0.85;
-}
-
-.request-item.is-approved {
-  background: linear-gradient(135deg, #f4fff5 0%, #ebf9ec 100%);
-  border-color: #b9e2bf;
-  box-shadow: 0 12px 24px rgba(17, 140, 15, 0.1);
-}
-
-.request-item.is-approved .request-main-col,
-.request-item.is-approved .request-side-event,
-.request-item.is-approved .request-resource-col h3,
-.request-item.is-approved .request-owner,
-.request-item.is-approved .request-phone,
-.request-item.is-approved .request-event-row span,
-.request-item.is-approved .request-meta-row,
-.request-item.is-approved .resource-grid,
-.request-item.is-approved .request-decision-name,
-.request-item.is-approved .request-decision-text {
-  color: #2f6d38;
-}
-
-.request-item.is-approved .request-row-title strong,
-.request-item.is-approved .request-event-row strong,
-.request-item.is-approved .request-resource-col h3,
-.request-item.is-approved .request-side-event strong {
-  color: #157a24;
-}
-
-.request-item.is-approved .request-side-event {
-  background: #e5f7e7;
-  border-color: #b9e2bf;
-}
-
-.request-item.is-approved .request-resource-col {
-  border-left-color: #b9e2bf;
-}
-
-.request-item.is-approved .resource-grid i {
-  color: #17842b;
-}
-
 .request-owner,
 .request-phone {
   margin: 0;
@@ -273,45 +224,6 @@
   color: #1e2f73;
 }
 
-.request-item.is-rejected {
-  background: linear-gradient(135deg, #fff5f5 0%, #ffecec 100%);
-  border-color: #efb3b3;
-  box-shadow: 0 12px 24px rgba(211, 53, 53, 0.12);
-}
-
-.request-item.is-rejected .request-main-col,
-.request-item.is-rejected .request-side-event,
-.request-item.is-rejected .request-resource-col h3,
-.request-item.is-rejected .request-owner,
-.request-item.is-rejected .request-phone,
-.request-item.is-rejected .request-event-row span,
-.request-item.is-rejected .request-meta-row,
-.request-item.is-rejected .resource-grid,
-.request-item.is-rejected .request-decision-name,
-.request-item.is-rejected .request-decision-text {
-  color: #7b2e2e;
-}
-
-.request-item.is-rejected .request-row-title strong,
-.request-item.is-rejected .request-event-row strong,
-.request-item.is-rejected .request-resource-col h3,
-.request-item.is-rejected .request-side-event strong {
-  color: #9a1f1f;
-}
-
-.request-item.is-rejected .request-side-event {
-  background: #ffe7e7;
-  border-color: #efb3b3;
-}
-
-.request-item.is-rejected .request-resource-col {
-  border-left-color: #efb3b3;
-}
-
-.request-item.is-rejected .resource-grid i {
-  color: #c93a3a;
-}
-
 .request-action-stack {
   display: none;
   flex-direction: column;
@@ -361,10 +273,11 @@
 
 .request-content-card.pending-mode .approve-btn,
 .request-content-card.pending-mode .reject-btn {
-  opacity: 1;
-  filter: none;
-  box-shadow: inherit;
-  cursor: pointer;
+  opacity: 0.52;
+  filter: grayscale(0.4);
+  box-shadow: none;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .request-decision {
