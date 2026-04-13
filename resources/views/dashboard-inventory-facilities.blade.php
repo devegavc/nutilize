@@ -66,222 +66,26 @@
               <thead>
                 <tr>
                   <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>
-                  <th>Item Name</th>
-                  <th>Clasification</th>
-                  <th>Total Count</th>
+                  <th>Room Number</th>
+                  <th>Classification</th>
                   <th>Location</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="facilities-table-body">
-                <tr>
-                  <td>#74fAy51</td>
-                  <td>Room 501</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
+                @forelse(($facilityRows ?? []) as $facility)
+                <tr data-facility-id="{{ $facility['room_id'] }}" data-facility-category="{{ $facility['classification_key'] }}" data-facility-room-type="{{ $facility['room_type'] }}">
+                  <td>{{ $facility['asset_id'] }}</td>
+                  <td>{{ $facility['item_name'] }}</td>
+                  <td>{{ $facility['classification'] }}</td>
+                  <td>{{ $facility['location'] }}</td>
                   <td><button class="table-edit-btn" type="button">Edit</button></td>
                 </tr>
+                @empty
                 <tr>
-                  <td>#X9D2k8A</td>
-                  <td>Room 502</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
+                  <td colspan="5">No rooms found in the database.</td>
                 </tr>
-                <tr>
-                  <td>#4fHqWZ7</td>
-                  <td>Room 503</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#R8A3xM9</td>
-                  <td>Room 504</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#3Fq8Dk2</td>
-                  <td>Room 505</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#9A7MzxQ</td>
-                  <td>Room 506</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#W5DkF8R</td>
-                  <td>Room 507</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#X2q9A7M</td>
-                  <td>Room 508</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#P7Lm2Qx</td>
-                  <td>Room 509</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#K1Dz9Rv</td>
-                  <td>Room 510</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#N6Qw4By</td>
-                  <td>Room 511</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#T3Va8Hp</td>
-                  <td>Room 512</td>
-                  <td>Facilities</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#B4Yk7Jn</td>
-                  <td>Room 630</td>
-                  <td>Facilities/Computer Lab</td>
-                  <td>1</td>
-                  <td>Sixth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#H8Ms3Qc</td>
-                  <td>Room 631</td>
-                  <td>Facilities/Computer Lab</td>
-                  <td>1</td>
-                  <td>Sixth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#J2Rx5Wu</td>
-                  <td>Room 632</td>
-                  <td>Facilities/Computer Lab</td>
-                  <td>1</td>
-                  <td>Sixth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#Q9Nt6Zm</td>
-                  <td>Room 633</td>
-                  <td>Facilities/Computer Lab</td>
-                  <td>1</td>
-                  <td>Sixth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#V5Cg1Ls</td>
-                  <td>Room 615</td>
-                  <td>Facilities/Clinical Lab</td>
-                  <td>1</td>
-                  <td>Sixth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#M7Pb4Xe</td>
-                  <td>Room 616</td>
-                  <td>Facilities/Chem Lab</td>
-                  <td>1</td>
-                  <td>Sixth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#D1Kw8Tf</td>
-                  <td>Room 617</td>
-                  <td>Facilities/Chem Lab</td>
-                  <td>1</td>
-                  <td>Sixth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#L3Yq2An</td>
-                  <td>Room 618</td>
-                  <td>Facilities/Chem Lab</td>
-                  <td>1</td>
-                  <td>Sixth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#Z8Hp6Md</td>
-                  <td>Gym</td>
-                  <td>Gymnasium</td>
-                  <td>1</td>
-                  <td>Sixth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#C3Vn1Sk</td>
-                  <td>AVR</td>
-                  <td>Events Place</td>
-                  <td>1</td>
-                  <td>Sixth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#A6Ry4Lp</td>
-                  <td>Library</td>
-                  <td>Library</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#F2Gt9Nv</td>
-                  <td>Canteen</td>
-                  <td>Canteen</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#P4Kx8Te</td>
-                  <td>Student Lounge</td>
-                  <td>Lounge</td>
-                  <td>1</td>
-                  <td>Fifth Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr>
-                  <td>#U1Wm3Qd</td>
-                  <td>Ground</td>
-                  <td>Ground</td>
-                  <td>1</td>
-                  <td>Ground Floor</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
+                @endforelse
               </tbody>
             </table>
           </div>
@@ -295,49 +99,24 @@
     <article class="facilities-modal-card" role="dialog" aria-modal="true" aria-labelledby="facilities-modal-title">
       <div class="facilities-modal-top"></div>
       <div class="facilities-modal-body">
-        <h2 id="facilities-modal-title">Add Item</h2>
+        <h2 id="facilities-modal-title">Add Room/Facility</h2>
 
-        <label class="facilities-field-label" for="facility-item-name">Item/facility Name</label>
-        <input id="facility-item-name" class="facilities-input" type="text" placeholder="Item Name" />
+        <label class="facilities-field-label" for="facility-item-name">Room/Facility Name</label>
+        <input id="facility-item-name" class="facilities-input" type="text" placeholder="Room Number" />
 
         <div class="facilities-inline-fields">
           <div>
-            <label class="facilities-field-label" for="facility-category">Category</label>
+            <label class="facilities-field-label" for="facility-category">Room Type</label>
             <select id="facility-category" class="facilities-input facilities-select">
-              <option value="" selected disabled>Select Category</option>
-              <option value="Facilities">Facilities</option>
-              <option value="Facilities/Computer Lab">Facilities/Computer Lab</option>
-              <option value="Facilities/Clinical Lab">Facilities/Clinical Lab</option>
-              <option value="Facilities/Chem Lab">Facilities/Chem Lab</option>
-              <option value="Gymnasium">Gymnasium</option>
-              <option value="Events Place">Events Place</option>
-              <option value="Library">Library</option>
-              <option value="Canteen">Canteen</option>
-              <option value="Lounge">Lounge</option>
+              <option value="" selected disabled>Select Room Type</option>
+              <option value="rooms">Rooms</option>
+              <option value="lab">Lab</option>
+              <option value="others">Others</option>
             </select>
-          </div>
-          <div>
-            <label class="facilities-field-label" for="facility-quantity">Quantity</label>
-            <div class="facilities-qty-wrap">
-              <button type="button" class="facilities-qty-btn" id="facility-qty-minus">-</button>
-              <input id="facility-quantity" class="facilities-qty-input" type="number" min="0" value="1" />
-              <button type="button" class="facilities-qty-btn" id="facility-qty-plus">+</button>
-            </div>
           </div>
         </div>
 
-        <label class="facilities-field-label" for="facility-location">Location</label>
-        <select id="facility-location" class="facilities-input facilities-select">
-          <option value="" selected disabled>Select Location</option>
-          <option value="Ground Floor">Ground Floor</option>
-          <option value="Fifth Floor">Fifth Floor</option>
-          <option value="Sixth Floor">Sixth Floor</option>
-          <option value="Storage A">Storage A</option>
-          <option value="Storage B">Storage B</option>
-          <option value="Storage C">Storage C</option>
-        </select>
-
-        <label class="facilities-field-label" for="facility-upload-input">Upload Item</label>
+        <label class="facilities-field-label" for="facility-upload-input">Upload Room/Facility</label>
         <div class="facilities-upload-row">
           <div class="facilities-upload-text">
             <i class="bi bi-upload"></i>
@@ -347,7 +126,7 @@
             </div>
           </div>
           <input id="facility-upload-input" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
-          <button type="button" class="facilities-upload-btn" id="facility-upload-btn">Add Item</button>
+          <button type="button" class="facilities-upload-btn" id="facility-upload-btn">Add Room/Facility</button>
         </div>
 
         <label class="facilities-field-label" for="facility-description">Description</label>
@@ -355,7 +134,7 @@
 
         <div class="facilities-modal-actions">
           <button type="button" class="facilities-action-btn cancel" id="facility-cancel-btn">Cancel</button>
-          <button type="button" class="facilities-action-btn submit" id="facility-save-btn">Add Item</button>
+          <button type="button" class="facilities-action-btn submit" id="facility-save-btn">Add Room/Facility</button>
         </div>
       </div>
     </article>

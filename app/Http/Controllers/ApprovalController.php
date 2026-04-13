@@ -5,15 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Office;
 use App\Models\Reservation;
 use App\Models\ReservationApproval;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class ApprovalController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth');
-    }
-
     public function index()
     {
         $user = Auth::user();
@@ -25,16 +22,6 @@ class ApprovalController extends Controller
         $pendingQuery = ReservationApproval::where('office_id', $user->office_id)
             ->whereNull('approved_at')
             ->with(['reservation.user', 'reservation.approvals', 'reservation.details']);
-
-        if ($user->isPhysicalFacilitiesAdmin()) {
-            $pendingQuery->whereDoesntHave('reservation.approvals', function ($query) use ($user) {
-                $query->where('office_id', '!=', $user->office_id)
-                    ->where(function ($subQuery) {
-                        $subQuery->where('status', '!=', 'approved')
-                            ->orWhereNull('approved_at');
-                    });
-            });
-        }
 
         $pendingApprovals = $pendingQuery
             ->orderByDesc('created_at')
@@ -50,6 +37,7 @@ class ApprovalController extends Controller
             'pendingApprovals' => $pendingApprovals,
             'approvedApprovals' => $approvedApprovals,
             'authUser' => $user,
+            'isPfAdmin' => $user->isPhysicalFacilitiesAdmin(),
         ]);
     }
 
@@ -65,12 +53,6 @@ class ApprovalController extends Controller
 
         if ($approval->office_id !== $user->office_id) {
             return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        if ($user->isPhysicalFacilitiesAdmin() && !$this->isReadyForFinalPhysicalFacilitiesApproval($approval->reservation, $user->office_id)) {
-            return response()->json([
-                'error' => 'This request is not yet ready for final Physical Facilities approval.',
-            ], 422);
         }
 
         $approval->update([
@@ -102,12 +84,6 @@ class ApprovalController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        if ($user->isPhysicalFacilitiesAdmin() && !$this->isReadyForFinalPhysicalFacilitiesApproval($approval->reservation, $user->office_id)) {
-            return response()->json([
-                'error' => 'This request is not yet ready for final Physical Facilities decision.',
-            ], 422);
-        }
-
         $approval->update([
             'status' => 'rejected',
             'approved_at' => now(),
@@ -121,6 +97,63 @@ class ApprovalController extends Controller
             'message' => 'Request rejected.',
             'approval' => $approval,
         ]);
+    }
+
+    public function finalApproveReservation($reservationId)
+    {
+        return $this->finalizePhysicalFacilitiesDecision($reservationId, 'approved');
+    }
+
+    public function finalRejectReservation($reservationId)
+    {
+        return $this->finalizePhysicalFacilitiesDecision($reservationId, 'rejected');
+    }
+
+    private function finalizePhysicalFacilitiesDecision($reservationId, string $status)
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user || !$user->isPhysicalFacilitiesAdmin()) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $reservation = Reservation::findOrFail($reservationId);
+            $physicalFacilitiesOfficeId = $this->getPhysicalFacilitiesOfficeId();
+
+            DB::transaction(function () use ($reservation, $physicalFacilitiesOfficeId, $status) {
+                $reservation->update(['overall_status' => $status]);
+
+                if (is_null($physicalFacilitiesOfficeId)) {
+                    return;
+                }
+
+                DB::table('reservation_approvals')->updateOrInsert(
+                    [
+                        'reservation_id' => $reservation->reservation_id,
+                        'office_id' => $physicalFacilitiesOfficeId,
+                    ],
+                    [
+                        'status' => $status,
+                        'approved_at' => now(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]
+                );
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => $status === 'approved' ? 'Request approved successfully.' : 'Request rejected.',
+                'reservation_id' => $reservation->reservation_id,
+            ]);
+        } catch (Throwable $throwable) {
+            report($throwable);
+
+            return response()->json([
+                'error' => $throwable->getMessage(),
+            ], 500);
+        }
     }
 
     private function updateReservationStatus($reservationId)

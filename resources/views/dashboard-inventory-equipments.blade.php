@@ -70,155 +70,30 @@
                   <th>Total Count</th>
                   <th>In Use</th>
                   <th>Status</th>
-                  <th>Location</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="equipment-table-body">
-                <tr data-equipment-row="multimedia">
-                  <td>#9985fht</td>
-                  <td>Projectors</td>
-                  <td>6</td>
-                  <td>4</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage A</td>
+                @forelse(($equipmentRows ?? []) as $equipment)
+                <tr data-equipment-row="{{ $equipment['category'] }}" data-item-id="{{ $equipment['item_id'] }}">
+                  <td>{{ $equipment['asset_id'] }}</td>
+                  <td>{{ $equipment['item_name'] }}</td>
+                  <td>{{ $equipment['total_count'] }}</td>
+                  <td>{{ $equipment['in_use'] }}</td>
+                  <td><span class="status-pill {{ $equipment['status_key'] }}">{{ $equipment['status_label'] }}</span></td>
                   <td><button class="table-edit-btn" type="button">Edit</button></td>
                 </tr>
+                @empty
                 <tr data-equipment-row="multimedia">
-                  <td>#X9D2k8A</td>
-                  <td>Wireless Mic</td>
-                  <td>8</td>
-                  <td>2</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage A</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="multimedia">
-                  <td>#4fHqWZ7</td>
-                  <td>Wired Mic</td>
-                  <td>4</td>
-                  <td>1</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage A</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="multimedia">
-                  <td>#R8A3xM9</td>
-                  <td>Lapel Mics</td>
-                  <td>13</td>
-                  <td>1</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage A</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="multimedia">
-                  <td>#3Fq8Dk2</td>
-                  <td>Speaker</td>
-                  <td>4</td>
-                  <td>3</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage A</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="multimedia">
-                  <td>#9A7MzxQ</td>
-                  <td>Tripod</td>
-                  <td>3</td>
-                  <td>2</td>
-                  <td><span class="status-pill maintenance">Maintenance</span></td>
-                  <td>Storage A</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="multimedia">
-                  <td>#W5DkF8R</td>
-                  <td>Camera</td>
-                  <td>5</td>
-                  <td>1</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage A</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
+                  <td colspan="6">No equipment records found in the database.</td>
                 </tr>
                 <tr data-equipment-row="electronics">
-                  <td>#gThr31</td>
-                  <td>HDMI</td>
-                  <td>15</td>
-                  <td>4</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage B</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="electronics">
-                  <td>#VhT1lJk</td>
-                  <td>Wireless Clickers</td>
-                  <td>5</td>
-                  <td>2</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage B</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="electronics">
-                  <td>#78jgFhI</td>
-                  <td>Extension Cords</td>
-                  <td>9</td>
-                  <td>8</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage B</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="electronics">
-                  <td>#HjsDr44</td>
-                  <td>Power Strip</td>
-                  <td>10</td>
-                  <td>7</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage B</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="electronics">
-                  <td>#Ty667qI</td>
-                  <td>Port Dongles</td>
-                  <td>1</td>
-                  <td>0</td>
-                  <td><span class="status-pill damaged">Damaged</span></td>
-                  <td>Storage B</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
+                  <td colspan="6">No equipment records found in the database.</td>
                 </tr>
                 <tr data-equipment-row="utility">
-                  <td>#Yu667B</td>
-                  <td>Triangular Tables</td>
-                  <td>50</td>
-                  <td>33</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage C</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
+                  <td colspan="6">No equipment records found in the database.</td>
                 </tr>
-                <tr data-equipment-row="utility">
-                  <td>#4CfftyZ</td>
-                  <td>Monoblock Chairs</td>
-                  <td>145</td>
-                  <td>71</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage C</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="utility">
-                  <td>#KklbVG</td>
-                  <td>Industrial Fans</td>
-                  <td>15</td>
-                  <td>8</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage C</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
-                <tr data-equipment-row="utility">
-                  <td>#KTVpl5</td>
-                  <td>Podiums</td>
-                  <td>1</td>
-                  <td>0</td>
-                  <td><span class="status-pill good">Good</span></td>
-                  <td>Storage C</td>
-                  <td><button class="table-edit-btn" type="button">Edit</button></td>
-                </tr>
+                @endforelse
               </tbody>
             </table>
           </div>
@@ -268,14 +143,6 @@
             </select>
           </div>
         </div>
-
-        <label class="facilities-field-label" for="equipment-location">Location</label>
-        <select id="equipment-location" class="facilities-input facilities-select">
-          <option value="" selected disabled>Select Location</option>
-          <option value="Storage A">Storage A</option>
-          <option value="Storage B">Storage B</option>
-          <option value="Storage C">Storage C</option>
-        </select>
 
         <label class="facilities-field-label" for="equipment-upload-input">Upload Item</label>
         <div class="facilities-upload-row">

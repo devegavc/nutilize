@@ -5,11 +5,11 @@
     {{-- Page Header --}}
     <div class="row mb-4">
         <div class="col-md-6">
-            <h1 class="h3 mb-0">Request Approvals</h1>
-            <p class="text-muted">Manage and approve facility reservation requests</p>
+            <h1 class="h3 mb-0">{{ $isPfAdmin ? 'Final Approval' : 'Request Approvals' }}</h1>
+            <p class="text-muted">{{ $isPfAdmin ? 'Review and finalize reservation requests from all other office approvals' : 'Manage and approve facility reservation requests' }}</p>
         </div>
         <div class="col-md-6 text-end">
-            <span class="badge bg-warning">{{ $pendingApprovals->total() }} Pending</span>
+            <span class="badge bg-warning">{{ $pendingApprovals->total() }} {{ $isPfAdmin ? 'Final Requests' : 'Pending' }}</span>
         </div>
     </div>
 
@@ -17,7 +17,7 @@
     <ul class="nav nav-tabs mb-4" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab" aria-controls="pending" aria-selected="true">
-                Pending Approvals ({{ $pendingApprovals->total() }})
+                {{ $isPfAdmin ? 'Final Requests' : 'Pending Approvals' }} ({{ $pendingApprovals->total() }})
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -47,7 +47,7 @@
                                             </small>
                                         </div>
                                         <div class="col-auto">
-                                            <span class="badge bg-warning">PENDING</span>
+                                            <span class="badge bg-warning">{{ $isPfAdmin ? 'FINAL REVIEW' : 'PENDING' }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -92,13 +92,13 @@
                                                 class="btn btn-success flex-grow-1 approve-btn"
                                                 data-approval-id="{{ $approval->approval_id }}"
                                                 data-approval-action="approve">
-                                            <i class="bi bi-check-circle"></i> Approve
+                                            <i class="bi bi-check-circle"></i> {{ $isPfAdmin ? 'Final Approve' : 'Approve' }}
                                         </button>
                                         <button type="button" 
                                                 class="btn btn-danger flex-grow-1 approve-btn"
                                                 data-approval-id="{{ $approval->approval_id }}"
                                                 data-approval-action="reject">
-                                            <i class="bi bi-x-circle"></i> Reject
+                                            <i class="bi bi-x-circle"></i> {{ $isPfAdmin ? 'Final Reject' : 'Reject' }}
                                         </button>
                                     </div>
                                 </div>

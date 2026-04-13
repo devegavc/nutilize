@@ -14,11 +14,7 @@ const facilitiesInlineSearchInput = document.querySelector('.facilities-inline-s
 const facilitiesEditModal = document.getElementById('facilities-edit-modal');
 const facilitiesItemNameInput = document.getElementById('facility-item-name');
 const facilitiesCategoryInput = document.getElementById('facility-category');
-const facilitiesQuantityInput = document.getElementById('facility-quantity');
-const facilitiesLocationInput = document.getElementById('facility-location');
 const facilitiesDescriptionInput = document.getElementById('facility-description');
-const facilitiesQtyMinusButton = document.getElementById('facility-qty-minus');
-const facilitiesQtyPlusButton = document.getElementById('facility-qty-plus');
 const facilitiesCancelButton = document.getElementById('facility-cancel-btn');
 const facilitiesSaveButton = document.getElementById('facility-save-btn');
 const facilitiesAddButton = document.getElementById('facilities-add-btn');
@@ -32,7 +28,6 @@ const equipmentCategoryInput = document.getElementById('equipment-category');
 const equipmentTotalCountInput = document.getElementById('equipment-total-count');
 const equipmentInUseInput = document.getElementById('equipment-in-use');
 const equipmentStatusInput = document.getElementById('equipment-status');
-const equipmentLocationInput = document.getElementById('equipment-location');
 const equipmentDescriptionInput = document.getElementById('equipment-description');
 const equipmentCancelButton = document.getElementById('equipment-cancel-btn');
 const equipmentSaveButton = document.getElementById('equipment-save-btn');
@@ -168,7 +163,9 @@ const messagePreviewItems = [
   { name: 'De Vega, Val', unread: true, snippet: 'Can we move it tomorrow?' },
 ];
 
-const maintenanceRowsByTab = {
+const maintenanceRowsByTab = (window.maintenanceRowsByTab && typeof window.maintenanceRowsByTab === 'object')
+  ? window.maintenanceRowsByTab
+  : {
   maintenance: [
     { id: '#9985fht', item: 'Podium', count: '1', date: '31/03/2025', status: 'Maintenance', statusClass: 'maintenance', location: 'Storage A' },
     { id: '#X9D2k8A', item: 'HDMI', count: '3', date: '30/03/2025', status: 'Maintenance', statusClass: 'maintenance', location: 'Storage B' },
@@ -667,6 +664,114 @@ function applyRequestDecision(item, status) {
   }
 }
 
+async function submitRequestDecision(item, button, status) {
+  const approvalId = button ? button.dataset.approvalId : '';
+
+  if (!approvalId) {
+    window.alert('Approval record is not available for this request.');
+    return;
+  }
+
+  const action = status === 'approved' ? 'approve' : 'reject';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  if (!csrfToken) {
+    window.alert('Missing CSRF token. Please refresh the page and try again.');
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+  }
+
+  try {
+    const response = await fetch(`/dashboard/approval/${approvalId}/${action}`, {
+      method: 'PATCH',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      window.alert(data.error || data.message || 'Unable to process this request.');
+      return;
+    }
+
+    applyRequestDecision(item, status);
+  } catch (error) {
+    window.console.error('Request approval error:', error);
+    window.alert('An error occurred while processing the request.');
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
+}
+
+async function submitFinalRequestDecision(item, button, status) {
+  const reservationId = button ? button.dataset.reservationId : '';
+
+  if (!reservationId) {
+    window.alert('Reservation record is not available for this request.');
+    return;
+  }
+
+  const action = status === 'approved' ? 'final-approve' : 'final-reject';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  if (!csrfToken) {
+    window.alert('Missing CSRF token. Please refresh the page and try again.');
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+  }
+
+  try {
+    const response = await fetch(`/dashboard/request/${reservationId}/${action}`, {
+      method: 'PATCH',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const responseText = await response.text();
+    let data = {};
+
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        data = { error: responseText };
+      }
+    }
+
+    if (!response.ok || !data.success) {
+      const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
+      window.alert((data.error || data.message || 'Unable to process this request.') + statusMessage);
+      return;
+    }
+
+    applyRequestDecision(item, status);
+  } catch (error) {
+    window.console.error('Final request approval error:', error);
+    window.alert('An error occurred while processing the request.');
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
+}
+
 function setRequestTabMode(mode) {
   if (!requestTabs.length || !requestContentCard) {
     return;
@@ -698,15 +803,7 @@ function openFacilitiesEditModal(row) {
   }
 
   if (facilitiesCategoryInput) {
-    facilitiesCategoryInput.value = cells[2] ? cells[2].textContent.trim() : '';
-  }
-
-  if (facilitiesQuantityInput) {
-    facilitiesQuantityInput.value = cells[3] ? cells[3].textContent.trim() : '1';
-  }
-
-  if (facilitiesLocationInput) {
-    facilitiesLocationInput.value = cells[4] ? cells[4].textContent.trim() : '';
+    facilitiesCategoryInput.value = row.dataset.facilityCategory || 'rooms';
   }
 
   if (facilitiesDescriptionInput) {
@@ -722,11 +819,11 @@ function openFacilitiesEditModal(row) {
   }
 
   if (facilitiesModalTitle) {
-    facilitiesModalTitle.textContent = 'Edit Item';
+    facilitiesModalTitle.textContent = 'Edit Room/Facility';
   }
 
   if (facilitiesSaveButton) {
-    facilitiesSaveButton.textContent = 'Save Item';
+    facilitiesSaveButton.textContent = 'Save Room/Facility';
   }
 
   facilitiesEditModal.classList.add('is-open');
@@ -748,14 +845,6 @@ function openFacilitiesAddModal() {
     facilitiesCategoryInput.value = '';
   }
 
-  if (facilitiesQuantityInput) {
-    facilitiesQuantityInput.value = '0';
-  }
-
-  if (facilitiesLocationInput) {
-    facilitiesLocationInput.value = '';
-  }
-
   if (facilitiesDescriptionInput) {
     facilitiesDescriptionInput.value = '';
   }
@@ -769,11 +858,11 @@ function openFacilitiesAddModal() {
   }
 
   if (facilitiesModalTitle) {
-    facilitiesModalTitle.textContent = 'Add Item';
+    facilitiesModalTitle.textContent = 'Add Room/Facility';
   }
 
   if (facilitiesSaveButton) {
-    facilitiesSaveButton.textContent = 'Add Item';
+    facilitiesSaveButton.textContent = 'Add Room/Facility';
   }
 
   facilitiesEditModal.classList.add('is-open');
@@ -790,43 +879,8 @@ function closeFacilitiesEditModal() {
   activeEditingRow = null;
 }
 
-function updateFacilitiesQuantity(delta) {
-  if (!facilitiesQuantityInput) {
-    return;
-  }
-
-  const current = Number.parseInt(facilitiesQuantityInput.value, 10) || 0;
-  const next = Math.max(0, current + delta);
-  facilitiesQuantityInput.value = String(next);
-}
-
-function normalizeFacilitiesQuantityInput() {
-  if (!facilitiesQuantityInput) {
-    return;
-  }
-
-  const parsed = Number.parseInt(facilitiesQuantityInput.value, 10);
-  facilitiesQuantityInput.value = Number.isNaN(parsed) ? '0' : String(Math.max(0, parsed));
-}
-
 function getFacilitiesRowCategory(row) {
-  const cells = row.querySelectorAll('td');
-  const itemName = cells[1] ? cells[1].textContent.trim().toLowerCase() : '';
-  const classification = cells[2] ? cells[2].textContent.trim().toLowerCase() : '';
-
-  if (classification.includes('lab')) {
-    return 'lab';
-  }
-
-  if (classification.includes('storage') || classification.includes('utility')) {
-    return 'others';
-  }
-
-  if (itemName.startsWith('room') || classification.includes('facilities')) {
-    return 'rooms';
-  }
-
-  return 'others';
+  return row.dataset.facilityCategory || 'others';
 }
 
 function applyFacilitiesFilters() {
@@ -893,6 +947,44 @@ function getEquipmentStatusLabel(statusValue) {
   return 'Good';
 }
 
+function showSaveSuccessToast(message) {
+  const existing = document.getElementById('save-success-toast');
+
+  if (existing) {
+    existing.remove();
+  }
+
+  const toast = document.createElement('div');
+  toast.id = 'save-success-toast';
+  toast.textContent = message;
+  toast.style.position = 'fixed';
+  toast.style.top = '24px';
+  toast.style.right = '24px';
+  toast.style.zIndex = '9999';
+  toast.style.background = '#1f8b4c';
+  toast.style.color = '#ffffff';
+  toast.style.padding = '10px 14px';
+  toast.style.borderRadius = '8px';
+  toast.style.fontSize = '14px';
+  toast.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.2)';
+  toast.style.opacity = '0';
+  toast.style.transform = 'translateY(-6px)';
+  toast.style.transition = 'opacity 140ms ease, transform 140ms ease';
+
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+
+  window.setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-6px)';
+    window.setTimeout(() => toast.remove(), 180);
+  }, 1500);
+}
+
 function closeEquipmentEditModal() {
   if (!equipmentEditModal) {
     return;
@@ -941,10 +1033,6 @@ function openEquipmentEditModal(row) {
     } else {
       equipmentStatusInput.value = 'good';
     }
-  }
-
-  if (equipmentLocationInput) {
-    equipmentLocationInput.value = cells[5] ? cells[5].textContent.trim() : '';
   }
 
   if (equipmentDescriptionInput) {
@@ -996,10 +1084,6 @@ function openEquipmentAddModal() {
 
   if (equipmentStatusInput) {
     equipmentStatusInput.value = '';
-  }
-
-  if (equipmentLocationInput) {
-    equipmentLocationInput.value = '';
   }
 
   if (equipmentDescriptionInput) {
@@ -1153,6 +1237,31 @@ async function loadNavbar() {
     navbarContainer.querySelectorAll('a.nav-item, a.nav-subitem').forEach((link) => {
       link.addEventListener('click', closeSidebarDrawer);
     });
+
+    const logoutButton = navbarContainer.querySelector('[data-nav-action="logout"]');
+    if (logoutButton instanceof HTMLButtonElement) {
+      logoutButton.addEventListener('click', () => {
+        const token = document.querySelector('meta[name="csrf-token"]');
+
+        if (!token || !token.content) {
+          alert('Unable to logout. Missing CSRF token.');
+          return;
+        }
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/logout';
+
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = '_token';
+        input.value = token.content;
+
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+      });
+    }
   } catch (error) {
     console.error('Unable to load navbar component:', error);
   }
@@ -2227,14 +2336,24 @@ if (requestItems.length) {
     if (approveButton) {
       approveButton.addEventListener('click', (event) => {
         event.stopPropagation();
-        applyRequestDecision(item, 'approved');
+        if (approveButton.dataset.reservationId) {
+          submitFinalRequestDecision(item, approveButton, 'approved');
+          return;
+        }
+
+        submitRequestDecision(item, approveButton, 'approved');
       });
     }
 
     if (rejectButton) {
       rejectButton.addEventListener('click', (event) => {
         event.stopPropagation();
-        applyRequestDecision(item, 'rejected');
+        if (rejectButton.dataset.reservationId) {
+          submitFinalRequestDecision(item, rejectButton, 'rejected');
+          return;
+        }
+
+        submitRequestDecision(item, rejectButton, 'rejected');
       });
     }
 
@@ -2245,9 +2364,15 @@ if (requestItems.length) {
         return;
       }
 
+      const isAlreadySelected = item.classList.contains('is-selected');
+
       requestItems.forEach((node) => {
-        node.classList.toggle('is-selected', node === item);
+        node.classList.remove('is-selected');
       });
+
+      if (!isAlreadySelected) {
+        item.classList.add('is-selected');
+      }
     });
   });
 }
@@ -2263,89 +2388,119 @@ if (requestTabs.length) {
   setRequestTabMode(defaultActiveTab instanceof HTMLElement ? defaultActiveTab.dataset.requestTab || 'final' : 'final');
 }
 
-if (facilitiesQtyMinusButton) {
-  facilitiesQtyMinusButton.addEventListener('click', () => {
-    updateFacilitiesQuantity(-1);
-  });
-}
-
-if (facilitiesQtyPlusButton) {
-  facilitiesQtyPlusButton.addEventListener('click', () => {
-    updateFacilitiesQuantity(1);
-  });
-}
-
-if (facilitiesQuantityInput) {
-  facilitiesQuantityInput.addEventListener('input', normalizeFacilitiesQuantityInput);
-  facilitiesQuantityInput.addEventListener('blur', normalizeFacilitiesQuantityInput);
-}
-
 if (facilitiesCancelButton) {
   facilitiesCancelButton.addEventListener('click', closeFacilitiesEditModal);
 }
 
+if (facilitiesAddButton) {
+  facilitiesAddButton.addEventListener('click', openFacilitiesAddModal);
+}
+
 if (facilitiesSaveButton) {
-  facilitiesSaveButton.addEventListener('click', () => {
-    if (!activeEditingRow) {
-      if (!facilitiesTableBody || !facilitiesItemNameInput || !facilitiesCategoryInput || !facilitiesQuantityInput || !facilitiesLocationInput) {
-        closeFacilitiesEditModal();
-        return;
-      }
-
-      const itemName = facilitiesItemNameInput.value.trim();
-      const category = facilitiesCategoryInput.value.trim();
-      const quantity = facilitiesQuantityInput.value.trim() || '0';
-      const location = facilitiesLocationInput.value.trim();
-
-      if (!itemName || !category || !location) {
-        window.alert('Please complete Item Name, Category, and Location.');
-        return;
-      }
-
-      const assetId = `#${Math.random().toString(36).slice(2, 9)}`;
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${assetId}</td>
-        <td>${itemName}</td>
-        <td>${category}</td>
-        <td>${quantity}</td>
-        <td>${location}</td>
-        <td><button class="table-edit-btn" type="button">Edit</button></td>
-      `;
-
-      facilitiesTableBody.prepend(row);
+  facilitiesSaveButton.addEventListener('click', async () => {
+    if (!facilitiesTableBody || !facilitiesItemNameInput || !facilitiesCategoryInput) {
       closeFacilitiesEditModal();
-      applyFacilitiesFilters();
       return;
     }
 
-    const cells = activeEditingRow.querySelectorAll('td');
+    const itemName = facilitiesItemNameInput.value.trim();
+    const category = facilitiesCategoryInput.value.trim();
 
-    if (cells[1] && facilitiesItemNameInput) {
-      cells[1].textContent = facilitiesItemNameInput.value.trim() || cells[1].textContent;
+    if (!itemName || !category) {
+      window.alert('Please complete Facility Name and Room Type.');
+      return;
     }
 
-    if (cells[2] && facilitiesCategoryInput) {
-      cells[2].textContent = facilitiesCategoryInput.value.trim() || cells[2].textContent;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+
+    if (!csrfToken) {
+      window.alert('Unable to save changes. Missing CSRF token.');
+      return;
     }
 
-    if (cells[3] && facilitiesQuantityInput) {
-      const qtyValue = facilitiesQuantityInput.value.trim();
-      cells[3].textContent = qtyValue || cells[3].textContent;
-    }
+    try {
+      const isEditing = Boolean(activeEditingRow && activeEditingRow.dataset.facilityId);
+      const endpoint = isEditing
+        ? `/dashboard/inventory/facilities/${encodeURIComponent(activeEditingRow.dataset.facilityId)}`
+        : '/dashboard/inventory/facilities';
+      const response = await fetch(endpoint, {
+        method: isEditing ? 'PATCH' : 'POST',
+        headers: {
+          'X-CSRF-TOKEN': csrfToken.content,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({
+          item_name: itemName,
+          category,
+        }),
+      });
 
-    if (cells[4] && facilitiesLocationInput) {
-      cells[4].textContent = facilitiesLocationInput.value.trim() || cells[4].textContent;
-    }
+      const responseText = await response.text();
+      let payload = {};
 
-    closeFacilitiesEditModal();
-    applyFacilitiesFilters();
+      try {
+        payload = responseText ? JSON.parse(responseText) : {};
+      } catch (error) {
+        payload = {};
+      }
+
+      if (!response.ok || !payload.success) {
+        window.alert(payload.error || `Unable to save facility changes. (HTTP ${response.status})`);
+        return;
+      }
+
+      const facility = payload.facility;
+
+      if (isEditing && activeEditingRow) {
+        const cells = activeEditingRow.querySelectorAll('td');
+        activeEditingRow.dataset.facilityCategory = facility.classification_key || facility.category || 'rooms';
+        activeEditingRow.dataset.facilityRoomType = facility.room_type || '';
+
+        if (cells[0]) {
+          cells[0].textContent = facility.asset_id;
+        }
+
+        if (cells[1]) {
+          cells[1].textContent = facility.item_name;
+        }
+
+        if (cells[2]) {
+          cells[2].textContent = facility.classification;
+        }
+
+        if (cells[3]) {
+          cells[3].textContent = facility.location;
+        }
+      } else {
+        const row = document.createElement('tr');
+        row.dataset.facilityId = facility.room_id;
+        row.dataset.facilityCategory = facility.classification_key || facility.category || 'rooms';
+        row.dataset.facilityRoomType = facility.room_type || '';
+        row.innerHTML = `
+          <td>${facility.asset_id}</td>
+          <td>${facility.item_name}</td>
+          <td>${facility.classification}</td>
+          <td>${facility.location}</td>
+          <td><button class="table-edit-btn" type="button">Edit</button></td>
+        `;
+
+        facilitiesTableBody.prepend(row);
+      }
+
+      closeFacilitiesEditModal();
+      applyFacilitiesFilters();
+      showSaveSuccessToast(isEditing ? 'Edited successfully.' : 'Added successfully.');
+    } catch (error) {
+      window.alert('Unable to save facility changes right now. Please check your connection and try again.');
+    }
   });
 }
 
 if (equipmentSaveButton) {
-  equipmentSaveButton.addEventListener('click', () => {
-    if (!equipmentTableBody || !equipmentItemNameInput || !equipmentCategoryInput || !equipmentTotalCountInput || !equipmentInUseInput || !equipmentStatusInput || !equipmentLocationInput) {
+  equipmentSaveButton.addEventListener('click', async () => {
+    if (!equipmentTableBody || !equipmentItemNameInput || !equipmentCategoryInput || !equipmentTotalCountInput || !equipmentInUseInput || !equipmentStatusInput) {
       closeEquipmentEditModal();
       return;
     }
@@ -2355,34 +2510,153 @@ if (equipmentSaveButton) {
     const totalCount = equipmentTotalCountInput.value.trim() || '0';
     const inUse = equipmentInUseInput.value.trim() || '0';
     const status = equipmentStatusInput.value.trim();
-    const location = equipmentLocationInput.value.trim();
-
-    if (!itemName || !category || !status || !location) {
-      window.alert('Please complete Item Name, Category, Status, and Location.');
+    if (!itemName || !category || !status) {
+      window.alert('Please complete Item Name, Category, and Status.');
       return;
+    }
+
+    if (!activeEquipmentEditingRow) {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]');
+
+      if (!csrfToken) {
+        window.alert('Unable to save changes. Missing CSRF token.');
+        return;
+      }
+
+      try {
+        const response = await fetch('/dashboard/inventory/equipments', {
+          method: 'POST',
+          headers: {
+            'X-CSRF-TOKEN': csrfToken.content,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({
+            item_name: itemName,
+            category,
+            total_count: Number.parseInt(totalCount, 10) || 1,
+            in_use: Number.parseInt(inUse, 10) || 0,
+            status,
+          }),
+        });
+
+        const responseText = await response.text();
+        let payload = {};
+
+        try {
+          payload = responseText ? JSON.parse(responseText) : {};
+        } catch (error) {
+          payload = {};
+        }
+
+        if (!response.ok || !payload.success) {
+          window.alert(payload.error || `Unable to save equipment changes. (HTTP ${response.status})`);
+          return;
+        }
+
+        const createdItem = payload.item;
+        const row = document.createElement('tr');
+        row.dataset.equipmentRow = createdItem.category;
+        row.dataset.itemId = createdItem.item_id;
+        row.innerHTML = `
+          <td>${createdItem.asset_id}</td>
+          <td>${createdItem.item_name}</td>
+          <td>${createdItem.total_count}</td>
+          <td>${createdItem.in_use}</td>
+          <td><span class="status-pill ${createdItem.status_key}">${createdItem.status_label}</span></td>
+          <td><button class="table-edit-btn" type="button">Edit</button></td>
+        `;
+
+        equipmentTableBody.prepend(row);
+        closeEquipmentEditModal();
+        applyEquipmentFilters();
+        showSaveSuccessToast('Added successfully.');
+        return;
+      } catch (error) {
+        window.alert('Unable to save equipment changes right now. Please check your connection and try again.');
+        return;
+      }
     }
 
     const statusClass = getEquipmentStatusClass(status);
     const statusLabel = getEquipmentStatusLabel(status);
 
-    if (!activeEquipmentEditingRow) {
-      const assetId = `#${Math.random().toString(36).slice(2, 9)}`;
-      const row = document.createElement('tr');
-      row.dataset.equipmentRow = category;
-      row.innerHTML = `
-        <td>${assetId}</td>
-        <td>${itemName}</td>
-        <td>${totalCount}</td>
-        <td>${inUse}</td>
-        <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
-        <td>${location}</td>
-        <td><button class="table-edit-btn" type="button">Edit</button></td>
-      `;
+    const itemId = activeEquipmentEditingRow.dataset.itemId;
 
-      equipmentTableBody.prepend(row);
-      closeEquipmentEditModal();
-      applyEquipmentFilters();
-      return;
+    if (itemId) {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]');
+
+      if (!csrfToken) {
+        window.alert('Unable to save changes. Missing CSRF token.');
+        return;
+      }
+
+      try {
+        const response = await fetch(`/dashboard/inventory/equipments/${encodeURIComponent(itemId)}`, {
+          method: 'PATCH',
+          headers: {
+            'X-CSRF-TOKEN': csrfToken.content,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({
+            item_name: itemName,
+            category,
+            total_count: Number.parseInt(totalCount, 10) || 1,
+            in_use: Number.parseInt(inUse, 10) || 0,
+            status,
+          }),
+        });
+
+        const responseText = await response.text();
+        let payload = {};
+
+        try {
+          payload = responseText ? JSON.parse(responseText) : {};
+        } catch (error) {
+          payload = {};
+        }
+
+        if (!response.ok || !payload.success) {
+          window.alert(payload.error || `Unable to save equipment changes. (HTTP ${response.status})`);
+          return;
+        }
+
+        const updatedItem = payload.item;
+        const cells = activeEquipmentEditingRow.querySelectorAll('td');
+
+        activeEquipmentEditingRow.dataset.equipmentRow = updatedItem.category;
+
+        if (cells[0]) {
+          cells[0].textContent = updatedItem.asset_id;
+        }
+
+        if (cells[1]) {
+          cells[1].textContent = updatedItem.item_name;
+        }
+
+        if (cells[2]) {
+          cells[2].textContent = String(updatedItem.total_count);
+        }
+
+        if (cells[3]) {
+          cells[3].textContent = String(updatedItem.in_use);
+        }
+
+        if (cells[4]) {
+          cells[4].innerHTML = `<span class="status-pill ${updatedItem.status_key}">${updatedItem.status_label}</span>`;
+        }
+
+        closeEquipmentEditModal();
+        applyEquipmentFilters();
+        showSaveSuccessToast('Edited successfully.');
+        return;
+      } catch (error) {
+        window.alert('Unable to save equipment changes right now. Please check your connection and try again.');
+        return;
+      }
     }
 
     const cells = activeEquipmentEditingRow.querySelectorAll('td');
@@ -2404,12 +2678,9 @@ if (equipmentSaveButton) {
       cells[4].innerHTML = `<span class="status-pill ${statusClass}">${statusLabel}</span>`;
     }
 
-    if (cells[5]) {
-      cells[5].textContent = location;
-    }
-
     closeEquipmentEditModal();
     applyEquipmentFilters();
+    showSaveSuccessToast('Edited successfully.');
   });
 }
 

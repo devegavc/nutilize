@@ -192,6 +192,9 @@
     </article>
   </section>
 
+  <script>
+    window.maintenanceRowsByTab = @json($maintenanceRowsByTab ?? ['maintenance' => [], 'damaged' => []]);
+  </script>
   <script src="/js/dashboard.js"></script>
 </body>
 </html>
