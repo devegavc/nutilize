@@ -1112,7 +1112,11 @@ function openEquipmentAddModal() {
 
 function setActiveNavByPage() {
   const path = window.location.pathname.toLowerCase();
-  const navTarget = path.includes('/dashboard/messages')
+  const navTarget = path.includes('/dashboard/office/requests')
+    ? 'requests'
+    : path.includes('/dashboard/office/archive')
+    ? 'archive'
+    : path.includes('/dashboard/messages')
     ? ''
     : path.includes('/dashboard/profile')
       ? ''
@@ -2068,6 +2072,509 @@ function initToolbarSearchToggle() {
   });
 }
 
+function initOfficeQuickSortControl() {
+  const sortShell = document.querySelector('.quick-control-shell.is-sort');
+  const sortInput = document.getElementById('quick-view-sort');
+  const sortTrigger = document.getElementById('quick-view-sort-trigger');
+  const sortLabel = sortTrigger ? sortTrigger.querySelector('.quick-sort-label') : null;
+  const sortMenu = document.getElementById('quick-view-sort-menu');
+
+  if (!(sortShell instanceof HTMLElement)
+    || !(sortInput instanceof HTMLInputElement)
+    || !(sortTrigger instanceof HTMLButtonElement)
+    || !(sortMenu instanceof HTMLElement)
+    || !(sortLabel instanceof HTMLElement)) {
+    return;
+  }
+
+  const optionButtons = Array.from(sortMenu.querySelectorAll('.quick-sort-option[data-sort-value]'));
+
+  const closeMenu = () => {
+    sortShell.classList.remove('is-open');
+    sortTrigger.setAttribute('aria-expanded', 'false');
+  };
+
+  const openMenu = () => {
+    sortShell.classList.add('is-open');
+    sortTrigger.setAttribute('aria-expanded', 'true');
+  };
+
+  const setSelected = (value, labelText) => {
+    sortInput.value = value;
+    sortLabel.textContent = labelText;
+
+    optionButtons.forEach((button) => {
+      const isActive = button.dataset.sortValue === value;
+      button.classList.toggle('is-active', isActive);
+      if (isActive) {
+        button.setAttribute('aria-selected', 'true');
+      } else {
+        button.removeAttribute('aria-selected');
+      }
+    });
+  };
+
+  sortTrigger.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (sortShell.classList.contains('is-open')) {
+      closeMenu();
+      return;
+    }
+
+    openMenu();
+  });
+
+  optionButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const value = button.dataset.sortValue || 'all';
+      const labelText = (button.textContent || 'All').trim();
+      setSelected(value, labelText);
+      closeMenu();
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+
+    if (!(target instanceof Node)) {
+      return;
+    }
+
+    if (!sortShell.contains(target)) {
+      closeMenu();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && sortShell.classList.contains('is-open')) {
+      closeMenu();
+    }
+  });
+
+  const initialActive = optionButtons.find((button) => button.classList.contains('is-active'));
+  if (initialActive instanceof HTMLButtonElement) {
+    const value = initialActive.dataset.sortValue || 'all';
+    const labelText = (initialActive.textContent || 'All').trim();
+    setSelected(value, labelText);
+  }
+}
+
+function initOfficeQuickDateControl() {
+  const dateInput = document.getElementById('quick-view-date');
+
+  if (!(dateInput instanceof HTMLInputElement) || typeof window.flatpickr !== 'function') {
+    return;
+  }
+
+  const defaultDate = dateInput.dataset.defaultDate || dateInput.value || undefined;
+
+  window.flatpickr(dateInput, {
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'M j, Y',
+    defaultDate,
+    disableMobile: true,
+    allowInput: false,
+    monthSelectorType: 'dropdown',
+    shorthandCurrentMonth: false,
+    prevArrow: '<i class="bi bi-chevron-left"></i>',
+    nextArrow: '<i class="bi bi-chevron-right"></i>',
+  });
+}
+
+function initOfficeReservationModal() {
+  const modal = document.getElementById('office-request-modal');
+  const rows = document.querySelectorAll('.office-reservation-row');
+  const nameField = document.getElementById('office-request-name');
+  const titleField = document.getElementById('office-request-title');
+  const dateField = document.getElementById('office-request-date');
+  const timeField = document.getElementById('office-request-time');
+  const attendanceField = document.getElementById('office-request-attendance');
+  const resourceField = document.getElementById('office-request-resource');
+  const chairsField = document.getElementById('office-request-chairs');
+  const tablesField = document.getElementById('office-request-tables');
+  const noteField = document.getElementById('office-request-note');
+  const cancelButton = document.getElementById('office-request-cancel');
+  const rejectButton = document.getElementById('office-request-reject');
+  const approveButton = document.getElementById('office-request-approve');
+  const approveConfirmModal = document.getElementById('office-approve-confirm-modal');
+  const approveConfirmCancel = document.getElementById('office-approve-confirm-cancel');
+  const approveConfirmApprove = document.getElementById('office-approve-confirm-approve');
+  const approveFeedbackModal = document.getElementById('office-approve-feedback-modal');
+  const approveFeedbackFinish = document.getElementById('office-approve-feedback-finish');
+  const rejectReasonModal = document.getElementById('office-reject-reason-modal');
+  const rejectReasonOptions = document.querySelectorAll('.office-reject-reason-option[data-reject-reason]');
+  const rejectReasonCancel = document.getElementById('office-reject-reason-cancel');
+  const rejectReasonConfirm = document.getElementById('office-reject-reason-confirm');
+  const rejectOtherWrap = document.getElementById('office-reject-other-wrap');
+  const rejectOtherInput = document.getElementById('office-reject-other-input');
+  const rejectFeedbackModal = document.getElementById('office-reject-feedback-modal');
+  const rejectFeedbackFinish = document.getElementById('office-reject-feedback-finish');
+
+  if (!(modal instanceof HTMLElement)
+    || !rows.length
+    || !(nameField instanceof HTMLElement)
+    || !(titleField instanceof HTMLElement)
+    || !(dateField instanceof HTMLElement)
+    || !(timeField instanceof HTMLElement)
+    || !(attendanceField instanceof HTMLElement)
+    || !(resourceField instanceof HTMLElement)
+    || !(chairsField instanceof HTMLElement)
+    || !(tablesField instanceof HTMLElement)) {
+    return;
+  }
+
+  let activeRow = null;
+  let activeRejectReason = '';
+
+  const closeModal = (resetActiveRow = true) => {
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    if (resetActiveRow) {
+      activeRow = null;
+    }
+  };
+
+  const openApproveConfirmModal = () => {
+    if (!(approveConfirmModal instanceof HTMLElement)) {
+      return;
+    }
+
+    approveConfirmModal.classList.add('is-open');
+    approveConfirmModal.setAttribute('aria-hidden', 'false');
+  };
+
+  const resetRejectReasonState = () => {
+    activeRejectReason = '';
+
+    rejectReasonOptions.forEach((option) => {
+      option.classList.remove('is-active');
+      option.removeAttribute('aria-selected');
+    });
+
+    if (rejectReasonConfirm instanceof HTMLButtonElement) {
+      rejectReasonConfirm.disabled = true;
+    }
+
+    if (rejectOtherWrap instanceof HTMLElement) {
+      rejectOtherWrap.hidden = true;
+    }
+
+    if (rejectOtherInput instanceof HTMLInputElement) {
+      rejectOtherInput.value = '';
+    }
+  };
+
+  const syncRejectConfirmState = () => {
+    if (!(rejectReasonConfirm instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    if (!activeRejectReason) {
+      rejectReasonConfirm.disabled = true;
+      return;
+    }
+
+    if (activeRejectReason !== 'Others') {
+      rejectReasonConfirm.disabled = false;
+      return;
+    }
+
+    const hasOtherText = rejectOtherInput instanceof HTMLInputElement
+      ? rejectOtherInput.value.trim().length > 0
+      : false;
+
+    rejectReasonConfirm.disabled = !hasOtherText;
+  };
+
+  const openRejectReasonModal = () => {
+    if (!(rejectReasonModal instanceof HTMLElement)) {
+      return;
+    }
+
+    resetRejectReasonState();
+    rejectReasonModal.classList.add('is-open');
+    rejectReasonModal.setAttribute('aria-hidden', 'false');
+  };
+
+  const closeRejectReasonModal = () => {
+    if (!(rejectReasonModal instanceof HTMLElement)) {
+      return;
+    }
+
+    rejectReasonModal.classList.remove('is-open');
+    rejectReasonModal.setAttribute('aria-hidden', 'true');
+  };
+
+  const openRejectFeedbackModal = () => {
+    if (!(rejectFeedbackModal instanceof HTMLElement)) {
+      return;
+    }
+
+    rejectFeedbackModal.classList.add('is-open');
+    rejectFeedbackModal.setAttribute('aria-hidden', 'false');
+  };
+
+  const closeRejectFeedbackModal = () => {
+    if (!(rejectFeedbackModal instanceof HTMLElement)) {
+      return;
+    }
+
+    rejectFeedbackModal.classList.remove('is-open');
+    rejectFeedbackModal.setAttribute('aria-hidden', 'true');
+  };
+
+  const closeApproveConfirmModal = () => {
+    if (!(approveConfirmModal instanceof HTMLElement)) {
+      return;
+    }
+
+    approveConfirmModal.classList.remove('is-open');
+    approveConfirmModal.setAttribute('aria-hidden', 'true');
+  };
+
+  const openApproveFeedbackModal = () => {
+    if (!(approveFeedbackModal instanceof HTMLElement)) {
+      return;
+    }
+
+    approveFeedbackModal.classList.add('is-open');
+    approveFeedbackModal.setAttribute('aria-hidden', 'false');
+  };
+
+  const closeApproveFeedbackModal = () => {
+    if (!(approveFeedbackModal instanceof HTMLElement)) {
+      return;
+    }
+
+    approveFeedbackModal.classList.remove('is-open');
+    approveFeedbackModal.setAttribute('aria-hidden', 'true');
+  };
+
+  const openModal = (row) => {
+    activeRow = row;
+    nameField.textContent = row.dataset.requestName || '';
+    titleField.textContent = row.dataset.requestTitle || '';
+    dateField.textContent = row.dataset.requestDate || '';
+    timeField.textContent = row.dataset.requestTime || '';
+    attendanceField.textContent = row.dataset.requestAttendance || '';
+    resourceField.textContent = row.dataset.requestResource || '';
+    chairsField.textContent = row.dataset.requestChairs || '0';
+    tablesField.textContent = row.dataset.requestTables || '0';
+
+    if (noteField instanceof HTMLTextAreaElement) {
+      noteField.value = '';
+    }
+
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+  };
+
+  const applyDecisionToRow = (status) => {
+    if (!(activeRow instanceof HTMLTableRowElement)) {
+      return;
+    }
+
+    const statusBadge = activeRow.querySelector('.badge');
+
+    if (!(statusBadge instanceof HTMLElement)) {
+      return;
+    }
+
+    if (status === 'approve') {
+      statusBadge.classList.remove('pending', 'rejected');
+      statusBadge.classList.add('solved');
+      statusBadge.textContent = 'Approve';
+      return;
+    }
+
+    statusBadge.classList.remove('solved', 'pending');
+    statusBadge.classList.add('rejected');
+    statusBadge.textContent = 'Rejected';
+  };
+
+  rows.forEach((row) => {
+    row.addEventListener('click', () => {
+      if (row instanceof HTMLTableRowElement) {
+        openModal(row);
+      }
+    });
+  });
+
+  modal.addEventListener('click', (event) => {
+    const target = event.target;
+
+    if (target instanceof HTMLElement && target.dataset.closeOfficeRequestModal === 'true') {
+      closeModal();
+    }
+  });
+
+  if (cancelButton instanceof HTMLButtonElement) {
+    cancelButton.addEventListener('click', closeModal);
+  }
+
+  if (rejectButton instanceof HTMLButtonElement) {
+    rejectButton.addEventListener('click', () => {
+      closeModal(false);
+      openRejectReasonModal();
+    });
+  }
+
+  rejectReasonOptions.forEach((optionButton) => {
+    optionButton.addEventListener('click', () => {
+      activeRejectReason = optionButton.dataset.rejectReason || '';
+
+      rejectReasonOptions.forEach((option) => {
+        const isActive = option === optionButton;
+        option.classList.toggle('is-active', isActive);
+
+        if (isActive) {
+          option.setAttribute('aria-selected', 'true');
+        } else {
+          option.removeAttribute('aria-selected');
+        }
+      });
+
+      if (rejectOtherWrap instanceof HTMLElement) {
+        rejectOtherWrap.hidden = activeRejectReason !== 'Others';
+      }
+
+      if (rejectOtherInput instanceof HTMLInputElement && activeRejectReason === 'Others') {
+        rejectOtherInput.focus();
+      }
+
+      syncRejectConfirmState();
+    });
+  });
+
+  if (rejectOtherInput instanceof HTMLInputElement) {
+    rejectOtherInput.addEventListener('input', () => {
+      syncRejectConfirmState();
+    });
+  }
+
+  if (rejectReasonModal instanceof HTMLElement) {
+    rejectReasonModal.addEventListener('click', (event) => {
+      const target = event.target;
+
+      if (target instanceof HTMLElement && target.dataset.closeOfficeRejectReason === 'true') {
+        closeRejectReasonModal();
+
+        if (activeRow instanceof HTMLTableRowElement) {
+          openModal(activeRow);
+        }
+      }
+    });
+  }
+
+  if (rejectReasonCancel instanceof HTMLButtonElement) {
+    rejectReasonCancel.addEventListener('click', () => {
+      closeRejectReasonModal();
+
+      if (activeRow instanceof HTMLTableRowElement) {
+        openModal(activeRow);
+      }
+    });
+  }
+
+  if (rejectReasonConfirm instanceof HTMLButtonElement) {
+    rejectReasonConfirm.addEventListener('click', () => {
+      if (!activeRejectReason) {
+        return;
+      }
+
+      applyDecisionToRow('reject');
+      closeRejectReasonModal();
+      openRejectFeedbackModal();
+    });
+  }
+
+  if (rejectFeedbackFinish instanceof HTMLButtonElement) {
+    rejectFeedbackFinish.addEventListener('click', () => {
+      closeRejectFeedbackModal();
+      activeRow = null;
+    });
+  }
+
+  if (approveButton instanceof HTMLButtonElement) {
+    approveButton.addEventListener('click', () => {
+      closeModal(false);
+      openApproveConfirmModal();
+    });
+  }
+
+  if (approveConfirmModal instanceof HTMLElement) {
+    approveConfirmModal.addEventListener('click', (event) => {
+      const target = event.target;
+
+      if (target instanceof HTMLElement && target.dataset.closeOfficeApproveConfirm === 'true') {
+        closeApproveConfirmModal();
+
+        if (activeRow instanceof HTMLTableRowElement) {
+          openModal(activeRow);
+        }
+      }
+    });
+  }
+
+  if (approveConfirmCancel instanceof HTMLButtonElement) {
+    approveConfirmCancel.addEventListener('click', () => {
+      closeApproveConfirmModal();
+
+      if (activeRow instanceof HTMLTableRowElement) {
+        openModal(activeRow);
+      }
+    });
+  }
+
+  if (approveConfirmApprove instanceof HTMLButtonElement) {
+    approveConfirmApprove.addEventListener('click', () => {
+      applyDecisionToRow('approve');
+      closeApproveConfirmModal();
+      openApproveFeedbackModal();
+    });
+  }
+
+  if (approveFeedbackFinish instanceof HTMLButtonElement) {
+    approveFeedbackFinish.addEventListener('click', () => {
+      closeApproveFeedbackModal();
+      activeRow = null;
+    });
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+      closeModal();
+    }
+
+    if (event.key === 'Escape' && approveConfirmModal instanceof HTMLElement && approveConfirmModal.classList.contains('is-open')) {
+      closeApproveConfirmModal();
+
+      if (activeRow instanceof HTMLTableRowElement) {
+        openModal(activeRow);
+      }
+    }
+
+    if (event.key === 'Escape' && approveFeedbackModal instanceof HTMLElement && approveFeedbackModal.classList.contains('is-open')) {
+      closeApproveFeedbackModal();
+      activeRow = null;
+    }
+
+    if (event.key === 'Escape' && rejectReasonModal instanceof HTMLElement && rejectReasonModal.classList.contains('is-open')) {
+      closeRejectReasonModal();
+
+      if (activeRow instanceof HTMLTableRowElement) {
+        openModal(activeRow);
+      }
+    }
+
+    if (event.key === 'Escape' && rejectFeedbackModal instanceof HTMLElement && rejectFeedbackModal.classList.contains('is-open')) {
+      closeRejectFeedbackModal();
+      activeRow = null;
+    }
+  });
+}
+
 initToolbarSearchToggle();
 
 if (searchInput && (reportTableBody || inventoryTableBody || historyTableBody || maintenanceTableBody || facilitiesTableBody || equipmentTableBody)) {
@@ -2903,4 +3410,7 @@ window.addEventListener('resize', () => {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadNavbar();
+  initOfficeQuickDateControl();
+  initOfficeQuickSortControl();
+  initOfficeReservationModal();
 });

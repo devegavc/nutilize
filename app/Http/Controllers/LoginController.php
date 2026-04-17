@@ -19,7 +19,7 @@ class LoginController extends Controller
             $request->session()->regenerate();
             $user = $request->user();
 
-            if ($user && strtolower((string) $user->role) === 'admin' && (int) $user->user_id === 8) {
+            if ($user && (int) $user->user_id === 8) {
                 return redirect()->route('office.home');
             }
 
