@@ -40,6 +40,7 @@ Route::get('/health/db', function () {
 
 Route::middleware('auth')->group(function () {
     Route::patch('/dashboard/profile', [ProfileController::class, 'update'])->name('dashboard.profile.update');
+    Route::view('/dashboard/office/home', 'office-home')->name('office.home');
 
     Route::prefix('dashboard')->group(function () {
         Route::view('/home', 'dashboard-home')->name('dashboard.home');

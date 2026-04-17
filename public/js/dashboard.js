@@ -1223,8 +1223,13 @@ async function loadNavbar() {
     return;
   }
 
+  const navComponentPath =
+    (typeof window.dashboardNavComponent === 'string' && window.dashboardNavComponent.trim())
+      ? window.dashboardNavComponent.trim()
+      : '/components/navbar.html';
+
   try {
-    const response = await fetch('/components/navbar.html');
+    const response = await fetch(navComponentPath);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }

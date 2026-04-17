@@ -17,6 +17,11 @@ class LoginController extends Controller
 
         if (Auth::attempt($credentials)) {
             $request->session()->regenerate();
+            $user = $request->user();
+
+            if ($user && strtolower((string) $user->role) === 'admin' && (int) $user->user_id === 8) {
+                return redirect()->route('office.home');
+            }
 
             return redirect()->route('dashboard.home');
         }
