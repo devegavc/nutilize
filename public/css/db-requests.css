@@ -141,9 +141,17 @@
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
 }
 
-.status-dots .bi-circle-fill {
+.status-dots .dot-pending {
   color: #b9c0cb;
   text-shadow: none;
+}
+
+.status-dots .dot-approved {
+  color: #1ea64b;
+}
+
+.status-dots .dot-rejected {
+  color: #df3b3b;
 }
 
 .request-owner,

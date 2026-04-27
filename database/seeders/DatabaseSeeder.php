@@ -22,6 +22,8 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
 
+        $this->call(OfficeSeeder::class);
+        $this->call(OfficeAdminSeeder::class);
         $this->call(FacilitiesRoomsSeeder::class);
     }
 }

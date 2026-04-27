@@ -1001,23 +1001,24 @@
 
 .office-request-modal-card {
 	position: relative;
-	width: min(720px, 92vw);
-	margin: 44px auto;
+	width: min(620px, 86vw);
+	max-height: 86vh;
+	margin: 24px auto;
 	background: #f3f3f3;
 	border: 1px solid #d5d9e8;
 	border-radius: 12px;
 	box-shadow: 0 18px 34px rgba(16, 24, 63, 0.36);
-	overflow: hidden;
+	overflow: auto;
 }
 
 .office-request-modal-body {
-	padding: 14px 18px 20px;
+	padding: 12px 14px 16px;
 }
 
 .office-request-modal-body h2 {
 	margin: 0;
-	padding: 2px 8px 12px;
-	font-size: 2rem;
+	padding: 2px 4px 10px;
+	font-size: 1.5rem;
 	color: #32408a;
 	font-weight: 700;
 	border-bottom: 1px solid #cfd4e2;
@@ -1025,61 +1026,61 @@
 
 .office-request-grid {
 	display: grid;
-	grid-template-columns: 220px 1fr;
-	gap: 8px 12px;
-	padding: 14px 8px 0;
+	grid-template-columns: 180px 1fr;
+	gap: 6px 10px;
+	padding: 10px 4px 0;
 }
 
 .office-request-grid > span:nth-child(odd) {
-	font-size: 1.1rem;
+	font-size: 0.95rem;
 	font-weight: 700;
 	color: #30408a;
 	align-self: center;
 }
 
 .office-request-grid > span:nth-child(even) {
-	font-size: 1.05rem;
+	font-size: 0.95rem;
 	color: #1e2338;
-	padding: 8px 10px;
+	padding: 6px 8px;
 	background: #ffffff;
 	border: 1px solid #d3d7e4;
-	border-radius: 5px;
+	border-radius: 6px;
 }
 
 .office-request-extra-title {
-	margin: 10px 8px 6px;
-	font-size: 1.1rem;
+	margin: 8px 4px 5px;
+	font-size: 0.95rem;
 	font-weight: 700;
 	color: #30408a;
 }
 
 .office-request-extra-list {
-	margin: 0 8px;
-	padding: 8px 10px;
+	margin: 0 4px;
+	padding: 7px 8px;
 	border: 1px solid #d3d7e4;
-	border-radius: 5px;
+	border-radius: 6px;
 	background: #ffffff;
 	display: grid;
-	gap: 8px;
+	gap: 6px;
 }
 
 .office-request-extra-list > div {
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
-	font-size: 1rem;
+	font-size: 0.92rem;
 	color: #1f2438;
 }
 
 .office-request-extra-list i {
-	font-size: 1.1rem;
+	font-size: 1rem;
 	color: #0f0f10;
 }
 
 .office-request-note-label {
 	display: block;
-	margin: 12px 8px 6px;
-	font-size: 1.1rem;
+	margin: 10px 4px 5px;
+	font-size: 0.95rem;
 	font-weight: 700;
 	color: #12131f;
 }
@@ -1091,34 +1092,34 @@
 }
 
 #office-request-note {
-	width: calc(100% - 16px);
-	margin: 0 8px;
-	padding: 10px;
+	width: calc(100% - 8px);
+	margin: 0 4px;
+	padding: 8px;
 	border: 1px solid #d3d7e4;
-	border-radius: 5px;
+	border-radius: 6px;
 	font: inherit;
 	resize: vertical;
-	min-height: 64px;
+	min-height: 56px;
 }
 
 .office-request-actions {
-	margin: 14px 8px 0;
+	margin: 12px 4px 0;
 	display: flex;
 	justify-content: flex-start;
-	gap: 12px;
+	gap: 10px;
 }
 
 .office-request-primary-actions {
 	display: inline-flex;
-	gap: 12px;
+	gap: 10px;
 	margin-left: auto;
 }
 
 .office-modal-btn {
-	min-width: 120px;
-	height: 40px;
-	border-radius: 8px;
-	font-size: 1rem;
+	min-width: 104px;
+	height: 36px;
+	border-radius: 7px;
+	font-size: 0.92rem;
 	font-weight: 600;
 	cursor: pointer;
 	transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
@@ -1184,12 +1185,12 @@
 .office-reject-reason-card,
 .office-reject-feedback-card {
 	position: relative;
-	width: min(680px, 92vw);
+	width: min(520px, 88vw);
 	margin: 0;
 	background: linear-gradient(180deg, #fcfcff 0%, #f0f2fa 100%);
 	border: 1px solid #c8d0e8;
-	border-radius: 16px;
-	box-shadow: 0 24px 44px rgba(16, 24, 63, 0.5);
+	border-radius: 14px;
+	box-shadow: 0 18px 34px rgba(16, 24, 63, 0.42);
 	overflow: hidden;
 	animation: officeApprovePop 0.22s ease-out;
 }
@@ -1214,7 +1215,7 @@
 .office-approve-feedback-head,
 .office-reject-reason-head,
 .office-reject-feedback-head {
-	padding: 18px 18px 14px;
+	padding: 12px 14px 10px;
 	border-bottom: 1px solid #d8ddee;
 }
 
@@ -1223,7 +1224,7 @@
 .office-reject-reason-head h2,
 .office-reject-feedback-head h2 {
 	margin: 0;
-	font-size: 1.95rem;
+	font-size: 1.35rem;
 	font-weight: 700;
 	color: #0b8a0b;
 	letter-spacing: 0.01em;
@@ -1236,8 +1237,8 @@
 }
 
 .office-approve-confirm-body {
-	padding: 18px;
-	font-size: 1.18rem;
+	padding: 14px;
+	font-size: 0.96rem;
 	line-height: 1.45;
 	color: #1f2432;
 }
@@ -1247,23 +1248,23 @@
 }
 
 .office-approve-confirm-actions {
-	padding: 14px 18px 16px;
+	padding: 10px 14px 12px;
 	border-top: 1px solid #d8ddee;
 	display: flex;
 	justify-content: flex-end;
-	gap: 16px;
+	gap: 10px;
 }
 
 .office-approve-feedback-card {
-	width: min(700px, 92vw);
+	width: min(440px, 88vw);
 }
 
 .office-reject-feedback-card {
-	width: min(700px, 92vw);
+	width: min(440px, 88vw);
 }
 
 .office-approve-feedback-body {
-	padding: 30px 16px 34px;
+	padding: 18px 14px 20px;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -1271,46 +1272,46 @@
 }
 
 .office-approve-feedback-icon {
-	width: 164px;
-	height: 164px;
+	width: 112px;
+	height: 112px;
 	border-radius: 50%;
 	background: radial-gradient(circle at 28% 22%, #22b422 0%, #0b8a0b 64%, #077107 100%);
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	color: #ffffff;
-	font-size: 7.1rem;
+	font-size: 4.6rem;
 	line-height: 1;
-	margin-bottom: 16px;
-	box-shadow: 0 0 0 10px rgba(11, 138, 11, 0.1), 0 16px 28px rgba(11, 138, 11, 0.34);
+	margin-bottom: 12px;
+	box-shadow: 0 0 0 8px rgba(11, 138, 11, 0.1), 0 12px 20px rgba(11, 138, 11, 0.28);
 	animation: officeApprovePulse 1.9s ease-in-out infinite;
 }
 
 .office-reject-feedback-icon {
-	width: 164px;
-	height: 164px;
+	width: 112px;
+	height: 112px;
 	border-radius: 50%;
 	background: radial-gradient(circle at 28% 22%, #f12828 0%, #d31212 64%, #bb0f0f 100%);
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	color: #ffffff;
-	font-size: 7.1rem;
+	font-size: 4.6rem;
 	line-height: 1;
-	margin-bottom: 16px;
-	box-shadow: 0 0 0 10px rgba(211, 18, 18, 0.1), 0 16px 28px rgba(211, 18, 18, 0.34);
+	margin-bottom: 12px;
+	box-shadow: 0 0 0 8px rgba(211, 18, 18, 0.1), 0 12px 20px rgba(211, 18, 18, 0.28);
 	animation: officeRejectPulse 1.9s ease-in-out infinite;
 }
 
 .office-approve-feedback-body h3 {
 	margin: 0;
-	font-size: 2.05rem;
+	font-size: 1.3rem;
 	line-height: 1.1;
 	color: #111827;
 }
 
 .office-reject-feedback-body {
-	padding: 30px 16px 34px;
+	padding: 18px 14px 20px;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -1319,31 +1320,31 @@
 
 .office-reject-feedback-body h3 {
 	margin: 0;
-	font-size: 2.05rem;
+	font-size: 1.3rem;
 	line-height: 1.1;
 	color: #111827;
 }
 
 .office-reject-feedback-body p {
-	margin: 10px 0 0;
-	font-size: 1.02rem;
+	margin: 8px 0 0;
+	font-size: 0.93rem;
 	color: #4a4f61;
 }
 
 .office-approve-feedback-body p {
-	margin: 10px 0 0;
-	font-size: 1.02rem;
+	margin: 8px 0 0;
+	font-size: 0.93rem;
 	color: #4a4f61;
 }
 
 .office-approve-feedback-finish {
-	margin-top: 22px;
-	min-width: 184px;
-	height: 50px;
-	border-radius: 10px;
+	margin-top: 16px;
+	min-width: 150px;
+	height: 40px;
+	border-radius: 8px;
 	border: 1px solid #a9b2c6;
 	background: linear-gradient(180deg, #f4f5f9 0%, #d6dbe7 100%);
-	font-size: 1.35rem;
+	font-size: 0.98rem;
 	font-weight: 500;
 	color: #1d1f24;
 	cursor: pointer;
@@ -1352,13 +1353,13 @@
 }
 
 .office-reject-feedback-finish {
-	margin-top: 22px;
-	min-width: 184px;
-	height: 50px;
-	border-radius: 10px;
+	margin-top: 16px;
+	min-width: 150px;
+	height: 40px;
+	border-radius: 8px;
 	border: 1px solid #a9b2c6;
 	background: linear-gradient(180deg, #f4f5f9 0%, #d6dbe7 100%);
-	font-size: 1.35rem;
+	font-size: 0.98rem;
 	font-weight: 500;
 	color: #1d1f24;
 	cursor: pointer;
@@ -1390,32 +1391,32 @@
 }
 
 .office-reject-reason-body {
-	padding: 16px 18px 10px;
+	padding: 12px 14px 8px;
 }
 
 .office-reject-reason-label {
 	margin: 0;
-	font-size: 1.18rem;
+	font-size: 0.96rem;
 	font-weight: 700;
 	color: #14151b;
 }
 
 .office-reject-reason-label span {
-	font-size: 1rem;
+	font-size: 0.88rem;
 	font-weight: 500;
 	color: #666f8f;
 }
 
 .office-reject-reason-options {
-	margin-top: 10px;
+	margin-top: 8px;
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
+	gap: 7px;
 }
 
 .office-reject-other-wrap {
-	margin-top: 10px;
-	padding-top: 8px;
+	margin-top: 8px;
+	padding-top: 7px;
 	border-top: 1px solid #c4c9d8;
 }
 
@@ -1424,8 +1425,8 @@
 	border: 0;
 	border-bottom: 1px solid #939cb5;
 	background: transparent;
-	padding: 7px 2px;
-	font-size: 1rem;
+	padding: 6px 2px;
+	font-size: 0.92rem;
 	color: #1c2233;
 	outline: 0;
 }
@@ -1443,9 +1444,9 @@
 	border-radius: 6px;
 	background: #d6d8dc;
 	color: #202126;
-	font-size: 1rem;
+	font-size: 0.9rem;
 	line-height: 1;
-	padding: 8px 18px;
+	padding: 7px 12px;
 	cursor: pointer;
 	transition: filter 0.14s ease, transform 0.14s ease;
 }
@@ -1461,11 +1462,11 @@
 }
 
 .office-reject-reason-actions {
-	padding: 14px 18px 16px;
+	padding: 10px 14px 12px;
 	border-top: 1px solid #d8ddee;
 	display: flex;
 	justify-content: flex-end;
-	gap: 16px;
+	gap: 10px;
 }
 
 .office-reject-reason-actions .office-modal-btn.reject:disabled {

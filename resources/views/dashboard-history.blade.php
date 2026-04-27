@@ -18,6 +18,7 @@
       full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
       role: '{{ auth()->user()->role ?? 'user' }}'
     };
+    window.historyRowsByTab = @json($historyRowsByTab ?? ['latest' => [], 'oldest' => [], 'damaged' => []]);
   </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
@@ -86,88 +87,7 @@
               </thead>
               <tbody id="history-table-body">
                 <tr>
-                  <td>#74fAy51</td>
-                  <td>Marites Espinal</td>
-                  <td>01/05/2026 - 01/08/2026</td>
-                  <td>Room 543</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#X9D2k8A</td>
-                  <td>Ryan Mendoza</td>
-                  <td>02/09/2026 - 02/16/2026</td>
-                  <td>Tablet</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#4fHqWZ7</td>
-                  <td>Angela Cruz</td>
-                  <td>03/01/2026 - 03/04/2026</td>
-                  <td>Router</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#R8A3xM9</td>
-                  <td>John Mark Padilla</td>
-                  <td>04/12/2026 - 04/14/2026</td>
-                  <td>Printer</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#3Fq8Dk2</td>
-                  <td>Carlo Miguel Lim</td>
-                  <td>06/03/2026 - 06/07/2026</td>
-                  <td>Laptop</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#9A7MzxQ</td>
-                  <td>Mark Lester Dizon</td>
-                  <td>07/18/2026 - 07/22/2026</td>
-                  <td>Library</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#W5DkF8R</td>
-                  <td>Grace Valdez</td>
-                  <td>08/01/2026 - 08/05/2026</td>
-                  <td>Room 203</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#X2q9A7M</td>
-                  <td>Faith Delgado</td>
-                  <td>09/10/2026 - 09/13/2026</td>
-                  <td>AVR Room</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#P7Lm2Qx</td>
-                  <td>Janine Flores</td>
-                  <td>10/08/2026 - 10/10/2026</td>
-                  <td>Projector</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#K1Dz9Rv</td>
-                  <td>Noel Ramos</td>
-                  <td>11/02/2026 - 11/03/2026</td>
-                  <td>Sound Mixer</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#N6Qw4By</td>
-                  <td>Sarah Castillo</td>
-                  <td>11/18/2026 - 11/19/2026</td>
-                  <td>Wireless Mic</td>
-                  <td>Returned</td>
-                </tr>
-                <tr>
-                  <td>#T3Va8Hp</td>
-                  <td>Patrick Javier</td>
-                  <td>12/05/2026 - 12/09/2026</td>
-                  <td>TV</td>
-                  <td>Returned</td>
+                  <td colspan="5">Loading history records...</td>
                 </tr>
               </tbody>
             </table>

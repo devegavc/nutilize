@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <title>NUtilize | Inventory Analytics</title>
+  <title>NUtilize | Inventory Insights</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/db-inventory.css" />
@@ -45,32 +45,45 @@
       <div id="navbar-container"></div>
 
       <section class="content-card analytics-content-card">
-        <h1 class="section-title">ANALYTICS DASHBOARD</h1>
+        <h1 class="section-title">INSIGHTS DASHBOARD</h1>
 
         <section class="analytics-top-row">
           <article class="analytics-chart-card" aria-label="Borrow trend chart">
             <div class="chart-grid-lines"></div>
             <div class="chart-bars" aria-hidden="true">
-              <span style="width: 49%"></span>
-              <span style="width: 58%"></span>
-              <span style="width: 82%"></span>
+              @foreach ($trendBars as $bar)
+                <span style="width: {{ $bar }}%"></span>
+              @endforeach
             </div>
             <div class="chart-years" aria-hidden="true">
-              <span>2019</span>
-              <span>2020</span>
-              <span>2021</span>
-              <span>2022</span>
-              <span>2023</span>
-              <span>2024</span>
-              <span>2025</span>
-              <span>2026</span>
+              @foreach ($yearLabels as $yearLabel)
+                <span>{{ $yearLabel }}</span>
+              @endforeach
             </div>
           </article>
 
           <article class="analytics-kpi-card">
-            <p><span>Total Borrowers</span><strong>4,413</strong><em class="up">+4.8%</em></p>
-            <p><span>Engagement Rates</span><strong>13,304</strong><em class="down">-2.8%</em></p>
-            <p><span>New Users</span><strong>141</strong><em class="up">+7%</em></p>
+            <p>
+              <span>Total Borrowers</span>
+              <strong>{{ number_format($totalBorrowers) }}</strong>
+              <em class="{{ $borrowersGrowth >= 0 ? 'up' : 'down' }}">
+                {{ $borrowersGrowth > 0 ? '+' : '' }}{{ number_format($borrowersGrowth, 1) }}%
+              </em>
+            </p>
+            <p>
+              <span>Engagement Rates</span>
+              <strong>{{ number_format($engagementCount) }}</strong>
+              <em class="{{ $engagementGrowth >= 0 ? 'up' : 'down' }}">
+                {{ $engagementGrowth > 0 ? '+' : '' }}{{ number_format($engagementGrowth, 1) }}%
+              </em>
+            </p>
+            <p>
+              <span>New Users</span>
+              <strong>{{ number_format($newUsers) }}</strong>
+              <em class="{{ $newUsersGrowth >= 0 ? 'up' : 'down' }}">
+                {{ $newUsersGrowth > 0 ? '+' : '' }}{{ number_format($newUsersGrowth, 1) }}%
+              </em>
+            </p>
           </article>
         </section>
 
@@ -90,41 +103,19 @@
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>HDMI</td>
-                  <td>Electronic</td>
-                  <td>Storage A</td>
-                  <td class="asset-id">#gThr31</td>
-                  <td><span class="freq-bar"><span style="width: 90%"></span></span></td>
-                </tr>
-                <tr>
-                  <td>TV</td>
-                  <td>Electronic</td>
-                  <td>Storage A</td>
-                  <td class="asset-id">#gThr31</td>
-                  <td><span class="freq-bar"><span style="width: 76%"></span></span></td>
-                </tr>
-                <tr>
-                  <td>AVR</td>
-                  <td>Events Place</td>
-                  <td>6th Floor</td>
-                  <td class="asset-id">#gThr31</td>
-                  <td><span class="freq-bar"><span style="width: 50%"></span></span></td>
-                </tr>
-                <tr>
-                  <td>Speaker</td>
-                  <td>Electronic</td>
-                  <td>Storage B</td>
-                  <td class="asset-id">#gThr31</td>
-                  <td><span class="freq-bar"><span style="width: 31%"></span></span></td>
-                </tr>
-                <tr>
-                  <td>Podium</td>
-                  <td>Utility</td>
-                  <td>Storage C</td>
-                  <td class="asset-id">#gThr31</td>
-                  <td><span class="freq-bar"><span style="width: 12%"></span></span></td>
-                </tr>
+                @forelse ($topItems as $item)
+                  <tr>
+                    <td>{{ $item['item_name'] }}</td>
+                    <td>{{ $item['category'] }}</td>
+                    <td>{{ $item['location'] }}</td>
+                    <td class="asset-id">{{ $item['asset_id'] }}</td>
+                    <td><span class="freq-bar"><span style="width: {{ $item['usage_percent'] }}%"></span></span></td>
+                  </tr>
+                @empty
+                  <tr>
+                    <td colspan="5">No borrowed items found yet.</td>
+                  </tr>
+                @endforelse
               </tbody>
             </table>
           </div>

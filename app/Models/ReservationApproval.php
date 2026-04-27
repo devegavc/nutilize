@@ -10,7 +10,7 @@ class ReservationApproval extends Model
     use HasFactory;
 
     protected $primaryKey = 'approval_id';
-    protected $fillable = ['reservation_id', 'office_id', 'status', 'approved_at'];
+    protected $fillable = ['reservation_id', 'office_id', 'approved_by_user_id', 'status', 'approved_at'];
 
     public function reservation()
     {
@@ -20,5 +20,10 @@ class ReservationApproval extends Model
     public function office()
     {
         return $this->belongsTo(Office::class, 'office_id', 'office_id');
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by_user_id', 'user_id');
     }
 }

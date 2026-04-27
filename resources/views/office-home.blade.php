@@ -7,7 +7,6 @@
   <title>NUtilize | Office Home</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
   <link rel="stylesheet" href="/css/office.css" />
 </head>
 <body>
@@ -48,250 +47,566 @@
     <section class="workspace-grid">
       <div id="navbar-container"></div>
 
-      <section class="content-card office-home-card">
+      <section class="content-card office-requests-card">
         <h1 class="section-title">OFFICE APPROVAL DASHBOARD</h1>
-        <p class="office-subtitle">{{ auth()->user()?->office?->department_name ?? 'Student Development Office' }}</p>
+        <p class="office-subtitle">Pending approvals for your office only, based on sequence.</p>
 
-        <section class="stats-grid" aria-label="Request summary">
-          <article class="stat-card">
-            <span class="stat-icon"><i class="bi bi-hourglass-split"></i></span>
+        <section class="office-request-summary-grid" aria-label="Request summaries">
+          <article class="office-request-summary-tile">
+            <span class="office-request-summary-icon"><i class="bi bi-inboxes-fill"></i></span>
             <div>
-              <p class="stat-number">12</p>
-              <p class="stat-label">Pending Request</p>
+              <p class="office-request-summary-value" id="office-summary-actionable">{{ $totalRequests }}</p>
+              <p class="office-request-summary-label">Actionable Requests</p>
             </div>
           </article>
-          <article class="stat-card">
-            <span class="stat-icon"><i class="bi bi-x-circle"></i></span>
+          <article class="office-request-summary-tile">
+            <span class="office-request-summary-icon"><i class="bi bi-hourglass-split"></i></span>
             <div>
-              <p class="stat-number">5</p>
-              <p class="stat-label">Canceled Request</p>
+              <p class="office-request-summary-value" id="office-summary-pending">{{ $pendingRequests }}</p>
+              <p class="office-request-summary-label">Pending in Queue</p>
             </div>
           </article>
-          <article class="stat-card">
-            <span class="stat-icon"><i class="bi bi-check-circle"></i></span>
+          <article class="office-request-summary-tile">
+            <span class="office-request-summary-icon"><i class="bi bi-check-circle"></i></span>
             <div>
-              <p class="stat-number">8</p>
-              <p class="stat-label">Approved</p>
+              <p class="office-request-summary-value" id="office-summary-approved">{{ $approvedRequests }}</p>
+              <p class="office-request-summary-label">Approved</p>
             </div>
           </article>
-          <article class="stat-card">
-            <span class="stat-icon"><i class="bi bi-inboxes-fill"></i></span>
+          <article class="office-request-summary-tile">
+            <span class="office-request-summary-icon"><i class="bi bi-x-circle"></i></span>
             <div>
-              <p class="stat-number">25</p>
-              <p class="stat-label">Total Request</p>
+              <p class="office-request-summary-value" id="office-summary-rejected">{{ $rejectedRequests }}</p>
+              <p class="office-request-summary-label">Rejected</p>
             </div>
           </article>
         </section>
 
-        <section class="middle-grid">
-          <article class="quick-view">
-            <div class="quick-view-header">
-              <div class="quick-view-header-main">
-                <i class="bi bi-journal-check"></i>
-                <span>Reservations</span>
-              </div>
-              <div class="quick-view-controls">
-                <div class="quick-control-group">
-                  <label for="quick-view-date">Date:</label>
-                  <div class="quick-control-shell is-date">
-                    <i class="bi bi-calendar2-event"></i>
-                    <input id="quick-view-date" type="text" value="{{ now()->toDateString() }}" data-default-date="{{ now()->toDateString() }}" />
-                  </div>
-                </div>
-
-                <div class="quick-control-group">
-                  <label for="quick-view-sort">Sort by:</label>
-                  <div class="quick-control-shell is-sort">
-                    <i class="bi bi-funnel"></i>
-                    <input id="quick-view-sort" type="hidden" value="all" />
-                    <button id="quick-view-sort-trigger" class="quick-sort-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="quick-view-sort-menu">
-                      <span class="quick-sort-label">All</span>
-                    </button>
-                    <span class="quick-control-chevron"><i class="bi bi-chevron-down"></i></span>
-                    <div id="quick-view-sort-menu" class="quick-sort-menu" role="listbox" aria-label="Sort reservations">
-                      <button type="button" class="quick-sort-option is-active" data-sort-value="all" role="option" aria-selected="true">All</button>
-                      <button type="button" class="quick-sort-option" data-sort-value="approve" role="option">Approve</button>
-                      <button type="button" class="quick-sort-option" data-sort-value="rejected" role="option">Rejected</button>
-                      <button type="button" class="quick-sort-option" data-sort-value="pending" role="option">Pending</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
+        <section class="office-request-history-card" aria-label="Request queue table">
+          <header class="office-request-history-head">
+            <h2>Pending Request Approval Queue</h2>
+          </header>
+          <div class="table-wrap office-request-history-wrap">
+            <table class="office-request-history-table">
+              <thead>
+                <tr>
+                  <th>Reservation ID</th>
+                  <th>Requested By</th>
+                  <th>Activity</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="office-request-history-body">
+                @forelse($requests as $request)
+                  @php
+                    $status = strtolower((string) ($request->status ?? 'pending'));
+                    $badgeClass = $status === 'approved' ? 'solved' : ($status === 'rejected' ? 'rejected' : 'pending');
+                    $badgeText = $status === 'approved' ? 'Approved' : ($status === 'rejected' ? 'Rejected' : 'Pending');
+                    $reservation = $request->reservation;
+                  @endphp
                   <tr>
-                    <th>Student ID</th>
-                    <th>Requested by</th>
-                    <th>Resource</th>
-                    <th>Activity</th>
-                    <th>Status</th>
+                    <td>#{{ $request->reservation_id }}</td>
+                    <td>{{ $reservation?->user?->full_name ?? $reservation?->user?->username ?? 'Unknown' }}</td>
+                    <td>{{ $reservation?->activity_name ?? 'N/A' }}</td>
+                    <td>{{ optional($reservation?->created_at)->format('M d, Y h:i A') }}</td>
+                    <td><span class="badge {{ $badgeClass }}">{{ $badgeText }}</span></td>
+                    <td>
+                      @if(is_null($request->approved_at) && $status === 'pending')
+                        <div style="display:flex; gap:8px; justify-content:center;">
+                          <button
+                            type="button"
+                            class="office-queue-action-btn office-queue-approve"
+                            data-approval-id="{{ $request->approval_id }}"
+                            data-action="approve"
+                          >Approve</button>
+                          <button
+                            type="button"
+                            class="office-queue-action-btn office-queue-reject"
+                            data-approval-id="{{ $request->approval_id }}"
+                            data-action="reject"
+                          >Reject</button>
+                        </div>
+                      @else
+                        <span style="color:#6a728f;">-</span>
+                      @endif
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  <tr class="office-reservation-row" data-request-name="Menesis, Archie" data-request-title="Faculty Meeting" data-request-date="April 2, 2025" data-request-time="1:00 PM - 3:00 PM" data-request-attendance="10 People" data-request-resource="Room 607" data-request-chairs="20" data-request-tables="5">
-                    <td>2021-181217</td>
-                    <td>Pastrana, John Paul</td>
-                    <td>Rm 607</td>
-                    <td>Faculty Meeting</td>
-                    <td><span class="badge pending">Pending</span></td>
+                @empty
+                  <tr>
+                    <td colspan="6">No actionable requests found for your office.</td>
                   </tr>
-                  <tr class="office-reservation-row" data-request-name="Cumpas, Josh Andrew" data-request-title="Film Showing" data-request-date="April 3, 2025" data-request-time="9:00 AM - 11:00 AM" data-request-attendance="35 People" data-request-resource="TV #03" data-request-chairs="30" data-request-tables="2">
-                    <td>2022-171602</td>
-                    <td>Cumpas, Josh Andrew</td>
-                    <td>TV #03</td>
-                    <td>Film Showing</td>
-                    <td><span class="badge pending">Pending</span></td>
-                  </tr>
-                  <tr class="office-reservation-row" data-request-name="Cumpas, Josh Andrew" data-request-title="Film Showing" data-request-date="April 3, 2025" data-request-time="1:00 PM - 3:00 PM" data-request-attendance="42 People" data-request-resource="Projector #09" data-request-chairs="40" data-request-tables="4">
-                    <td>2023-192003</td>
-                    <td>Cumpas, Josh Andrew</td>
-                    <td>Projector #09</td>
-                    <td>Film Showing</td>
-                    <td><span class="badge pending">Pending</span></td>
-                  </tr>
-                  <tr class="office-reservation-row" data-request-name="Nadal, Kitchie" data-request-title="Group Study" data-request-date="April 4, 2025" data-request-time="10:00 AM - 12:00 PM" data-request-attendance="12 People" data-request-resource="Room 508" data-request-chairs="12" data-request-tables="2">
-                    <td>2021-10027</td>
-                    <td>Nadal, Kitchie</td>
-                    <td>Rm 508</td>
-                    <td>Group Study</td>
-                    <td><span class="badge pending">Pending</span></td>
-                  </tr>
-                  <tr class="office-reservation-row" data-request-name="Velasquez, Regine" data-request-title="Flag Ceremony" data-request-date="April 5, 2025" data-request-time="7:00 AM - 8:30 AM" data-request-attendance="120 People" data-request-resource="Speaker #32" data-request-chairs="0" data-request-tables="0">
-                    <td>2024-101611</td>
-                    <td>Velasquez, Regine</td>
-                    <td>Speaker #32</td>
-                    <td>Flag Ceremony</td>
-                    <td><span class="badge solved">Approve</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
+                @endforelse
+              </tbody>
+            </table>
+          </div>
+          <div class="office-request-pagination" id="office-request-pagination">
+            {{ $requests->links() }}
+          </div>
         </section>
       </section>
     </section>
   </main>
 
-  <section class="office-request-modal" id="office-request-modal" aria-hidden="true">
-    <div class="office-request-modal-overlay" data-close-office-request-modal="true"></div>
-    <article class="office-request-modal-card" role="dialog" aria-modal="true" aria-labelledby="office-request-modal-title">
-      <div class="office-request-modal-body">
-        <h2 id="office-request-modal-title">More Information</h2>
-
-        <div class="office-request-grid">
-          <span>Name:</span>
-          <span id="office-request-name"></span>
-
-          <span>Title of Activity:</span>
-          <span id="office-request-title"></span>
-
-          <span>Date(s) of Activity:</span>
-          <span id="office-request-date"></span>
-
-          <span>Time of Activity:</span>
-          <span id="office-request-time"></span>
-
-          <span>Expected Attendance:</span>
-          <span id="office-request-attendance"></span>
-
-          <span>Type of Resource:</span>
-          <span id="office-request-resource"></span>
-        </div>
-
-        <div class="office-request-extra-title">Other Resources Requested:</div>
-        <div class="office-request-extra-list">
-          <div><i class="bi bi-chair"></i> <strong>Arm Chairs:</strong> <span id="office-request-chairs"></span></div>
-          <div><i class="bi bi-table"></i> <strong>Tables:</strong> <span id="office-request-tables"></span></div>
-        </div>
-
-        <label class="office-request-note-label" for="office-request-note">Additional notes <span>(optional)</span></label>
-        <textarea id="office-request-note" rows="3" placeholder="Write notes here..."></textarea>
-
-        <div class="office-request-actions">
-          <button class="office-modal-btn cancel" id="office-request-cancel" type="button">Cancel</button>
-          <div class="office-request-primary-actions">
-            <button class="office-modal-btn reject" id="office-request-reject" type="button">Reject</button>
-            <button class="office-modal-btn approve" id="office-request-approve" type="button">Approve</button>
-          </div>
-        </div>
-      </div>
-    </article>
-  </section>
-
-  <section class="office-approve-confirm-modal" id="office-approve-confirm-modal" aria-hidden="true">
-    <div class="office-approve-confirm-overlay" data-close-office-approve-confirm="true"></div>
-    <article class="office-approve-confirm-card" role="dialog" aria-modal="true" aria-labelledby="office-approve-confirm-title">
-      <header class="office-approve-confirm-head">
-        <h2 id="office-approve-confirm-title">Confirm Approval</h2>
+  <div class="office-action-confirm-modal" id="office-action-confirm-modal" aria-hidden="true">
+    <div class="office-action-confirm-overlay" data-close-office-action-confirm="true"></div>
+    <article class="office-action-confirm-card" role="dialog" aria-modal="true" aria-labelledby="office-action-confirm-title">
+      <header class="office-action-confirm-head">
+        <h2 id="office-action-confirm-title">Confirm Approval</h2>
       </header>
-      <div class="office-approve-confirm-body">
-        <p>Are you sure you want to approve this reservation request?<br>This action cannot be undone.</p>
+      <div class="office-action-confirm-body">
+        <p id="office-action-confirm-message">Are you sure you want to approve this reservation request? This action cannot be undone.</p>
       </div>
-      <footer class="office-approve-confirm-actions">
-        <button type="button" class="office-modal-btn cancel" id="office-approve-confirm-cancel">Cancel</button>
-        <button type="button" class="office-modal-btn approve" id="office-approve-confirm-approve">Approve</button>
-      </footer>
-    </article>
-  </section>
-
-  <section class="office-approve-feedback-modal" id="office-approve-feedback-modal" aria-hidden="true">
-    <div class="office-approve-feedback-overlay"></div>
-    <article class="office-approve-feedback-card" role="dialog" aria-modal="true" aria-labelledby="office-approve-feedback-title">
-      <header class="office-approve-feedback-head">
-        <h2 id="office-approve-feedback-title">Feedback</h2>
-      </header>
-      <div class="office-approve-feedback-body">
-        <div class="office-approve-feedback-icon"><i class="bi bi-check-lg"></i></div>
-        <h3>Request Approved</h3>
-        <p>The request has been successfully approved.</p>
-        <button type="button" class="office-approve-feedback-finish" id="office-approve-feedback-finish">Finish</button>
+      <div class="office-action-confirm-actions">
+        <button type="button" class="office-modal-btn cancel" id="office-action-confirm-cancel">Cancel</button>
+        <button type="button" class="office-modal-btn approve" id="office-action-confirm-submit">Approve</button>
       </div>
     </article>
-  </section>
+  </div>
 
-  <section class="office-reject-reason-modal" id="office-reject-reason-modal" aria-hidden="true">
-    <div class="office-reject-reason-overlay" data-close-office-reject-reason="true"></div>
-    <article class="office-reject-reason-card" role="dialog" aria-modal="true" aria-labelledby="office-reject-reason-title">
-      <header class="office-reject-reason-head">
-        <h2 id="office-reject-reason-title">Reject Reservation</h2>
-      </header>
-      <div class="office-reject-reason-body">
-        <p class="office-reject-reason-label">Reason for rejection: <span>(required)</span></p>
-        <div class="office-reject-reason-options" role="listbox" aria-label="Reject reason choices">
-          <button type="button" class="office-reject-reason-option" data-reject-reason="Room unavailable">Room unavailable</button>
-          <button type="button" class="office-reject-reason-option" data-reject-reason="Time conflict">Time conflict</button>
-          <button type="button" class="office-reject-reason-option" data-reject-reason="Insufficient resources">Insufficient resources</button>
-          <button type="button" class="office-reject-reason-option" data-reject-reason="Others">Others</button>
-        </div>
-        <div class="office-reject-other-wrap" id="office-reject-other-wrap" hidden>
-          <input type="text" id="office-reject-other-input" placeholder="Enter other reasons here" maxlength="120" />
-        </div>
-      </div>
-      <footer class="office-reject-reason-actions">
-        <button type="button" class="office-modal-btn cancel" id="office-reject-reason-cancel">Cancel</button>
-        <button type="button" class="office-modal-btn reject" id="office-reject-reason-confirm" disabled>Reject</button>
-      </footer>
-    </article>
-  </section>
-
-  <section class="office-reject-feedback-modal" id="office-reject-feedback-modal" aria-hidden="true">
-    <div class="office-reject-feedback-overlay"></div>
-    <article class="office-reject-feedback-card" role="dialog" aria-modal="true" aria-labelledby="office-reject-feedback-title">
-      <header class="office-reject-feedback-head">
-        <h2 id="office-reject-feedback-title">Feedback</h2>
-      </header>
-      <div class="office-reject-feedback-body">
-        <div class="office-reject-feedback-icon"><i class="bi bi-x-lg"></i></div>
-        <h3>Request Rejected</h3>
-        <p>You have successfully rejected the request</p>
-        <button type="button" class="office-reject-feedback-finish" id="office-reject-feedback-finish">Finish</button>
-      </div>
-    </article>
-  </section>
-
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script>
+    window.officeApprovalRoutes = {
+      approve: '{{ route('approval.approve', ['approvalId' => '__APPROVAL_ID__']) }}',
+      reject: '{{ route('approval.reject', ['approvalId' => '__APPROVAL_ID__']) }}'
+    };
+  </script>
   <script src="/js/dashboard.js"></script>
+  <script>
+    (function () {
+      const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+      const queueBody = document.getElementById('office-request-history-body');
+      const paginationWrap = document.getElementById('office-request-pagination');
+      const actionConfirmModal = document.getElementById('office-action-confirm-modal');
+      const actionConfirmTitle = document.getElementById('office-action-confirm-title');
+      const actionConfirmMessage = document.getElementById('office-action-confirm-message');
+      const actionConfirmCancel = document.getElementById('office-action-confirm-cancel');
+      const actionConfirmSubmit = document.getElementById('office-action-confirm-submit');
+      const actionConfirmCard = actionConfirmModal instanceof HTMLElement
+        ? actionConfirmModal.querySelector('.office-action-confirm-card')
+        : null;
+
+      if (!(queueBody instanceof HTMLElement)) {
+        return;
+      }
+
+      const summaryIds = [
+        'office-summary-actionable',
+        'office-summary-pending',
+        'office-summary-approved',
+        'office-summary-rejected',
+      ];
+
+      let isRefreshing = false;
+      let isActing = false;
+      const refreshIntervalMs = 12000;
+
+      const resolveUrl = (action, approvalId) => {
+        const template = window.officeApprovalRoutes?.[action] || '';
+        return template.replace('__APPROVAL_ID__', String(approvalId));
+      };
+
+      const closeActionConfirmModal = () => {
+        if (!(actionConfirmModal instanceof HTMLElement)) {
+          return;
+        }
+
+        actionConfirmModal.classList.remove('is-open');
+        actionConfirmModal.setAttribute('aria-hidden', 'true');
+      };
+
+      const openActionConfirmModal = (action) => new Promise((resolve) => {
+        if (!(actionConfirmModal instanceof HTMLElement)
+          || !(actionConfirmTitle instanceof HTMLElement)
+          || !(actionConfirmMessage instanceof HTMLElement)
+          || !(actionConfirmCancel instanceof HTMLButtonElement)
+          || !(actionConfirmSubmit instanceof HTMLButtonElement)) {
+          resolve(true);
+          return;
+        }
+
+        const isApprove = action === 'approve';
+        actionConfirmTitle.textContent = isApprove ? 'Confirm Approval' : 'Confirm Rejection';
+        actionConfirmMessage.textContent = isApprove
+          ? 'Are you sure you want to approve this reservation request? This action cannot be undone.'
+          : 'Are you sure you want to reject this reservation request? This action cannot be undone.';
+        actionConfirmSubmit.textContent = isApprove ? 'Approve' : 'Reject';
+        actionConfirmSubmit.classList.toggle('approve', isApprove);
+        actionConfirmSubmit.classList.toggle('reject', !isApprove);
+
+        if (actionConfirmCard instanceof HTMLElement) {
+          actionConfirmCard.classList.toggle('is-reject', !isApprove);
+        }
+
+        actionConfirmModal.classList.add('is-open');
+        actionConfirmModal.setAttribute('aria-hidden', 'false');
+
+        const handleCancel = () => {
+          teardown();
+          closeActionConfirmModal();
+          resolve(false);
+        };
+
+        const handleSubmit = () => {
+          teardown();
+          closeActionConfirmModal();
+          resolve(true);
+        };
+
+        const handleBackdrop = (event) => {
+          const target = event.target;
+          if (target instanceof HTMLElement && target.dataset.closeOfficeActionConfirm === 'true') {
+            handleCancel();
+          }
+        };
+
+        const handleKeydown = (event) => {
+          if (event.key === 'Escape') {
+            handleCancel();
+          }
+        };
+
+        const teardown = () => {
+          actionConfirmCancel.removeEventListener('click', handleCancel);
+          actionConfirmSubmit.removeEventListener('click', handleSubmit);
+          actionConfirmModal.removeEventListener('click', handleBackdrop);
+          document.removeEventListener('keydown', handleKeydown);
+        };
+
+        actionConfirmCancel.addEventListener('click', handleCancel);
+        actionConfirmSubmit.addEventListener('click', handleSubmit);
+        actionConfirmModal.addEventListener('click', handleBackdrop);
+        document.addEventListener('keydown', handleKeydown);
+      });
+
+      const setButtonsDisabled = (state) => {
+        document.querySelectorAll('.office-queue-action-btn').forEach((button) => {
+          button.disabled = state;
+        });
+      };
+
+      const showActionToast = (message, status) => {
+        const existingToast = document.querySelector('.office-action-toast');
+        if (existingToast instanceof HTMLElement) {
+          existingToast.remove();
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `office-action-toast ${status === 'approved' ? 'is-approved' : 'is-rejected'}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        window.setTimeout(() => {
+          toast.classList.add('is-visible');
+        }, 20);
+
+        window.setTimeout(() => {
+          toast.classList.remove('is-visible');
+          window.setTimeout(() => toast.remove(), 180);
+        }, 1800);
+      };
+
+      const applySoftRefreshFromDocument = (doc) => {
+        const nextBody = doc.getElementById('office-request-history-body');
+        if (nextBody instanceof HTMLElement) {
+          queueBody.innerHTML = nextBody.innerHTML;
+        }
+
+        if (paginationWrap instanceof HTMLElement) {
+          const nextPagination = doc.getElementById('office-request-pagination');
+          if (nextPagination instanceof HTMLElement) {
+            paginationWrap.innerHTML = nextPagination.innerHTML;
+          }
+        }
+
+        summaryIds.forEach((id) => {
+          const current = document.getElementById(id);
+          const next = doc.getElementById(id);
+
+          if (current instanceof HTMLElement && next instanceof HTMLElement) {
+            current.textContent = next.textContent;
+          }
+        });
+      };
+
+      const softRefreshQueue = async () => {
+        if (isRefreshing || isActing) {
+          return;
+        }
+
+        isRefreshing = true;
+
+        try {
+          const response = await fetch(window.location.pathname + window.location.search, {
+            method: 'GET',
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              'Cache-Control': 'no-cache',
+            },
+            cache: 'no-store',
+          });
+
+          if (!response.ok) {
+            return;
+          }
+
+          const html = await response.text();
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          applySoftRefreshFromDocument(doc);
+        } catch (_error) {
+          // Silent fail: keep UI usable and try again on next interval.
+        } finally {
+          isRefreshing = false;
+        }
+      };
+
+      document.addEventListener('click', async (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+
+        const button = target.closest('.office-queue-action-btn');
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+
+        const approvalId = button.getAttribute('data-approval-id');
+        const action = button.getAttribute('data-action');
+
+        if (!approvalId || !action) {
+          return;
+        }
+
+        const confirmed = await openActionConfirmModal(action);
+
+        if (!confirmed) {
+          return;
+        }
+
+        isActing = true;
+        setButtonsDisabled(true);
+
+        try {
+          const response = await fetch(resolveUrl(action, approvalId), {
+            method: 'PATCH',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': token,
+            },
+            body: JSON.stringify({}),
+          });
+
+          const payload = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            showAppNotice(payload.error || 'Action failed. Please try again.');
+            return;
+          }
+
+          const actorName = window.authUser?.full_name || 'Admin';
+          const decisionWord = action === 'approve' ? 'approved' : 'rejected';
+          const fallbackMessage = `Request ${decisionWord} by ${actorName}.`;
+          showActionToast(payload.message || fallbackMessage, decisionWord === 'approved' ? 'approved' : 'rejected');
+
+          await softRefreshQueue();
+        } catch (_error) {
+          showAppNotice('Request failed. Please check your connection and try again.');
+        } finally {
+          isActing = false;
+          setButtonsDisabled(false);
+        }
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          softRefreshQueue();
+        }
+      });
+
+      window.setInterval(() => {
+        if (!document.hidden) {
+          softRefreshQueue();
+        }
+      }, refreshIntervalMs);
+    })();
+  </script>
+
+  <style>
+    .office-queue-action-btn {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter 0.15s ease, transform 0.15s ease;
+    }
+
+    .office-queue-action-btn:hover {
+      filter: brightness(0.97);
+      transform: translateY(-1px);
+    }
+
+    .office-queue-action-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .office-queue-approve {
+      border-color: #0b8a0b;
+      background: #0b8a0b;
+      color: #fff;
+    }
+
+    .office-queue-reject {
+      border-color: #d01d1d;
+      background: #fff;
+      color: #d01d1d;
+    }
+
+    .office-action-toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 9999;
+      min-width: 240px;
+      max-width: 360px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .office-action-toast.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .office-action-toast.is-approved {
+      background: #0a8f3e;
+    }
+
+    .office-action-toast.is-rejected {
+      background: #c92a2a;
+    }
+
+    .office-action-confirm-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1100;
+      display: none;
+    }
+
+    .office-action-confirm-modal.is-open {
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+
+    .office-action-confirm-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(22, 27, 39, 0.46);
+      backdrop-filter: blur(1px);
+    }
+
+    .office-action-confirm-card {
+      position: relative;
+      width: min(500px, 90vw);
+      background: #ffffff;
+      border: 1px solid #d5ddea;
+      border-radius: 10px;
+      box-shadow: 0 14px 30px rgba(18, 26, 51, 0.22);
+      overflow: hidden;
+    }
+
+    .office-action-confirm-card.is-reject {
+      border-color: #ebc9c9;
+    }
+
+    .office-action-confirm-head {
+      border-bottom: 1px solid #e8ecf3;
+      padding: 12px 16px;
+      background: #fbfcff;
+    }
+
+    .office-action-confirm-head h2 {
+      margin: 0;
+      color: #167d2e;
+      font-size: 1.65rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .office-action-confirm-card.is-reject .office-action-confirm-head h2 {
+      color: #c53030;
+    }
+
+    .office-action-confirm-body {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e8ecf3;
+      color: #2f3545;
+      font-size: 1.08rem;
+      line-height: 1.42;
+      background: #ffffff;
+    }
+
+    .office-action-confirm-body p {
+      margin: 0;
+    }
+
+    .office-action-confirm-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 10px 16px 12px;
+      background: #fbfcff;
+    }
+
+    #office-action-confirm-cancel {
+      min-width: 104px;
+      height: 36px;
+      border: 1px solid #c7cfde;
+      background: #f1f4fa;
+      color: #3b4458;
+      font-weight: 600;
+    }
+
+    #office-action-confirm-submit {
+      min-width: 118px;
+      height: 36px;
+      border-radius: 7px;
+      font-weight: 700;
+      box-shadow: none;
+    }
+
+    #office-action-confirm-submit.approve {
+      border-color: #158a31;
+      background: #149031;
+    }
+
+    #office-action-confirm-submit.reject {
+      border-color: #d44545;
+      background: #cf3b3b;
+      color: #ffffff;
+    }
+
+    @media (max-width: 768px) {
+      .office-action-confirm-head h2 {
+        font-size: 1.35rem;
+      }
+
+      .office-action-confirm-body {
+        font-size: 0.96rem;
+      }
+    }
+  </style>
 </body>
 </html>

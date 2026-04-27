@@ -2,10 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />  <meta name="csrf-token" content="{{ csrf_token() }}" />  <title>NUtilize | Inventory Equipment</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
+  <title>NUtilize | Manage Items</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/db-inventory.css" />
+  <style>
+    .office-items-subtitle {
+      margin: 10px 22px 0;
+      color: #4b567f;
+      font-size: 0.95rem;
+      font-weight: 500;
+      line-height: 1.3;
+    }
+  </style>
 </head>
 <body>
   <script>
@@ -14,14 +25,16 @@
       username: '{{ auth()->user()->username ?? 'User' }}',
       email: '{{ auth()->user()->email ?? '' }}',
       full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
-      role: '{{ auth()->user()->role ?? 'user' }}'
+      role: '{{ auth()->user()->role ?? 'user' }}',
+      office_name: '{{ auth()->user()?->office?->department_name ?? 'Office' }}',
+      office_short_code: '{{ auth()->user()?->office?->short_code ?? '' }}'
     };
-    window.equipmentCategoryCreateEndpoint = '{{ route('dashboard.inventory.equipment-categories.store') }}';
-    window.equipmentCategoryUpdateEndpointBase = '{{ url('/dashboard/inventory/equipment-categories') }}';
-    window.equipmentCategoryDeleteEndpointBase = '{{ url('/dashboard/inventory/equipment-categories') }}';
+    window.dashboardNavComponent = '/components/navbar-office.html';
+    window.equipmentEndpointBase = '/dashboard/office/items';
     window.equipmentCategories = @json($equipmentCategories ?? []);
     window.defaultEquipmentCategory = '{{ $defaultEquipmentCategory ?? '' }}';
   </script>
+
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
       <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
@@ -48,7 +61,8 @@
       <div id="navbar-container"></div>
 
       <section class="content-card facilities-content-card">
-        <h1 class="section-title">EQUIPMENT INVENTORY</h1>
+        <h1 class="section-title">MANAGE OFFICE ITEMS</h1>
+        <p class="office-items-subtitle">Manage equipment assigned to {{ auth()->user()?->office?->department_name ?? 'your office' }}</p>
 
         <section class="facilities-filter-row">
           <div class="facilities-tab-group" role="tablist" aria-label="Equipment category">
@@ -62,10 +76,7 @@
             <input id="equipment-inline-search" type="text" placeholder="Search" />
           </div>
 
-          <div class="facilities-action-group">
-            <button class="facilities-add-category-btn" id="equipment-add-category-btn" type="button">Add Category</button>
-            <button class="facilities-add-btn" id="equipment-add-btn" type="button">Add Equipment</button>
-          </div>
+          <button class="facilities-add-btn" id="equipment-add-btn" type="button">Add Item</button>
         </section>
 
         <section class="inventory-grid facilities-grid">
@@ -93,7 +104,7 @@
                 </tr>
                 @empty
                 <tr data-equipment-row="{{ $defaultEquipmentCategory ?? '' }}">
-                  <td colspan="6">No equipment records found in the database.</td>
+                  <td colspan="6">No items found for your office yet.</td>
                 </tr>
                 @endforelse
               </tbody>
@@ -104,28 +115,12 @@
     </section>
   </main>
 
-  <div class="inventory-confirm-modal" id="inventory-confirm-modal" aria-hidden="true">
-    <div class="inventory-confirm-overlay" data-close-inventory-confirm="true"></div>
-    <article class="inventory-confirm-card" role="dialog" aria-modal="true" aria-labelledby="inventory-confirm-title">
-      <header class="inventory-confirm-head">
-        <h2 id="inventory-confirm-title">Confirm Delete</h2>
-      </header>
-      <div class="inventory-confirm-body">
-        <p id="inventory-confirm-message">Are you sure you want to delete this item? This cannot be undone.</p>
-      </div>
-      <div class="inventory-confirm-actions">
-        <button type="button" class="inventory-confirm-btn cancel" id="inventory-confirm-cancel">Cancel</button>
-        <button type="button" class="inventory-confirm-btn delete" id="inventory-confirm-submit">Delete</button>
-      </div>
-    </article>
-  </div>
-
   <section class="facilities-modal" id="equipment-edit-modal" aria-hidden="true">
     <div class="facilities-modal-overlay" data-close-equipment-modal="true"></div>
     <article class="facilities-modal-card" role="dialog" aria-modal="true" aria-labelledby="equipment-modal-title">
       <div class="facilities-modal-top"></div>
       <div class="facilities-modal-body">
-        <h2 id="equipment-modal-title">Add Equipment</h2>
+        <h2 id="equipment-modal-title">Add Item</h2>
 
         <label class="facilities-field-label" for="equipment-item-name">Item Name</label>
         <input id="equipment-item-name" class="facilities-input" type="text" placeholder="Item Name" />
@@ -187,40 +182,6 @@
     </article>
   </section>
 
-  <section class="facilities-modal" id="equipment-category-modal" aria-hidden="true">
-    <div class="facilities-modal-overlay" data-close-equipment-category-modal="true"></div>
-    <article class="facilities-modal-card equipment-category-modal-card" role="dialog" aria-modal="true" aria-labelledby="equipment-category-modal-title">
-      <div class="facilities-modal-top"></div>
-      <div class="facilities-modal-body">
-        <h2 id="equipment-category-modal-title">Add Category</h2>
-
-        <label class="facilities-field-label" for="equipment-category-name-input">Category Name</label>
-        <input id="equipment-category-name-input" class="facilities-input" type="text" placeholder="e.g. Audio-Visual" maxlength="100" />
-
-        <p class="equipment-category-list-title">Existing Categories</p>
-        <ul id="equipment-category-list" class="equipment-category-list" aria-live="polite">
-          @forelse(($equipmentCategories ?? []) as $category)
-            <li class="equipment-category-list-item" data-category-id="{{ $category['id'] }}" data-category-key="{{ $category['key'] }}">
-              <span class="equipment-category-list-label">{{ $category['label'] }}</span>
-              <div class="equipment-category-list-actions">
-                <button type="button" class="equipment-category-rename-btn" data-rename-equipment-category-id="{{ $category['id'] }}">Rename</button>
-                <button type="button" class="equipment-category-delete-btn" data-delete-equipment-category-id="{{ $category['id'] }}" data-delete-equipment-category-key="{{ $category['key'] }}">Delete</button>
-              </div>
-            </li>
-          @empty
-            <li class="equipment-category-list-empty">No categories yet.</li>
-          @endforelse
-        </ul>
-
-        <div class="facilities-modal-actions">
-          <button type="button" class="facilities-action-btn cancel" id="equipment-category-cancel-btn">Cancel</button>
-          <button type="button" class="facilities-action-btn submit" id="equipment-category-save-btn">Add Category</button>
-        </div>
-      </div>
-    </article>
-  </section>
-
   <script src="/js/dashboard.js"></script>
 </body>
 </html>
-

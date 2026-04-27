@@ -51,28 +51,28 @@
           <article class="stat-card">
             <span class="stat-icon"><i class="bi bi-files"></i></span>
             <div>
-              <p class="stat-number">17</p>
+              <p class="stat-number">{{ str_pad((string) ($stats['total_requests'] ?? 0), 2, '0', STR_PAD_LEFT) }}</p>
               <p class="stat-label">Total Request</p>
             </div>
           </article>
           <article class="stat-card">
             <span class="stat-icon"><i class="bi bi-wallet2"></i></span>
             <div>
-              <p class="stat-number">09</p>
+              <p class="stat-number">{{ str_pad((string) ($stats['borrowed'] ?? 0), 2, '0', STR_PAD_LEFT) }}</p>
               <p class="stat-label">Borrowed</p>
             </div>
           </article>
           <article class="stat-card">
             <span class="stat-icon"><i class="bi bi-check-circle-fill"></i></span>
             <div>
-              <p class="stat-number">74</p>
+              <p class="stat-number">{{ str_pad((string) ($stats['available'] ?? 0), 2, '0', STR_PAD_LEFT) }}</p>
               <p class="stat-label">Available</p>
             </div>
           </article>
           <article class="stat-card">
             <span class="stat-icon"><i class="bi bi-wrench-adjustable-circle"></i></span>
             <div>
-              <p class="stat-number">20</p>
+              <p class="stat-number">{{ str_pad((string) ($stats['maintenance'] ?? 0), 2, '0', STR_PAD_LEFT) }}</p>
               <p class="stat-label">Maintenance</p>
             </div>
           </article>
@@ -92,30 +92,18 @@
                   </tr>
                 </thead>
                 <tbody id="report-table-body">
-                  <tr>
-                    <td>Projector</td>
-                    <td>Mr. Martin Espanoso</td>
-                    <td>2 Images</td>
-                    <td><span class="badge pending">Pending</span></td>
-                  </tr>
-                  <tr>
-                    <td>Speaker</td>
-                    <td>Mrs. Nina Tamaza</td>
-                    <td>1 Video 2 Images</td>
-                    <td><span class="badge pending">Pending</span></td>
-                  </tr>
-                  <tr>
-                    <td>Microphone</td>
-                    <td>Mr. Drei Punzalan</td>
-                    <td>no attachment</td>
-                    <td><span class="badge pending">Pending</span></td>
-                  </tr>
-                  <tr>
-                    <td>Speaker</td>
-                    <td>Mr. Jed Perez</td>
-                    <td>2 Images</td>
-                    <td><span class="badge solved">Solved</span></td>
-                  </tr>
+                  @forelse(($quickReports ?? []) as $report)
+                    <tr>
+                      <td>{{ $report['item'] }}</td>
+                      <td>{{ $report['reported_by'] }}</td>
+                      <td>{{ $report['attachment_label'] }}</td>
+                      <td><span class="badge {{ $report['status_class'] }}">{{ $report['status_label'] }}</span></td>
+                    </tr>
+                  @empty
+                    <tr>
+                      <td colspan="4">No reports found.</td>
+                    </tr>
+                  @endforelse
                 </tbody>
               </table>
             </div>
@@ -136,36 +124,19 @@
           <article class="extra-card upcoming-card">
             <h3><i class="bi bi-calendar2-event-fill"></i> Upcoming Requests</h3>
             <ul>
-              <li>
-                <span>March 23, 9:00 AM</span>
-                <strong>Room 501 - Faculty Meeting</strong>
-                <small>Requester: Archie Mesis | Resources: Projector, 30 Chairs</small>
-              </li>
-              <li>
-                <span>March 23, 2:00 PM</span>
-                <strong>Room 632 - PTA Briefing</strong>
-                <small>Requester: Joel Enriquez | Resources: 1 TV, 20 Chairs</small>
-              </li>
-              <li>
-                <span>March 24, 1:00 PM</span>
-                <strong>AVR - Student Assembly</strong>
-                <small>Requester: Jei Pastrana | Resources: Sound System, 50 Chairs</small>
-              </li>
-              <li>
-                <span>March 24, 3:30 PM</span>
-                <strong>Lab 204 - ICT Workshop</strong>
-                <small>Requester: Ryan Mendoza | Resources: 15 PCs, HDMI Adapter</small>
-              </li>
-              <li>
-                <span>March 25, 10:30 AM</span>
-                <strong>Gym - Sports Briefing</strong>
-                <small>Requester: Carlo Lim | Resources: PA System, 2 Tables</small>
-              </li>
-              <li>
-                <span>March 26, 8:00 AM</span>
-                <strong>Room 215 - Orientation Session</strong>
-                <small>Requester: Faith Delgado | Resources: Whiteboard Kit, 25 Chairs</small>
-              </li>
+              @forelse(($upcomingRequests ?? []) as $request)
+                <li>
+                  <span>{{ $request['time_label'] }}</span>
+                  <strong>{{ $request['title'] }}</strong>
+                  <small>{{ $request['subtitle'] }}</small>
+                </li>
+              @empty
+                <li>
+                  <span>{{ now()->format('F j') }}</span>
+                  <strong>No requests submitted today</strong>
+                  <small>New requests created today will appear here first.</small>
+                </li>
+              @endforelse
             </ul>
           </article>
 
@@ -174,19 +145,19 @@
             <div class="highlights-grid">
               <div>
                 <p class="highlight-label">Resolved Today</p>
-                <p class="highlight-value">12</p>
+                <p class="highlight-value">{{ $dailyHighlights['resolved_today'] ?? 0 }}</p>
               </div>
               <div>
                 <p class="highlight-label">Pending Reports</p>
-                <p class="highlight-value">5</p>
+                <p class="highlight-value">{{ $dailyHighlights['pending_reports'] ?? 0 }}</p>
               </div>
               <div>
                 <p class="highlight-label">Rooms Utilized</p>
-                <p class="highlight-value">18</p>
+                <p class="highlight-value">{{ $dailyHighlights['rooms_utilized'] ?? 0 }}</p>
               </div>
               <div>
                 <p class="highlight-label">Equipment Checked</p>
-                <p class="highlight-value">34</p>
+                <p class="highlight-value">{{ $dailyHighlights['equipment_checked'] ?? 0 }}</p>
               </div>
             </div>
           </article>

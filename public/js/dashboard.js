@@ -29,13 +29,27 @@ const equipmentTotalCountInput = document.getElementById('equipment-total-count'
 const equipmentInUseInput = document.getElementById('equipment-in-use');
 const equipmentStatusInput = document.getElementById('equipment-status');
 const equipmentDescriptionInput = document.getElementById('equipment-description');
+const equipmentDeleteButton = document.getElementById('equipment-delete-btn');
 const equipmentCancelButton = document.getElementById('equipment-cancel-btn');
 const equipmentSaveButton = document.getElementById('equipment-save-btn');
 const equipmentAddButton = document.getElementById('equipment-add-btn');
 const equipmentModalTitle = document.getElementById('equipment-modal-title');
+const inventoryConfirmModal = document.getElementById('inventory-confirm-modal');
+const inventoryConfirmTitle = document.getElementById('inventory-confirm-title');
+const inventoryConfirmMessage = document.getElementById('inventory-confirm-message');
+const inventoryConfirmCancel = document.getElementById('inventory-confirm-cancel');
+const inventoryConfirmSubmit = document.getElementById('inventory-confirm-submit');
 const equipmentUploadInput = document.getElementById('equipment-upload-input');
 const equipmentUploadButton = document.getElementById('equipment-upload-btn');
 const equipmentUploadName = document.getElementById('equipment-upload-name');
+const equipmentAddCategoryButton = document.getElementById('equipment-add-category-btn');
+const equipmentCategoryModal = document.getElementById('equipment-category-modal');
+const equipmentCategoryModalTitle = document.getElementById('equipment-category-modal-title');
+const equipmentCategoryNameInput = document.getElementById('equipment-category-name-input');
+const equipmentCategoryCancelButton = document.getElementById('equipment-category-cancel-btn');
+const equipmentCategorySaveButton = document.getElementById('equipment-category-save-btn');
+const equipmentCategoryList = document.getElementById('equipment-category-list');
+const equipmentTabGroup = document.querySelector('.facilities-tab-group[aria-label="Equipment category"]');
 const equipmentTabs = document.querySelectorAll('[data-equipment-tab]');
 const historyTabs = document.querySelectorAll('[data-history-tab]');
 const maintenanceTabs = document.querySelectorAll('[data-maintenance-tab]');
@@ -53,22 +67,25 @@ const maintenanceStatusSelect = document.getElementById('maintenance-status-sele
 const maintenanceFormSubmitButton = document.getElementById('maintenance-form-submit-btn');
 const scheduleFilterButtons = document.querySelectorAll('[data-schedule-filter]');
 const scheduleDayCells = document.querySelectorAll('.calendar-grid .day[data-day]');
+const scheduleMonthSelect = document.getElementById('schedule-month-select');
+const scheduleYearSelect = document.getElementById('schedule-year-select');
 const scheduleRequestModal = document.getElementById('schedule-request-modal');
 const scheduleRequestBody = document.getElementById('schedule-request-body');
 const scheduleModalDate = document.getElementById('schedule-modal-date');
 const scheduleInlineDate = document.getElementById('schedule-inline-date');
 const scheduleInlineRequestBody = document.getElementById('schedule-inline-request-body');
-const scheduleInlineDetailName = document.getElementById('schedule-inline-detail-name');
-const scheduleInlineDetailTitle = document.getElementById('schedule-inline-detail-title');
-const scheduleInlineDetailDate = document.getElementById('schedule-inline-detail-date');
-const scheduleInlineDetailTime = document.getElementById('schedule-inline-detail-time');
-const scheduleInlineDetailAttendance = document.getElementById('schedule-inline-detail-attendance');
-const scheduleInlineDetailResource = document.getElementById('schedule-inline-detail-resource');
-const scheduleInlineDetailChairs = document.getElementById('schedule-inline-detail-chairs');
-const scheduleInlineDetailTables = document.getElementById('schedule-inline-detail-tables');
+const scheduleInlineDetailRequester = document.getElementById('schedule-inline-detail-requester');
+const scheduleInlineDetailActivity = document.getElementById('schedule-inline-detail-activity');
+const scheduleInlineDetailRequestedOn = document.getElementById('schedule-inline-detail-requested-on');
+const scheduleInlineDetailRequestedTime = document.getElementById('schedule-inline-detail-requested-time');
+const scheduleInlineDetailReservationCode = document.getElementById('schedule-inline-detail-reservation-code');
+const scheduleInlineDetailStatus = document.getElementById('schedule-inline-detail-status');
+const scheduleInlineDetailResources = document.getElementById('schedule-inline-detail-resources');
+const scheduleInlineDetailApprovals = document.getElementById('schedule-inline-detail-approvals');
 const requestItems = document.querySelectorAll('.request-item');
 const requestTabs = document.querySelectorAll('[data-request-tab]');
 const requestContentCard = document.querySelector('.request-content-card');
+const requestListWrap = document.getElementById('request-list-wrap');
 const scheduleDetailModal = document.getElementById('schedule-detail-modal');
 const scheduleDetailName = document.getElementById('schedule-detail-name');
 const scheduleDetailTitleActivity = document.getElementById('schedule-detail-title-activity');
@@ -116,9 +133,285 @@ const messageThreadWrap = document.getElementById('message-thread-wrap');
 const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
 const toolbarSearchWrap = searchInput ? searchInput.closest('.search-wrap') : null;
+const equipmentEndpointBase =
+  (typeof window.equipmentEndpointBase === 'string' && window.equipmentEndpointBase.trim())
+    ? window.equipmentEndpointBase.trim().replace(/\/$/, '')
+    : '/dashboard/inventory/equipments';
+const maintenanceUnitsEndpointBase =
+  (typeof window.maintenanceUnitsEndpointBase === 'string' && window.maintenanceUnitsEndpointBase.trim())
+    ? window.maintenanceUnitsEndpointBase.trim().replace(/\/$/, '')
+    : '/dashboard/maintenance/units';
+const equipmentCategoryCreateEndpoint =
+  (typeof window.equipmentCategoryCreateEndpoint === 'string' && window.equipmentCategoryCreateEndpoint.trim())
+    ? window.equipmentCategoryCreateEndpoint.trim().replace(/\/$/, '')
+    : '';
+const equipmentCategoryUpdateEndpointBase =
+  (typeof window.equipmentCategoryUpdateEndpointBase === 'string' && window.equipmentCategoryUpdateEndpointBase.trim())
+    ? window.equipmentCategoryUpdateEndpointBase.trim().replace(/\/$/, '')
+    : '';
+const equipmentCategoryDeleteEndpointBase =
+  (typeof window.equipmentCategoryDeleteEndpointBase === 'string' && window.equipmentCategoryDeleteEndpointBase.trim())
+    ? window.equipmentCategoryDeleteEndpointBase.trim().replace(/\/$/, '')
+    : '';
+
+let appNoticeResolver = null;
+
+function showAppNotice(message, options = {}) {
+  const {
+    title = 'Notice',
+    buttonText = 'OK',
+    variant = 'info',
+    autoCloseMs = 0,
+  } = options;
+
+  let modal = document.getElementById('app-notice-modal');
+
+  if (!(modal instanceof HTMLElement)) {
+    const styleId = 'app-notice-style';
+
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        .app-notice-modal {
+          position: fixed;
+          inset: 0;
+          z-index: 3200;
+          display: none;
+        }
+        .app-notice-modal.is-open {
+          display: grid;
+          place-items: center;
+          padding: 18px;
+        }
+        .app-notice-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(18, 22, 34, 0.45);
+          backdrop-filter: blur(1px);
+        }
+        .app-notice-card {
+          position: relative;
+          width: min(480px, 90vw);
+          background: #ffffff;
+          border: 1px solid #d7ddea;
+          border-radius: 12px;
+          box-shadow: 0 14px 30px rgba(20, 26, 48, 0.22);
+          overflow: hidden;
+        }
+        .app-notice-card::before {
+          content: "";
+          position: absolute;
+          inset: 0 auto auto 0;
+          width: 100%;
+          height: 4px;
+          background: linear-gradient(90deg, #2f3f8a 0%, #4b60bd 100%);
+        }
+        .app-notice-card.is-success::before {
+          background: linear-gradient(90deg, #2b8a3e 0%, #46a35d 100%);
+        }
+        .app-notice-card.is-error::before {
+          background: linear-gradient(90deg, #d44545 0%, #ea6a6a 100%);
+        }
+        .app-notice-head {
+          padding: 12px 16px 10px;
+          border-bottom: 1px solid #e6eaf2;
+          background: #fbfcff;
+        }
+        .app-notice-head h2 {
+          margin: 0;
+          font-size: 1.35rem;
+          font-weight: 700;
+          color: #243274;
+        }
+        .app-notice-card.is-success .app-notice-head h2 { color: #257a35; }
+        .app-notice-card.is-error .app-notice-head h2 { color: #c53030; }
+        .app-notice-body {
+          padding: 14px 16px;
+          border-bottom: 1px solid #e6eaf2;
+          color: #2f3545;
+          font-size: 1rem;
+          line-height: 1.45;
+        }
+        .app-notice-card.is-success .app-notice-body {
+          padding: 18px 16px 20px;
+          text-align: center;
+        }
+        .app-notice-success-visual {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+        }
+        .app-notice-success-icon {
+          width: 112px;
+          height: 112px;
+          border-radius: 50%;
+          background: radial-gradient(circle at 28% 22%, #22b422 0%, #0b8a0b 64%, #077107 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff;
+          font-size: 4.6rem;
+          line-height: 1;
+          box-shadow: 0 0 0 8px rgba(11, 138, 11, 0.1), 0 12px 20px rgba(11, 138, 11, 0.28);
+        }
+        .app-notice-success-copy {
+          margin: 0;
+          font-size: 1.05rem;
+          line-height: 1.35;
+          color: #1f2432;
+          font-weight: 600;
+        }
+        .app-notice-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          padding: 12px 16px;
+          background: #fbfcff;
+        }
+        .app-notice-btn {
+          min-width: 96px;
+          height: 36px;
+          border-radius: 8px;
+          border: 1px solid #c7cfde;
+          background: #f1f4fa;
+          color: #3b4458;
+          font-size: 0.92rem;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .app-notice-btn.info {
+          border-color: #4b60bd;
+          background: #4b60bd;
+          color: #fff;
+        }
+        .app-notice-btn.success {
+          border-color: #158a31;
+          background: #149031;
+          color: #fff;
+        }
+        .app-notice-btn.error {
+          border-color: #cf3b3b;
+          background: #cf3b3b;
+          color: #fff;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    modal = document.createElement('div');
+    modal.id = 'app-notice-modal';
+    modal.className = 'app-notice-modal';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+      <div class="app-notice-overlay" data-close-app-notice="true"></div>
+      <article class="app-notice-card" role="dialog" aria-modal="true" aria-labelledby="app-notice-title">
+        <header class="app-notice-head">
+          <h2 id="app-notice-title">Notice</h2>
+        </header>
+        <div class="app-notice-body" id="app-notice-body">
+          <p id="app-notice-message"></p>
+        </div>
+        <div class="app-notice-actions">
+          <button type="button" class="app-notice-btn info" id="app-notice-ok">OK</button>
+        </div>
+      </article>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const titleNode = modal.querySelector('#app-notice-title');
+  const messageNode = modal.querySelector('#app-notice-message');
+  const okButton = modal.querySelector('#app-notice-ok');
+  const card = modal.querySelector('.app-notice-card');
+  const bodyNode = modal.querySelector('#app-notice-body');
+
+  if (!(titleNode instanceof HTMLElement)
+    || !(messageNode instanceof HTMLElement)
+    || !(okButton instanceof HTMLButtonElement)
+    || !(card instanceof HTMLElement)
+    || !(bodyNode instanceof HTMLElement)) {
+    return Promise.resolve();
+  }
+
+  titleNode.textContent = title;
+  card.classList.remove('is-success', 'is-error');
+
+  if (variant === 'success') {
+    card.classList.add('is-success');
+    bodyNode.innerHTML = `
+      <div class="app-notice-success-visual">
+        <div class="app-notice-success-icon"><i class="bi bi-check-lg"></i></div>
+        <p id="app-notice-message" class="app-notice-success-copy"></p>
+      </div>
+    `;
+  } else if (variant === 'error') {
+    card.classList.add('is-error');
+    bodyNode.innerHTML = '<p id="app-notice-message"></p>';
+  } else {
+    bodyNode.innerHTML = '<p id="app-notice-message"></p>';
+  }
+
+  const refreshedMessageNode = modal.querySelector('#app-notice-message');
+  if (refreshedMessageNode instanceof HTMLElement) {
+    refreshedMessageNode.textContent = String(message || '');
+  }
+
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+  okButton.textContent = buttonText;
+  okButton.classList.remove('info', 'success', 'error');
+  okButton.classList.add(variant === 'success' ? 'success' : (variant === 'error' ? 'error' : 'info'));
+
+  return new Promise((resolve) => {
+    appNoticeResolver = resolve;
+    let autoCloseTimer = null;
+
+    const finish = () => {
+      if (autoCloseTimer) {
+        window.clearTimeout(autoCloseTimer);
+        autoCloseTimer = null;
+      }
+
+      if (typeof appNoticeResolver === 'function') {
+        appNoticeResolver();
+      }
+
+      appNoticeResolver = null;
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+    };
+
+    const handleBackdrop = (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.dataset.closeAppNotice === 'true') {
+        finish();
+      }
+    };
+
+    const handleKeydown = (event) => {
+      if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+        finish();
+      }
+    };
+
+    const handleClick = () => finish();
+
+    okButton.addEventListener('click', handleClick, { once: true });
+    modal.addEventListener('click', handleBackdrop, { once: true });
+    document.addEventListener('keydown', handleKeydown, { once: true });
+
+    if (variant === 'success' && Number.isFinite(autoCloseMs) && autoCloseMs > 0) {
+      autoCloseTimer = window.setTimeout(() => finish(), autoCloseMs);
+    }
+  });
+}
 
 let activeFacilitiesTab = 'rooms';
-let activeEquipmentTab = 'multimedia';
+let activeEquipmentTab = (typeof window.defaultEquipmentCategory === 'string' && window.defaultEquipmentCategory)
+  ? window.defaultEquipmentCategory
+  : '';
 let activeHistoryTab = 'latest';
 let activeMaintenanceTab = 'maintenance';
 let activeEditingRow = null;
@@ -127,6 +420,7 @@ let activeScheduleCategory = 'all';
 let visibleScheduleRequests = [];
 let visibleScheduleInlineRequests = [];
 let selectedScheduleDay = null;
+let inventoryConfirmResolver = null;
 let messagePopover = null;
 let activeMessageButton = null;
 let notificationPopover = null;
@@ -139,6 +433,37 @@ let sidebarBackdrop = null;
 let isToolbarSearchExpanded = false;
 let messageOutsidePointerHandlerBound = false;
 let activeMaintenanceAddressRow = null;
+let activeEquipmentCategoryEditingId = null;
+const scheduleCalendarData = (window.scheduleCalendarData && typeof window.scheduleCalendarData === 'object')
+  ? window.scheduleCalendarData
+  : null;
+const scheduleMarkedDays = scheduleCalendarData?.markedDays && typeof scheduleCalendarData.markedDays === 'object'
+  ? scheduleCalendarData.markedDays
+  : {
+    all: [],
+    rooms: [],
+    tv: [],
+    speaker: [],
+    furniture: [],
+  };
+const scheduleRequestData = scheduleCalendarData?.requestData && typeof scheduleCalendarData.requestData === 'object'
+  ? scheduleCalendarData.requestData
+  : {};
+const scheduleMonthKey = typeof scheduleCalendarData?.monthKey === 'string'
+  ? scheduleCalendarData.monthKey
+  : '';
+const scheduleMonthLabel = typeof scheduleCalendarData?.monthLabel === 'string'
+  ? scheduleCalendarData.monthLabel
+  : 'Schedule';
+let equipmentCategoriesCache = Array.isArray(window.equipmentCategories)
+  ? window.equipmentCategories
+    .map((category) => ({
+      id: Number.parseInt(String(category?.id ?? ''), 10),
+      key: String(category?.key ?? '').trim(),
+      label: String(category?.label ?? '').trim(),
+    }))
+    .filter((category) => Number.isInteger(category.id) && category.id > 0 && category.key && category.label)
+  : [];
 
 const notificationItems = [
   { name: 'Maria Lerma', unread: true },
@@ -186,7 +511,7 @@ const maintenanceRowsByTab = (window.maintenanceRowsByTab && typeof window.maint
   ],
 };
 
-const historyRowsByTab = {
+const fallbackHistoryRowsByTab = {
   latest: [
     { id: '#74fAy51', user: 'Marites Espinal', date: '01/05/2026 - 01/08/2026', item: 'Room 543', status: 'Returned' },
     { id: '#X9D2k8A', user: 'Ryan Mendoza', date: '02/09/2026 - 02/16/2026', item: 'Tablet', status: 'Returned' },
@@ -217,6 +542,14 @@ const historyRowsByTab = {
     { id: '#T8E5pW1', user: 'Celina Navarro', date: '08/02/2025 - 08/19/2025', item: 'Art Supplies', status: 'Damaged' },
   ],
 };
+
+const historyRowsByTab = (window.historyRowsByTab && typeof window.historyRowsByTab === 'object')
+  ? {
+    latest: Array.isArray(window.historyRowsByTab.latest) ? window.historyRowsByTab.latest : [],
+    oldest: Array.isArray(window.historyRowsByTab.oldest) ? window.historyRowsByTab.oldest : [],
+    damaged: Array.isArray(window.historyRowsByTab.damaged) ? window.historyRowsByTab.damaged : [],
+  }
+  : fallbackHistoryRowsByTab;
 
 function applyHistoryFilters() {
   if (!historyTableBody) {
@@ -279,7 +612,7 @@ function applyMaintenanceFilters() {
 
   maintenanceTableBody.innerHTML = filteredRows
     .map((row) => `
-      <tr>
+      <tr data-unit-id="${row.unit_id || ''}" data-maintenance-reason="${String(row.reason || '').replace(/"/g, '&quot;')}">
         <td>${row.id}</td>
         <td>${row.item}</td>
         <td>${row.count}</td>
@@ -307,21 +640,25 @@ function openMaintenanceEvalModal(row) {
   }
 
   activeMaintenanceAddressRow = row;
+  const unitCodeCell = row ? row.children[0] : null;
   const itemCell = row ? row.children[1] : null;
   const countCell = row ? row.children[2] : null;
+  const unitCode = unitCodeCell ? unitCodeCell.textContent.trim() : '';
   const itemName = itemCell ? itemCell.textContent.trim() : 'Podium';
   const itemCount = countCell ? countCell.textContent.trim() : '10';
+  const reason = row && row.dataset.maintenanceReason ? row.dataset.maintenanceReason.trim() : '';
+  const itemDisplay = unitCode ? `${itemName || '-'} (${unitCode})` : (itemName || '-');
 
   if (maintenanceEvalItemName) {
-    maintenanceEvalItemName.textContent = itemName || '-';
+    maintenanceEvalItemName.textContent = itemDisplay;
   }
 
   if (maintenanceEvalReason) {
-    maintenanceEvalReason.textContent = `${itemCount || '10'}x Used`;
+    maintenanceEvalReason.textContent = reason || `${itemCount || '1'}x Used`;
   }
 
   if (maintenanceFormItemName) {
-    maintenanceFormItemName.textContent = itemName || '-';
+    maintenanceFormItemName.textContent = itemDisplay;
   }
 
   maintenanceEvalModal.classList.add('is-open');
@@ -354,54 +691,19 @@ function openMaintenanceFormModal() {
   maintenanceFormModal.setAttribute('aria-hidden', 'false');
 }
 
-const scheduleMarkedDays = {
-  all: [4, 5, 7, 10, 12, 13, 16, 18, 21, 27],
-  rooms: [4, 7, 21],
-  tv: [4, 12, 16, 21],
-  speaker: [4, 5, 13, 27],
-  furniture: [10, 18],
-};
-
-const scheduleRequestData = {
-  4: [
-    { studentId: '2021-182127', resource: 'ROOM 525', category: 'rooms', name: 'Menesis, Archie', title: 'Faculty Meeting', time: '1:00 PM - 3:00 PM', attendance: '10 People', chairs: 20, tables: 5 },
-    { studentId: '2021-182127', resource: 'TV', category: 'tv', name: 'Menesis, Archie', title: 'Faculty Meeting', time: '1:00 PM - 3:00 PM', attendance: '10 People', chairs: 0, tables: 0 },
-    { studentId: '2021-182127', resource: 'SPEAKER', category: 'speaker', name: 'Menesis, Archie', title: 'Faculty Meeting', time: '1:00 PM - 3:00 PM', attendance: '10 People', chairs: 0, tables: 0 },
-    { studentId: '2021-182127', resource: 'FURNITURE', category: 'furniture', name: 'Menesis, Archie', title: 'Faculty Meeting', time: '1:00 PM - 3:00 PM', attendance: '10 People', chairs: 20, tables: 5 },
-    { studentId: '2021-182127', resource: 'TV', category: 'tv', name: 'Menesis, Archie', title: 'Faculty Meeting', time: '1:00 PM - 3:00 PM', attendance: '10 People', chairs: 0, tables: 0 },
-  ],
-  5: [
-    { studentId: '2021-182145', resource: 'SPEAKER', category: 'speaker' },
-  ],
-  7: [
-    { studentId: '2021-182165', resource: 'ROOM 401', category: 'rooms' },
-  ],
-  10: [
-    { studentId: '2021-182178', resource: 'FURNITURE', category: 'furniture' },
-  ],
-  12: [
-    { studentId: '2021-182188', resource: 'TV', category: 'tv' },
-  ],
-  13: [
-    { studentId: '2021-182194', resource: 'SPEAKER', category: 'speaker' },
-  ],
-  16: [
-    { studentId: '2021-182201', resource: 'TV', category: 'tv' },
-  ],
-  18: [
-    { studentId: '2021-182214', resource: 'FURNITURE', category: 'furniture' },
-  ],
-  21: [
-    { studentId: '2021-182225', resource: 'ROOM 215', category: 'rooms' },
-    { studentId: '2021-182230', resource: 'TV', category: 'tv' },
-  ],
-  27: [
-    { studentId: '2021-182240', resource: 'SPEAKER', category: 'speaker' },
-  ],
-};
-
 function getScheduleDateLabel(day) {
-  return `02-${String(day).padStart(2, '0')}-2026`;
+  if (scheduleMonthKey && /^\d{4}-\d{2}$/.test(scheduleMonthKey)) {
+    const [year, month] = scheduleMonthKey.split('-').map((value) => Number.parseInt(value, 10));
+    const date = new Date(year, month - 1, day);
+
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
+
+  return `Month ${String(day).padStart(2, '0')}, 2026`;
 }
 
 function closeScheduleRequestModal() {
@@ -427,73 +729,82 @@ function openScheduleDetailModal(request, dateLabel) {
     return;
   }
 
-  if (scheduleDetailName) {
-    scheduleDetailName.textContent = request.name || 'Menesis, Archie';
-  }
-
-  if (scheduleDetailTitleActivity) {
-    scheduleDetailTitleActivity.textContent = request.title || 'Faculty Meeting';
-  }
-
-  if (scheduleDetailDate) {
-    scheduleDetailDate.textContent = dateLabel;
-  }
-
-  if (scheduleDetailTime) {
-    scheduleDetailTime.textContent = request.time || '1:00 PM - 3:00 PM';
-  }
-
-  if (scheduleDetailAttendance) {
-    scheduleDetailAttendance.textContent = request.attendance || '10 People';
-  }
-
-  if (scheduleDetailResource) {
-    scheduleDetailResource.textContent = request.resource || '-';
-  }
-
-  if (scheduleDetailChairs) {
-    scheduleDetailChairs.textContent = String(request.chairs ?? 0);
-  }
-
-  if (scheduleDetailTables) {
-    scheduleDetailTables.textContent = String(request.tables ?? 0);
-  }
+  renderScheduleDetailContent(request, dateLabel, {
+    requester: scheduleDetailName,
+    activity: scheduleDetailTitleActivity,
+    requestedOn: scheduleDetailDate,
+    requestedTime: scheduleDetailTime,
+    reservationCode: scheduleDetailAttendance,
+    status: scheduleDetailResource,
+    resources: scheduleDetailChairs,
+    approvals: scheduleDetailTables,
+  });
 
   scheduleDetailModal.classList.add('is-open');
   scheduleDetailModal.setAttribute('aria-hidden', 'false');
 }
 
 function renderScheduleInlineDetail(request, dateLabel) {
-  if (scheduleInlineDetailName) {
-    scheduleInlineDetailName.textContent = request.name || 'Menesis, Archie';
+  renderScheduleDetailContent(request, dateLabel, {
+    requester: scheduleInlineDetailRequester,
+    activity: scheduleInlineDetailActivity,
+    requestedOn: scheduleInlineDetailRequestedOn,
+    requestedTime: scheduleInlineDetailRequestedTime,
+    reservationCode: scheduleInlineDetailReservationCode,
+    status: scheduleInlineDetailStatus,
+    resources: scheduleInlineDetailResources,
+    approvals: scheduleInlineDetailApprovals,
+  });
+}
+
+function renderScheduleDetailContent(request, dateLabel, targets) {
+  const resources = Array.isArray(request.resources) ? request.resources : [];
+  const approvals = Array.isArray(request.approval_steps) ? request.approval_steps : [];
+  const totalQuantity = resources.reduce((sum, resource) => sum + Number.parseInt(String(resource.quantity ?? 0), 10), 0);
+
+  if (targets.requester) {
+    targets.requester.textContent = request.requester_name || 'Unknown requester';
   }
 
-  if (scheduleInlineDetailTitle) {
-    scheduleInlineDetailTitle.textContent = request.title || 'Faculty Meeting';
+  if (targets.activity) {
+    targets.activity.textContent = request.activity_name || 'Reservation';
   }
 
-  if (scheduleInlineDetailDate) {
-    scheduleInlineDetailDate.textContent = dateLabel;
+  if (targets.requestedOn) {
+    targets.requestedOn.textContent = request.scheduled_on || dateLabel || '-';
   }
 
-  if (scheduleInlineDetailTime) {
-    scheduleInlineDetailTime.textContent = request.time || '1:00 PM - 3:00 PM';
+  if (targets.requestedTime) {
+    targets.requestedTime.textContent = request.requested_time || '-';
   }
 
-  if (scheduleInlineDetailAttendance) {
-    scheduleInlineDetailAttendance.textContent = request.attendance || '10 People';
+  if (targets.reservationCode) {
+    targets.reservationCode.textContent = request.reservation_code || '-';
   }
 
-  if (scheduleInlineDetailResource) {
-    scheduleInlineDetailResource.textContent = request.resource || '-';
+  if (targets.status) {
+    targets.status.textContent = request.status_label || 'Fully Approved';
+    targets.status.className = `schedule-status-pill ${request.status_class || 'is-approved'}`;
   }
 
-  if (scheduleInlineDetailChairs) {
-    scheduleInlineDetailChairs.textContent = String(request.chairs ?? 0);
+  if (targets.resources) {
+    if (!resources.length) {
+      targets.resources.innerHTML = '<div>No resource details available.</div>';
+    } else {
+      targets.resources.innerHTML = resources.map((resource) => `
+        <div><i class="bi ${resource.icon || 'bi-box-seam'}"></i> ${resource.quantity > 1 ? `${resource.quantity} x ` : ''}${resource.label}</div>
+      `).join('');
+    }
   }
 
-  if (scheduleInlineDetailTables) {
-    scheduleInlineDetailTables.textContent = String(request.tables ?? 0);
+  if (targets.approvals) {
+    if (!approvals.length) {
+      targets.approvals.innerHTML = '<div>No approval trail available.</div>';
+    } else {
+      targets.approvals.innerHTML = approvals.map((approval) => `
+        <div><i class="bi bi-check-circle-fill"></i> ${approval.office}: ${approval.status} <span>${approval.approved_at || ''}</span></div>
+      `).join('');
+    }
   }
 }
 
@@ -506,7 +817,7 @@ function openScheduleInlineDetails(day) {
   const dayRequests = scheduleRequestData[day] || [];
   const filteredRequests = activeScheduleCategory === 'all'
     ? dayRequests
-    : dayRequests.filter((request) => request.category === activeScheduleCategory);
+    : dayRequests.filter((request) => Array.isArray(request.categories) && request.categories.includes(activeScheduleCategory));
 
   selectedScheduleDay = day;
   visibleScheduleInlineRequests = filteredRequests;
@@ -516,23 +827,23 @@ function openScheduleInlineDetails(day) {
     cell.classList.toggle('selected', dayValue === day);
   });
 
-  scheduleInlineDate.textContent = `Date Requested: ${dateLabel}`;
+  scheduleInlineDate.textContent = `Date Used: ${dateLabel}`;
 
   if (!filteredRequests.length) {
     scheduleInlineRequestBody.innerHTML = `
       <tr>
-        <td colspan="3">No requests for the selected category on this date.</td>
+        <td colspan="4">No approved requests for the selected category on this date.</td>
       </tr>
     `;
 
     renderScheduleInlineDetail({
-      name: '-',
-      title: '-',
-      time: '-',
-      attendance: '-',
-      resource: '-',
-      chairs: 0,
-      tables: 0,
+      requester_name: '-',
+      activity_name: '-',
+      requested_time: '-',
+      reservation_code: '-',
+      status_label: '-',
+      resources: [],
+      approval_steps: [],
     }, '-');
 
     return;
@@ -541,9 +852,9 @@ function openScheduleInlineDetails(day) {
   scheduleInlineRequestBody.innerHTML = filteredRequests
     .map((request, index) => `
       <tr data-inline-request-index="${index}">
-        <td>${request.studentId}</td>
-        <td>${dateLabel}</td>
-        <td>${request.resource}</td>
+        <td>${request.reservation_code || '-'}</td>
+        <td>${request.requester_name || '-'}</td>
+        <td>${request.resource_summary || '-'}</td>
       </tr>
     `)
     .join('');
@@ -560,25 +871,25 @@ function openScheduleRequestModal(day) {
   const dayRequests = scheduleRequestData[day] || [];
   const filteredRequests = activeScheduleCategory === 'all'
     ? dayRequests
-    : dayRequests.filter((request) => request.category === activeScheduleCategory);
+    : dayRequests.filter((request) => Array.isArray(request.categories) && request.categories.includes(activeScheduleCategory));
   visibleScheduleRequests = filteredRequests;
 
-  scheduleModalDate.textContent = `Date Requested: ${dateLabel}`;
+  scheduleModalDate.textContent = `Date Used: ${dateLabel}`;
 
   if (!filteredRequests.length) {
     scheduleRequestBody.innerHTML = `
       <tr>
-        <td colspan="4">No requests for the selected category on this date.</td>
+        <td colspan="4">No approved requests for the selected category on this date.</td>
       </tr>
     `;
   } else {
     scheduleRequestBody.innerHTML = filteredRequests
       .map((request, index) => `
         <tr>
-          <td>${request.studentId}</td>
-          <td>${dateLabel}</td>
-          <td>${request.resource}</td>
-          <td><button class="schedule-view-btn" type="button" data-request-index="${index}" data-request-date="${dateLabel}"><i class="bi bi-person"></i> View</button></td>
+          <td>${request.reservation_code || '-'}</td>
+          <td>${request.requester_name || '-'}</td>
+          <td>${request.resource_summary || '-'}</td>
+          <td><button class="schedule-view-btn" type="button" data-request-index="${index}" data-request-date="${request.scheduled_on || dateLabel}"><i class="bi bi-person"></i> View</button></td>
         </tr>
       `)
       .join('');
@@ -664,11 +975,131 @@ function applyRequestDecision(item, status) {
   }
 }
 
+function showRequestDecisionToast(message, status) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  if (!document.getElementById('request-action-toast-style')) {
+    const style = document.createElement('style');
+    style.id = 'request-action-toast-style';
+    style.textContent = `
+      .request-action-toast {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 9999;
+        min-width: 240px;
+        max-width: 360px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        color: #fff;
+        font-weight: 700;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.18s ease, transform 0.18s ease;
+      }
+      .request-action-toast.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .request-action-toast.is-approved {
+        background: #0a8f3e;
+      }
+      .request-action-toast.is-rejected {
+        background: #c92a2a;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const existing = document.querySelector('.request-action-toast');
+  if (existing) {
+    existing.remove();
+  }
+
+  const toast = document.createElement('div');
+  const isApproved = status === 'approved';
+  toast.className = `request-action-toast ${isApproved ? 'is-approved' : 'is-rejected'}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  window.setTimeout(() => {
+    toast.classList.add('is-visible');
+  }, 20);
+
+  window.setTimeout(() => {
+    toast.classList.remove('is-visible');
+    window.setTimeout(() => toast.remove(), 180);
+  }, 1600);
+}
+
+function getRequestItems() {
+  return document.querySelectorAll('.request-item');
+}
+
+async function refreshRequestListPreservingTab(explicitUrl) {
+  if (!requestListWrap) {
+    return;
+  }
+
+  const refreshUrl = (typeof window.requestListRefreshUrl === 'string' && window.requestListRefreshUrl)
+    ? window.requestListRefreshUrl
+    : '/dashboard/request/list';
+  let refreshRequestUrl = refreshUrl;
+
+  if (typeof explicitUrl === 'string' && explicitUrl.trim() !== '') {
+    const parsedUrl = new URL(explicitUrl, window.location.origin);
+    const explicitQuery = parsedUrl.search.replace(/^\?/, '');
+    refreshRequestUrl = explicitQuery
+      ? `${refreshUrl}${refreshUrl.includes('?') ? '&' : '?'}${explicitQuery}`
+      : refreshUrl;
+  } else {
+    const queryString = typeof window.location?.search === 'string' ? window.location.search : '';
+    refreshRequestUrl = queryString
+      ? `${refreshUrl}${refreshUrl.includes('?') ? '&' : '?'}${queryString.replace(/^\?/, '')}`
+      : refreshUrl;
+  }
+
+  const activeTabElement = document.querySelector('[data-request-tab].active');
+  const activeTab = activeTabElement instanceof HTMLElement
+    ? (activeTabElement.dataset.requestTab || 'final')
+    : 'final';
+
+  const response = await fetch(refreshRequestUrl, {
+    method: 'GET',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      Accept: 'application/json',
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || !data.success || typeof data.html !== 'string') {
+    throw new Error(data.error || data.message || 'Unable to refresh request list.');
+  }
+
+  requestListWrap.innerHTML = data.html;
+
+  if (typeof explicitUrl === 'string' && explicitUrl.trim() !== '') {
+    const parsedUrl = new URL(explicitUrl, window.location.origin);
+    const samePath = parsedUrl.pathname === window.location.pathname;
+    if (samePath) {
+      const nextUrl = `${window.location.pathname}${parsedUrl.search}`;
+      window.history.replaceState({}, '', nextUrl);
+    }
+  }
+
+  setRequestTabMode(activeTab);
+}
+
 async function submitRequestDecision(item, button, status) {
   const approvalId = button ? button.dataset.approvalId : '';
 
   if (!approvalId) {
-    window.alert('Approval record is not available for this request.');
+    showAppNotice('Approval record is not available for this request.');
     return;
   }
 
@@ -676,7 +1107,7 @@ async function submitRequestDecision(item, button, status) {
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
   if (!csrfToken) {
-    window.alert('Missing CSRF token. Please refresh the page and try again.');
+    showAppNotice('Missing CSRF token. Please refresh the page and try again.');
     return;
   }
 
@@ -698,14 +1129,19 @@ async function submitRequestDecision(item, button, status) {
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-      window.alert(data.error || data.message || 'Unable to process this request.');
+      showAppNotice(data.error || data.message || 'Unable to process this request.');
       return;
     }
 
     applyRequestDecision(item, status);
+    showRequestDecisionToast(
+      status === 'approved' ? 'Request approved successfully.' : 'Request rejected successfully.',
+      status,
+    );
+    await refreshRequestListPreservingTab();
   } catch (error) {
     window.console.error('Request approval error:', error);
-    window.alert('An error occurred while processing the request.');
+    showAppNotice('An error occurred while processing the request.');
   } finally {
     if (button) {
       button.disabled = false;
@@ -717,7 +1153,7 @@ async function submitFinalRequestDecision(item, button, status) {
   const reservationId = button ? button.dataset.reservationId : '';
 
   if (!reservationId) {
-    window.alert('Reservation record is not available for this request.');
+    showAppNotice('Reservation record is not available for this request.');
     return;
   }
 
@@ -725,7 +1161,7 @@ async function submitFinalRequestDecision(item, button, status) {
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
   if (!csrfToken) {
-    window.alert('Missing CSRF token. Please refresh the page and try again.');
+    showAppNotice('Missing CSRF token. Please refresh the page and try again.');
     return;
   }
 
@@ -757,14 +1193,19 @@ async function submitFinalRequestDecision(item, button, status) {
 
     if (!response.ok || !data.success) {
       const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
-      window.alert((data.error || data.message || 'Unable to process this request.') + statusMessage);
+      showAppNotice((data.error || data.message || 'Unable to process this request.') + statusMessage);
       return;
     }
 
     applyRequestDecision(item, status);
+    showRequestDecisionToast(
+      status === 'approved' ? 'Request approved successfully.' : 'Request rejected successfully.',
+      status,
+    );
+    await refreshRequestListPreservingTab();
   } catch (error) {
     window.console.error('Final request approval error:', error);
-    window.alert('An error occurred while processing the request.');
+    showAppNotice('An error occurred while processing the request.');
   } finally {
     if (button) {
       button.disabled = false;
@@ -783,7 +1224,7 @@ function setRequestTabMode(mode) {
     tab.classList.toggle('active', tab.dataset.requestTab === requestMode);
   });
 
-  requestItems.forEach((item) => {
+  getRequestItems().forEach((item) => {
     item.classList.remove('is-selected', 'is-approved', 'is-rejected');
   });
 
@@ -915,12 +1356,451 @@ function applyEquipmentFilters() {
   rows.forEach((row) => {
     const rowCategory = row.dataset.equipmentRow || '';
     const rowText = row.textContent.toLowerCase();
-    const matchesTab = rowCategory === activeEquipmentTab;
+    const matchesTab = !activeEquipmentTab || rowCategory === activeEquipmentTab;
     const matchesTopSearch = !topTerm || rowText.includes(topTerm);
     const matchesInlineSearch = !inlineTerm || rowText.includes(inlineTerm);
 
     row.style.display = matchesTab && matchesTopSearch && matchesInlineSearch ? '' : 'none';
   });
+}
+
+function getEquipmentTabButtons() {
+  if (equipmentTabGroup) {
+    return equipmentTabGroup.querySelectorAll('[data-equipment-tab]');
+  }
+
+  return equipmentTabs;
+}
+
+function getDefaultEquipmentCategoryKey() {
+  const activeTabButton = document.querySelector('[data-equipment-tab].active');
+  if (activeTabButton instanceof HTMLElement && activeTabButton.dataset.equipmentTab) {
+    return activeTabButton.dataset.equipmentTab;
+  }
+
+  const firstTabButton = getEquipmentTabButtons()[0];
+  if (firstTabButton instanceof HTMLElement && firstTabButton.dataset.equipmentTab) {
+    return firstTabButton.dataset.equipmentTab;
+  }
+
+  if (typeof window.defaultEquipmentCategory === 'string' && window.defaultEquipmentCategory.trim()) {
+    return window.defaultEquipmentCategory.trim();
+  }
+
+  return '';
+}
+
+function setActiveEquipmentTab(categoryKey) {
+  const nextKey = (categoryKey || '').trim();
+
+  activeEquipmentTab = nextKey;
+
+  getEquipmentTabButtons().forEach((button) => {
+    const tabKey = button instanceof HTMLElement ? (button.dataset.equipmentTab || '') : '';
+    if (button instanceof HTMLElement) {
+      button.classList.toggle('active', tabKey === nextKey);
+    }
+  });
+
+  applyEquipmentFilters();
+}
+
+function normalizeEquipmentCategories(categories) {
+  if (!Array.isArray(categories)) {
+    return [];
+  }
+
+  return categories
+    .map((category) => ({
+      id: Number.parseInt(String(category?.id ?? ''), 10),
+      key: String(category?.key ?? '').trim(),
+      label: String(category?.label ?? '').trim(),
+    }))
+    .filter((category) => Number.isInteger(category.id) && category.id > 0 && category.key && category.label);
+}
+
+function renderEquipmentCategoryList() {
+  if (!equipmentCategoryList) {
+    return;
+  }
+
+  if (!equipmentCategoriesCache.length) {
+    equipmentCategoryList.innerHTML = '<li class="equipment-category-list-empty">No categories yet.</li>';
+    return;
+  }
+
+  equipmentCategoryList.innerHTML = equipmentCategoriesCache
+    .map((category) => `
+      <li class="equipment-category-list-item" data-category-id="${category.id}" data-category-key="${category.key}">
+        <span class="equipment-category-list-label">${category.label}</span>
+        <div class="equipment-category-list-actions">
+          <button type="button" class="equipment-category-rename-btn" data-rename-equipment-category-id="${category.id}">Rename</button>
+          <button type="button" class="equipment-category-delete-btn" data-delete-equipment-category-id="${category.id}" data-delete-equipment-category-key="${category.key}">Delete</button>
+        </div>
+      </li>
+    `)
+    .join('');
+}
+
+function resetEquipmentCategoryModalMode() {
+  activeEquipmentCategoryEditingId = null;
+
+  if (equipmentCategoryModalTitle) {
+    equipmentCategoryModalTitle.textContent = 'Add Category';
+  }
+
+  if (equipmentCategorySaveButton instanceof HTMLButtonElement) {
+    equipmentCategorySaveButton.textContent = 'Add Category';
+  }
+}
+
+function setEquipmentCategoryEditMode(categoryId, categoryLabel) {
+  activeEquipmentCategoryEditingId = Number.parseInt(String(categoryId || ''), 10);
+
+  if (!Number.isInteger(activeEquipmentCategoryEditingId) || activeEquipmentCategoryEditingId <= 0) {
+    activeEquipmentCategoryEditingId = null;
+    return;
+  }
+
+  if (equipmentCategoryModalTitle) {
+    equipmentCategoryModalTitle.textContent = 'Rename Category';
+  }
+
+  if (equipmentCategorySaveButton instanceof HTMLButtonElement) {
+    equipmentCategorySaveButton.textContent = 'Save Rename';
+  }
+
+  if (equipmentCategoryNameInput) {
+    equipmentCategoryNameInput.value = String(categoryLabel || '').trim();
+    equipmentCategoryNameInput.focus();
+    equipmentCategoryNameInput.select();
+  }
+}
+
+function setEquipmentCategoryActionsDisabled(disabled) {
+  if (equipmentCategorySaveButton instanceof HTMLButtonElement) {
+    equipmentCategorySaveButton.disabled = disabled;
+  }
+
+  if (equipmentAddCategoryButton instanceof HTMLButtonElement) {
+    equipmentAddCategoryButton.disabled = disabled;
+  }
+
+  if (equipmentCategoryList) {
+    equipmentCategoryList.querySelectorAll('.equipment-category-delete-btn, .equipment-category-rename-btn').forEach((button) => {
+      if (button instanceof HTMLButtonElement) {
+        button.disabled = disabled;
+      }
+    });
+  }
+}
+
+function syncEquipmentCategoriesInUi(categories, preferredActiveKey = '') {
+  const normalizedCategories = normalizeEquipmentCategories(categories);
+  if (Array.isArray(categories)) {
+    equipmentCategoriesCache = normalizedCategories;
+  }
+
+  if (equipmentCategoryInput) {
+    equipmentCategoryInput.innerHTML = '<option value="" selected disabled>Select Category</option>';
+
+    equipmentCategoriesCache.forEach((category) => {
+      const option = document.createElement('option');
+      option.value = category.key;
+      option.textContent = category.label;
+      equipmentCategoryInput.appendChild(option);
+    });
+  }
+
+  if (equipmentTabGroup) {
+    equipmentTabGroup.innerHTML = '';
+
+    equipmentCategoriesCache.forEach((category) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'facilities-tab';
+      button.dataset.equipmentTab = category.key;
+      button.textContent = category.label;
+      equipmentTabGroup.appendChild(button);
+    });
+  }
+
+  renderEquipmentCategoryList();
+
+  const categoryKeys = equipmentCategoriesCache.map((category) => category.key);
+  let nextActiveKey = (preferredActiveKey || activeEquipmentTab || '').trim();
+
+  if (!categoryKeys.includes(nextActiveKey)) {
+    nextActiveKey = categoryKeys[0] || '';
+  }
+
+  setActiveEquipmentTab(nextActiveKey);
+}
+
+function ensureEquipmentCategoryInUi(categoryKey, categoryLabel) {
+  const normalizedKey = (categoryKey || '').trim();
+  const normalizedLabel = (categoryLabel || categoryKey || '').trim();
+
+  if (!normalizedKey || !normalizedLabel) {
+    return;
+  }
+
+  const existing = equipmentCategoriesCache.find((category) => category.key === normalizedKey);
+
+  if (existing) {
+    existing.label = normalizedLabel;
+    syncEquipmentCategoriesInUi(equipmentCategoriesCache, normalizedKey);
+    return;
+  }
+
+  if (equipmentCategoryInput) {
+    const hasOption = Array.from(equipmentCategoryInput.options).some((option) => option.value === normalizedKey);
+    if (!hasOption) {
+      const option = document.createElement('option');
+      option.value = normalizedKey;
+      option.textContent = normalizedLabel;
+      equipmentCategoryInput.appendChild(option);
+    }
+  }
+
+  if (equipmentTabGroup) {
+    const hasTab = Array.from(equipmentTabGroup.querySelectorAll('[data-equipment-tab]')).some((tab) => tab.dataset.equipmentTab === normalizedKey);
+    if (!hasTab) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'facilities-tab';
+      button.dataset.equipmentTab = normalizedKey;
+      button.textContent = normalizedLabel;
+      equipmentTabGroup.appendChild(button);
+    }
+  }
+}
+
+function closeEquipmentCategoryModal() {
+  if (!equipmentCategoryModal) {
+    return;
+  }
+
+  resetEquipmentCategoryModalMode();
+
+  equipmentCategoryModal.classList.remove('is-open');
+  equipmentCategoryModal.setAttribute('aria-hidden', 'true');
+}
+
+function openEquipmentCategoryModal() {
+  if (!equipmentCategoryModal) {
+    return;
+  }
+
+  if (equipmentCategoryNameInput) {
+    equipmentCategoryNameInput.value = '';
+  }
+
+  resetEquipmentCategoryModalMode();
+  renderEquipmentCategoryList();
+
+  equipmentCategoryModal.classList.add('is-open');
+  equipmentCategoryModal.setAttribute('aria-hidden', 'false');
+
+  if (equipmentCategoryNameInput) {
+    equipmentCategoryNameInput.focus();
+  }
+}
+
+async function submitEquipmentCategoryCreate() {
+  if (Number.isInteger(activeEquipmentCategoryEditingId) && activeEquipmentCategoryEditingId > 0) {
+    await submitEquipmentCategoryRename(activeEquipmentCategoryEditingId);
+    return;
+  }
+
+  if (!equipmentCategoryCreateEndpoint) {
+    showAppNotice('Category endpoint is not configured on this page.');
+    return;
+  }
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  if (!csrfToken) {
+    showAppNotice('Unable to add category. Missing CSRF token.');
+    return;
+  }
+
+  const categoryName = equipmentCategoryNameInput ? equipmentCategoryNameInput.value.trim() : '';
+
+  if (!categoryName) {
+    showAppNotice('Category name cannot be empty.');
+    return;
+  }
+
+  setEquipmentCategoryActionsDisabled(true);
+
+  try {
+    const response = await fetch(equipmentCategoryCreateEndpoint, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({
+        display_name: categoryName,
+      }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok || !payload.success || !payload.category) {
+      showAppNotice(payload.error || `Unable to add category. (HTTP ${response.status})`);
+      return;
+    }
+
+    if (Array.isArray(payload.categories)) {
+      syncEquipmentCategoriesInUi(payload.categories, payload.category.key);
+    } else {
+      ensureEquipmentCategoryInUi(payload.category.key, payload.category.label);
+      setActiveEquipmentTab(payload.category.key);
+    }
+
+    if (equipmentCategoryInput) {
+      equipmentCategoryInput.value = payload.category.key;
+    }
+
+    closeEquipmentCategoryModal();
+    showSaveSuccessToast('Category has been added successfully.');
+  } catch (_error) {
+    showAppNotice('Unable to add category right now. Please try again.');
+  } finally {
+    setEquipmentCategoryActionsDisabled(false);
+  }
+}
+
+async function submitEquipmentCategoryRename(categoryId) {
+  if (!equipmentCategoryUpdateEndpointBase) {
+    showAppNotice('Category update endpoint is not configured on this page.');
+    return;
+  }
+
+  const parsedCategoryId = Number.parseInt(String(categoryId || ''), 10);
+  if (!Number.isInteger(parsedCategoryId) || parsedCategoryId <= 0) {
+    showAppNotice('Invalid category selected.');
+    return;
+  }
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  if (!csrfToken) {
+    showAppNotice('Unable to rename category. Missing CSRF token.');
+    return;
+  }
+
+  const categoryName = equipmentCategoryNameInput ? equipmentCategoryNameInput.value.trim() : '';
+
+  if (!categoryName) {
+    showAppNotice('Category name cannot be empty.');
+    return;
+  }
+
+  setEquipmentCategoryActionsDisabled(true);
+
+  try {
+    const response = await fetch(`${equipmentCategoryUpdateEndpointBase}/${parsedCategoryId}`, {
+      method: 'PATCH',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({
+        display_name: categoryName,
+      }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok || !payload.success || !payload.category) {
+      showAppNotice(payload.error || `Unable to rename category. (HTTP ${response.status})`);
+      return;
+    }
+
+    if (Array.isArray(payload.categories)) {
+      syncEquipmentCategoriesInUi(payload.categories, payload.category.key);
+    }
+
+    closeEquipmentCategoryModal();
+    showSaveSuccessToast('Category has been renamed successfully.');
+  } catch (_error) {
+    showAppNotice('Unable to rename category right now. Please try again.');
+  } finally {
+    setEquipmentCategoryActionsDisabled(false);
+  }
+}
+
+async function submitEquipmentCategoryDelete(categoryId, categoryKey) {
+  if (!equipmentCategoryDeleteEndpointBase) {
+    showAppNotice('Category delete endpoint is not configured on this page.');
+    return;
+  }
+
+  const parsedCategoryId = Number.parseInt(String(categoryId || ''), 10);
+  if (!Number.isInteger(parsedCategoryId) || parsedCategoryId <= 0) {
+    showAppNotice('Invalid category selected.');
+    return;
+  }
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  if (!csrfToken) {
+    showAppNotice('Unable to delete category. Missing CSRF token.');
+    return;
+  }
+
+  const normalizedCategoryKey = String(categoryKey || '').trim();
+  const confirmed = await openInventoryConfirmModal({
+    title: 'Delete Category',
+    message: 'Are you sure you want to delete this category? This cannot be undone.',
+    confirmText: 'Delete',
+    variant: 'delete',
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  setEquipmentCategoryActionsDisabled(true);
+
+  try {
+    const response = await fetch(`${equipmentCategoryDeleteEndpointBase}/${parsedCategoryId}`, {
+      method: 'DELETE',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok || !payload.success) {
+      showAppNotice(payload.error || `Unable to delete category. (HTTP ${response.status})`);
+      return;
+    }
+
+    if (Array.isArray(payload.categories)) {
+      syncEquipmentCategoriesInUi(payload.categories);
+    }
+
+    if (equipmentCategoryInput && equipmentCategoryInput.value === normalizedCategoryKey) {
+      equipmentCategoryInput.value = '';
+    }
+
+    showSaveSuccessToast('Category has been deleted successfully.');
+  } catch (_error) {
+    showAppNotice('Unable to delete category right now. Please try again.');
+  } finally {
+    setEquipmentCategoryActionsDisabled(false);
+  }
 }
 
 function getEquipmentStatusClass(statusValue) {
@@ -948,41 +1828,53 @@ function getEquipmentStatusLabel(statusValue) {
 }
 
 function showSaveSuccessToast(message) {
-  const existing = document.getElementById('save-success-toast');
+  showAppNotice(message, {
+    title: 'Feedback',
+    buttonText: 'Finish',
+    variant: 'success',
+    autoCloseMs: 1800,
+  });
+}
 
-  if (existing) {
-    existing.remove();
+function closeInventoryConfirmModal() {
+  if (!(inventoryConfirmModal instanceof HTMLElement)) {
+    return;
   }
 
-  const toast = document.createElement('div');
-  toast.id = 'save-success-toast';
-  toast.textContent = message;
-  toast.style.position = 'fixed';
-  toast.style.top = '24px';
-  toast.style.right = '24px';
-  toast.style.zIndex = '9999';
-  toast.style.background = '#1f8b4c';
-  toast.style.color = '#ffffff';
-  toast.style.padding = '10px 14px';
-  toast.style.borderRadius = '8px';
-  toast.style.fontSize = '14px';
-  toast.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.2)';
-  toast.style.opacity = '0';
-  toast.style.transform = 'translateY(-6px)';
-  toast.style.transition = 'opacity 140ms ease, transform 140ms ease';
+  inventoryConfirmModal.classList.remove('is-open');
+  inventoryConfirmModal.setAttribute('aria-hidden', 'true');
+  inventoryConfirmModal.dataset.confirmVariant = '';
+  inventoryConfirmResolver = null;
+}
 
-  document.body.appendChild(toast);
+function openInventoryConfirmModal(options = {}) {
+  if (!(inventoryConfirmModal instanceof HTMLElement)
+    || !(inventoryConfirmTitle instanceof HTMLElement)
+    || !(inventoryConfirmMessage instanceof HTMLElement)
+    || !(inventoryConfirmCancel instanceof HTMLButtonElement)
+    || !(inventoryConfirmSubmit instanceof HTMLButtonElement)) {
+    return Promise.resolve(true);
+  }
 
-  requestAnimationFrame(() => {
-    toast.style.opacity = '1';
-    toast.style.transform = 'translateY(0)';
+  const {
+    title = 'Confirm Delete',
+    message = 'Are you sure you want to delete this item? This cannot be undone.',
+    confirmText = 'Delete',
+    variant = 'delete',
+  } = options;
+
+  inventoryConfirmTitle.textContent = title;
+  inventoryConfirmMessage.textContent = message;
+  inventoryConfirmSubmit.textContent = confirmText;
+  inventoryConfirmSubmit.classList.toggle('delete', variant === 'delete');
+  inventoryConfirmSubmit.classList.toggle('danger', variant === 'danger');
+  inventoryConfirmModal.dataset.confirmVariant = variant;
+  inventoryConfirmModal.classList.add('is-open');
+  inventoryConfirmModal.setAttribute('aria-hidden', 'false');
+
+  return new Promise((resolve) => {
+    inventoryConfirmResolver = resolve;
   });
-
-  window.setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(-6px)';
-    window.setTimeout(() => toast.remove(), 180);
-  }, 1500);
 }
 
 function closeEquipmentEditModal() {
@@ -993,6 +1885,124 @@ function closeEquipmentEditModal() {
   equipmentEditModal.classList.remove('is-open');
   equipmentEditModal.setAttribute('aria-hidden', 'true');
   activeEquipmentEditingRow = null;
+}
+
+function ensureEquipmentEmptyStateRow() {
+  if (!equipmentTableBody) {
+    return;
+  }
+
+  const hasDataRows = Array.from(equipmentTableBody.querySelectorAll('tr')).some((row) => {
+    return row instanceof HTMLElement && Boolean(row.dataset.itemId);
+  });
+
+  if (hasDataRows) {
+    return;
+  }
+
+  const placeholder = document.createElement('tr');
+  placeholder.dataset.equipmentRow = activeEquipmentTab || getDefaultEquipmentCategoryKey() || '';
+  placeholder.innerHTML = '<td colspan="6">No equipment records found in the database.</td>';
+  equipmentTableBody.appendChild(placeholder);
+}
+
+function removeEquipmentEmptyStateRows() {
+  if (!equipmentTableBody) {
+    return;
+  }
+
+  equipmentTableBody.querySelectorAll('tr').forEach((row) => {
+    if (!(row instanceof HTMLElement)) {
+      return;
+    }
+
+    const hasDataRow = Boolean(row.dataset.itemId);
+    const placeholderCell = row.querySelector('td[colspan="6"]');
+
+    if (!hasDataRow && placeholderCell) {
+      row.remove();
+    }
+  });
+}
+
+async function submitEquipmentDelete() {
+  if (!activeEquipmentEditingRow || !equipmentTableBody) {
+    return;
+  }
+
+  const itemId = activeEquipmentEditingRow.dataset.itemId;
+
+  if (!itemId) {
+    showAppNotice('Unable to delete item. Missing item identifier.');
+    return;
+  }
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]');
+
+  if (!csrfToken) {
+    showAppNotice('Unable to delete item. Missing CSRF token.');
+    return;
+  }
+
+  const confirmed = await openInventoryConfirmModal({
+    title: 'Delete Item',
+    message: 'Are you sure you want to delete this item? This cannot be undone.',
+    confirmText: 'Delete',
+    variant: 'delete',
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  if (equipmentDeleteButton instanceof HTMLButtonElement) {
+    equipmentDeleteButton.disabled = true;
+  }
+
+  if (equipmentSaveButton instanceof HTMLButtonElement) {
+    equipmentSaveButton.disabled = true;
+  }
+
+  try {
+    const response = await fetch(`${equipmentEndpointBase}/${encodeURIComponent(itemId)}`, {
+      method: 'DELETE',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken.content,
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+
+    const responseText = await response.text();
+    let payload = {};
+
+    try {
+      payload = responseText ? JSON.parse(responseText) : {};
+    } catch (_error) {
+      payload = {};
+    }
+
+    if (!response.ok || !payload.success) {
+      showAppNotice(payload.error || `Unable to delete item. (HTTP ${response.status})`);
+      return;
+    }
+
+    activeEquipmentEditingRow.remove();
+    closeEquipmentEditModal();
+    ensureEquipmentEmptyStateRow();
+    applyEquipmentFilters();
+    showSaveSuccessToast('Item has been deleted successfully.');
+  } catch (_error) {
+    showAppNotice('Unable to delete item right now. Please try again.');
+  } finally {
+    if (equipmentDeleteButton instanceof HTMLButtonElement) {
+      equipmentDeleteButton.disabled = false;
+    }
+
+    if (equipmentSaveButton instanceof HTMLButtonElement) {
+      equipmentSaveButton.disabled = false;
+    }
+  }
 }
 
 function openEquipmentEditModal(row) {
@@ -1008,7 +2018,14 @@ function openEquipmentEditModal(row) {
   }
 
   if (equipmentCategoryInput) {
-    equipmentCategoryInput.value = row.dataset.equipmentRow || 'multimedia';
+    const rowCategoryKey = row.dataset.equipmentRow || getDefaultEquipmentCategoryKey();
+    const fallbackLabel = rowCategoryKey
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+
+    ensureEquipmentCategoryInUi(rowCategoryKey, fallbackLabel || rowCategoryKey);
+    equipmentCategoryInput.value = rowCategoryKey;
   }
 
   if (equipmentTotalCountInput) {
@@ -1053,6 +2070,10 @@ function openEquipmentEditModal(row) {
 
   if (equipmentSaveButton) {
     equipmentSaveButton.textContent = 'Save Item';
+  }
+
+  if (equipmentDeleteButton instanceof HTMLButtonElement) {
+    equipmentDeleteButton.hidden = false;
   }
 
   equipmentEditModal.classList.add('is-open');
@@ -1106,6 +2127,10 @@ function openEquipmentAddModal() {
     equipmentSaveButton.textContent = 'Add Item';
   }
 
+  if (equipmentDeleteButton instanceof HTMLButtonElement) {
+    equipmentDeleteButton.hidden = true;
+  }
+
   equipmentEditModal.classList.add('is-open');
   equipmentEditModal.setAttribute('aria-hidden', 'false');
 }
@@ -1114,6 +2139,10 @@ function setActiveNavByPage() {
   const path = window.location.pathname.toLowerCase();
   const navTarget = path.includes('/dashboard/office/requests')
     ? 'requests'
+    : path.includes('/dashboard/office/items/maintenance')
+    ? 'manage-maintenance'
+    : path.includes('/dashboard/office/items')
+    ? 'manage-items'
     : path.includes('/dashboard/office/archive')
     ? 'archive'
     : path.includes('/dashboard/messages')
@@ -1239,6 +2268,17 @@ async function loadNavbar() {
     }
 
     navbarContainer.innerHTML = await response.text();
+
+    const currentUsername = String(window.authUser?.username || '').toLowerCase();
+    const currentOfficeCode = String(window.authUser?.office_short_code || '').toLowerCase();
+    const isIoAdmin = currentUsername === 'io_admin' || currentOfficeCode === 'io';
+
+    navbarContainer.querySelectorAll('[data-visible-for="io-admin"]').forEach((item) => {
+      if (!isIoAdmin) {
+        item.remove();
+      }
+    });
+
     setActiveNavByPage();
     ensureSidebarToggleButton();
     ensureSidebarBackdrop();
@@ -1253,7 +2293,7 @@ async function loadNavbar() {
         const token = document.querySelector('meta[name="csrf-token"]');
 
         if (!token || !token.content) {
-          alert('Unable to logout. Missing CSRF token.');
+          showAppNotice('Unable to logout. Missing CSRF token.');
           return;
         }
 
@@ -1799,9 +2839,9 @@ if (profileEditSaveButton) {
       }
 
       closeProfileEditModal();
-      window.alert(result.message || 'Profile updated successfully.');
+      showAppNotice(result.message || 'Profile updated successfully.');
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Failed to update profile.');
+      showAppNotice(error instanceof Error ? error.message : 'Failed to update profile.');
     } finally {
       profileEditSaveButton.disabled = false;
     }
@@ -1844,7 +2884,7 @@ if (profileAvatarUploadInput && profileEditAvatar && profileEditAvatarImage) {
 
     if (!validType) {
       profileAvatarUploadInput.value = '';
-      window.alert('Invalid image type. Please upload JPG or PNG only.');
+      showAppNotice('Invalid image type. Please upload JPG or PNG only.');
       return;
     }
 
@@ -1852,7 +2892,7 @@ if (profileAvatarUploadInput && profileEditAvatar && profileEditAvatarImage) {
 
     if (file.size > maxSizeBytes) {
       profileAvatarUploadInput.value = '';
-      window.alert('Image is too large. Maximum size is 5MB.');
+      showAppNotice('Image is too large. Maximum size is 5MB.');
       return;
     }
 
@@ -2584,7 +3624,7 @@ if (searchInput && (reportTableBody || inventoryTableBody || historyTableBody ||
       return;
     }
 
-    if (equipmentTableBody && equipmentTabs.length) {
+    if (equipmentTableBody && (equipmentTabGroup || equipmentTabs.length)) {
       applyEquipmentFilters();
       return;
     }
@@ -2683,7 +3723,7 @@ if (maintenanceEvalSettleButton) {
 }
 
 if (maintenanceFormSubmitButton) {
-  maintenanceFormSubmitButton.addEventListener('click', () => {
+  maintenanceFormSubmitButton.addEventListener('click', async () => {
     if (!maintenanceAssessmentInput || !maintenanceStatusSelect) {
       closeMaintenanceFormModal();
       activeMaintenanceAddressRow = null;
@@ -2694,13 +3734,79 @@ if (maintenanceFormSubmitButton) {
     const statusValue = maintenanceStatusSelect.value.trim();
 
     if (!assessmentValue || !statusValue) {
-      window.alert('Please complete Assessment and Status.');
+      showAppNotice('Please complete Assessment and Status.');
       return;
     }
 
-    closeMaintenanceFormModal();
-    activeMaintenanceAddressRow = null;
-    window.alert('Maintenance evaluation submitted.');
+    const unitId = Number.parseInt(activeMaintenanceAddressRow?.dataset.unitId || '', 10);
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+    if (!Number.isInteger(unitId) || unitId <= 0) {
+      showAppNotice('Unable to identify the selected item unit.');
+      return;
+    }
+
+    if (!csrfToken) {
+      showAppNotice('Missing CSRF token. Please refresh and try again.');
+      return;
+    }
+
+    maintenanceFormSubmitButton.disabled = true;
+
+    try {
+      const response = await fetch(`${maintenanceUnitsEndpointBase}/${encodeURIComponent(unitId)}`, {
+        method: 'PATCH',
+        headers: {
+          'X-CSRF-TOKEN': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assessment: assessmentValue,
+          status: statusValue,
+        }),
+      });
+
+      const responseText = await response.text();
+      let payload = {};
+
+      try {
+        payload = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        payload = {};
+      }
+
+      if (!response.ok || !payload.success) {
+        showAppNotice(payload.error || `Unable to update maintenance unit. (HTTP ${response.status})`);
+        return;
+      }
+
+      const unitRow = payload.unit;
+
+      for (const key of Object.keys(maintenanceRowsByTab)) {
+        const currentRows = Array.isArray(maintenanceRowsByTab[key]) ? maintenanceRowsByTab[key] : [];
+        maintenanceRowsByTab[key] = currentRows.filter((row) => Number.parseInt(String(row.unit_id || ''), 10) !== unitId);
+      }
+
+      if (!unitRow.resolved) {
+        const targetTab = unitRow.statusClass === 'damaged' ? 'damaged' : 'maintenance';
+        if (!Array.isArray(maintenanceRowsByTab[targetTab])) {
+          maintenanceRowsByTab[targetTab] = [];
+        }
+        maintenanceRowsByTab[targetTab].unshift(unitRow);
+      }
+
+      closeMaintenanceFormModal();
+      closeMaintenanceEvalModal();
+      activeMaintenanceAddressRow = null;
+      applyMaintenanceFilters();
+      showAppNotice('Maintenance evaluation submitted.');
+    } catch (error) {
+      showAppNotice('Unable to submit maintenance update right now.');
+    } finally {
+      maintenanceFormSubmitButton.disabled = false;
+    }
   });
 }
 
@@ -2748,7 +3854,9 @@ if (facilitiesAddButton && facilitiesEditModal) {
   facilitiesAddButton.addEventListener('click', openFacilitiesAddModal);
 }
 
-if (equipmentTableBody && equipmentTabs.length) {
+if (equipmentTableBody && (equipmentTabGroup || equipmentTabs.length)) {
+  syncEquipmentCategoriesInUi(equipmentCategoriesCache);
+
   equipmentTableBody.addEventListener('click', (event) => {
     const target = event.target;
 
@@ -2769,17 +3877,25 @@ if (equipmentTableBody && equipmentTabs.length) {
     }
   });
 
-  equipmentTabs.forEach((tabButton) => {
-    tabButton.addEventListener('click', () => {
-      activeEquipmentTab = tabButton.dataset.equipmentTab || 'multimedia';
+  if (equipmentTabGroup) {
+    equipmentTabGroup.addEventListener('click', (event) => {
+      const target = event.target;
 
-      equipmentTabs.forEach((button) => {
-        button.classList.toggle('active', button === tabButton);
-      });
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
 
-      applyEquipmentFilters();
+      const tabButton = target.closest('[data-equipment-tab]');
+
+      if (!(tabButton instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      setActiveEquipmentTab(tabButton.dataset.equipmentTab || getDefaultEquipmentCategoryKey());
     });
-  });
+  }
+
+  setActiveEquipmentTab(getDefaultEquipmentCategoryKey());
 
   if (equipmentInlineSearchInput) {
     equipmentInlineSearchInput.addEventListener('input', applyEquipmentFilters);
@@ -2788,8 +3904,126 @@ if (equipmentTableBody && equipmentTabs.length) {
   applyEquipmentFilters();
 }
 
+if (equipmentAddCategoryButton) {
+  equipmentAddCategoryButton.addEventListener('click', () => {
+    openEquipmentCategoryModal();
+  });
+}
+
+if (equipmentCategoryModal) {
+  equipmentCategoryModal.addEventListener('click', (event) => {
+    const target = event.target;
+
+    if (target instanceof HTMLElement && target.dataset.closeEquipmentCategoryModal === 'true') {
+      closeEquipmentCategoryModal();
+    }
+  });
+}
+
+if (equipmentCategoryList) {
+  equipmentCategoryList.addEventListener('click', (event) => {
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const renameButton = target.closest('[data-rename-equipment-category-id]');
+
+    if (renameButton instanceof HTMLButtonElement) {
+      const categoryId = renameButton.dataset.renameEquipmentCategoryId;
+      const parsedCategoryId = Number.parseInt(String(categoryId || ''), 10);
+      const categoryLabel = equipmentCategoriesCache.find((category) => category.id === parsedCategoryId)?.label || '';
+      setEquipmentCategoryEditMode(categoryId, categoryLabel);
+      return;
+    }
+
+    const deleteButton = target.closest('[data-delete-equipment-category-id]');
+
+    if (!(deleteButton instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    const categoryId = deleteButton.dataset.deleteEquipmentCategoryId;
+    const categoryKey = deleteButton.dataset.deleteEquipmentCategoryKey || '';
+    submitEquipmentCategoryDelete(categoryId, categoryKey);
+  });
+}
+
+if (inventoryConfirmModal instanceof HTMLElement) {
+  const finalizeInventoryConfirm = (result) => {
+    if (typeof inventoryConfirmResolver === 'function') {
+      inventoryConfirmResolver(result);
+    }
+
+    closeInventoryConfirmModal();
+  };
+
+  inventoryConfirmModal.addEventListener('click', (event) => {
+    const target = event.target;
+
+    if (target instanceof HTMLElement && target.dataset.closeInventoryConfirm === 'true') {
+      finalizeInventoryConfirm(false);
+    }
+  });
+
+  if (inventoryConfirmCancel instanceof HTMLButtonElement) {
+    inventoryConfirmCancel.addEventListener('click', () => finalizeInventoryConfirm(false));
+  }
+
+  if (inventoryConfirmSubmit instanceof HTMLButtonElement) {
+    inventoryConfirmSubmit.addEventListener('click', () => finalizeInventoryConfirm(true));
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && inventoryConfirmModal.classList.contains('is-open')) {
+      finalizeInventoryConfirm(false);
+    }
+  });
+}
+
+if (equipmentCategoryCancelButton) {
+  equipmentCategoryCancelButton.addEventListener('click', closeEquipmentCategoryModal);
+}
+
+if (equipmentCategorySaveButton) {
+  equipmentCategorySaveButton.addEventListener('click', submitEquipmentCategoryCreate);
+}
+
+if (equipmentCategoryNameInput) {
+  equipmentCategoryNameInput.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    event.preventDefault();
+    submitEquipmentCategoryCreate();
+  });
+}
+
 if (equipmentAddButton && equipmentEditModal) {
   equipmentAddButton.addEventListener('click', openEquipmentAddModal);
+}
+
+if (scheduleMonthSelect && scheduleYearSelect) {
+  const openSelectedScheduleMonth = () => {
+    const selectedMonth = String(scheduleMonthSelect.value || '').trim();
+    const selectedYear = String(scheduleYearSelect.value || '').trim();
+    const monthKey = `${selectedYear}-${selectedMonth}`;
+
+    if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+      return;
+    }
+
+    const baseUrl = (typeof window.scheduleMonthBaseUrl === 'string' && window.scheduleMonthBaseUrl)
+      ? window.scheduleMonthBaseUrl
+      : '/dashboard/schedule';
+
+    window.location.href = `${baseUrl}?month=${encodeURIComponent(monthKey)}`;
+  };
+
+  scheduleMonthSelect.addEventListener('change', openSelectedScheduleMonth);
+  scheduleYearSelect.addEventListener('change', openSelectedScheduleMonth);
 }
 
 if (scheduleFilterButtons.length && scheduleDayCells.length) {
@@ -2809,11 +4043,17 @@ if (scheduleFilterButtons.length && scheduleDayCells.length) {
 
       if (!Number.isNaN(day)) {
         openScheduleInlineDetails(day);
+        openScheduleRequestModal(day);
       }
     });
   });
 
   applyScheduleCategory('all');
+
+  const defaultScheduleDay = Number.parseInt(String(scheduleCalendarData?.defaultDay ?? ''), 10);
+  if (Number.isInteger(defaultScheduleDay) && defaultScheduleDay > 0) {
+    openScheduleInlineDetails(defaultScheduleDay);
+  }
 }
 
 if (scheduleInlineRequestBody) {
@@ -2840,51 +4080,74 @@ if (scheduleInlineRequestBody) {
   });
 }
 
-if (requestItems.length) {
-  requestItems.forEach((item) => {
-    const approveButton = item.querySelector('.approve-btn');
-    const rejectButton = item.querySelector('.reject-btn');
+if (requestListWrap) {
+  requestListWrap.addEventListener('click', (event) => {
+    const target = event.target;
 
-    if (approveButton) {
-      approveButton.addEventListener('click', (event) => {
-        event.stopPropagation();
-        if (approveButton.dataset.reservationId) {
-          submitFinalRequestDecision(item, approveButton, 'approved');
-          return;
-        }
-
-        submitRequestDecision(item, approveButton, 'approved');
-      });
+    if (!(target instanceof HTMLElement)) {
+      return;
     }
 
-    if (rejectButton) {
-      rejectButton.addEventListener('click', (event) => {
-        event.stopPropagation();
-        if (rejectButton.dataset.reservationId) {
-          submitFinalRequestDecision(item, rejectButton, 'rejected');
-          return;
-        }
+    const actionButton = target.closest('.approve-btn, .reject-btn');
 
-        submitRequestDecision(item, rejectButton, 'rejected');
-      });
-    }
+    if (actionButton instanceof HTMLButtonElement) {
+      event.stopPropagation();
+      const item = actionButton.closest('.request-item');
 
-    item.addEventListener('click', (event) => {
-      const target = event.target;
-
-      if (target instanceof HTMLElement && target.closest('.approve-btn, .reject-btn')) {
+      if (!(item instanceof HTMLElement)) {
         return;
       }
 
-      const isAlreadySelected = item.classList.contains('is-selected');
+      const status = actionButton.classList.contains('approve-btn') ? 'approved' : 'rejected';
 
-      requestItems.forEach((node) => {
-        node.classList.remove('is-selected');
-      });
-
-      if (!isAlreadySelected) {
-        item.classList.add('is-selected');
+      if (actionButton.dataset.reservationId) {
+        submitFinalRequestDecision(item, actionButton, status);
+        return;
       }
+
+      submitRequestDecision(item, actionButton, status);
+      return;
+    }
+
+    const item = target.closest('.request-item');
+
+    if (!(item instanceof HTMLElement)) {
+      return;
+    }
+
+    const isAlreadySelected = item.classList.contains('is-selected');
+
+    getRequestItems().forEach((node) => {
+      node.classList.remove('is-selected');
+    });
+
+    if (!isAlreadySelected) {
+      item.classList.add('is-selected');
+    }
+  });
+
+  requestListWrap.addEventListener('click', (event) => {
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const pageLink = target.closest('.pagination a');
+
+    if (!(pageLink instanceof HTMLAnchorElement)) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!pageLink.href) {
+      return;
+    }
+
+    refreshRequestListPreservingTab(pageLink.href).catch((error) => {
+      window.console.error('Request list pagination refresh error:', error);
+      showAppNotice('Unable to load the selected page. Please try again.');
     });
   });
 }
@@ -2919,14 +4182,14 @@ if (facilitiesSaveButton) {
     const category = facilitiesCategoryInput.value.trim();
 
     if (!itemName || !category) {
-      window.alert('Please complete Facility Name and Room Type.');
+      showAppNotice('Please complete Facility Name and Room Type.');
       return;
     }
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]');
 
     if (!csrfToken) {
-      window.alert('Unable to save changes. Missing CSRF token.');
+      showAppNotice('Unable to save changes. Missing CSRF token.');
       return;
     }
 
@@ -2959,7 +4222,7 @@ if (facilitiesSaveButton) {
       }
 
       if (!response.ok || !payload.success) {
-        window.alert(payload.error || `Unable to save facility changes. (HTTP ${response.status})`);
+        showAppNotice(payload.error || `Unable to save facility changes. (HTTP ${response.status})`);
         return;
       }
 
@@ -3003,9 +4266,9 @@ if (facilitiesSaveButton) {
 
       closeFacilitiesEditModal();
       applyFacilitiesFilters();
-      showSaveSuccessToast(isEditing ? 'Edited successfully.' : 'Added successfully.');
+      showSaveSuccessToast(isEditing ? 'Facility has been updated successfully.' : 'Facility has been added successfully.');
     } catch (error) {
-      window.alert('Unable to save facility changes right now. Please check your connection and try again.');
+      showAppNotice('Unable to save facility changes right now. Please check your connection and try again.');
     }
   });
 }
@@ -3022,8 +4285,26 @@ if (equipmentSaveButton) {
     const totalCount = equipmentTotalCountInput.value.trim() || '0';
     const inUse = equipmentInUseInput.value.trim() || '0';
     const status = equipmentStatusInput.value.trim();
+    const parsedTotalCount = Number.parseInt(totalCount, 10);
+    const parsedInUse = Number.parseInt(inUse, 10);
+
     if (!itemName || !category || !status) {
-      window.alert('Please complete Item Name, Category, and Status.');
+      showAppNotice('Please complete Item Name, Category, and Status.');
+      return;
+    }
+
+    if (!Number.isInteger(parsedTotalCount) || parsedTotalCount < 0) {
+      showAppNotice('Total Count must be a whole number of 0 or greater.');
+      return;
+    }
+
+    if (!Number.isInteger(parsedInUse) || parsedInUse < 0) {
+      showAppNotice('In Use must be a whole number of 0 or greater.');
+      return;
+    }
+
+    if (parsedInUse > parsedTotalCount) {
+      showAppNotice('In Use cannot be greater than Total Count.');
       return;
     }
 
@@ -3031,12 +4312,12 @@ if (equipmentSaveButton) {
       const csrfToken = document.querySelector('meta[name="csrf-token"]');
 
       if (!csrfToken) {
-        window.alert('Unable to save changes. Missing CSRF token.');
+        showAppNotice('Unable to save changes. Missing CSRF token.');
         return;
       }
 
       try {
-        const response = await fetch('/dashboard/inventory/equipments', {
+        const response = await fetch(equipmentEndpointBase, {
           method: 'POST',
           headers: {
             'X-CSRF-TOKEN': csrfToken.content,
@@ -3047,8 +4328,8 @@ if (equipmentSaveButton) {
           body: JSON.stringify({
             item_name: itemName,
             category,
-            total_count: Number.parseInt(totalCount, 10) || 1,
-            in_use: Number.parseInt(inUse, 10) || 0,
+            total_count: parsedTotalCount,
+            in_use: parsedInUse,
             status,
           }),
         });
@@ -3063,11 +4344,12 @@ if (equipmentSaveButton) {
         }
 
         if (!response.ok || !payload.success) {
-          window.alert(payload.error || `Unable to save equipment changes. (HTTP ${response.status})`);
+          showAppNotice(payload.error || `Unable to save equipment changes. (HTTP ${response.status})`);
           return;
         }
 
         const createdItem = payload.item;
+        removeEquipmentEmptyStateRows();
         const row = document.createElement('tr');
         row.dataset.equipmentRow = createdItem.category;
         row.dataset.itemId = createdItem.item_id;
@@ -3083,10 +4365,10 @@ if (equipmentSaveButton) {
         equipmentTableBody.prepend(row);
         closeEquipmentEditModal();
         applyEquipmentFilters();
-        showSaveSuccessToast('Added successfully.');
+        showSaveSuccessToast('Equipment has been added successfully.');
         return;
       } catch (error) {
-        window.alert('Unable to save equipment changes right now. Please check your connection and try again.');
+        showAppNotice('Unable to save equipment changes right now. Please check your connection and try again.');
         return;
       }
     }
@@ -3100,12 +4382,12 @@ if (equipmentSaveButton) {
       const csrfToken = document.querySelector('meta[name="csrf-token"]');
 
       if (!csrfToken) {
-        window.alert('Unable to save changes. Missing CSRF token.');
+        showAppNotice('Unable to save changes. Missing CSRF token.');
         return;
       }
 
       try {
-        const response = await fetch(`/dashboard/inventory/equipments/${encodeURIComponent(itemId)}`, {
+        const response = await fetch(`${equipmentEndpointBase}/${encodeURIComponent(itemId)}`, {
           method: 'PATCH',
           headers: {
             'X-CSRF-TOKEN': csrfToken.content,
@@ -3116,8 +4398,8 @@ if (equipmentSaveButton) {
           body: JSON.stringify({
             item_name: itemName,
             category,
-            total_count: Number.parseInt(totalCount, 10) || 1,
-            in_use: Number.parseInt(inUse, 10) || 0,
+            total_count: parsedTotalCount,
+            in_use: parsedInUse,
             status,
           }),
         });
@@ -3132,7 +4414,7 @@ if (equipmentSaveButton) {
         }
 
         if (!response.ok || !payload.success) {
-          window.alert(payload.error || `Unable to save equipment changes. (HTTP ${response.status})`);
+          showAppNotice(payload.error || `Unable to save equipment changes. (HTTP ${response.status})`);
           return;
         }
 
@@ -3163,10 +4445,10 @@ if (equipmentSaveButton) {
 
         closeEquipmentEditModal();
         applyEquipmentFilters();
-        showSaveSuccessToast('Edited successfully.');
+        showSaveSuccessToast('Equipment has been updated successfully.');
         return;
       } catch (error) {
-        window.alert('Unable to save equipment changes right now. Please check your connection and try again.');
+        showAppNotice('Unable to save equipment changes right now. Please check your connection and try again.');
         return;
       }
     }
@@ -3192,8 +4474,12 @@ if (equipmentSaveButton) {
 
     closeEquipmentEditModal();
     applyEquipmentFilters();
-    showSaveSuccessToast('Edited successfully.');
+    showSaveSuccessToast('Equipment has been updated successfully.');
   });
+}
+
+if (equipmentDeleteButton) {
+  equipmentDeleteButton.addEventListener('click', submitEquipmentDelete);
 }
 
 if (facilitiesUploadButton && facilitiesUploadInput) {
@@ -3220,14 +4506,14 @@ if (facilitiesUploadInput && facilitiesUploadName) {
     if (!validType) {
       facilitiesUploadInput.value = '';
       facilitiesUploadName.textContent = 'No file selected';
-      window.alert('Invalid file type. Please upload JPG or PNG only.');
+      showAppNotice('Invalid file type. Please upload JPG or PNG only.');
       return;
     }
 
     if (file.size > maxSizeBytes) {
       facilitiesUploadInput.value = '';
       facilitiesUploadName.textContent = 'No file selected';
-      window.alert('File is too large. Maximum size is 5MB.');
+      showAppNotice('File is too large. Maximum size is 5MB.');
       return;
     }
 
@@ -3259,14 +4545,14 @@ if (equipmentUploadInput && equipmentUploadName) {
     if (!validType) {
       equipmentUploadInput.value = '';
       equipmentUploadName.textContent = 'No file selected';
-      window.alert('Invalid file type. Please upload JPG or PNG only.');
+      showAppNotice('Invalid file type. Please upload JPG or PNG only.');
       return;
     }
 
     if (file.size > maxSizeBytes) {
       equipmentUploadInput.value = '';
       equipmentUploadName.textContent = 'No file selected';
-      window.alert('File is too large. Maximum size is 5MB.');
+      showAppNotice('File is too large. Maximum size is 5MB.');
       return;
     }
 

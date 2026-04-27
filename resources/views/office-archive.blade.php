@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <title>NUtilize | Office Archieve</title>
+  <title>NUtilize | Office Archive</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/office.css" />
@@ -21,70 +21,6 @@
     };
     window.dashboardNavComponent = '/components/navbar-office.html';
   </script>
-
-  @php
-    $archivedRecords = [
-      [
-        'request_id' => 'REQ-2026-0417-001',
-        'requested_by' => 'Alyssa Mae Cruz',
-        'resource' => 'Room 607',
-        'deleted_at' => 'Apr 15, 2026 10:30 AM',
-        'deleted_by' => 'Office Staff - SDO',
-        'reason' => 'Duplicate request entry',
-        'retention' => 'Under Retention',
-      ],
-      [
-        'request_id' => 'REQ-2026-0415-013',
-        'requested_by' => 'Jasper Dela Torre',
-        'resource' => 'Projector #09',
-        'deleted_at' => 'Apr 14, 2026 04:12 PM',
-        'deleted_by' => 'Office Admin - Registrar',
-        'reason' => 'Canceled by requester',
-        'retention' => 'Soft Deleted',
-      ],
-      [
-        'request_id' => 'REQ-2026-0412-027',
-        'requested_by' => 'Regine Velasquez',
-        'resource' => 'Speaker #32',
-        'deleted_at' => 'Apr 13, 2026 09:05 AM',
-        'deleted_by' => 'Office Staff - PFMO',
-        'reason' => 'Conflict with facility maintenance',
-        'retention' => 'Soft Deleted',
-      ],
-      [
-        'request_id' => 'REQ-2026-0407-041',
-        'requested_by' => 'Kenneth Lim',
-        'resource' => 'Lab PC Set A',
-        'deleted_at' => 'Apr 09, 2026 11:22 AM',
-        'deleted_by' => 'System Auto-Cleanup',
-        'reason' => 'Expired draft beyond retention window',
-        'retention' => 'Purge Ready',
-      ],
-      [
-        'request_id' => 'REQ-2026-0402-055',
-        'requested_by' => 'Maria Santos',
-        'resource' => 'Room 503',
-        'deleted_at' => 'Apr 05, 2026 02:01 PM',
-        'deleted_by' => 'Office Admin - Library',
-        'reason' => 'Invalid schedule information',
-        'retention' => 'Under Retention',
-      ],
-      [
-        'request_id' => 'REQ-2026-0329-061',
-        'requested_by' => 'John Paul Pastrana',
-        'resource' => 'TV #03',
-        'deleted_at' => 'Apr 03, 2026 08:44 AM',
-        'deleted_by' => 'Office Staff - SDO',
-        'reason' => 'Merged with updated request',
-        'retention' => 'Soft Deleted',
-      ],
-    ];
-
-    $totalArchived = count($archivedRecords);
-    $softDeletedCount = collect($archivedRecords)->where('retention', 'Soft Deleted')->count();
-    $underRetentionCount = collect($archivedRecords)->where('retention', 'Under Retention')->count();
-    $purgeReadyCount = collect($archivedRecords)->where('retention', 'Purge Ready')->count();
-  @endphp
 
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
@@ -112,49 +48,72 @@
       <div id="navbar-container"></div>
 
       <section class="content-card office-archive-card">
-        <h1 class="section-title">OFFICE ARCHIEVE DASHBOARD</h1>
-        <p class="office-subtitle">Soft-deleted request logs (dummy UI data only)</p>
+        <h1 class="section-title">OFFICE ARCHIVE DASHBOARD</h1>
+        <p class="office-subtitle">Approval and rejection transaction history for your office.</p>
 
         <section class="office-archive-overview" aria-label="Archive summary">
           <article class="office-archive-tile">
             <span class="office-archive-icon"><i class="bi bi-archive-fill"></i></span>
             <div>
-              <p class="office-archive-value">{{ $totalArchived }}</p>
-              <p class="office-archive-label">Total Archived</p>
+              <p class="office-archive-value">{{ $totalTransactions ?? 0 }}</p>
+              <p class="office-archive-label">Total Transactions</p>
             </div>
           </article>
           <article class="office-archive-tile">
             <span class="office-archive-icon"><i class="bi bi-trash3-fill"></i></span>
             <div>
-              <p class="office-archive-value">{{ $softDeletedCount }}</p>
-              <p class="office-archive-label">Soft Deleted</p>
+              <p class="office-archive-value">{{ $approvedCount ?? 0 }}</p>
+              <p class="office-archive-label">Approved</p>
             </div>
           </article>
           <article class="office-archive-tile">
             <span class="office-archive-icon"><i class="bi bi-shield-check"></i></span>
             <div>
-              <p class="office-archive-value">{{ $underRetentionCount }}</p>
-              <p class="office-archive-label">Under Retention</p>
+              <p class="office-archive-value">{{ $rejectedCount ?? 0 }}</p>
+              <p class="office-archive-label">Rejected</p>
             </div>
           </article>
           <article class="office-archive-tile">
             <span class="office-archive-icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
             <div>
-              <p class="office-archive-value">{{ $purgeReadyCount }}</p>
-              <p class="office-archive-label">Purge Ready</p>
+              <p class="office-archive-value">{{ $todayCount ?? 0 }}</p>
+              <p class="office-archive-label">Processed Today</p>
             </div>
           </article>
         </section>
 
-        <section class="office-archive-history-card" aria-label="Soft deleted records table">
+        <section class="office-archive-history-card" aria-label="Office approval transaction history table">
           <header class="office-archive-history-head">
-            <h2>Soft Deleted Records</h2>
+            <h2>Approval Transaction History</h2>
             <div class="office-archive-legend">
-              <span style="color:#9c4d00;">Soft Deleted</span>
-              <span style="color:#2b4298;">Under Retention</span>
-              <span style="color:#9a0f0f;">Purge Ready</span>
+              <span style="color:#148a31;">Approved</span>
+              <span style="color:#b02525;">Rejected</span>
             </div>
           </header>
+
+          <form method="GET" action="{{ route('office.archive') }}" style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin: 8px 0 14px;">
+            <div>
+              <label for="decision" style="display:block; font-size:12px; margin-bottom:4px;">Decision</label>
+              <select id="decision" name="decision" style="min-width:140px;">
+                <option value="all" {{ ($selectedDecision ?? 'all') === 'all' ? 'selected' : '' }}>All</option>
+                <option value="approved" {{ ($selectedDecision ?? 'all') === 'approved' ? 'selected' : '' }}>Approved</option>
+                <option value="rejected" {{ ($selectedDecision ?? 'all') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="from_date" style="display:block; font-size:12px; margin-bottom:4px;">From</label>
+              <input id="from_date" type="date" name="from_date" value="{{ $selectedFromDate ?? '' }}" />
+            </div>
+
+            <div>
+              <label for="to_date" style="display:block; font-size:12px; margin-bottom:4px;">To</label>
+              <input id="to_date" type="date" name="to_date" value="{{ $selectedToDate ?? '' }}" />
+            </div>
+
+            <button type="submit" class="btn-primary" style="padding:6px 14px;">Apply Filters</button>
+            <a href="{{ route('office.archive') }}" style="padding:6px 12px; border:1px solid #c5cad4; border-radius:8px; text-decoration:none; color:#26374a;">Clear</a>
+          </form>
 
           <div class="table-wrap office-archive-wrap">
             <table class="office-archive-table">
@@ -163,36 +122,40 @@
                   <th>Request ID</th>
                   <th>Requested By</th>
                   <th>Resource</th>
-                  <th>Deleted At</th>
-                  <th>Deleted By</th>
-                  <th>Reason</th>
-                  <th>Retention State</th>
+                  <th>Processed At</th>
+                  <th>Processed By</th>
+                  <th>Activity</th>
+                  <th>Decision</th>
                 </tr>
               </thead>
               <tbody>
-                @foreach($archivedRecords as $record)
-                  @php
-                    $statusClass = strtolower(str_replace(' ', '-', $record['retention']));
-                  @endphp
+                @forelse(($historyRows ?? []) as $record)
                   <tr>
                     <td>{{ $record['request_id'] }}</td>
                     <td>{{ $record['requested_by'] }}</td>
                     <td>{{ $record['resource'] }}</td>
-                    <td>{{ $record['deleted_at'] }}</td>
-                    <td>{{ $record['deleted_by'] }}</td>
+                    <td>{{ $record['processed_at'] }}</td>
+                    <td>{{ $record['processed_by'] }}</td>
                     <td>{{ $record['reason'] }}</td>
                     <td>
-                      <span class="archive-status {{ $statusClass }}">{{ $record['retention'] }}</span>
+                      @php
+                        $decisionClass = strtolower($record['decision']) === 'approved' ? 'under-retention' : 'purge-ready';
+                      @endphp
+                      <span class="archive-status {{ $decisionClass }}">{{ $record['decision'] }}</span>
                     </td>
                   </tr>
-                @endforeach
+                @empty
+                  <tr>
+                    <td colspan="7">No approval transactions yet for this office.</td>
+                  </tr>
+                @endforelse
               </tbody>
             </table>
           </div>
 
-          <p class="office-archive-note">
-            Demo UI only: these records are static placeholders for soft-delete archive behavior.
-          </p>
+          <div class="office-request-pagination">
+            {{ ($historyRows ?? null)?->links() }}
+          </div>
         </section>
       </section>
     </section>
