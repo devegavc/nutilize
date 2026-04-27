@@ -52,7 +52,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/dashboard/office/items/{itemId}', [OfficeItemController::class, 'destroy'])->name('office.items.destroy');
     Route::get('/dashboard/office/items/maintenance', [OfficeItemController::class, 'maintenance'])->name('office.items.maintenance');
     Route::patch('/dashboard/office/items/maintenance/units/{unitId}', [OfficeItemController::class, 'updateMaintenanceUnit'])->name('office.items.maintenance.units.update');
-    Route::get('/dashboard/office/archive', [OfficeArchiveController::class, 'index'])->name('office.archive');
+    Route::get('/dashboard/office/history', [OfficeArchiveController::class, 'index'])->name('office.history');
 
     Route::prefix('dashboard')->group(function () {
         Route::middleware('pf-admin')->group(function () {

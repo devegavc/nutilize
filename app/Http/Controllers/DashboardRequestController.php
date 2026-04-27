@@ -409,6 +409,7 @@ class DashboardRequestController extends Controller
         foreach ($actionOfficeIds as $officeId) {
             $approval = $reservation->approvals->firstWhere('office_id', $officeId);
             $status = strtolower((string) ($approval?->status ?? 'pending'));
+            $officeCode = strtoupper((string) ($officeMap[$officeId]['code'] ?? 'OFF'));
 
             $dotClass = 'dot-pending';
             if ($status === 'approved' && !is_null($approval?->approved_at)) {
@@ -417,11 +418,30 @@ class DashboardRequestController extends Controller
                 $dotClass = 'dot-rejected';
             }
 
+            $officeIcon = match ($officeCode) {
+                'PC' => 'bi-person-badge',
+                'IO' => 'bi-box-seam',
+                'PF' => 'bi-building-gear',
+                'SAO' => 'bi-people',
+                default => 'bi-building',
+            };
+
+            $stageLabel = match ($officeCode) {
+                'PC' => 'Program Chair',
+                'SAO' => 'SDAO',
+                'DO' => 'DO',
+                'SEC' => 'Security',
+                'PF' => 'Physical Facilities',
+                default => $officeMap[$officeId]['name'] ?? 'Item Owner',
+            };
+
             $steps[] = [
                 'office_id' => $officeId,
-                'office_code' => $officeMap[$officeId]['code'] ?? 'OFF',
+                'office_code' => $officeCode,
                 'office_name' => $officeMap[$officeId]['name'] ?? 'Office',
                 'dot_class' => $dotClass,
+                'icon_class' => $officeIcon,
+                'stage_label' => $stageLabel,
             ];
         }
 

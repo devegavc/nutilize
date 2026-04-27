@@ -2137,14 +2137,15 @@ function openEquipmentAddModal() {
 
 function setActiveNavByPage() {
   const path = window.location.pathname.toLowerCase();
+  const isProfilePage = path.includes('/dashboard/profile');
   const navTarget = path.includes('/dashboard/office/requests')
     ? 'requests'
     : path.includes('/dashboard/office/items/maintenance')
     ? 'manage-maintenance'
     : path.includes('/dashboard/office/items')
     ? 'manage-items'
-    : path.includes('/dashboard/office/archive')
-    ? 'archive'
+    : path.includes('/dashboard/office/history')
+    ? 'history'
     : path.includes('/dashboard/messages')
     ? ''
     : path.includes('/dashboard/profile')
@@ -2181,6 +2182,12 @@ function setActiveNavByPage() {
   subNavItems.forEach((item) => {
     item.classList.toggle('active', item.dataset.subnav === subTarget);
   });
+
+  if (toolbarProfileButtons.length) {
+    toolbarProfileButtons.forEach((button) => {
+      button.classList.toggle('profile-current-page', isProfilePage);
+    });
+  }
 }
 
 function closeSidebarDrawer() {

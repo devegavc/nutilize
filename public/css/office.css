@@ -451,12 +451,13 @@
 	flex-direction: column;
 	gap: 14px;
 	padding: 0 0 20px;
+	min-height: 0;
 	overflow-y: auto;
 }
 
 .office-archive-overview {
 	display: grid;
-	grid-template-columns: repeat(4, 1fr);
+	grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 	gap: 18px;
 	padding: 10px 22px 0;
 }
@@ -488,7 +489,7 @@
 
 .office-archive-value {
 	margin: 0;
-	font-size: 2.1rem;
+	font-size: clamp(1.2rem, 2vw, 2.1rem);
 	line-height: 1;
 	font-weight: 700;
 	color: #32408a;
@@ -496,7 +497,7 @@
 
 .office-archive-label {
 	margin: 4px 0 0;
-	font-size: 0.98rem;
+	font-size: clamp(0.76rem, 0.95vw, 0.98rem);
 	font-weight: 600;
 	color: #3f4e8d;
 }
@@ -522,7 +523,7 @@
 
 .office-archive-history-head h2 {
 	margin: 0;
-	font-size: 1.25rem;
+	font-size: clamp(0.9rem, 1.3vw, 1.25rem);
 	color: #ffffff;
 	font-weight: 700;
 }
@@ -554,9 +555,321 @@
 	background: currentColor;
 }
 
+.office-archive-legend-approved {
+	color: #148a31;
+}
+
+.office-archive-legend-rejected {
+	color: #b02525;
+}
+
+.office-history-filters {
+	display: grid;
+	grid-template-columns: minmax(220px, 1.2fr) minmax(170px, 0.7fr) minmax(170px, 0.7fr) auto;
+	align-items: flex-end;
+	column-gap: 12px;
+	row-gap: 10px;
+	padding: 12px 16px 14px;
+	background: linear-gradient(180deg, #f7f9ff 0%, #eef2ff 100%);
+	border-bottom: 1px solid #d2d8e8;
+}
+
+.office-history-filter-group {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+
+.office-history-filter-group .office-history-decision,
+.office-history-filter-group .office-history-date-field,
+.office-history-filter-group .office-history-filter-control {
+	width: 100%;
+}
+
+.office-history-filter-group label {
+	font-size: 0.78rem;
+	font-weight: 700;
+	letter-spacing: 0.01em;
+	color: #32408a;
+	padding-left: 2px;
+}
+
+.office-history-decision {
+	position: relative;
+}
+
+.office-history-decision-trigger {
+	width: 100%;
+	height: 38px;
+	padding: 0 12px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	border-radius: 10px;
+	border: 1px solid #c7d0e8;
+	background: #ffffff;
+	color: #1f2f62;
+	font-family: "Poppins", sans-serif;
+	font-size: 0.92rem;
+	font-weight: 600;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+	cursor: pointer;
+	transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.office-history-decision-trigger:focus {
+	outline: none;
+	border-color: #5e74c6;
+	box-shadow: 0 0 0 3px rgba(69, 90, 179, 0.2);
+}
+
+.office-history-decision-trigger i {
+	position: absolute;
+	right: 12px;
+	font-size: 0.82rem;
+	color: #32408a;
+	transition: transform 0.2s ease;
+}
+
+.office-history-decision.is-open .office-history-decision-trigger i {
+	transform: rotate(180deg);
+}
+
+.office-history-decision-menu {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	right: 0;
+	display: none;
+	flex-direction: column;
+	padding: 6px;
+	background: #ffffff;
+	border: 1px solid #c7d0e8;
+	border-radius: 12px;
+	box-shadow: 0 12px 24px rgba(41, 58, 130, 0.2);
+	z-index: 20;
+}
+
+.office-history-decision.is-open .office-history-decision-menu {
+	display: flex;
+}
+
+.office-history-decision-option {
+	border: 0;
+	background: transparent;
+	color: #24356a;
+	font-family: "Poppins", sans-serif;
+	font-size: 0.92rem;
+	font-weight: 600;
+	padding: 8px 10px;
+	border-radius: 8px;
+	text-align: center;
+	cursor: pointer;
+	transition: background 0.18s ease, color 0.18s ease;
+}
+
+.office-history-decision-option:hover,
+.office-history-decision-option:focus {
+	outline: none;
+	background: #edf1ff;
+	color: #1e2f64;
+}
+
+.office-history-decision-option.is-selected {
+	background: linear-gradient(135deg, #32408a 0%, #4f63b8 100%);
+	color: #ffffff;
+}
+
+.office-history-filter-control {
+	height: 38px;
+	padding: 0 12px;
+	border-radius: 10px;
+	border: 1px solid #c7d0e8;
+	background: #ffffff;
+	color: #1f2f62;
+	font-family: "Poppins", sans-serif;
+	font-size: 0.92rem;
+	font-weight: 600;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+	transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.office-history-filter-control option {
+	font-family: "Poppins", sans-serif;
+}
+
+select.office-history-filter-control {
+	text-align: center;
+	text-align-last: center;
+	padding-right: 34px;
+}
+
+select.office-history-filter-control option {
+	text-align: center;
+}
+
+.office-history-filter-control[type="date"] {
+	font-family: "Poppins", sans-serif;
+}
+
+.office-history-filter-control[type="date"]::-webkit-datetime-edit,
+.office-history-filter-control[type="date"]::-webkit-datetime-edit-text,
+.office-history-filter-control[type="date"]::-webkit-datetime-edit-month-field,
+.office-history-filter-control[type="date"]::-webkit-datetime-edit-day-field,
+.office-history-filter-control[type="date"]::-webkit-datetime-edit-year-field {
+	font-family: "Poppins", sans-serif;
+}
+
+.office-history-date-field {
+	position: relative;
+}
+
+.office-history-date-field .office-history-filter-control,
+.office-history-date-field .flatpickr-input[readonly] {
+	padding-right: 38px;
+	text-align: center;
+}
+
+.office-history-date-icon {
+	position: absolute;
+	right: 12px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: #4f63b8;
+	font-size: 0.95rem;
+	pointer-events: none;
+}
+
+.office-history-filters .flatpickr-input[readonly] {
+	width: 100%;
+	height: 38px;
+	padding: 0 12px;
+	border-radius: 10px;
+	border: 1px solid #c7d0e8;
+	background: #ffffff;
+	color: #1f2f62;
+	font-family: "Poppins", sans-serif;
+	font-size: 0.92rem;
+	font-weight: 600;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.flatpickr-calendar,
+.flatpickr-calendar * {
+	font-family: "Poppins", sans-serif;
+}
+
+.flatpickr-calendar {
+	border: 1px solid #c7d0e8;
+	border-radius: 12px;
+	box-shadow: 0 12px 24px rgba(41, 58, 130, 0.22);
+}
+
+.flatpickr-months {
+	background: linear-gradient(90deg, #32408a 0%, #4f63b8 100%);
+	border-radius: 12px 12px 0 0;
+}
+
+.flatpickr-current-month,
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month input.cur-year,
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+	color: #ffffff;
+	fill: #ffffff;
+	font-weight: 600;
+}
+
+.flatpickr-weekday {
+	color: #32408a;
+	font-weight: 700;
+}
+
+.flatpickr-day {
+	color: #233468;
+	border-radius: 8px;
+}
+
+.flatpickr-day:hover {
+	background: #e7ecff;
+	border-color: #d2dbfb;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange,
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange:hover,
+.flatpickr-day.endRange:hover {
+	background: #2f58d4;
+	border-color: #2f58d4;
+	color: #ffffff;
+}
+
+.flatpickr-day.today {
+	border-color: #f0ab06;
+}
+
+.office-history-filter-control:focus {
+	outline: none;
+	border-color: #5e74c6;
+	box-shadow: 0 0 0 3px rgba(69, 90, 179, 0.2);
+}
+
+.office-history-filter-actions {
+	display: flex;
+	align-items: flex-end;
+	gap: 10px;
+	margin-left: 0;
+	justify-content: flex-end;
+	white-space: nowrap;
+}
+
+.office-history-filter-submit,
+.office-history-filter-clear {
+	height: 38px;
+	padding: 0 16px;
+	border-radius: 10px;
+	font-size: 0.9rem;
+	font-weight: 700;
+	line-height: 38px;
+	text-decoration: none;
+	cursor: pointer;
+	transition: transform 0.15s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.office-history-filter-submit {
+	border: 0;
+	color: #ffffff;
+	background: linear-gradient(135deg, #32408a 0%, #4f63b8 100%);
+	box-shadow: 0 7px 14px rgba(42, 58, 130, 0.25);
+}
+
+.office-history-filter-submit:hover,
+.office-history-filter-submit:focus {
+	transform: translateY(-1px);
+	box-shadow: 0 10px 16px rgba(42, 58, 130, 0.3);
+}
+
+.office-history-filter-clear {
+	border: 1px solid #c5cad4;
+	background: #f7f8fb;
+	color: #26374a;
+	box-shadow: 0 2px 6px rgba(35, 49, 84, 0.08);
+}
+
+.office-history-filter-clear:hover,
+.office-history-filter-clear:focus {
+	background: #ffffff;
+	color: #1e2d42;
+	transform: translateY(-1px);
+}
+
 .office-archive-wrap {
 	max-height: 430px;
-	overflow-y: auto;
+	overflow: auto;
 }
 
 .office-archive-table {
@@ -566,10 +879,10 @@
 
 .office-archive-table th,
 .office-archive-table td {
-	padding: 10px 12px;
+	padding: clamp(6px, 0.9vw, 10px) clamp(6px, 1vw, 12px);
 	border-bottom: 1px solid #cfd4e5;
 	text-align: center;
-	font-size: 0.94rem;
+	font-size: clamp(0.7rem, 0.85vw, 0.94rem);
 	vertical-align: middle;
 }
 
@@ -610,19 +923,25 @@
 	background: currentColor;
 }
 
-.archive-status.soft-deleted {
-	background: #ffd9b2;
-	color: #9c4d00;
+.archive-status.approved,
+.archive-status.retention,
+.archive-status.under-retention {
+	background: #d6f5df;
+	color: #0f7a2d;
+	border: 1px solid #a8e6ba;
 }
 
-.archive-status.retention {
-	background: #d5ddfb;
-	color: #2b4298;
-}
-
+.archive-status.rejected,
 .archive-status.purge-ready {
-	background: #f8c2c2;
-	color: #9a0f0f;
+	background: #ffd9d9;
+	color: #a11c1c;
+	border: 1px solid #f3a9a9;
+}
+
+.archive-status.soft-deleted {
+	background: #ffe5c7;
+	color: #9c4d00;
+	border: 1px solid #f4c999;
 }
 
 .office-archive-note {
@@ -638,6 +957,11 @@
 
 .section-title {
 	background: linear-gradient(90deg, #32408a 0%, #455ab3 62%, #5970cc 100%);
+	font-size: clamp(1rem, 1.6vw, 1.5rem);
+}
+
+.office-subtitle {
+	font-size: clamp(0.78rem, 1vw, 1rem);
 }
 
 .stats-grid {
@@ -1524,6 +1848,32 @@
 		margin: 0 12px;
 	}
 
+	.office-history-filters {
+		display: grid;
+		grid-template-columns: 1fr;
+		padding: 12px;
+	}
+
+	.office-history-filter-group {
+		min-width: 100%;
+	}
+
+	.office-history-decision {
+		width: 100%;
+	}
+
+	.office-history-filter-actions {
+		margin-left: 0;
+		width: 100%;
+		justify-content: stretch;
+	}
+
+	.office-history-filter-submit,
+	.office-history-filter-clear {
+		flex: 1;
+		text-align: center;
+	}
+
 	.office-request-grid {
 		grid-template-columns: 1fr;
 	}
@@ -1587,6 +1937,62 @@
 		min-width: 150px;
 		height: 46px;
 		font-size: 1.2rem;
+	}
+}
+
+@media (max-width: 1180px) and (min-width: 761px) {
+	.office-history-filters {
+		grid-template-columns: repeat(2, minmax(180px, 1fr));
+	}
+
+	.office-history-filter-actions {
+		grid-column: 1 / -1;
+	}
+}
+
+@media (max-width: 480px) {
+	.section-title {
+		padding: 10px 12px;
+		letter-spacing: 0;
+	}
+
+	.office-subtitle {
+		margin: 0 12px;
+	}
+
+	.office-archive-overview {
+		padding: 8px 12px 0;
+		gap: 10px;
+	}
+
+	.office-archive-tile {
+		padding: 10px;
+		min-height: 84px;
+		gap: 10px;
+	}
+
+	.office-archive-icon {
+		width: 42px;
+		height: 42px;
+		font-size: 1.1rem;
+	}
+
+	.office-archive-history-head {
+		padding: 8px 10px;
+	}
+
+	.office-archive-legend {
+		font-size: 0.72rem;
+		gap: 6px;
+	}
+
+	.office-history-filters {
+		padding: 10px;
+		gap: 8px;
+	}
+
+	.office-request-pagination {
+		padding: 10px;
 	}
 }
 

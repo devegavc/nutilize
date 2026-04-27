@@ -32,9 +32,14 @@
       'phone_number' => $authUser->phone_number ?? '',
       'profile_update_url' => route('dashboard.profile.update'),
     ];
+
+    $profileNavComponent = method_exists($authUser, 'isPhysicalFacilitiesAdmin') && $authUser->isPhysicalFacilitiesAdmin()
+      ? '/components/navbar.html'
+      : '/components/navbar-office.html';
   @endphp
   <script>
     window.authUser = @json($authUserPayload);
+    window.dashboardNavComponent = @json($profileNavComponent);
   </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">

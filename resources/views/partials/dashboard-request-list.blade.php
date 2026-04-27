@@ -17,9 +17,19 @@
         <span>#NU-{{ str_pad((string) $reservation->reservation_id, 6, '0', STR_PAD_LEFT) }}</span>
         <span class="status-dots">
           @foreach($requestData['workflow_steps'] as $step)
-            <i class="bi bi-circle-fill {{ $step['dot_class'] }}" title="{{ $step['office_code'] }} - {{ $step['office_name'] }}"></i>
+            <i class="bi {{ $step['icon_class'] ?? 'bi-building' }} {{ $step['dot_class'] }}" title="{{ $step['office_code'] }} - {{ $step['office_name'] }}"></i>
           @endforeach
         </span>
+      </div>
+      <div class="status-timeline" style="--timeline-steps: {{ max(count($requestData['workflow_steps']), 1) }};" aria-hidden="true">
+        @foreach($requestData['workflow_steps'] as $step)
+          <div class="status-step {{ $step['dot_class'] }}">
+            <span class="status-step-node">
+              <i class="bi {{ $step['icon_class'] ?? 'bi-building' }}"></i>
+            </span>
+            <span class="status-step-label">{{ $step['stage_label'] ?? $step['office_name'] }}</span>
+          </div>
+        @endforeach
       </div>
       <p class="request-owner">{{ $requesterName }}</p>
       <p class="request-phone">{{ $displayPhone }}</p>

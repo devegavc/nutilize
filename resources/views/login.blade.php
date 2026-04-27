@@ -81,10 +81,19 @@
               <i class="bi bi-lock"></i>
             </span>
             <input type="password" 
+                   id="loginPassword"
                    name="password"
                    class="form-control" 
                    placeholder="Enter your password"
                    required>
+            <button type="button"
+                    class="btn btn-password-toggle"
+                    id="toggleLoginPassword"
+                    aria-label="Show password"
+                    aria-controls="loginPassword"
+                    aria-pressed="false">
+              <i class="bi bi-eye"></i>
+            </button>
           </div>
         </div>
 
@@ -100,6 +109,32 @@
     </div>
 
   </div>
+
+  <script>
+    (function () {
+      const passwordInput = document.getElementById('loginPassword');
+      const toggleButton = document.getElementById('toggleLoginPassword');
+
+      if (!passwordInput || !toggleButton) {
+        return;
+      }
+
+      const toggleIcon = toggleButton.querySelector('i');
+
+      toggleButton.addEventListener('click', function () {
+        const isPassword = passwordInput.type === 'password';
+
+        passwordInput.type = isPassword ? 'text' : 'password';
+        toggleButton.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
+        toggleButton.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+
+        if (toggleIcon) {
+          toggleIcon.classList.toggle('bi-eye', !isPassword);
+          toggleIcon.classList.toggle('bi-eye-slash', isPassword);
+        }
+      });
+    })();
+  </script>
 
 </body>
 </html>

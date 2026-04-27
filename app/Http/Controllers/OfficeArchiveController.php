@@ -123,7 +123,7 @@ class OfficeArchiveController extends Controller
 
         $todayCount = $todayQuery->count();
 
-        return view('office-archive', [
+        return view('office-history', [
             'historyRows' => $historyRows,
             'totalTransactions' => $totalTransactions,
             'approvedCount' => $approvedCount,
