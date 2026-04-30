@@ -23,14 +23,25 @@ class DashboardScheduleController extends Controller
         $monthStart = $selectedMonth->copy()->startOfMonth();
         $monthEnd = $selectedMonth->copy()->endOfMonth();
 
-        $scheduleRows = $this->buildApprovedReservationScheduleRows($monthStart, $monthEnd);
-        $reservationIds = $scheduleRows->pluck('reservation_id')->map(fn ($reservationId) => (int) $reservationId)->all();
-
         $reservations = Reservation::query()
             ->with(['user', 'approvals.office', 'approvals.approver'])
-            ->whereIn('reservation_id', $reservationIds)
-            ->get()
-            ->keyBy('reservation_id');
+            ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['approved'])
+            ->get();
+
+        $scheduleRows = $reservations
+            ->map(function (Reservation $reservation) {
+                $scheduleDate = $this->resolveScheduleDate($reservation);
+
+                return (object) [
+                    'reservation_id' => (int) $reservation->reservation_id,
+                    'schedule_date' => $scheduleDate->toDateString(),
+                ];
+            })
+            ->filter(fn (object $row) => Carbon::parse($row->schedule_date)->betweenIncluded($monthStart, $monthEnd))
+            ->values();
+
+        $reservationIds = $scheduleRows->pluck('reservation_id')->map(fn ($reservationId) => (int) $reservationId)->all();
+        $reservations = $reservations->keyBy('reservation_id');
 
         $resourceMap = $this->buildResourceMap($reservationIds);
 
@@ -103,45 +114,6 @@ class DashboardScheduleController extends Controller
         ]);
     }
 
-    private function buildApprovedReservationScheduleRows(Carbon $monthStart, Carbon $monthEnd)
-    {
-        $scheduleDateExpression = $this->scheduleDateExpressionForQuery();
-
-        return DB::table('reservations as reservations')
-            ->leftJoin('reservation_details as details', 'details.reservation_id', '=', 'reservations.reservation_id')
-            ->leftJoin('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
-            ->leftJoin('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
-            ->leftJoin('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
-            ->leftJoin('items as items', 'items.item_id', '=', 'reservationItems.item_id')
-            ->whereRaw("LOWER(COALESCE(reservations.overall_status, '')) = ?", ['approved'])
-            ->select(['reservations.reservation_id'])
-            ->selectRaw($scheduleDateExpression . ' as schedule_date')
-            ->groupBy('reservations.reservation_id')
-            ->havingRaw(
-                $scheduleDateExpression . ' BETWEEN ? AND ?',
-                [$monthStart->toDateString(), $monthEnd->toDateString()]
-            )
-            ->orderByRaw($scheduleDateExpression)
-            ->get();
-    }
-
-    private function scheduleDateExpressionForQuery(): string
-    {
-        if (Schema::hasColumn('reservations', 'Date_of_Activity')) {
-            if (Schema::hasColumn('reservations', 'Start_of_activity')) {
-                return "COALESCE(MIN(\"reservations\".\"Date_of_Activity\"::date), MIN(\"reservations\".\"Start_of_activity\"::date), MAX(COALESCE(rooms.date_reserved, items.date_reserved)), MIN(reservations.created_at::date))";
-            }
-
-            return "COALESCE(MIN(\"reservations\".\"Date_of_Activity\"::date), MAX(COALESCE(rooms.date_reserved, items.date_reserved)), MIN(reservations.created_at::date))";
-        }
-
-        if (Schema::hasColumn('reservations', 'Start_of_activity')) {
-            return "COALESCE(MIN(\"reservations\".\"Start_of_activity\"::date), MAX(COALESCE(rooms.date_reserved, items.date_reserved)), MIN(reservations.created_at::date))";
-        }
-
-        return "COALESCE(MAX(COALESCE(rooms.date_reserved, items.date_reserved)), MIN(reservations.created_at::date))";
-    }
-
     private function resolveMonth(?string $monthValue): Carbon
     {
         if (is_string($monthValue) && preg_match('/^\d{4}-\d{2}$/', $monthValue) === 1) {
@@ -153,6 +125,26 @@ class DashboardScheduleController extends Controller
         }
 
         return now()->startOfMonth();
+    }
+
+    private function resolveScheduleDate(Reservation $reservation): Carbon
+    {
+        $possibleDateKeys = [
+            'date_of_activity',
+            'Date_of_Activity',
+            'start_of_activity',
+            'Start_of_activity',
+        ];
+
+        foreach ($possibleDateKeys as $key) {
+            $value = $reservation->getAttribute($key);
+
+            if (!empty($value)) {
+                return Carbon::parse($value);
+            }
+        }
+
+        return Carbon::parse($reservation->created_at);
     }
 
     private function buildResourceMap(array $reservationIds): array

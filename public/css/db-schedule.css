@@ -23,9 +23,10 @@
 
 .schedule-layout {
   display: grid;
-  grid-template-columns: 144px minmax(0, 1fr);
-  gap: 16px;
-  padding: 18px 28px 12px;
+  grid-template-columns: 156px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px 28px 14px;
+  align-items: start;
 }
 
 .schedule-filter-card {
@@ -39,6 +40,7 @@
   gap: 8px;
   position: sticky;
   top: 12px;
+  align-self: start;
 }
 
 .schedule-filter-btn {
@@ -76,8 +78,9 @@
   border: 1px solid var(--schedule-panel-border);
   border-radius: 20px;
   box-shadow: var(--schedule-panel-shadow);
-  padding: 14px 18px 16px;
+  padding: 18px 20px 18px;
   overflow: hidden;
+  min-width: 0;
 }
 
 .schedule-calendar-card::after {
@@ -96,13 +99,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  margin-bottom: 10px;
+  padding: 0 56px;
+  margin-bottom: 12px;
+  position: relative;
 }
 
 .schedule-month-row h1 {
   margin: 0;
-  font-size: 1.8rem;
+  font-size: 1.95rem;
   font-weight: 800;
   letter-spacing: 0.03em;
   color: #1a2558;
@@ -179,13 +183,15 @@
 
 .calendar-grid-wrap {
   overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .calendar-grid {
-  min-width: 560px;
+  width: 100%;
+  min-width: 0;
   display: grid;
-  grid-template-columns: repeat(7, minmax(48px, 1fr));
-  gap: 8px 6px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px 8px;
   align-items: center;
 }
 
@@ -213,7 +219,7 @@
 
 .day-label {
   text-align: center;
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: #2b3877;
   text-transform: uppercase;
@@ -221,10 +227,11 @@
 }
 
 .day {
-  width: 40px;
-  height: 40px;
+  width: 100%;
+  max-width: 54px;
+  aspect-ratio: 1;
   margin: 0 auto;
-  border-radius: 12px;
+  border-radius: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -307,8 +314,8 @@
 
 .schedule-inline-content {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 280px);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1.75fr) minmax(280px, 360px);
+  gap: 14px;
   margin-top: 4px;
   align-items: start;
 }
@@ -385,7 +392,7 @@
   border-radius: 14px;
   padding: 12px;
   box-shadow: 0 12px 24px rgba(25, 41, 99, 0.1);
-  max-height: 340px;
+  max-height: 360px;
   overflow-y: auto;
 }
 
@@ -720,7 +727,7 @@
   }
 
   .schedule-month-row h1 {
-    font-size: 2rem;
+    font-size: 1.9rem;
   }
 }
 
@@ -734,8 +741,7 @@
   }
 
   .day {
-    width: 38px;
-    height: 38px;
+    max-width: 42px;
     font-size: 0.98rem;
   }
 

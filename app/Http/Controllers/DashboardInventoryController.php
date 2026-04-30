@@ -378,8 +378,8 @@ class DashboardInventoryController extends Controller
             ]);
         }
 
-        $unitsNeedingAttention = DB::table('item_units')
-            ->join('items', 'items.item_id', '=', 'item_units.item_id')
+        $unitQuery = DB::table('item_units')
+            ->leftJoin('items', 'items.item_id', '=', 'item_units.item_id')
             ->select([
                 'item_units.unit_id',
                 'item_units.unit_code',
@@ -389,14 +389,25 @@ class DashboardInventoryController extends Controller
                 'item_units.updated_at as unit_updated_at',
                 'item_units.created_at as unit_created_at',
                 'items.item_name',
-                'items.category',
             ])
-            ->whereIn('item_units.status', ['maintenance', 'damaged'])
+            ->whereIn('item_units.status', ['maintenance', 'damaged']);
+
+        if (Schema::hasColumn('items', 'category')) {
+            $unitQuery->addSelect('items.category');
+        } elseif (Schema::hasColumn('items', 'category_id') && Schema::hasTable('item_categories')) {
+            $unitQuery->leftJoin('item_categories as categories', 'categories.category_id', '=', 'items.category_id')
+                ->addSelect([
+                    'categories.category_key as category_key',
+                    'categories.display_name as category_display',
+                ]);
+        }
+
+        $unitsNeedingAttention = $unitQuery
             ->orderByDesc('item_units.updated_at')
             ->get();
 
         foreach ($unitsNeedingAttention as $unit) {
-            $category = $this->normalizeCategory((string) ($unit->category ?? 'multimedia'));
+            $category = $this->normalizeCategory((string) ($unit->category ?? $unit->category_key ?? $unit->category_display ?? 'multimedia'));
             $isDamaged = strtolower((string) $unit->status) === 'damaged';
             $tab = $isDamaged ? 'damaged' : 'maintenance';
 

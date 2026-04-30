@@ -155,7 +155,7 @@
                 <span>Activity:</span>
                 <span id="schedule-inline-detail-activity">-</span>
 
-                <span>Date Used:</span>
+                <span>Date of Activity:</span>
                 <span id="schedule-inline-detail-requested-on">-</span>
 
                 <span>Requested Time:</span>
@@ -189,7 +189,7 @@
     <article class="schedule-modal-card" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-date">
       <div class="schedule-modal-top"></div>
       <div class="schedule-modal-body">
-        <div class="schedule-modal-date" id="schedule-modal-date">Date Requested: --</div>
+        <div class="schedule-modal-date" id="schedule-modal-date">Date of Activity: --</div>
         <div class="schedule-modal-table-wrap">
           <table class="schedule-modal-table">
             <thead>
@@ -220,7 +220,7 @@
           <span>Activity:</span>
           <span id="schedule-detail-title-activity"></span>
 
-          <span>Date Used:</span>
+          <span>Date of Activity:</span>
           <span id="schedule-detail-date"></span>
 
           <span>Requested Time:</span>
