@@ -10,7 +10,13 @@ class Reservation extends Model
     use HasFactory;
 
     protected $primaryKey = 'reservation_id';
-    protected $fillable = ['user_id', 'activity_name', 'overall_status'];
+    protected $fillable = ['user_id', 'activity_name', 'overall_status', 'date_of_activity', 'start_of_activity', 'Date_of_Activity', 'Start_of_activity'];
+    protected $casts = [
+        'date_of_activity' => 'datetime',
+        'start_of_activity' => 'datetime',
+        'Date_of_Activity' => 'datetime',
+        'Start_of_activity' => 'datetime',
+    ];
 
     public function user()
     {

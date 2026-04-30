@@ -40,8 +40,8 @@
         <span>{{ $reservation->activity_name ?? 'Untitled Activity' }}</span>
       </div>
       <div class="request-meta-row">
-        <span>Date: {{ optional($reservation->created_at)->format('d/m/Y') ?? 'N/A' }}</span>
-        <span>Time: {{ optional($reservation->created_at)->format('g:i A') ?? 'N/A' }}</span>
+        <span>Date: {{ optional($reservation->Start_of_activity ?? $reservation->Date_of_Activity)->format('d/m/Y') ?? 'N/A' }}</span>
+        <span>Time: {{ optional($reservation->Start_of_activity ?? $reservation->Date_of_Activity)->format('g:i A') ?? 'N/A' }}</span>
       </div>
     </div>
 
