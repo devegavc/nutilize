@@ -50,11 +50,7 @@ class DashboardHomeController extends Controller
             $stats['borrowed'] = (int) ($unitStats->borrowed ?? 0);
             $stats['available'] = (int) ($unitStats->available ?? 0);
             $stats['maintenance'] = (int) ($unitStats->maintenance ?? 0);
-
-            return $stats;
-        }
-
-        if (Schema::hasTable('items')) {
+        } elseif (Schema::hasTable('items')) {
             $itemStats = DB::table('items')
                 ->selectRaw('SUM(COALESCE(quantity_in_use, 0)) as borrowed')
                 ->selectRaw('SUM(GREATEST(COALESCE(quantity_total, 0) - COALESCE(quantity_in_use, 0), 0)) as available')
@@ -64,6 +60,14 @@ class DashboardHomeController extends Controller
             $stats['borrowed'] = (int) ($itemStats->borrowed ?? 0);
             $stats['available'] = (int) ($itemStats->available ?? 0);
             $stats['maintenance'] = (int) ($itemStats->maintenance ?? 0);
+        }
+
+        if (Schema::hasTable('rooms')) {
+            $roomStats = DB::table('rooms')
+                ->selectRaw('SUM(CASE WHEN maintenance_status = true THEN 1 ELSE 0 END) as maintenance')
+                ->first();
+
+            $stats['maintenance'] += (int) ($roomStats->maintenance ?? 0);
         }
 
         return $stats;

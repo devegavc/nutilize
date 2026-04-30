@@ -365,6 +365,8 @@ class DashboardInventoryController extends Controller
         ]);
     }
 
+
+
     public function maintenance()
     {
         $rowsByTab = [
@@ -377,7 +379,6 @@ class DashboardInventoryController extends Controller
                 'maintenanceRowsByTab' => $rowsByTab,
             ]);
         }
-
         $unitQuery = DB::table('item_units')
             ->leftJoin('items', 'items.item_id', '=', 'item_units.item_id')
             ->select([
@@ -425,6 +426,103 @@ class DashboardInventoryController extends Controller
                 'location' => $this->locationFromCategory($category),
                 'reason' => (string) ($unit->condition_notes ?? ''),
             ];
+        }
+
+        if (Schema::hasTable('reports')) {
+            $reportRows = DB::table('reports as reports')
+                ->leftJoin('items as items', 'items.item_id', '=', 'reports.item_id')
+                ->leftJoin('rooms as rooms', 'rooms.room_id', '=', 'reports.room_id')
+                ->select([
+                    'reports.report_id',
+                    'reports.report_info',
+                    'reports.generated_at',
+                    'reports.created_at',
+                    'items.item_name',
+                    'rooms.room_number',
+                ])
+                ->orderByDesc('reports.generated_at')
+                ->get();
+
+            foreach ($reportRows as $report) {
+                $reportText = trim((string) ($report->report_info ?? ''));
+                $isDamagedReport = stripos($reportText, 'damaged') !== false
+                    || stripos($reportText, 'damage') !== false
+                    || stripos($reportText, 'broken') !== false;
+                $tab = $isDamagedReport ? 'damaged' : 'maintenance';
+                $itemLabel = trim((string) ($report->item_name ?? ''));
+
+                if ($itemLabel === '') {
+                    $roomNumber = trim((string) ($report->room_number ?? ''));
+                    $itemLabel = $roomNumber !== '' ? ('Room ' . $roomNumber) : 'Reported Issue';
+                }
+
+                $dateValue = $report->generated_at ?? $report->created_at;
+                $rowsByTab[$tab][] = [
+                    'unit_id' => 0,
+                    'id' => 'report_' . (int) $report->report_id,
+                    'item' => $itemLabel,
+                    'count' => '1',
+                    'date' => $dateValue ? date('d/m/Y', strtotime((string) $dateValue)) : date('d/m/Y'),
+                    'status' => 'Reported',
+                    'statusClass' => $isDamagedReport ? 'damaged' : 'maintenance',
+                    'location' => strpos($itemLabel, 'Room ') === 0 ? 'Room' : 'Reported',
+                    'reason' => $reportText !== '' ? $reportText : 'Reported issue',
+                ];
+            }
+        }
+
+        if (Schema::hasTable('maintenance') && Schema::hasTable('rooms')) {
+            $roomMaintenanceRows = DB::table('maintenance as maintenance')
+                ->join('rooms as rooms', 'rooms.room_id', '=', 'maintenance.room_id')
+                ->whereNotNull('maintenance.room_id')
+                ->whereNull('maintenance.date_resolved')
+                ->select([
+                    'maintenance.maintenance_id',
+                    'rooms.room_number',
+                    'maintenance.issue_description',
+                    'maintenance.updated_at',
+                    'maintenance.created_at',
+                ])
+                ->distinct()
+                ->get();
+
+            foreach ($roomMaintenanceRows as $row) {
+                $dateSource = $row->updated_at ?? $row->created_at;
+                $dateLabel = $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y');
+
+                $rowsByTab['damaged'][] = [
+                    'unit_id' => 0,
+                    'id' => 'room_' . (int) $row->maintenance_id,
+                    'item' => 'Room ' . trim((string) ($row->room_number ?? '')), 
+                    'count' => '1',
+                    'date' => $dateLabel,
+                    'status' => 'Damaged',
+                    'statusClass' => 'damaged',
+                    'location' => 'Room',
+                    'reason' => (string) ($row->issue_description ?? 'Damaged room'),
+                ];
+            }
+        } elseif (Schema::hasTable('rooms')) {
+            $roomRows = DB::table('rooms')
+                ->where('maintenance_status', true)
+                ->get(['room_id', 'room_number', 'updated_at', 'created_at']);
+
+            foreach ($roomRows as $room) {
+                $dateSource = $room->updated_at ?? $room->created_at;
+                $dateLabel = $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y');
+
+                $rowsByTab['maintenance'][] = [
+                    'unit_id' => 0,
+                    'id' => 'room_' . (int) $room->room_id,
+                    'item' => 'Room ' . trim((string) ($room->room_number ?? '')),
+                    'count' => '1',
+                    'date' => $dateLabel,
+                    'status' => 'Maintenance',
+                    'statusClass' => 'maintenance',
+                    'location' => 'Room',
+                    'reason' => 'Requires maintenance',
+                ];
+            }
         }
 
         return view('dashboard-maintenance', [
@@ -1230,3 +1328,4 @@ class DashboardInventoryController extends Controller
         };
     }
 }
+

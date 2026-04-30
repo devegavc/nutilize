@@ -190,6 +190,11 @@ class ApprovalController extends Controller
             DB::transaction(function () use ($reservation, $physicalFacilitiesOfficeId, $status, $user) {
                 $reservation->update(['overall_status' => $status]);
 
+                if ($status === 'damaged') {
+                    $this->applyReservationDamageToMaintenance($reservation);
+                    $this->createDamageReportsForReservation($reservation);
+                }
+
                 if (is_null($physicalFacilitiesOfficeId)) {
                     return;
                 }
@@ -215,6 +220,10 @@ class ApprovalController extends Controller
 
                 if ($historyApproval) {
                     $this->upsertApprovalHistory((int) $historyApproval->approval_id, (int) $reservation->reservation_id, (int) $physicalFacilitiesOfficeId, $status, (int) $user->user_id, now());
+                }
+
+                if ($status === 'damaged') {
+                    $this->applyReservationDamageToMaintenance($reservation);
                 }
             });
 
@@ -273,6 +282,183 @@ class ApprovalController extends Controller
             $reservation->update(['overall_status' => 'awaiting_physical_facilities']);
         } else {
             $reservation->update(['overall_status' => 'pending_office_approvals']);
+        }
+    }
+
+    private function applyReservationDamageToMaintenance(Reservation $reservation): void
+    {
+        if (!Schema::hasTable('reservation_details')) {
+            return;
+        }
+
+        $itemRows = DB::table('reservation_details as details')
+            ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
+            ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+            ->where('details.reservation_id', $reservation->reservation_id)
+            ->select(['items.item_id', 'details.quantity'])
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'item_id' => (int) ($row->item_id ?? 0),
+                    'quantity' => max(1, (int) ($row->quantity ?? 1)),
+                ];
+            })
+            ->filter(fn ($row) => $row['item_id'] > 0)
+            ->values()
+            ->all();
+
+        if (!empty($itemRows) && Schema::hasTable('item_units')) {
+            foreach ($itemRows as $itemRow) {
+                $unitIds = DB::table('item_units')
+                    ->where('item_id', $itemRow['item_id'])
+                    ->whereIn('status', ['in_use', 'available'])
+                    ->orderByRaw("CASE WHEN status = 'in_use' THEN 1 WHEN status = 'available' THEN 2 ELSE 3 END")
+                    ->limit($itemRow['quantity'])
+                    ->pluck('unit_id')
+                    ->all();
+
+                if (!empty($unitIds)) {
+                    DB::table('item_units')
+                        ->whereIn('unit_id', $unitIds)
+                        ->update([
+                            'status' => 'damaged',
+                            'condition_notes' => 'Marked damaged by Physical Facilities',
+                            'last_maintenance_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                }
+
+                $itemStats = DB::table('item_units')
+                    ->where('item_id', $itemRow['item_id'])
+                    ->selectRaw("COUNT(*) FILTER (WHERE status <> 'retired') as total_active")
+                    ->selectRaw("COUNT(*) FILTER (WHERE status = 'in_use') as in_use_count")
+                    ->selectRaw("COUNT(*) FILTER (WHERE status IN ('maintenance', 'damaged')) as issue_count")
+                    ->first();
+
+                DB::table('items')
+                    ->where('item_id', $itemRow['item_id'])
+                    ->update([
+                        'quantity_total' => max(1, (int) ($itemStats->total_active ?? 1)),
+                        'quantity_in_use' => max(0, min(max(1, (int) ($itemStats->total_active ?? 1)), (int) ($itemStats->in_use_count ?? 0))),
+                        'maintenance_status' => DB::raw(((int) ($itemStats->issue_count ?? 0) > 0) ? 'true' : 'false'),
+                        'availability_status' => DB::raw((((int) ($itemStats->in_use_count ?? 0)) <= 0 && ((int) ($itemStats->issue_count ?? 0)) <= 0) ? 'true' : 'false'),
+                        'updated_at' => now(),
+                    ]);
+            }
+        } elseif (!empty($itemRows) && Schema::hasTable('items')) {
+            $itemIds = array_column($itemRows, 'item_id');
+            DB::table('items')
+                ->whereIn('item_id', $itemIds)
+                ->update([
+                    'maintenance_status' => true,
+                    'availability_status' => false,
+                    'updated_at' => now(),
+                ]);
+        }
+
+        $roomIds = [];
+        if (Schema::hasTable('reservation_rooms') && Schema::hasTable('rooms')) {
+            $roomIds = DB::table('reservation_details as details')
+                ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+                ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+                ->where('details.reservation_id', $reservation->reservation_id)
+                ->pluck('rooms.room_id')
+                ->filter(fn ($roomId) => !is_null($roomId))
+                ->map(fn ($roomId) => (int) $roomId)
+                ->all();
+
+            if (!empty($roomIds)) {
+                DB::table('rooms')
+                    ->whereIn('room_id', $roomIds)
+                    ->update([
+                        'maintenance_status' => true,
+                        'availability_status' => false,
+                        'updated_at' => now(),
+                    ]);
+            }
+        }
+
+        if (Schema::hasTable('maintenance')) {
+            foreach ($itemRows as $itemRow) {
+                DB::table('maintenance')->updateOrInsert(
+                    ['item_id' => $itemRow['item_id'], 'room_id' => null],
+                    [
+                        'issue_description' => 'Request marked damaged by Physical Facilities',
+                        'action_taken' => null,
+                        'cost' => 0,
+                        'date_resolved' => null,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
+            }
+
+            foreach ($roomIds as $roomId) {
+                DB::table('maintenance')->updateOrInsert(
+                    ['item_id' => null, 'room_id' => $roomId],
+                    [
+                        'issue_description' => 'Request marked damaged by Physical Facilities',
+                        'action_taken' => null,
+                        'cost' => 0,
+                        'date_resolved' => null,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
+            }
+        }
+    }
+
+    private function createDamageReportsForReservation(Reservation $reservation): void
+    {
+        if (!Schema::hasTable('reports')) {
+            return;
+        }
+
+        $hasGeneratedAtColumn = Schema::hasColumn('reports', 'generated_at');
+        $now = now();
+        $reportBase = [
+            'user_id' => (int) $reservation->user_id,
+            'report_info' => sprintf('Reservation #%s marked damaged by Physical Facilities.', $reservation->reservation_id),
+            'updated_at' => $now,
+            'created_at' => $now,
+        ];
+        if ($hasGeneratedAtColumn) {
+            $reportBase['generated_at'] = $now;
+        }
+
+        $itemIds = DB::table('reservation_details as details')
+            ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
+            ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+            ->where('details.reservation_id', $reservation->reservation_id)
+            ->whereNotNull('items.item_id')
+            ->distinct()
+            ->pluck('items.item_id')
+            ->filter(fn ($itemId) => !is_null($itemId))
+            ->map(fn ($itemId) => (int) $itemId)
+            ->all();
+
+        foreach ($itemIds as $itemId) {
+            DB::table('reports')->insert(array_merge($reportBase, ['item_id' => $itemId, 'room_id' => null]));
+        }
+
+        $roomIds = DB::table('reservation_details as details')
+            ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+            ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+            ->where('details.reservation_id', $reservation->reservation_id)
+            ->whereNotNull('rooms.room_id')
+            ->distinct()
+            ->pluck('rooms.room_id')
+            ->filter(fn ($roomId) => !is_null($roomId))
+            ->map(fn ($roomId) => (int) $roomId)
+            ->all();
+
+        foreach ($roomIds as $roomId) {
+            DB::table('reports')->insert(array_merge($reportBase, ['item_id' => null, 'room_id' => $roomId]));
+        }
+
+        if (empty($itemIds) && empty($roomIds)) {
+            DB::table('reports')->insert(array_merge($reportBase, ['item_id' => null, 'room_id' => null]));
         }
     }
 
@@ -437,12 +623,30 @@ class ApprovalController extends Controller
         $ioOfficeId = $ids['IO'] ?? null;
         $ownerOfficeId = $this->resolveOwnerOfficeId($reservationId, $ids, $pfOfficeId);
         $pcOfficeId = $ids['PC'] ?? null;
+        $genEdOfficeId = $ids['GENED'] ?? null;
         $startOfficeId = $ownerOfficeId;
 
-        if (is_null($startOfficeId) || (!is_null($pfOfficeId) && $startOfficeId === $pfOfficeId)) {
-            $startOfficeId = $pcOfficeId;
-        } elseif (!is_null($ioOfficeId) && $startOfficeId !== $ioOfficeId) {
-            $startOfficeId = $ioOfficeId;
+        if ($this->isGymRoomRequest($reservationId) && !is_null($genEdOfficeId)) {
+            $actionSequence = array_values(array_filter([
+                $ioOfficeId,
+                $genEdOfficeId,
+                $pcOfficeId,
+                $ids['SDAO'] ?? null,
+                $ids['DO'] ?? null,
+                $ids['SEC'] ?? null,
+            ]));
+
+            if ($this->isGymRoomRequestWithItems($reservationId) && !is_null($ioOfficeId)) {
+                $startOfficeId = $ioOfficeId;
+            } else {
+                $startOfficeId = $genEdOfficeId;
+            }
+        } else {
+            if (is_null($startOfficeId) || (!is_null($pfOfficeId) && $startOfficeId === $pfOfficeId)) {
+                $startOfficeId = $pcOfficeId;
+            } elseif (!is_null($ioOfficeId) && $startOfficeId !== $ioOfficeId) {
+                $startOfficeId = $ioOfficeId;
+            }
         }
 
         $startIndex = 0;
@@ -498,6 +702,45 @@ class ApprovalController extends Controller
             $ids['DO'] ?? null,
             $ids['SEC'] ?? null,
         ]));
+    }
+
+    private function isGymRoomRequest(int $reservationId): bool
+    {
+        if (!Schema::hasTable('reservation_details')) {
+            return false;
+        }
+
+        return DB::table('reservation_details as details')
+            ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+            ->join('rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+            ->where('details.reservation_id', $reservationId)
+            ->whereRaw('LOWER(TRIM(rooms.room_number)) = ?', ['gym'])
+            ->exists();
+    }
+
+    private function isGymRoomRequestWithItems(int $reservationId): bool
+    {
+        if (!Schema::hasTable('reservation_details')) {
+            return false;
+        }
+
+        $hasGymRoom = DB::table('reservation_details as details')
+            ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+            ->join('rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+            ->where('details.reservation_id', $reservationId)
+            ->whereRaw('LOWER(TRIM(rooms.room_number)) = ?', ['gym'])
+            ->exists();
+
+        if (!$hasGymRoom) {
+            return false;
+        }
+
+        return DB::table('reservation_details as details')
+            ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
+            ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+            ->where('details.reservation_id', $reservationId)
+            ->whereNotNull('items.item_id')
+            ->exists();
     }
 
     private function resolveOwnerOfficeId(int $reservationId, array $officeIdsByCode, ?int $pfOfficeId): ?int
