@@ -9,7 +9,12 @@
             <p class="text-muted">{{ $isPfAdmin ? 'Review and finalize reservation requests from all other office approvals' : 'Manage and approve facility reservation requests' }}</p>
         </div>
         <div class="col-md-6 text-end">
-            <span class="badge bg-warning">{{ $pendingApprovals->total() }} {{ $isPfAdmin ? 'Final Requests' : 'Pending' }}</span>
+                <span
+                    class="badge bg-warning"
+                    id="approval-summary-badge"
+                    data-total-count="{{ $pendingApprovals->total() }}"
+                    data-summary-label="{{ $isPfAdmin ? 'Final Requests' : 'Pending' }}"
+                >{{ $pendingApprovals->total() }} {{ $isPfAdmin ? 'Final Requests' : 'Pending' }}</span>
         </div>
     </div>
 
@@ -20,6 +25,13 @@
                 {{ $isPfAdmin ? 'Final Requests' : 'Pending Approvals' }} ({{ $pendingApprovals->total() }})
             </button>
         </li>
+        @if($isPfAdmin)
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="return-tab" data-bs-toggle="tab" data-bs-target="#return" type="button" role="tab" aria-controls="return" aria-selected="false">
+                Waiting Return ({{ $returnApprovals->total() }})
+            </button>
+        </li>
+        @endif
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">
                 Approval History
@@ -320,6 +332,65 @@
             @endif
         </div>
 
+        @if($isPfAdmin)
+        <div class="tab-pane fade" id="return" role="tabpanel" aria-labelledby="return-tab">
+            @if($returnApprovals->count() > 0)
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Activity Name</th>
+                                <th>Requested by</th>
+                                <th>Approved Date</th>
+                                <th>Return Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="return-history-body">
+                            @foreach($returnApprovals as $approval)
+                                <tr>
+                                    <td>
+                                        <strong>{{ $approval->reservation->activity_name ?? 'Unnamed' }}</strong>
+                                        <br>
+                                        <small class="text-muted">#{{ $approval->reservation->reservation_id }}</small>
+                                    </td>
+                                    <td>{{ $approval->reservation->user->full_name ?? $approval->reservation->user->username }}</td>
+                                    <td>{{ $approval->approved_at->format('M d, Y H:i A') }}</td>
+                                    <td><span class="badge bg-primary">Waiting Return</span></td>
+                                    <td>
+                                        <div class="d-flex flex-column gap-2">
+                                            <button class="btn btn-success rounded-pill fw-bold px-3 py-2 return-action-btn"
+                                                    type="button"
+                                                    data-reservation-id="{{ $approval->reservation->reservation_id }}"
+                                                    data-return-action="returned">
+                                                Returned
+                                            </button>
+                                            <button class="btn btn-danger rounded-pill fw-bold px-3 py-2 return-action-btn"
+                                                    type="button"
+                                                    data-reservation-id="{{ $approval->reservation->reservation_id }}"
+                                                    data-return-action="damaged">
+                                                Damaged
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <nav aria-label="Page navigation">
+                    {{ $returnApprovals->links() }}
+                </nav>
+            @else
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle"></i>
+                    No fully approved requests waiting for return yet.
+                </div>
+            @endif
+        </div>
+        @endif
+
         {{-- Approval History Tab --}}
         <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
             @if($approvedApprovals->count() > 0)
@@ -388,6 +459,234 @@
         office_id: {{ $authUser->office_id }},
         role: "{{ $authUser->role }}",
     };
+
+    function formatApprovalTimestamp(value) {
+        const date = value ? new Date(value) : new Date();
+
+        if (Number.isNaN(date.getTime())) {
+            return '';
+        }
+
+        return date.toLocaleString('en-US', {
+            month: 'short',
+            day: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+        });
+    }
+
+    function ensureHistoryTableBody() {
+        const historyPane = document.getElementById('history');
+
+        if (!(historyPane instanceof HTMLElement)) {
+            return null;
+        }
+
+        let tbody = historyPane.querySelector('tbody');
+        if (tbody) {
+            return tbody;
+        }
+
+        historyPane.innerHTML = `
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Activity Name</th>
+                            <th>Requested by</th>
+                            <th>Status</th>
+                            <th>Approved Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        `;
+
+        tbody = historyPane.querySelector('tbody');
+        return tbody instanceof HTMLElement ? tbody : null;
+    }
+
+    function ensureReturnTableBody() {
+        const returnPane = document.getElementById('return');
+
+        if (!(returnPane instanceof HTMLElement)) {
+            return null;
+        }
+
+        let tbody = returnPane.querySelector('tbody');
+        if (tbody) {
+            return tbody;
+        }
+
+        returnPane.innerHTML = `
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Activity Name</th>
+                            <th>Requested by</th>
+                            <th>Approved Date</th>
+                            <th>Return Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        `;
+
+        tbody = returnPane.querySelector('tbody');
+        return tbody instanceof HTMLElement ? tbody : null;
+    }
+
+    function appendHistoryRowFromApprovalCard(approvalCard, approvalData, status) {
+        const historyBody = ensureHistoryTableBody();
+
+        if (!(approvalCard instanceof HTMLElement) || !(historyBody instanceof HTMLElement)) {
+            return;
+        }
+
+        const activityTitle = approvalCard.querySelector('.card-title')?.textContent?.trim() || 'Unnamed Activity';
+        const reservationIdText = approvalCard.querySelector('small.text-muted')?.textContent?.trim() || '';
+        const requesterName = approvalCard.querySelector('.card-body .mb-2:first-of-type')?.textContent?.replace(/Requested by:\s*/i, '').trim()
+            || 'Unknown requester';
+        const approvedAtText = formatApprovalTimestamp(approvalData?.approved_at);
+        const statusLabel = status === 'approved' ? 'Approved' : 'Rejected';
+        const statusClass = status === 'approved' ? 'bg-success' : 'bg-danger';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <strong>${activityTitle}</strong>
+                <br>
+                <small class="text-muted">${reservationIdText}</small>
+            </td>
+            <td>${requesterName}</td>
+            <td>
+                <span class="badge ${statusClass}">${statusLabel}</span>
+            </td>
+            <td>${approvedAtText}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-secondary view-details-btn" type="button" data-reservation-id="${approvalData?.reservation_id || ''}">
+                    View Details
+                </button>
+            </td>
+        `;
+
+        const viewDetailsButton = row.querySelector('.view-details-btn');
+        if (viewDetailsButton instanceof HTMLButtonElement) {
+            viewDetailsButton.addEventListener('click', () => {
+                showAppNotice('Viewing details for reservation #' + (approvalData?.reservation_id || ''));
+            });
+        }
+
+        historyBody.prepend(row);
+
+        const historyPane = document.getElementById('history');
+        const emptyState = historyPane?.querySelector('.alert.alert-info');
+        if (emptyState) {
+            emptyState.remove();
+        }
+    }
+
+    function appendReturnRowFromApprovalCard(approvalCard, approvalData, status) {
+        if (status !== 'approved') {
+            return;
+        }
+
+        const returnBody = ensureReturnTableBody();
+
+        if (!(approvalCard instanceof HTMLElement) || !(returnBody instanceof HTMLElement)) {
+            return;
+        }
+
+        const activityTitle = approvalCard.querySelector('.card-title')?.textContent?.trim() || 'Unnamed Activity';
+        const reservationIdText = approvalCard.querySelector('small.text-muted')?.textContent?.trim() || '';
+        const requesterName = approvalCard.querySelector('.card-body .mb-2:first-of-type')?.textContent?.replace(/Requested by:\s*/i, '').trim()
+            || 'Unknown requester';
+        const approvedAtText = formatApprovalTimestamp(approvalData?.approved_at);
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <strong>${activityTitle}</strong>
+                <br>
+                <small class="text-muted">${reservationIdText}</small>
+            </td>
+            <td>${requesterName}</td>
+            <td>${approvedAtText}</td>
+            <td><span class="badge bg-primary">Waiting Return</span></td>
+            <td>
+                <button class="btn btn-sm btn-outline-secondary view-details-btn" type="button" data-reservation-id="${approvalData?.reservation_id || ''}">
+                    View Details
+                </button>
+            </td>
+        `;
+
+        const viewDetailsButton = row.querySelector('.view-details-btn');
+        if (viewDetailsButton instanceof HTMLButtonElement) {
+            viewDetailsButton.addEventListener('click', () => {
+                showAppNotice('Viewing details for reservation #' + (approvalData?.reservation_id || ''));
+            });
+        }
+
+        returnBody.prepend(row);
+
+        const returnPane = document.getElementById('return');
+        const emptyState = returnPane?.querySelector('.alert.alert-info');
+        if (emptyState) {
+            emptyState.remove();
+        }
+    }
+
+    function updateApprovalBoardAfterAction(buttonElement, approvalData, status) {
+        if (!(buttonElement instanceof HTMLElement)) {
+            return;
+        }
+
+        const approvalCard = buttonElement.closest('.col-lg-6.mb-4');
+        if (approvalCard) {
+            approvalCard.remove();
+        }
+
+        const summaryBadge = document.getElementById('approval-summary-badge');
+        const pendingTab = document.getElementById('pending-tab');
+
+        const currentTotal = Number.parseInt(summaryBadge?.dataset.totalCount || '0', 10);
+        const nextTotal = Number.isFinite(currentTotal) ? Math.max(0, currentTotal - 1) : 0;
+
+        if (summaryBadge instanceof HTMLElement) {
+            const summaryLabel = summaryBadge.dataset.summaryLabel || 'Pending';
+            summaryBadge.dataset.totalCount = String(nextTotal);
+            summaryBadge.textContent = `${nextTotal} ${summaryLabel}`;
+        }
+
+        if (pendingTab instanceof HTMLElement) {
+            const tabLabel = pendingTab.dataset.tabLabel || pendingTab.textContent.replace(/\s*\(\d+\)\s*$/, '').trim();
+            pendingTab.dataset.totalCount = String(nextTotal);
+            pendingTab.dataset.tabLabel = tabLabel;
+            pendingTab.textContent = `${tabLabel} (${nextTotal})`;
+        }
+
+        const pendingPane = document.getElementById('pending');
+        const remainingCards = pendingPane ? pendingPane.querySelectorAll('.col-lg-6.mb-4').length : 0;
+
+        if (pendingPane instanceof HTMLElement && remainingCards === 0) {
+            pendingPane.innerHTML = `
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle"></i>
+                    No pending approvals at the moment. All requests have been reviewed!
+                </div>
+            `;
+        }
+
+        appendReturnRowFromApprovalCard(approvalCard, approvalData, status);
+        appendHistoryRowFromApprovalCard(approvalCard, approvalData, status);
+    }
 </script>
 
 <style>
@@ -505,7 +804,7 @@
         button.addEventListener('click', async function() {
             const approvalId = this.dataset.approvalId;
             const action = this.dataset.approvalAction;
-            const actionUrl = action === 'approve' 
+            const actionUrl = action === 'approve'
                 ? `/dashboard/approval/${approvalId}/approve`
                 : `/dashboard/approval/${approvalId}/reject`;
 
@@ -514,6 +813,49 @@
                 message: `Are you sure you want to ${action} this request? This action cannot be undone.`,
                 confirmText: action === 'approve' ? 'Approve' : 'Reject',
                 mode: action,
+            });
+
+            if (confirmed) {
+                fetch(actionUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAppNotice(data.message);
+                        updateApprovalBoardAfterAction(this, data.approval, action);
+                    } else {
+                        showAppNotice('Error: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAppNotice('An error occurred while processing your request.');
+                });
+            }
+        });
+    });
+
+    const returnButtons = document.querySelectorAll('.return-action-btn');
+    returnButtons.forEach(button => {
+        button.addEventListener('click', async function() {
+            const reservationId = this.dataset.reservationId;
+            const action = this.dataset.returnAction;
+            const actionUrl = action === 'returned'
+                ? `/dashboard/request/${reservationId}/final-return`
+                : `/dashboard/request/${reservationId}/final-damaged`;
+
+            const confirmed = await openConfirm({
+                title: action === 'returned' ? 'Confirm Return' : 'Confirm Damage',
+                message: action === 'returned'
+                    ? 'Mark this request as returned and in good condition?'
+                    : 'Mark this request as damaged?',
+                confirmText: action === 'returned' ? 'Returned' : 'Damaged',
+                mode: action === 'returned' ? 'approve' : 'reject',
             });
 
             if (confirmed) {
@@ -680,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                     if (data.success) {
                         showAppNotice(data.message);
-                        location.reload();
+                        updateApprovalBoardAfterAction(this, data.approval, action);
                     } else {
                         showAppNotice('Error: ' + (data.error || 'Unknown error'));
                     }

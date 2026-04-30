@@ -1,5 +1,5 @@
 @php
-  $allRequests = $finalRequests->concat($pendingRequests);
+  $allRequests = $finalRequests->concat($returnRequests ?? collect())->concat($pendingRequests);
 @endphp
 
 @forelse($allRequests as $requestData)
@@ -8,7 +8,9 @@
     $user = $reservation->user;
     $requesterName = $user->full_name ?? $user->username ?? 'User';
     $displayPhone = $user->phone_number ?? $user->contact_number ?? 'N/A';
-    $cssVisibilityClass = $requestData['tab'] === 'final' ? 'final-only' : 'pending-only';
+    $cssVisibilityClass = $requestData['tab'] === 'final'
+      ? 'final-only'
+      : ($requestData['tab'] === 'return' ? 'return-only' : 'pending-only');
   @endphp
   <article class="request-item {{ $cssVisibilityClass }} {{ $requestData['decision_status_class'] }}" data-requester="{{ $requesterName }}">
     <div class="request-main-col">
@@ -55,13 +57,18 @@
         @endforelse
       </div>
       <div class="request-action-stack">
-        <button class="approve-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-final-action="approve">Approve</button>
-        <button class="reject-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-final-action="reject">Reject</button>
+        @if($requestData['tab'] === 'return')
+          <button class="return-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="returned">Returned</button>
+          <button class="damage-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="damaged">Damaged</button>
+        @else
+          <button class="approve-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-final-action="approve">Approve</button>
+          <button class="reject-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-final-action="reject">Reject</button>
+        @endif
       </div>
       <div class="request-decision" aria-live="polite">
         <p class="request-decision-name">
           {{ $requesterName }}'s request
-          {{ $requestData['decision_badge'] === 'Pending' ? 'is pending' : 'has been ' . strtolower($requestData['decision_badge']) }}
+          {{ $requestData['decision_badge'] === 'Pending' ? 'is pending' : ($requestData['decision_badge'] === 'Waiting Return' ? 'is waiting for return' : 'has been ' . strtolower($requestData['decision_badge'])) }}
         </p>
         <p class="request-decision-text"></p>
         <span class="request-decision-badge">{{ $requestData['decision_badge'] }}</span>

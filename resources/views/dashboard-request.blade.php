@@ -52,6 +52,7 @@
         <section class="request-head">
           <div class="request-tabs" role="tablist" aria-label="Request status">
             <button class="request-tab active" type="button" data-request-tab="final">Final Approval</button>
+            <button class="request-tab" type="button" data-request-tab="return">Waiting Return</button>
             <button class="request-tab" type="button" data-request-tab="pending">Pending</button>
           </div>
           <div class="request-date-row">

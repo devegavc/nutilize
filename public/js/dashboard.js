@@ -1190,7 +1190,6 @@ async function submitFinalRequestDecision(item, button, status) {
         data = { error: responseText };
       }
     }
-
     if (!response.ok || !data.success) {
       const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
       showAppNotice((data.error || data.message || 'Unable to process this request.') + statusMessage);
@@ -1213,12 +1212,76 @@ async function submitFinalRequestDecision(item, button, status) {
   }
 }
 
+async function submitReturnDecision(item, button, status) {
+  const reservationId = button ? button.dataset.reservationId : '';
+
+  if (!reservationId) {
+    showAppNotice('Reservation record is not available for this request.');
+    return;
+  }
+
+  const action = status === 'returned' ? 'return' : 'damaged';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  if (!csrfToken) {
+    showAppNotice('Missing CSRF token. Please refresh the page and try again.');
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+  }
+
+  try {
+    const response = await fetch(`/dashboard/request/${reservationId}/final-${action}`, {
+      method: 'PATCH',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const responseText = await response.text();
+    let data = {};
+
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        data = { error: responseText };
+      }
+    }
+
+    if (!response.ok || !data.success) {
+      const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
+      showAppNotice((data.error || data.message || 'Unable to process this request.') + statusMessage);
+      return;
+    }
+
+    applyRequestDecision(item, status === 'returned' ? 'approved' : 'rejected');
+    showRequestDecisionToast(
+      status === 'returned' ? 'Request marked as returned.' : 'Request marked as damaged.',
+      status === 'returned' ? 'approved' : 'rejected',
+    );
+    await refreshRequestListPreservingTab();
+  } catch (error) {
+    window.console.error('Return decision error:', error);
+    showAppNotice('An error occurred while processing the request.');
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
+}
+
 function setRequestTabMode(mode) {
   if (!requestTabs.length || !requestContentCard) {
     return;
   }
 
-  const requestMode = mode === 'pending' ? 'pending' : 'final';
+  const requestMode = mode === 'pending' || mode === 'return' ? mode : 'final';
 
   requestTabs.forEach((tab) => {
     tab.classList.toggle('active', tab.dataset.requestTab === requestMode);
@@ -1229,6 +1292,7 @@ function setRequestTabMode(mode) {
   });
 
   requestContentCard.classList.toggle('pending-mode', requestMode === 'pending');
+  requestContentCard.classList.toggle('return-mode', requestMode === 'return');
 }
 
 function openFacilitiesEditModal(row) {
@@ -4095,7 +4159,7 @@ if (requestListWrap) {
       return;
     }
 
-    const actionButton = target.closest('.approve-btn, .reject-btn');
+    const actionButton = target.closest('.approve-btn, .reject-btn, .return-btn, .damage-btn');
 
     if (actionButton instanceof HTMLButtonElement) {
       event.stopPropagation();
@@ -4105,9 +4169,20 @@ if (requestListWrap) {
         return;
       }
 
-      const status = actionButton.classList.contains('approve-btn') ? 'approved' : 'rejected';
+      let status = actionButton.classList.contains('approve-btn') ? 'approved' : 'rejected';
+
+      if (actionButton.classList.contains('return-btn')) {
+        status = 'returned';
+      } else if (actionButton.classList.contains('damage-btn')) {
+        status = 'damaged';
+      }
 
       if (actionButton.dataset.reservationId) {
+        if (actionButton.dataset.returnAction) {
+          submitReturnDecision(item, actionButton, status);
+          return;
+        }
+
         submitFinalRequestDecision(item, actionButton, status);
         return;
       }

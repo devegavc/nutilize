@@ -68,21 +68,33 @@ class DashboardRequestController extends Controller
 
         $preparedRequests = $reservations->getCollection()->map(function (Reservation $reservation) use ($resourceMap, $actionableOfficeIds, $isPfAdmin, $pfOfficeId) {
             $overallStatus = strtolower((string) $reservation->overall_status);
-            $isFinalDecision = in_array($overallStatus, ['approved', 'rejected'], true);
+            $isFinalDecision = $overallStatus === 'rejected';
+            $isWaitingReturn = $overallStatus === 'approved';
+            $isClosed = in_array($overallStatus, ['returned', 'damaged'], true);
             $isPfActionable = $isPfAdmin
                 && !is_null($pfOfficeId)
                 && (($actionableOfficeIds[(int) $reservation->reservation_id] ?? null) === (int) $pfOfficeId);
-            $isFinal = $isFinalDecision || $isPfActionable;
+            $isFinal = $isPfActionable || $isFinalDecision;
             $resources = $resourceMap[$reservation->reservation_id] ?? [];
             $workflow = $this->buildWorkflowForReservation($reservation);
 
+            $tab = $isClosed
+                ? 'closed'
+                : ($isWaitingReturn
+                ? 'return'
+                : ($isFinal ? 'final' : 'pending'));
+
             return [
                 'reservation' => $reservation,
-                'tab' => $isFinal ? 'final' : 'pending',
+                'tab' => $tab,
                 'workflow_steps' => $workflow['steps'],
                 'resources' => $resources,
-                'decision_badge' => !$isFinalDecision ? 'Pending' : ($overallStatus === 'rejected' ? 'Rejected' : 'Approved'),
-                'decision_status_class' => !$isFinalDecision ? '' : ($overallStatus === 'rejected' ? 'is-rejected' : 'is-approved'),
+                'decision_badge' => $tab === 'return'
+                    ? 'Waiting Return'
+                    : ($tab === 'closed' ? ucfirst($overallStatus) : (!$isFinalDecision ? 'Pending' : 'Rejected')),
+                'decision_status_class' => $tab === 'return'
+                    ? 'is-approved'
+                    : ($tab === 'closed' ? ($overallStatus === 'damaged' ? 'is-rejected' : 'is-approved') : (!$isFinalDecision ? '' : 'is-rejected')),
             ];
         });
 
@@ -90,6 +102,7 @@ class DashboardRequestController extends Controller
 
         return [
             'finalRequests' => $preparedRequests->where('tab', 'final')->values(),
+            'returnRequests' => $preparedRequests->where('tab', 'return')->values(),
             'pendingRequests' => $preparedRequests->where('tab', 'pending')->values(),
             'requestPagination' => $reservations,
             'isPfAdmin' => $isPfAdmin,

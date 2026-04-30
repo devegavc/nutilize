@@ -57,6 +57,13 @@ class ApprovalController extends Controller
             ->orderByDesc('created_at')
             ->paginate(10);
 
+        $returnApprovals = ReservationApproval::where('office_id', $user->office_id)
+            ->where('status', 'approved')
+            ->whereNotNull('approved_at')
+            ->with(['reservation.user'])
+            ->orderByDesc('approved_at')
+            ->paginate(10);
+
         $approvedApprovals = ReservationApproval::where('office_id', $user->office_id)
             ->whereNotNull('approved_at')
             ->with(['reservation.user'])
@@ -65,6 +72,7 @@ class ApprovalController extends Controller
 
         return view('dashboard-approvals', [
             'pendingApprovals' => $pendingApprovals,
+            'returnApprovals' => $returnApprovals,
             'approvedApprovals' => $approvedApprovals,
             'authUser' => $user,
             'isPfAdmin' => $user->isPhysicalFacilitiesAdmin(),
@@ -157,6 +165,16 @@ class ApprovalController extends Controller
         return $this->finalizePhysicalFacilitiesDecision($reservationId, 'rejected');
     }
 
+    public function finalReturnReservation($reservationId)
+    {
+        return $this->finalizePhysicalFacilitiesDecision($reservationId, 'returned');
+    }
+
+    public function finalDamagedReservation($reservationId)
+    {
+        return $this->finalizePhysicalFacilitiesDecision($reservationId, 'damaged');
+    }
+
     private function finalizePhysicalFacilitiesDecision($reservationId, string $status)
     {
         try {
@@ -202,7 +220,13 @@ class ApprovalController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => $status === 'approved' ? 'Request approved successfully.' : 'Request rejected.',
+                'message' => match ($status) {
+                    'approved' => 'Request approved successfully.',
+                    'rejected' => 'Request rejected.',
+                    'returned' => 'Request marked as returned.',
+                    'damaged' => 'Request marked as damaged.',
+                    default => 'Request updated successfully.',
+                },
                 'reservation_id' => $reservation->reservation_id,
             ]);
         } catch (Throwable $throwable) {

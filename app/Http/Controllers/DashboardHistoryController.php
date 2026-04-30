@@ -32,7 +32,9 @@ class DashboardHistoryController extends Controller
 
             $status = strtolower((string) $reservation->overall_status);
             $statusLabel = match ($status) {
-                'approved' => 'Returned',
+                'approved' => 'Approved',
+                'returned' => 'Returned',
+                'damaged' => 'Damaged',
                 'rejected' => 'Rejected',
                 default => 'Pending',
             };
@@ -43,13 +45,14 @@ class DashboardHistoryController extends Controller
                 'date' => $requestDate->format('m/d/Y') . ' - ' . $endDate->format('m/d/Y'),
                 'item' => $resourceMap[(int) $reservation->reservation_id] ?? 'No resource details',
                 'status' => $statusLabel,
+                'raw_status' => $status,
             ];
         })->values()->all();
 
         $historyRowsByTab = [
             'latest' => $latestRows,
             'oldest' => array_values(array_reverse($latestRows)),
-            'damaged' => array_values(array_filter($latestRows, fn (array $row) => strtolower((string) ($row['status'] ?? '')) === 'damaged')),
+            'damaged' => array_values(array_filter($latestRows, fn (array $row) => strtolower((string) ($row['raw_status'] ?? '')) === 'damaged')),
         ];
 
         return view('dashboard-history', [
