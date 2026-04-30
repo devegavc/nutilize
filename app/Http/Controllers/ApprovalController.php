@@ -255,12 +255,23 @@ class ApprovalController extends Controller
 
         $anyRejected = $approvals->some(fn($a) => $a->status === 'rejected');
 
+        if ($anyRejected) {
+            // If any approval is rejected, reject all pending approvals and set overall status to rejected
+            ReservationApproval::where('reservation_id', $reservationId)
+                ->whereNull('approved_at')
+                ->update([
+                    'status' => 'rejected',
+                    'approved_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            $reservation->update(['overall_status' => 'rejected']);
+            return;
+        }
+
         if (is_null($physicalFacilitiesOfficeId)) {
             $allApproved = $approvals->every(fn($a) => $a->status === 'approved' && !is_null($a->approved_at));
 
-            if ($anyRejected) {
-                $reservation->update(['overall_status' => 'rejected']);
-            } elseif ($allApproved) {
+            if ($allApproved) {
                 $reservation->update(['overall_status' => 'approved']);
             } else {
                 $reservation->update(['overall_status' => 'pending_office_approvals']);
@@ -274,9 +285,7 @@ class ApprovalController extends Controller
             ->where('office_id', '!=', $physicalFacilitiesOfficeId)
             ->every(fn($a) => $a->status === 'approved' && !is_null($a->approved_at));
 
-        if ($anyRejected) {
-            $reservation->update(['overall_status' => 'rejected']);
-        } elseif ($pfApproval && $pfApproval->status === 'approved' && $pfApproval->approved_at) {
+        if ($pfApproval && $pfApproval->status === 'approved' && $pfApproval->approved_at) {
             $reservation->update(['overall_status' => 'approved']);
         } elseif ($allNonPfApproved) {
             $reservation->update(['overall_status' => 'awaiting_physical_facilities']);
