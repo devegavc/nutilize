@@ -435,14 +435,15 @@ class DashboardRequestController extends Controller
                 'PC' => 'bi-person-badge',
                 'IO' => 'bi-box-seam',
                 'PF' => 'bi-building-gear',
-                'SAO' => 'bi-people',
+                'SDAO' => 'bi-people',
+                'DO' => 'bi-clipboard-check',
                 default => 'bi-building',
             };
 
             $stageLabel = match ($officeCode) {
                 'PC' => 'Program Chair',
-                'SAO' => 'SDAO',
-                'DO' => 'DO',
+                'SDAO' => 'Student Development and Activities Office',
+                'DO' => 'Discipline Office',
                 'SEC' => 'Security',
                 'PF' => 'Physical Facilities',
                 default => $officeMap[$officeId]['name'] ?? 'Item Owner',
