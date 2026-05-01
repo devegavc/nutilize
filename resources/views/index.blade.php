@@ -71,7 +71,7 @@
             </div>
             <div class="facility-info">
               <h3 class="facility-name">COMPUTER LAB</h3>
-              <p class="facility-description">Technology-equipped AVRs designed to support presentations, multimedia activities, and collaborative sessions.</p>
+              <p class="facility-description">Technology-equipped computer laboratories designed to support programming, research, multimedia activities, and collaborative learning sessions.</p>
             </div>
           </div>
         </div>
