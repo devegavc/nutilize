@@ -9,6 +9,7 @@
   <title>NUtilize | Office Home</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
   <link rel="stylesheet" href="/css/office.css" />
 </head>
 <body>
@@ -86,7 +87,16 @@
 
         <section class="office-request-history-card" aria-label="Request queue table">
           <header class="office-request-history-head">
-            <h2>Pending Request Approval Queue</h2>
+            <div class="office-request-history-head-inner">
+              <div>
+                <h2>Pending Request Approval Queue</h2>
+                
+              </div>
+              <button id="office-queue-reload" type="button" class="office-queue-reload-btn">
+                <span class="office-queue-reload-icon" aria-hidden="true"><i class="bi bi-arrow-clockwise"></i></span>
+                <span class="office-queue-reload-text">Reload</span>
+              </button>
+            </div>
           </header>
           <div class="table-wrap office-request-history-wrap">
             <table class="office-request-history-table">
@@ -95,51 +105,14 @@
                   <th>Reservation ID</th>
                   <th>Requested By</th>
                   <th>Activity</th>
+                  <th>Event Date</th>
                   <th>Submitted</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="office-request-history-body">
-                @forelse($requests as $request)
-                  @php
-                    $status = strtolower((string) ($request->status ?? 'pending'));
-                    $badgeClass = $status === 'approved' ? 'solved' : ($status === 'rejected' ? 'rejected' : 'pending');
-                    $badgeText = $status === 'approved' ? 'Approved' : ($status === 'rejected' ? 'Rejected' : 'Pending');
-                    $reservation = $request->reservation;
-                  @endphp
-                  <tr>
-                    <td>#{{ $request->reservation_id }}</td>
-                    <td>{{ $reservation?->user?->full_name ?? $reservation?->user?->username ?? 'Unknown' }}</td>
-                    <td>{{ $reservation?->activity_name ?? 'N/A' }}</td>
-                    <td>{{ optional($reservation?->created_at)->format('M d, Y h:i A') }}</td>
-                    <td><span class="badge {{ $badgeClass }}">{{ $badgeText }}</span></td>
-                    <td>
-                      @if(is_null($request->approved_at) && $status === 'pending')
-                        <div style="display:flex; gap:8px; justify-content:center;">
-                          <button
-                            type="button"
-                            class="office-queue-action-btn office-queue-approve"
-                            data-approval-id="{{ $request->approval_id }}"
-                            data-action="approve"
-                          >Approve</button>
-                          <button
-                            type="button"
-                            class="office-queue-action-btn office-queue-reject"
-                            data-approval-id="{{ $request->approval_id }}"
-                            data-action="reject"
-                          >Reject</button>
-                        </div>
-                      @else
-                        <span style="color:#6a728f;">-</span>
-                      @endif
-                    </td>
-                  </tr>
-                @empty
-                  <tr>
-                    <td colspan="6">No actionable requests found for your office.</td>
-                  </tr>
-                @endforelse
+                @include('partials.office-request-rows', ['requests' => $requests])
               </tbody>
             </table>
           </div>
@@ -172,6 +145,7 @@
       approve: '{{ route('approval.approve', ['approvalId' => '__APPROVAL_ID__']) }}',
       reject: '{{ route('approval.reject', ['approvalId' => '__APPROVAL_ID__']) }}'
     };
+    window.officeQueueSnapshotUrl = '{{ route('office.requests.snapshot') }}';
   </script>
   <script src="/js/dashboard.js"></script>
   <script>
@@ -201,7 +175,8 @@
 
       let isRefreshing = false;
       let isActing = false;
-      const refreshIntervalMs = 12000;
+      let refreshVersion = 0;
+      const refreshIntervalMs = 30000;
 
       const resolveUrl = (action, approvalId) => {
         const template = window.officeApprovalRoutes?.[action] || '';
@@ -308,41 +283,140 @@
         }, 1800);
       };
 
-      const applySoftRefreshFromDocument = (doc) => {
-        const nextBody = doc.getElementById('office-request-history-body');
-        if (nextBody instanceof HTMLElement) {
-          queueBody.innerHTML = nextBody.innerHTML;
+      const bumpSummaryValue = (id, delta) => {
+        const el = document.getElementById(id);
+        if (!(el instanceof HTMLElement)) {
+          return;
         }
 
-        if (paginationWrap instanceof HTMLElement) {
-          const nextPagination = doc.getElementById('office-request-pagination');
-          if (nextPagination instanceof HTMLElement) {
-            paginationWrap.innerHTML = nextPagination.innerHTML;
-          }
+        const current = Number.parseInt((el.textContent || '').replace(/[^\d-]/g, ''), 10);
+        if (!Number.isFinite(current)) {
+          return;
         }
+
+        el.textContent = String(Math.max(0, current + delta));
+      };
+
+      const applyLocalQueueDecision = (button, action) => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+
+        const row = button.closest('tr');
+        if (!(row instanceof HTMLTableRowElement)) {
+          return;
+        }
+
+        row.remove();
+
+        const hasRows = queueBody.querySelector('tr');
+        if (!hasRows) {
+          queueBody.innerHTML = '<tr><td colspan="6">No actionable requests found for your office.</td></tr>';
+        }
+
+        // Keep summary tiles responsive while server-side refresh runs.
+        bumpSummaryValue('office-summary-actionable', -1);
+        bumpSummaryValue('office-summary-pending', -1);
+        if (action === 'approve') {
+          bumpSummaryValue('office-summary-approved', 1);
+        } else if (action === 'reject') {
+          bumpSummaryValue('office-summary-rejected', 1);
+        }
+      };
+
+      const getRefreshStatusEl = () => document.getElementById('office-request-refresh-status');
+
+      const setReloadButtonState = (isLoading, isManual = false) => {
+        if (!isManual) {
+          return; // Only update button for manual refreshes
+        }
+
+        const reloadButton = document.getElementById('office-queue-reload');
+        const icon = reloadButton?.querySelector('.office-queue-reload-icon');
+        const text = reloadButton?.querySelector('.office-queue-reload-text');
+
+        if (reloadButton instanceof HTMLButtonElement) {
+          reloadButton.disabled = isLoading;
+        }
+
+        if (icon instanceof HTMLElement) {
+          icon.classList.toggle('is-loading', isLoading);
+        }
+
+        if (text instanceof HTMLElement) {
+          text.textContent = isLoading ? 'Refreshing...' : 'Reload';
+        }
+      };
+
+      const updateRefreshStatus = () => {
+        const statusEl = getRefreshStatusEl();
+        if (!(statusEl instanceof HTMLElement)) {
+          return;
+        }
+        const now = new Date();
+        statusEl.textContent = `Last updated ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      };
+
+      const initOfficeQueueReloadButton = () => {
+        const reloadButton = document.getElementById('office-queue-reload');
+        if (!(reloadButton instanceof HTMLElement)) {
+          return;
+        }
+
+        reloadButton.addEventListener('click', () => {
+          softRefreshQueue(true); // Mark as manual
+        });
+      };
+
+      const applyQueueSnapshotPayload = (payload) => {
+        if (!payload || typeof payload !== 'object') {
+          return;
+        }
+
+        if (typeof payload.rows_html === 'string') {
+          queueBody.innerHTML = payload.rows_html;
+        }
+
+        if (paginationWrap instanceof HTMLElement && typeof payload.pagination_html === 'string') {
+          paginationWrap.innerHTML = payload.pagination_html;
+        }
+
+        const summary = payload.summary && typeof payload.summary === 'object' ? payload.summary : {};
+        const summaryMap = {
+          'office-summary-actionable': summary.actionable,
+          'office-summary-pending': summary.pending,
+          'office-summary-approved': summary.approved,
+          'office-summary-rejected': summary.rejected,
+        };
 
         summaryIds.forEach((id) => {
           const current = document.getElementById(id);
-          const next = doc.getElementById(id);
-
-          if (current instanceof HTMLElement && next instanceof HTMLElement) {
-            current.textContent = next.textContent;
+          const nextValue = summaryMap[id];
+          if (current instanceof HTMLElement && Number.isFinite(Number(nextValue))) {
+            current.textContent = String(Math.max(0, Number(nextValue)));
           }
         });
       };
 
-      const softRefreshQueue = async () => {
-        if (isRefreshing || isActing) {
+      const softRefreshQueue = async (isManual = false, forceWhileActing = false) => {
+        if (isRefreshing || (isActing && !forceWhileActing)) {
           return;
         }
 
         isRefreshing = true;
+        const runVersion = refreshVersion;
+        setReloadButtonState(true, isManual);
 
         try {
-          const response = await fetch(window.location.pathname + window.location.search, {
+          const snapshotUrl = (typeof window.officeQueueSnapshotUrl === 'string' && window.officeQueueSnapshotUrl)
+            ? window.officeQueueSnapshotUrl
+            : '/dashboard/office/requests/snapshot';
+
+          const response = await fetch(snapshotUrl, {
             method: 'GET',
             headers: {
               'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'application/json',
               'Cache-Control': 'no-cache',
             },
             cache: 'no-store',
@@ -352,13 +426,28 @@
             return;
           }
 
-          const html = await response.text();
-          const doc = new DOMParser().parseFromString(html, 'text/html');
-          applySoftRefreshFromDocument(doc);
+          const payload = await response.json().catch(() => ({}));
+          if (!payload.success) {
+            return;
+          }
+
+          // Ignore stale refresh responses that started before a newer state mutation.
+          if (runVersion !== refreshVersion) {
+            return;
+          }
+
+          // Guard against applying background snapshots while an action is still in progress.
+          if (isActing && !forceWhileActing) {
+            return;
+          }
+
+          applyQueueSnapshotPayload(payload);
+          updateRefreshStatus();
         } catch (_error) {
           // Silent fail: keep UI usable and try again on next interval.
         } finally {
           isRefreshing = false;
+          setReloadButtonState(false, isManual);
         }
       };
 
@@ -387,6 +476,7 @@
         }
 
         isActing = true;
+        refreshVersion += 1;
         setButtonsDisabled(true);
 
         try {
@@ -411,8 +501,13 @@
           const decisionWord = action === 'approve' ? 'approved' : 'rejected';
           const fallbackMessage = `Request ${decisionWord} by ${actorName}.`;
           showActionToast(payload.message || fallbackMessage, decisionWord === 'approved' ? 'approved' : 'rejected');
+          applyLocalQueueDecision(button, action);
+          const statusEl = getRefreshStatusEl();
+          if (statusEl instanceof HTMLElement) {
+            statusEl.textContent = 'Syncing latest changes...';
+          }
 
-          await softRefreshQueue();
+          softRefreshQueue(false, true);
         } catch (_error) {
           showAppNotice('Request failed. Please check your connection and try again.');
         } finally {
@@ -426,6 +521,8 @@
           softRefreshQueue();
         }
       });
+
+      initOfficeQueueReloadButton();
 
       window.setInterval(() => {
         if (!document.hidden) {
@@ -455,6 +552,51 @@
       opacity: 0.6;
       cursor: not-allowed;
       transform: none;
+    }
+
+    .office-queue-reload-btn {
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: #fff;
+      color: #0f172a;
+      border-radius: 10px;
+      padding: 0.65rem 0.9rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      transition: filter 0.15s ease, transform 0.15s ease;
+    }
+
+    .office-queue-reload-btn:hover {
+      filter: brightness(0.95);
+      transform: translateY(-1px);
+    }
+
+    .office-queue-reload-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s ease;
+    }
+
+    .office-queue-reload-icon.is-loading {
+      transform: rotate(90deg);
+    }
+
+    .office-request-refresh-status {
+      display: block;
+      margin-top: 0.25rem;
+      color: #64748b;
+      font-size: 0.88rem;
+    }
+
+    .office-request-history-head-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
     }
 
     .office-queue-approve {

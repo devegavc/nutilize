@@ -518,11 +518,102 @@
   padding: 5px 12px;
 }
 
+.inventory-confirm-modal {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: center;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+}
+
+.inventory-confirm-modal.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.inventory-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(22, 34, 75, 0.52);
+}
+
+.inventory-confirm-card {
+  position: relative;
+  width: min(420px, calc(100% - 32px));
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(36, 56, 108, 0.2);
+  padding: 24px;
+  z-index: 1;
+}
+
+.inventory-confirm-head h2 {
+  margin: 0 0 10px;
+  color: #1f2d5d;
+  font-size: 1.2rem;
+}
+
+.inventory-confirm-body p {
+  margin: 0;
+  color: #4b5677;
+  line-height: 1.75;
+  font-size: 0.98rem;
+}
+
+.inventory-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 22px;
+}
+
+.inventory-confirm-btn {
+  border: 0;
+  border-radius: 999px;
+  min-width: 100px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+}
+
+.inventory-confirm-btn.cancel {
+  background: #eef0f5;
+  color: #4c556e;
+}
+
+.inventory-confirm-btn.confirm,
+.inventory-confirm-btn.delete,
+.inventory-confirm-btn.danger {
+  background: #1f3eb6;
+  color: #ffffff;
+}
+
+.inventory-confirm-btn.delete,
+.inventory-confirm-btn.danger {
+  background: #dc2626;
+}
+
+.inventory-confirm-btn:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.08);
+}
+
 .pending-only {
   display: none;
 }
 
 .return-only {
+  display: none;
+}
+
+.rejected-only {
   display: none;
 }
 
@@ -538,6 +629,10 @@
   display: none;
 }
 
+.request-content-card.pending-mode .rejected-only {
+  display: none;
+}
+
 .request-content-card.return-mode .final-only,
 .request-content-card.return-mode .pending-only {
   display: none;
@@ -545,6 +640,47 @@
 
 .request-content-card.return-mode .return-only {
   display: grid;
+}
+
+.request-content-card.return-mode .rejected-only {
+  display: none;
+}
+
+.request-content-card.final-mode .final-only {
+  display: grid;
+}
+
+.request-content-card.final-mode .pending-only,
+.request-content-card.final-mode .return-only,
+.request-content-card.final-mode .rejected-only {
+  display: none;
+}
+
+.request-content-card.rejected-mode .final-only,
+.request-content-card.rejected-mode .pending-only,
+.request-content-card.rejected-mode .return-only {
+  display: none;
+}
+
+.request-content-card.rejected-mode .rejected-only {
+  display: grid;
+}
+
+.request-list-wrap .pagination li:first-child,
+.request-list-wrap .pagination li:last-child,
+.request-list-wrap .pagination .page-item:first-child,
+.request-list-wrap .pagination .page-item:last-child,
+.request-list-wrap .pagination a[rel="prev"],
+.request-list-wrap .pagination a[rel="next"],
+.request-list-wrap .pagination span[aria-label="Previous"],
+.request-list-wrap .pagination span[aria-label="Next"],
+.request-list-wrap .pagination a:has(svg),
+.request-list-wrap .pagination span:has(svg),
+.request-list-wrap .pagination a:contains('«'),
+.request-list-wrap .pagination a:contains('»'),
+.request-list-wrap .pagination span:contains('«'),
+.request-list-wrap .pagination span:contains('»') {
+  display: none !important;
 }
 
 .request-item.is-selected .request-side-event {

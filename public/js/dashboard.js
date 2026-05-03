@@ -465,17 +465,271 @@ let equipmentCategoriesCache = Array.isArray(window.equipmentCategories)
     .filter((category) => Number.isInteger(category.id) && category.id > 0 && category.key && category.label)
   : [];
 
-const notificationItems = [
-  { name: 'Maria Lerma', unread: true },
-  { name: 'Joel Enriquez', unread: true },
-  { name: 'Mars Fha Uthang', unread: false },
-  { name: 'Maria Santos', unread: true },
-  { name: 'Anne Lopez', unread: false },
-  { name: 'Juan Dela Cruz', unread: false },
-  { name: 'Phenge Pira', unread: false },
-  { name: 'Jepoy Dizon', unread: true },
-  { name: 'Andrew Dano', unread: true },
-];
+let notificationItems = [];
+let notificationsLoaded = false;
+let notificationUnreadCount = 0;
+
+async function fetchNotifications() {
+  try {
+    const response = await fetch('/dashboard/notifications', {
+      method: 'GET',
+      headers: {
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+        'Accept': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      notificationItems = data.notifications.map(notification => ({
+        id: notification.id,
+        name: notification.title,
+        message: notification.message,
+        unread: !notification.read,
+        created_at: notification.created_at,
+        related_id: notification.related_id,
+      }));
+      notificationUnreadCount = notificationItems.filter((item) => item.unread).length;
+      notificationsLoaded = true;
+      updateNotificationBadge();
+    } else {
+      console.error('Failed to fetch notifications');
+      notificationItems = [];
+      notificationUnreadCount = 0;
+    }
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    notificationItems = [];
+    notificationUnreadCount = 0;
+  }
+}
+
+(async function preloadNotifications() {
+  // Poll for new notifications every 60 seconds when page is visible
+  let notificationPollInterval = null;
+  const startNotificationPolling = () => {
+    if (notificationPollInterval) {
+      clearInterval(notificationPollInterval);
+    }
+    notificationPollInterval = setInterval(async () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          await fetchNotifications();
+        } catch (error) {
+          console.error('Error polling notifications:', error);
+        }
+      }
+    }, 10000); // 10 seconds (faster feedback)
+  };
+
+  const stopNotificationPolling = () => {
+    if (notificationPollInterval) {
+      clearInterval(notificationPollInterval);
+      notificationPollInterval = null;
+    }
+  };
+
+  const bootstrapNotifications = () => {
+    fetchNotifications().catch((error) => console.error('Error preloading notifications:', error));
+    startNotificationPolling();
+  };
+
+  // Fetch immediately so notifications don't feel delayed.
+  setTimeout(bootstrapNotifications, 0);
+
+  // Polling and visibility handlers
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      // Refresh immediately when page becomes visible
+      fetchNotifications().catch(error => console.error('Error refreshing notifications on visibility:', error));
+    }
+  });
+
+  // Clean up on page unload
+  window.addEventListener('beforeunload', stopNotificationPolling);
+})();
+
+function updateNotificationBadge() {
+  notificationUnreadCount = notificationItems.filter((item) => item.unread).length;
+
+  toolbarNotificationButtons.forEach(button => {
+    let badge = button.querySelector('.notification-badge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'notification-badge';
+      button.appendChild(badge);
+    }
+
+    if (notificationUnreadCount > 0) {
+      badge.textContent = notificationUnreadCount > 99 ? '99+' : notificationUnreadCount.toString();
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
+  });
+}
+
+function getNotificationListMarkup() {
+  return notificationItems.length > 0
+    ? notificationItems
+        .map((item, index) => `
+          <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${item.id}" data-notification-index="${index}">
+            <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
+            <div class="notification-copy">
+              <strong>${item.name}</strong>
+              <span class="notification-sub">${item.message}</span>
+              <small class="notification-time">${item.created_at}</small>
+            </div>
+            <span class="notification-indicator ${item.unread ? 'unread' : 'read'}" aria-label="${item.unread ? 'Unread notification' : 'Read notification'}"></span>
+          </article>
+        `)
+        .join('')
+    : '<div class="notification-empty">No notifications</div>';
+}
+
+function refreshNotificationPopover() {
+  const panel = document.querySelector('.notification-popover');
+  if (!(panel instanceof HTMLElement)) {
+    return;
+  }
+
+  const list = panel.querySelector('.notification-popover-list');
+  if (!(list instanceof HTMLElement)) {
+    return;
+  }
+
+  list.innerHTML = getNotificationListMarkup();
+}
+
+function markNotificationsReadForReservation(reservationId) {
+  const reservationNumber = Number.parseInt(String(reservationId), 10);
+  if (Number.isNaN(reservationNumber) || reservationNumber <= 0) {
+    return Promise.resolve();
+  }
+
+  const toMark = notificationItems
+    .filter((item) => item.related_id === reservationNumber && item.unread)
+    .map((item) => item.id);
+
+  if (toMark.length === 0) {
+    return Promise.resolve();
+  }
+
+  return Promise.all(toMark.map(async (notificationId) => {
+    try {
+      await fetch(`/dashboard/notification/${notificationId}/read`, {
+        method: 'PATCH',
+        headers: {
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+          'Accept': 'application/json',
+        },
+      });
+    } catch (error) {
+      console.error(`Error marking notification ${notificationId} as read:`, error);
+    }
+  }));
+}
+
+function clearNotificationsForReservation(reservationId) {
+  const reservationNumber = Number.parseInt(String(reservationId), 10);
+  if (Number.isNaN(reservationNumber) || reservationNumber <= 0) {
+    return;
+  }
+
+  notificationItems = notificationItems.filter((item) => item.related_id !== reservationNumber);
+  updateNotificationBadge();
+  refreshNotificationPopover();
+}
+
+function showReservationDetailsModal(reservation) {
+  // Create modal
+  const modal = document.createElement('div');
+  modal.className = 'reservation-details-modal';
+  modal.innerHTML = `
+    <div class="reservation-details-overlay">
+      <div class="reservation-details-content">
+        <div class="reservation-details-header">
+          <h2>Reservation Details</h2>
+          <button class="reservation-details-close" type="button" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="reservation-details-body">
+          <div class="reservation-info">
+            <div class="info-row">
+              <strong>Activity:</strong>
+              <span>${reservation.activity_name}</span>
+            </div>
+            <div class="info-row">
+              <strong>Requester:</strong>
+              <span>${reservation.requester}</span>
+            </div>
+            <div class="info-row">
+              <strong>Requested Date:</strong>
+              <span>${reservation.requested_date}</span>
+            </div>
+            <div class="info-row">
+              <strong>Duration:</strong>
+              <span>${reservation.start_date} to ${reservation.end_date}</span>
+            </div>
+            <div class="info-row">
+              <strong>Time:</strong>
+              <span>${reservation.start_time} - ${reservation.end_time}</span>
+            </div>
+            <div class="info-row">
+              <strong>Status:</strong>
+              <span class="status-${reservation.status.toLowerCase()}">${reservation.status}</span>
+            </div>
+          </div>
+
+          <div class="reservation-items">
+            <h3>Requested Items</h3>
+            <div class="items-list">
+              ${reservation.items.map(item => `
+                <div class="item-row">
+                  <span class="item-name">${item.name}</span>
+                  <span class="item-quantity">${item.quantity} ${item.unit}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="reservation-approvals">
+            <h3>Approval Status</h3>
+            <div class="approvals-list">
+              ${reservation.approvals.map(approval => `
+                <div class="approval-row">
+                  <span class="office-name">${approval.office}</span>
+                  <span class="approval-status status-${approval.status.toLowerCase()}">${approval.status}</span>
+                  ${approval.approved_by ? `<span class="approved-by">by ${approval.approved_by}</span>` : ''}
+                  ${approval.approved_at ? `<span class="approved-at">${approval.approved_at}</span>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Add event listeners
+  const closeBtn = modal.querySelector('.reservation-details-close');
+  const overlay = modal.querySelector('.reservation-details-overlay');
+
+  const closeModal = () => {
+    modal.remove();
+  };
+
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      closeModal();
+    }
+  });
+
+  // Add to body
+  document.body.appendChild(modal);
+}
 
 const messagePreviewItems = [
   { name: 'Dela Cruz, Jon', unread: true, snippet: 'Sent a photo' },
@@ -1039,6 +1293,51 @@ function getRequestItems() {
   return document.querySelectorAll('.request-item');
 }
 
+function getRequestDecisionConfirmConfig(status) {
+  switch (status) {
+    case 'approved':
+      return {
+        title: 'Confirm Approval',
+        message: 'Are you sure you want to approve this reservation request? This action cannot be undone.',
+        confirmText: 'Approve',
+        variant: '',
+      };
+    case 'rejected':
+      return {
+        title: 'Confirm Rejection',
+        message: 'Are you sure you want to reject this reservation request? This action cannot be undone.',
+        confirmText: 'Reject',
+        variant: 'danger',
+      };
+    case 'returned':
+      return {
+        title: 'Confirm Return',
+        message: 'Mark this request as returned in good condition? This action cannot be undone.',
+        confirmText: 'Return',
+        variant: '',
+      };
+    case 'damaged':
+      return {
+        title: 'Confirm Damage',
+        message: 'Mark this request as damaged? This action cannot be undone.',
+        confirmText: 'Damage',
+        variant: 'danger',
+      };
+    default:
+      return {
+        title: 'Confirm Action',
+        message: 'Are you sure you want to continue? This action cannot be undone.',
+        confirmText: 'Confirm',
+        variant: '',
+      };
+  }
+}
+
+async function confirmRequestDecision(status) {
+  const config = getRequestDecisionConfirmConfig(status);
+  return openInventoryConfirmModal(config);
+}
+
 async function refreshRequestListPreservingTab(explicitUrl) {
   if (!requestListWrap) {
     return;
@@ -1093,6 +1392,9 @@ async function refreshRequestListPreservingTab(explicitUrl) {
   }
 
   setRequestTabMode(activeTab);
+
+  // Skip eager notification refresh here.
+  // Polling and visibility refresh already keep notifications in sync.
 }
 
 async function submitRequestDecision(item, button, status) {
@@ -1108,6 +1410,11 @@ async function submitRequestDecision(item, button, status) {
 
   if (!csrfToken) {
     showAppNotice('Missing CSRF token. Please refresh the page and try again.');
+    return;
+  }
+
+  const confirmed = await confirmRequestDecision(status);
+  if (!confirmed) {
     return;
   }
 
@@ -1138,6 +1445,16 @@ async function submitRequestDecision(item, button, status) {
       status === 'approved' ? 'Request approved successfully.' : 'Request rejected successfully.',
       status,
     );
+
+    if (status === 'approved' && data.approval && data.approval.reservation_id) {
+      await markNotificationsReadForReservation(data.approval.reservation_id);
+      clearNotificationsForReservation(data.approval.reservation_id);
+    }
+
+    // Refresh notifications immediately after a decision so the badge/popover updates without waiting for polling.
+    await fetchNotifications().catch((error) => console.error('Error refreshing notifications after decision:', error));
+    refreshNotificationPopover();
+
     await refreshRequestListPreservingTab();
   } catch (error) {
     window.console.error('Request approval error:', error);
@@ -1162,6 +1479,11 @@ async function submitFinalRequestDecision(item, button, status) {
 
   if (!csrfToken) {
     showAppNotice('Missing CSRF token. Please refresh the page and try again.');
+    return;
+  }
+
+  const confirmed = await confirmRequestDecision(status);
+  if (!confirmed) {
     return;
   }
 
@@ -1201,6 +1523,14 @@ async function submitFinalRequestDecision(item, button, status) {
       status === 'approved' ? 'Request approved successfully.' : 'Request rejected successfully.',
       status,
     );
+    if (status === 'approved') {
+      await markNotificationsReadForReservation(reservationId);
+      clearNotificationsForReservation(reservationId);
+    }
+
+    await fetchNotifications().catch((error) => console.error('Error refreshing notifications after final decision:', error));
+    refreshNotificationPopover();
+
     await refreshRequestListPreservingTab();
   } catch (error) {
     window.console.error('Final request approval error:', error);
@@ -1225,6 +1555,11 @@ async function submitReturnDecision(item, button, status) {
 
   if (!csrfToken) {
     showAppNotice('Missing CSRF token. Please refresh the page and try again.');
+    return;
+  }
+
+  const confirmed = await confirmRequestDecision(status);
+  if (!confirmed) {
     return;
   }
 
@@ -1281,7 +1616,7 @@ function setRequestTabMode(mode) {
     return;
   }
 
-  const requestMode = mode === 'pending' || mode === 'return' ? mode : 'final';
+  const requestMode = mode === 'pending' || mode === 'return' || mode === 'rejected' ? mode : 'final';
 
   requestTabs.forEach((tab) => {
     tab.classList.toggle('active', tab.dataset.requestTab === requestMode);
@@ -1293,6 +1628,8 @@ function setRequestTabMode(mode) {
 
   requestContentCard.classList.toggle('pending-mode', requestMode === 'pending');
   requestContentCard.classList.toggle('return-mode', requestMode === 'return');
+  requestContentCard.classList.toggle('rejected-mode', requestMode === 'rejected');
+  requestContentCard.classList.toggle('final-mode', requestMode === 'final');
 }
 
 function openFacilitiesEditModal(row) {
@@ -1939,6 +2276,33 @@ function openInventoryConfirmModal(options = {}) {
   return new Promise((resolve) => {
     inventoryConfirmResolver = resolve;
   });
+}
+
+async function confirmActionAndSubmit(button) {
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const form = button.closest('form');
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+
+  const title = button.dataset.confirmTitle || 'Confirm Action';
+  const message = button.dataset.confirmMessage || 'Are you sure you want to continue? This action cannot be undone.';
+  const confirmText = button.dataset.confirmText || 'Confirm';
+  const variant = button.dataset.confirmVariant || '';
+
+  const confirmed = await openInventoryConfirmModal({
+    title,
+    message,
+    confirmText,
+    variant,
+  });
+
+  if (confirmed) {
+    form.submit();
+  }
 }
 
 function closeEquipmentEditModal() {
@@ -2618,31 +2982,49 @@ function positionNotificationsPopover(button) {
   notificationPopover.style.left = `${left}px`;
 }
 
-function buildNotificationsPopover() {
+async function buildNotificationsPopover() {
   const panel = document.createElement('div');
   panel.className = 'notification-popover';
+
+  const renderList = () => {
+    const list = panel.querySelector('.notification-popover-list');
+    if (!(list instanceof HTMLElement)) {
+      return;
+    }
+
+    list.innerHTML = notificationItems.length > 0
+      ? notificationItems
+          .map((item, index) => `
+            <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${item.id}" data-notification-index="${index}">
+              <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
+              <div class="notification-copy">
+                <strong>${item.name}</strong>
+                <span class="notification-sub">${item.message}</span>
+                <small class="notification-time">${item.created_at}</small>
+              </div>
+              <span class="notification-indicator ${item.unread ? 'unread' : 'read'}" aria-label="${item.unread ? 'Unread notification' : 'Read notification'}"></span>
+            </article>
+          `)
+          .join('')
+      : '<div class="notification-empty">No notifications</div>';
+  };
+
+  const notificationListMarkup = notificationsLoaded
+    ? notificationItems.length > 0
+      ? getNotificationListMarkup()
+      : '<div class="notification-empty">No notifications</div>'
+    : '<div class="notification-loading">Loading notifications…</div>';
 
   panel.innerHTML = `
     <div class="notification-popover-head">
       <strong>Notifications</strong>
     </div>
     <div class="notification-popover-list">
-      ${notificationItems
-        .map((item, index) => `
-          <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-index="${index}">
-            <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
-            <div class="notification-copy">
-              <strong>${item.name} has submitted a request</strong>
-              <span class="notification-sub">Check the status update</span>
-            </div>
-            <span class="notification-indicator ${item.unread ? 'unread' : 'read'}" aria-label="${item.unread ? 'Unread notification' : 'Read notification'}"></span>
-          </article>
-        `)
-        .join('')}
+      ${notificationListMarkup}
     </div>
   `;
 
-  panel.addEventListener('click', (event) => {
+  panel.addEventListener('click', async (event) => {
     const target = event.target;
 
     if (!(target instanceof HTMLElement)) {
@@ -2655,30 +3037,78 @@ function buildNotificationsPopover() {
       return;
     }
 
-    const index = Number.parseInt(item.dataset.notificationIndex || '', 10);
+    const notificationId = item.dataset.notificationId;
+    const notificationIndex = item.dataset.notificationIndex;
 
-    if (Number.isNaN(index) || !notificationItems[index]) {
+    if (!notificationId || !notificationIndex) {
       return;
     }
 
-    notificationItems[index].unread = false;
-    item.classList.remove('unread');
+    const notification = notificationItems[Number.parseInt(notificationIndex, 10)];
+    if (!notification || !notification.related_id) {
+      return;
+    }
 
-    const indicator = item.querySelector('.notification-indicator');
+    // Update UI immediately on click
+    if (notification.unread) {
+      notification.unread = false;
+      updateNotificationBadge();
+      renderList();
+    }
 
-    if (indicator instanceof HTMLElement) {
-      indicator.classList.remove('unread');
-      indicator.classList.add('read');
-      indicator.setAttribute('aria-label', 'Read notification');
+    // Fetch reservation details and show modal
+    try {
+      const response = await fetch(`/dashboard/reservation/${notification.related_id}/details`, {
+        method: 'GET',
+        headers: {
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+          'Accept': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        showReservationDetailsModal(data.reservation);
+      } else {
+        console.error('Failed to fetch reservation details');
+      }
+    } catch (error) {
+      console.error('Error fetching reservation details:', error);
+    }
+
+    // Mark as read in database (don't fail if this errors, UI is already updated)
+    try {
+      await fetch(`/dashboard/notification/${notificationId}/read`, {
+        method: 'PATCH',
+        headers: {
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+          'Accept': 'application/json',
+        },
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      // Revert UI changes if API call failed
+      notification.unread = true;
+      updateNotificationBadge();
+      renderList();
     }
   });
+
+  (async function refreshPopoverNotifications() {
+    try {
+      await fetchNotifications();
+      renderList();
+    } catch (_error) {
+      // No-op: errors already logged
+    }
+  })();
 
   return panel;
 }
 
 if (toolbarNotificationButtons.length) {
   toolbarNotificationButtons.forEach((button) => {
-    button.addEventListener('click', (event) => {
+    button.addEventListener('click', async (event) => {
       event.stopPropagation();
 
       if (notificationPopover && activeNotificationButton === button) {
@@ -2687,7 +3117,7 @@ if (toolbarNotificationButtons.length) {
       }
 
       closeNotificationsPopover();
-      notificationPopover = buildNotificationsPopover();
+      notificationPopover = await buildNotificationsPopover();
       document.body.appendChild(notificationPopover);
       activeNotificationButton = button;
       button.classList.add('notification-open');
@@ -4046,6 +4476,21 @@ if (inventoryConfirmModal instanceof HTMLElement) {
     inventoryConfirmSubmit.addEventListener('click', () => finalizeInventoryConfirm(true));
   }
 
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const actionButton = target.closest('.confirm-action-btn');
+    if (!(actionButton instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    event.preventDefault();
+    confirmActionAndSubmit(actionButton);
+  });
+
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && inventoryConfirmModal.classList.contains('is-open')) {
       finalizeInventoryConfirm(false);
@@ -4152,7 +4597,7 @@ if (scheduleInlineRequestBody) {
 }
 
 if (requestListWrap) {
-  requestListWrap.addEventListener('click', (event) => {
+  requestListWrap.addEventListener('click', async (event) => {
     const target = event.target;
 
     if (!(target instanceof HTMLElement)) {
@@ -4776,9 +5221,28 @@ window.addEventListener('resize', () => {
   }
 });
 
-document.addEventListener('DOMContentLoaded', async () => {
-  await loadNavbar();
+const initializeDashboard = () => {
+  // Load navbar without blocking other dashboard initialization.
+  loadNavbar().catch((error) => console.error('Unable to initialize navbar:', error));
   initOfficeQuickDateControl();
   initOfficeQuickSortControl();
   initOfficeReservationModal();
-});
+  initApprovalReloadButton();
+};
+
+function initApprovalReloadButton() {
+  const button = document.querySelector('#approval-reload-button');
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+
+  button.addEventListener('click', () => {
+    window.location.reload();
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeDashboard);
+} else {
+  initializeDashboard();
+}

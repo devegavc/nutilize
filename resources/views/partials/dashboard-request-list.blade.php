@@ -1,5 +1,5 @@
 @php
-  $allRequests = $finalRequests->concat($returnRequests ?? collect())->concat($pendingRequests);
+  $allRequests = $finalRequests->concat($returnRequests ?? collect())->concat($rejectedRequests ?? collect())->concat($pendingRequests);
 @endphp
 
 @forelse($allRequests as $requestData)
@@ -10,7 +10,7 @@
     $displayPhone = $user->phone_number ?? $user->contact_number ?? 'N/A';
     $cssVisibilityClass = $requestData['tab'] === 'final'
       ? 'final-only'
-      : ($requestData['tab'] === 'return' ? 'return-only' : 'pending-only');
+      : ($requestData['tab'] === 'return' ? 'return-only' : ($requestData['tab'] === 'rejected' ? 'rejected-only' : 'pending-only'));
   @endphp
   <article class="request-item {{ $cssVisibilityClass }} {{ $requestData['decision_status_class'] }}" data-requester="{{ $requesterName }}">
     <div class="request-main-col">
@@ -58,11 +58,33 @@
       </div>
       <div class="request-action-stack">
         @if($requestData['tab'] === 'return')
-          <button class="return-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="returned">Returned</button>
-          <button class="damage-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="damaged">Damaged</button>
-        @else
-          <button class="approve-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-final-action="approve">Approve</button>
-          <button class="reject-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-final-action="reject">Reject</button>
+          <button class="return-btn confirm-action-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="returned"
+                  data-confirm-title="Confirm Return"
+                  data-confirm-message="Mark this request as returned in good condition? This action cannot be undone."
+                  data-confirm-text="Return">
+            Returned
+          </button>
+          <button class="damage-btn confirm-action-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="damaged"
+                  data-confirm-title="Confirm Damage"
+                  data-confirm-message="Mark this request as damaged? This action cannot be undone."
+                  data-confirm-text="Damage"
+                  data-confirm-variant="danger">
+            Damaged
+          </button>
+        @elseif($requestData['tab'] === 'final')
+          <button class="approve-btn confirm-action-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-final-action="approve"
+                  data-confirm-title="Confirm Approval"
+                  data-confirm-message="Are you sure you want to approve this reservation request? This action cannot be undone."
+                  data-confirm-text="Approve">
+            Approve
+          </button>
+          <button class="reject-btn confirm-action-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-final-action="reject"
+                  data-confirm-title="Confirm Rejection"
+                  data-confirm-message="Are you sure you want to reject this reservation request? This action cannot be undone."
+                  data-confirm-text="Reject"
+                  data-confirm-variant="danger">
+            Reject
+          </button>
         @endif
       </div>
       <div class="request-decision" aria-live="polite">
@@ -86,9 +108,3 @@
     </div>
   </article>
 @endforelse
-
-@if(isset($requestPagination) && $requestPagination->hasPages())
-  <div style="margin-top: 1rem; display: flex; justify-content: center;">
-    {{ $requestPagination->links() }}
-  </div>
-@endif

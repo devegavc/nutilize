@@ -38,12 +38,28 @@ class User extends Authenticatable
 
     public function isPhysicalFacilitiesAdmin()
     {
-        return $this->office && $this->office->isPhysicalFacilities() && strtolower($this->role) === 'admin';
+        if (!$this->office || !$this->office->isPhysicalFacilities()) {
+            return false;
+        }
+
+        $role = strtolower((string) $this->role);
+
+        return in_array($role, ['admin', 'pf_admin'], true);
     }
 
     public function isOfficeApprover()
     {
-        return !is_null($this->office_id) && strtolower((string) $this->role) === 'admin';
+        if (is_null($this->office_id)) {
+            return false;
+        }
+
+        $role = strtolower((string) $this->role);
+
+        if ($role === 'admin') {
+            return true;
+        }
+
+        return $role === 'pf_admin' && $this->office && $this->office->isPhysicalFacilities();
     }
 
     public function reservations()

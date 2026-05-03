@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Reservation;
 use App\Models\ReservationApproval;
+use App\Services\ReservationApprovalNotifier;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -15,6 +16,12 @@ class OfficeRequestController extends Controller
     private ?array $officeIdByDepartmentNameCache = null;
     private array $ownerOfficeIdCache = [];
 
+    /** @var array<int, true>|null Batch gym flags for getActionableOfficeIdsForReservations (avoid N queries per reservation). */
+    private ?array $batchGymLookup = null;
+
+    /** @var array<int, true>|null */
+    private ?array $batchGymWithItemsLookup = null;
+
     public function index()
     {
         $user = Auth::user();
@@ -23,20 +30,49 @@ class OfficeRequestController extends Controller
             return redirect('/dashboard/home')->with('error', 'Unauthorized access.');
         }
 
+        return view('office-home', $this->buildOfficeHomeData($user));
+    }
+
+    public function queueSnapshot()
+    {
+        $user = Auth::user();
+
+        if (!$user || !$user->isOfficeApprover()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Unauthorized access.',
+            ], 403);
+        }
+
+        $viewData = $this->buildOfficeHomeData($user);
+
+        return response()->json([
+            'success' => true,
+            'summary' => [
+                'actionable' => (int) ($viewData['totalRequests'] ?? 0),
+                'pending' => (int) ($viewData['pendingRequests'] ?? 0),
+                'approved' => (int) ($viewData['approvedRequests'] ?? 0),
+                'rejected' => (int) ($viewData['rejectedRequests'] ?? 0),
+            ],
+            'rows_html' => view('partials.office-request-rows', ['requests' => $viewData['requests']])->render(),
+            'pagination_html' => $viewData['requests']->links()->toHtml(),
+        ]);
+    }
+
+    private function buildOfficeHomeData($user): array
+    {
         $openReservationIds = Reservation::query()
             ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected'])
             ->pluck('reservation_id')
             ->all();
 
         // Automatic workflow sync on every page load can time out on large datasets.
-
         $actionableReservationIds = [];
 
         if ($user->isPhysicalFacilitiesAdmin()) {
             $actionableReservationIds = $openReservationIds;
         } else {
             $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($openReservationIds);
-
             $this->ensureActionableApprovalRows($actionableOfficeIds, (int) $user->office_id);
 
             foreach ($actionableOfficeIds as $reservationId => $officeId) {
@@ -54,27 +90,22 @@ class OfficeRequestController extends Controller
             ->orderByDesc('created_at')
             ->paginate(10);
 
-        $totalRequests = count($actionableReservationIds);
-        $pendingRequests = $requests->total();
-        $approvedRequests = ReservationApproval::query()
-            ->where('office_id', $user->office_id)
-            ->where('status', 'approved')
-            ->whereNotNull('approved_at')
-            ->count();
-        $rejectedRequests = ReservationApproval::query()
-            ->where('office_id', $user->office_id)
-            ->where('status', 'rejected')
-            ->whereNotNull('approved_at')
-            ->count();
-
-        return view('office-home', [
+        return [
             'requests' => $requests,
-            'totalRequests' => $totalRequests,
-            'pendingRequests' => $pendingRequests,
-            'approvedRequests' => $approvedRequests,
-            'rejectedRequests' => $rejectedRequests,
+            'totalRequests' => count($actionableReservationIds),
+            'pendingRequests' => $requests->total(),
+            'approvedRequests' => ReservationApproval::query()
+                ->where('office_id', $user->office_id)
+                ->where('status', 'approved')
+                ->whereNotNull('approved_at')
+                ->count(),
+            'rejectedRequests' => ReservationApproval::query()
+                ->where('office_id', $user->office_id)
+                ->where('status', 'rejected')
+                ->whereNotNull('approved_at')
+                ->count(),
             'authUser' => $user,
-        ]);
+        ];
     }
 
     private function syncReservationApprovalWorkflow(?array $reservationIds = null): void
@@ -141,39 +172,120 @@ class OfficeRequestController extends Controller
             return [];
         }
 
-        $approvalsByReservation = ReservationApproval::query()
-            ->whereIn('reservation_id', $reservationIds)
-            ->get(['reservation_id', 'office_id', 'status', 'approved_at'])
-            ->groupBy('reservation_id');
+        $reservationIds = array_values(array_unique(array_map('intval', $reservationIds)));
 
-        $actionableOfficeIds = [];
+        $this->warmBatchWorkflowLookups($reservationIds);
 
-        foreach ($reservationIds as $reservationId) {
-            $reservationId = (int) $reservationId;
-            $actionSequence = $this->resolveWorkflowOfficeIds($reservationId, false);
+        try {
+            $approvalsByReservation = ReservationApproval::query()
+                ->whereIn('reservation_id', $reservationIds)
+                ->get(['reservation_id', 'office_id', 'status', 'approved_at'])
+                ->groupBy('reservation_id');
 
-            if (empty($actionSequence)) {
-                continue;
+            $actionableOfficeIds = [];
+
+            foreach ($reservationIds as $reservationId) {
+                $reservationId = (int) $reservationId;
+                $actionSequence = $this->resolveWorkflowOfficeIds($reservationId, false);
+
+                if (empty($actionSequence)) {
+                    continue;
+                }
+
+                $approvals = ($approvalsByReservation->get($reservationId) ?? collect())
+                    ->keyBy(fn (ReservationApproval $row) => (int) $row->office_id);
+
+                foreach ($actionSequence as $officeId) {
+                    $officeId = (int) $officeId;
+                    $approval = $approvals->get($officeId);
+                    $status = strtolower((string) ($approval?->status ?? 'pending'));
+
+                    if ($status === 'rejected' && !is_null($approval?->approved_at)) {
+                        continue 2;
+                    }
+
+                    if ($status !== 'approved' || is_null($approval?->approved_at)) {
+                        $actionableOfficeIds[$reservationId] = (int) $officeId;
+                        continue 2;
+                    }
+                }
             }
 
-            $approvals = ($approvalsByReservation->get($reservationId) ?? collect())->keyBy('office_id');
+            return $actionableOfficeIds;
+        } finally {
+            $this->batchGymLookup = null;
+            $this->batchGymWithItemsLookup = null;
+        }
+    }
 
-            foreach ($actionSequence as $officeId) {
-                $approval = $approvals->get($officeId);
-                $status = strtolower((string) ($approval?->status ?? 'pending'));
+    /**
+     * Preload gym flags and item-owner rows for many reservations in O(1) queries instead of per-id exists()/joins.
+     */
+    private function warmBatchWorkflowLookups(array $reservationIds): void
+    {
+        $this->batchGymLookup = [];
+        $this->batchGymWithItemsLookup = [];
 
-                if ($status === 'rejected' && !is_null($approval?->approved_at)) {
-                    continue 2;
-                }
+        if (!Schema::hasTable('reservation_details')) {
+            return;
+        }
 
-                if ($status !== 'approved' || is_null($approval?->approved_at)) {
-                    $actionableOfficeIds[$reservationId] = (int) $officeId;
-                    continue 2;
-                }
+        $gymIds = DB::table('reservation_details as details')
+            ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+            ->join('rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+            ->whereIn('details.reservation_id', $reservationIds)
+            ->whereRaw('LOWER(TRIM(rooms.room_number)) = ?', ['gym'])
+            ->distinct()
+            ->pluck('details.reservation_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        foreach ($gymIds as $gid) {
+            $this->batchGymLookup[$gid] = true;
+        }
+
+        if ($gymIds !== []) {
+            $gymWithItemsIds = DB::table('reservation_details as details')
+                ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
+                ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+                ->whereIn('details.reservation_id', $gymIds)
+                ->whereNotNull('items.item_id')
+                ->distinct()
+                ->pluck('details.reservation_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            foreach ($gymWithItemsIds as $gid) {
+                $this->batchGymWithItemsLookup[$gid] = true;
             }
         }
 
-        return $actionableOfficeIds;
+        $officeIdsByCode = $this->getOfficeIdsByShortCode();
+        $pfOfficeId = $officeIdsByCode['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
+
+        $ownerRows = DB::table('reservation_details as details')
+            ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
+            ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+            ->leftJoin('item_owners as owners', 'owners.owner_id', '=', 'items.owner_id')
+            ->whereIn('details.reservation_id', $reservationIds)
+            ->select(['details.reservation_id', 'owners.owner_name', 'owners.department_affiliation'])
+            ->get();
+
+        $grouped = [];
+
+        foreach ($ownerRows as $row) {
+            $rid = (int) $row->reservation_id;
+            $grouped[$rid][] = $row;
+        }
+
+        foreach ($reservationIds as $rid) {
+            if (array_key_exists($rid, $this->ownerOfficeIdCache)) {
+                continue;
+            }
+
+            $rows = $grouped[$rid] ?? [];
+            $this->ownerOfficeIdCache[$rid] = $this->computeOwnerOfficeIdFromItemOwnerRows($rows, $officeIdsByCode, $pfOfficeId);
+        }
     }
 
     private function ensureActionableApprovalRows(array $actionableOfficeIds, int $officeId): void
@@ -223,11 +335,39 @@ class OfficeRequestController extends Controller
         }
 
         DB::table('reservation_approvals')->insert($rows);
+
+        $pfOfficeId = $this->getOfficeIdsByShortCode()['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
+
+        foreach ($missingReservationIds as $reservationId) {
+            $reservation = Reservation::with('user')->find($reservationId);
+            if (!$reservation) {
+                continue;
+            }
+
+            $actionableOfficeId = $this->getCurrentActionableOfficeId((int) $reservationId);
+
+            ReservationApprovalNotifier::notifyOfficeIfRelevant(
+                $reservation,
+                $officeId,
+                $actionableOfficeId,
+                $pfOfficeId,
+            );
+
+            if (!is_null($pfOfficeId)) {
+                ReservationApprovalNotifier::notifyOfficeIfRelevant(
+                    $reservation,
+                    (int) $pfOfficeId,
+                    $actionableOfficeId,
+                    $pfOfficeId,
+                );
+            }
+        }
     }
 
     private function resolveWorkflowOfficeIds(int $reservationId, bool $includePf): array
     {
         $ids = $this->getOfficeIdsByShortCode();
+        $idsMulti = $this->getOfficeIdsByShortCodeMulti();
         $actionSequence = $this->getActionSequenceOfficeIds();
 
         if (empty($actionSequence)) {
@@ -235,15 +375,41 @@ class OfficeRequestController extends Controller
         }
 
         $pfOfficeId = $ids['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
-        $ioOfficeId = $ids['IO'] ?? null;
+        $ioOfficeIds = $idsMulti['IO'] ?? (isset($ids['IO']) ? [(int) $ids['IO']] : []);
         $ownerOfficeId = $this->resolveOwnerOfficeId($reservationId, $ids, $pfOfficeId);
         $pcOfficeId = $ids['PC'] ?? null;
+        $genEdOfficeId = $ids['GENED'] ?? null;
         $startOfficeId = $ownerOfficeId;
 
-        if (is_null($startOfficeId) || (!is_null($pfOfficeId) && $startOfficeId === $pfOfficeId)) {
-            $startOfficeId = $pcOfficeId;
-        } elseif (!is_null($ioOfficeId) && $startOfficeId !== $ioOfficeId) {
-            $startOfficeId = $ioOfficeId;
+        if ($this->isGymRoomRequest($reservationId) && !is_null($genEdOfficeId)) {
+            if ($this->isGymRoomRequestWithItems($reservationId) && !empty($ioOfficeIds)) {
+                $actionSequence = array_values(array_filter(array_merge(
+                    [
+                        $genEdOfficeId,
+                    ],
+                    $ioOfficeIds,
+                    [
+                        $pcOfficeId,
+                        $ids['SDAO'] ?? null,
+                        $ids['DO'] ?? null,
+                        $ids['SEC'] ?? null,
+                    ]
+                )));
+            } else {
+                $actionSequence = array_values(array_filter([
+                    $genEdOfficeId,
+                    $pcOfficeId,
+                    $ids['SDAO'] ?? null,
+                    $ids['DO'] ?? null,
+                    $ids['SEC'] ?? null,
+                ]));
+            }
+
+            $startOfficeId = $genEdOfficeId;
+        } else {
+            if (is_null($startOfficeId) || (!is_null($pfOfficeId) && (int) $startOfficeId === (int) $pfOfficeId)) {
+                $startOfficeId = $pcOfficeId;
+            }
         }
 
         $startIndex = 0;
@@ -256,11 +422,22 @@ class OfficeRequestController extends Controller
 
         $workflowOfficeIds = array_slice($actionSequence, $startIndex);
 
-        if (!is_null($pfOfficeId) && !in_array($pfOfficeId, $workflowOfficeIds, true)) {
+        if ($includePf && !is_null($pfOfficeId) && !in_array($pfOfficeId, $workflowOfficeIds, true)) {
             $workflowOfficeIds[] = $pfOfficeId;
         }
 
-        return array_values(array_unique($workflowOfficeIds));
+        $seen = [];
+        $deduped = [];
+        foreach ($workflowOfficeIds as $officeId) {
+            $officeId = (int) $officeId;
+            if ($officeId <= 0 || isset($seen[$officeId])) {
+                continue;
+            }
+            $seen[$officeId] = true;
+            $deduped[] = $officeId;
+        }
+
+        return $deduped;
     }
 
     private function getOfficeIdsByShortCode(): array
@@ -286,6 +463,33 @@ class OfficeRequestController extends Controller
         $this->officeIdsByShortCodeCache = $ids;
 
         return $this->officeIdsByShortCodeCache;
+    }
+
+    /**
+     * Return all office IDs per short_code (supports multiple IO offices).
+     *
+     * @return array<string, array<int, int>>
+     */
+    private function getOfficeIdsByShortCodeMulti(): array
+    {
+        $rows = DB::table('offices')
+            ->select(['office_id', 'short_code', 'order_sequence'])
+            ->whereNotNull('short_code')
+            ->orderByRaw('COALESCE(order_sequence, 999999) ASC')
+            ->orderBy('office_id')
+            ->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $code = strtoupper(trim((string) ($row->short_code ?? '')));
+            if ($code === '') {
+                continue;
+            }
+            $map[$code] ??= [];
+            $map[$code][] = (int) $row->office_id;
+        }
+
+        return $map;
     }
 
     private function getActionSequenceOfficeIds(): array
@@ -353,8 +557,20 @@ class OfficeRequestController extends Controller
             ->select(['owners.owner_name', 'owners.department_affiliation'])
             ->get();
 
-        if ($ownerRows->isEmpty()) {
-            return $this->ownerOfficeIdCache[$reservationId] = null;
+        return $this->ownerOfficeIdCache[$reservationId] = $this->computeOwnerOfficeIdFromItemOwnerRows(
+            $ownerRows->all(),
+            $officeIdsByCode,
+            $pfOfficeId,
+        );
+    }
+
+    /**
+     * @param  array<int, object>  $ownerRows
+     */
+    private function computeOwnerOfficeIdFromItemOwnerRows(array $ownerRows, array $officeIdsByCode, ?int $pfOfficeId): ?int
+    {
+        if ($ownerRows === []) {
+            return null;
         }
 
         $ioOfficeId = $officeIdsByCode['IO'] ?? null;
@@ -398,14 +614,14 @@ class OfficeRequestController extends Controller
         }
 
         if ($hasNonPfOwner) {
-            return $this->ownerOfficeIdCache[$reservationId] = $ioOfficeId ?? $fallbackOfficeId;
+            return $ioOfficeId ?? $fallbackOfficeId;
         }
 
         if ($hasPfOwner) {
-            return $this->ownerOfficeIdCache[$reservationId] = $pfOfficeId ?? $fallbackOfficeId;
+            return $pfOfficeId ?? $fallbackOfficeId;
         }
 
-        return $this->ownerOfficeIdCache[$reservationId] = $fallbackOfficeId;
+        return $fallbackOfficeId;
     }
 
     private function isPhysicalFacilitiesOwnedReservation(int $reservationId, ?int $pfOfficeId = null): bool
@@ -451,5 +667,56 @@ class OfficeRequestController extends Controller
                 'created_at' => now(),
             ]
         );
+    }
+
+    private function isGymRoomRequest(int $reservationId): bool
+    {
+        $rid = (int) $reservationId;
+
+        if ($this->batchGymLookup !== null) {
+            return isset($this->batchGymLookup[$rid]);
+        }
+
+        if (!Schema::hasTable('reservation_details')) {
+            return false;
+        }
+
+        return DB::table('reservation_details as details')
+            ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+            ->join('rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+            ->where('details.reservation_id', $reservationId)
+            ->whereRaw('LOWER(TRIM(rooms.room_number)) = ?', ['gym'])
+            ->exists();
+    }
+
+    private function isGymRoomRequestWithItems(int $reservationId): bool
+    {
+        $rid = (int) $reservationId;
+
+        if ($this->batchGymWithItemsLookup !== null) {
+            return isset($this->batchGymWithItemsLookup[$rid]);
+        }
+
+        if (!Schema::hasTable('reservation_details')) {
+            return false;
+        }
+
+        $hasGymRoom = DB::table('reservation_details as details')
+            ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+            ->join('rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+            ->where('details.reservation_id', $reservationId)
+            ->whereRaw('LOWER(TRIM(rooms.room_number)) = ?', ['gym'])
+            ->exists();
+
+        if (!$hasGymRoom) {
+            return false;
+        }
+
+        return DB::table('reservation_details as details')
+            ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
+            ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+            ->where('details.reservation_id', $reservationId)
+            ->whereNotNull('items.item_id')
+            ->exists();
     }
 }

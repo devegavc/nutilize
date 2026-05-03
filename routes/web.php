@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/dashboard/profile', [ProfileController::class, 'update'])->name('dashboard.profile.update');
     Route::get('/dashboard/office/home', [OfficeRequestController::class, 'index'])->name('office.home');
     Route::get('/dashboard/office/requests', fn () => redirect()->route('office.home'))->name('office.requests');
+    Route::get('/dashboard/office/requests/snapshot', [OfficeRequestController::class, 'queueSnapshot'])->name('office.requests.snapshot');
     Route::get('/dashboard/office/items', [OfficeItemController::class, 'index'])->name('office.items');
     Route::post('/dashboard/office/items', [OfficeItemController::class, 'store'])->name('office.items.store');
     Route::patch('/dashboard/office/items/{itemId}', [OfficeItemController::class, 'update'])->name('office.items.update');
@@ -79,6 +80,11 @@ Route::middleware('auth')->group(function () {
         Route::view('/profile', 'dashboard-profile')->name('dashboard.profile');
         Route::get('/request', [DashboardRequestController::class, 'index'])->name('dashboard.request');
         Route::get('/request/list', [DashboardRequestController::class, 'requestList'])->name('dashboard.request.list');
+
+        // Notification routes
+        Route::get('/notifications', [ApprovalController::class, 'getNotifications'])->name('notifications.index');
+        Route::patch('/notification/{notificationId}/read', [ApprovalController::class, 'markNotificationAsRead'])->name('notification.read');
+        Route::get('/reservation/{reservationId}/details', [ApprovalController::class, 'getReservationDetails'])->name('reservation.details');
 
         // Approval routes for Physical Facilities admin
         Route::get('/approvals', [ApprovalController::class, 'index'])->name('dashboard.approvals');
