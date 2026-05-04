@@ -115,9 +115,9 @@
             <h2>Tasks To Acomplish</h2>
             <p class="tasks-sub">(This week)</p>
             <ul>
-              <li><i class="bi bi-record-circle"></i> Pending Final Approvals (7)</li>
-              <li><i class="bi bi-file-earmark-lock2-fill"></i> Review Damaged Items (3)</li>
-              <li><i class="bi bi-tools"></i> Need of repair (2)</li>
+              <li><i class="bi bi-record-circle"></i> Pending Final Approvals ({{ $tasks['pending_final_approvals'] ?? 0 }})</li>
+              <li><i class="bi bi-file-earmark-lock2-fill"></i> Review Damaged Items ({{ $tasks['review_damaged_items'] ?? 0 }})</li>
+              <li><i class="bi bi-tools"></i> Need of repair ({{ $tasks['need_repair'] ?? 0 }})</li>
             </ul>
           </article>
         </section>

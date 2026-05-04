@@ -21,8 +21,53 @@ class DashboardHomeController extends Controller
             'stats' => $this->buildStats(),
             'quickReports' => $this->buildQuickReports(),
             'upcomingRequests' => $this->buildUpcomingRequestsForToday(),
+            'tasks' => $this->buildTasks(),
             'dailyHighlights' => $this->buildDailyHighlights(),
         ]);
+    }
+
+    private function buildTasks(): array
+    {
+        $pendingFinalApprovals = 0;
+        if (Schema::hasTable('reservation_approvals') && Schema::hasColumn('reservation_approvals', 'office_id')) {
+            $pendingFinalApprovals = (int) DB::table('reservation_approvals as approvals')
+                ->join('reservations as reservations', 'reservations.reservation_id', '=', 'approvals.reservation_id')
+                ->where('approvals.office_id', (int) (Auth::user()?->office_id ?? 0))
+                ->whereNull('approvals.approved_at')
+                ->whereNotIn(DB::raw("LOWER(COALESCE(reservations.overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
+                ->whereRaw("LOWER(COALESCE(reservations.overall_status, '')) NOT LIKE ?", ['cancel%'])
+                ->count();
+        }
+
+        $reviewDamagedItems = 0;
+        if (Schema::hasTable('item_units') && Schema::hasColumn('item_units', 'status')) {
+            $reviewDamagedItems = (int) DB::table('item_units')
+                ->whereRaw("LOWER(COALESCE(status, '')) = 'damaged'")
+                ->count();
+        } elseif (Schema::hasTable('items') && Schema::hasColumn('items', 'maintenance_status')) {
+            $reviewDamagedItems = (int) DB::table('items')
+                ->whereRaw('maintenance_status IS TRUE')
+                ->count();
+        }
+
+        $needRepair = 0;
+        if (Schema::hasTable('item_units') && Schema::hasColumn('item_units', 'status')) {
+            $needRepair += (int) DB::table('item_units')
+                ->whereRaw("LOWER(COALESCE(status, '')) = 'maintenance'")
+                ->count();
+        }
+
+        if (Schema::hasTable('rooms') && Schema::hasColumn('rooms', 'maintenance_status')) {
+            $needRepair += (int) DB::table('rooms')
+                ->whereRaw('maintenance_status IS TRUE')
+                ->count();
+        }
+
+        return [
+            'pending_final_approvals' => $pendingFinalApprovals,
+            'review_damaged_items' => $reviewDamagedItems,
+            'need_repair' => $needRepair,
+        ];
     }
 
     private function buildStats(): array
@@ -255,6 +300,13 @@ class DashboardHomeController extends Controller
                 ->count();
         }
 
+        if ($resolvedToday === 0 && Schema::hasTable('reports') && Schema::hasColumn('reports', 'status') && Schema::hasColumn('reports', 'updated_at')) {
+            $resolvedToday = (int) DB::table('reports')
+                ->whereRaw("LOWER(COALESCE(status, '')) IN ('solved', 'resolved', 'fixed', 'closed', 'done')")
+                ->whereDate('updated_at', now()->toDateString())
+                ->count();
+        }
+
         $pendingReports = 0;
         if (Schema::hasTable('reports')) {
             if (Schema::hasColumn('reports', 'status')) {
@@ -267,11 +319,28 @@ class DashboardHomeController extends Controller
         }
 
         $roomsUtilized = 0;
-        if (Schema::hasTable('rooms')) {
+        if (Schema::hasTable('rooms') && Schema::hasColumn('rooms', 'date_reserved')) {
             $roomsUtilized = (int) DB::table('rooms')
                 ->whereNotNull('date_reserved')
                 ->whereDate('date_reserved', now()->toDateString())
                 ->count();
+        }
+
+        if ($roomsUtilized === 0 && Schema::hasTable('reservations')) {
+            $reservationColumns = Schema::getColumnListing('reservations');
+            $activityDateColumn = null;
+
+            if (in_array('Date_of_Activity', $reservationColumns, true)) {
+                $activityDateColumn = 'Date_of_Activity';
+            } elseif (in_array('date_of_activity', $reservationColumns, true)) {
+                $activityDateColumn = 'date_of_activity';
+            }
+
+            if (!is_null($activityDateColumn)) {
+                $roomsUtilized = (int) DB::table('reservations')
+                    ->whereDate($activityDateColumn, now()->toDateString())
+                    ->count();
+            }
         }
 
         $equipmentChecked = 0;

@@ -399,6 +399,64 @@
   text-align: center;
 }
 
+.facilities-grid .users-table th:nth-child(1),
+.facilities-grid .users-table td:nth-child(1) {
+  width: 13%;
+}
+
+.facilities-grid .users-table th:nth-child(2),
+.facilities-grid .users-table td:nth-child(2) {
+  width: 19%;
+}
+
+.facilities-grid .users-table th:nth-child(3),
+.facilities-grid .users-table td:nth-child(3) {
+  width: 20%;
+  overflow-wrap: anywhere;
+}
+
+.facilities-grid .users-table th:nth-child(4),
+.facilities-grid .users-table td:nth-child(4) {
+  width: 10%;
+}
+
+.facilities-grid .users-table th:nth-child(5),
+.facilities-grid .users-table td:nth-child(5) {
+  width: 14%;
+}
+
+.facilities-grid .users-table th:nth-child(6),
+.facilities-grid .users-table td:nth-child(6) {
+  width: 11%;
+}
+
+.facilities-grid .users-table th:nth-child(7),
+.facilities-grid .users-table td:nth-child(7) {
+  width: 13%;
+}
+
+.facilities-grid .users-table .table-actions-cell {
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.facilities-grid .users-table .inline-action-form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.facilities-grid .users-table .table-edit-btn,
+.facilities-grid .users-table .table-delete-btn {
+  min-width: 68px;
+  padding: 6px 10px;
+  font-size: 0.88rem;
+  line-height: 1.1;
+  border-radius: 8px;
+  text-align: center;
+}
+
 .table-edit-btn {
   border: 0;
   background: var(--blue);
@@ -1066,15 +1124,19 @@
 .chart-bars {
   position: relative;
   z-index: 1;
-  margin-top: 22px;
-  display: grid;
-  gap: 14px;
+  margin-top: 10px;
+  height: 132px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
 }
 
 .chart-bars span {
   display: block;
-  height: 30px;
-  border-radius: 999px;
+  flex: 1 1 0;
+  min-width: 8px;
+  border-radius: 8px 8px 3px 3px;
+  background: #8ea0e2;
   box-shadow: 0 2px 7px rgba(19, 31, 80, 0.16);
 }
 
@@ -1101,6 +1163,11 @@
   color: #2a366f;
   font-weight: 600;
   z-index: 1;
+}
+
+.chart-years span {
+  flex: 1 1 0;
+  text-align: center;
 }
 
 .analytics-kpi-card {

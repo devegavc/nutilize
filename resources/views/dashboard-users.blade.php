@@ -75,7 +75,7 @@
 
         <section class="inventory-grid facilities-grid">
           <div class="table-wrap">
-            <table class="inventory-table">
+            <table class="inventory-table users-table">
               <thead>
                 <tr>
                   <th><i class="bi bi-person-lines-fill"></i> Username</th>

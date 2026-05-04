@@ -51,32 +51,37 @@ class DashboardInventoryController extends Controller
         $yearLabels = [];
         $yearCounts = [];
 
+        $endMonth = now()->startOfMonth();
+        $startMonth = (clone $endMonth)->subMonths(11);
+
+        $countsByMonth = [];
+
         if (Schema::hasTable('reservations')) {
-            $yearTotals = DB::table('reservations')
+            $approvedReservationRows = DB::table('reservations')
                 ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['approved'])
-                ->selectRaw('EXTRACT(YEAR FROM created_at) as year')
-                ->selectRaw('COUNT(*) as total')
-                ->groupByRaw('EXTRACT(YEAR FROM created_at)')
-                ->orderByRaw('EXTRACT(YEAR FROM created_at)')
+                ->whereBetween('created_at', [
+                    (clone $startMonth)->startOfMonth(),
+                    (clone $endMonth)->endOfMonth(),
+                ])
+                ->select('created_at')
                 ->get();
 
-            $countsByYear = [];
-            foreach ($yearTotals as $row) {
-                $countsByYear[(int) $row->year] = (int) $row->total;
-            }
+            foreach ($approvedReservationRows as $row) {
+                if (empty($row->created_at)) {
+                    continue;
+                }
 
-            $startYear = !empty($countsByYear) ? min(array_keys($countsByYear)) : (int) now()->year;
-            $endYear = !empty($countsByYear) ? max(array_keys($countsByYear)) : (int) now()->year;
-
-            for ($year = $startYear; $year <= $endYear; $year++) {
-                $yearLabels[] = (string) $year;
-                $yearCounts[] = $countsByYear[$year] ?? 0;
+                $monthKey = date('Y-m', strtotime((string) $row->created_at));
+                $countsByMonth[$monthKey] = ($countsByMonth[$monthKey] ?? 0) + 1;
             }
         }
 
-        if (empty($yearLabels)) {
-            $yearLabels = [(string) now()->year];
-            $yearCounts = [0];
+        $cursorMonth = clone $startMonth;
+        while ($cursorMonth <= $endMonth) {
+            $monthKey = $cursorMonth->format('Y-m');
+            $yearLabels[] = $cursorMonth->format('M');
+            $yearCounts[] = $countsByMonth[$monthKey] ?? 0;
+            $cursorMonth->addMonth();
         }
 
         $maxYearCount = max(1, max($yearCounts));

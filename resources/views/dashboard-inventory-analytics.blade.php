@@ -54,7 +54,7 @@
             <div class="chart-grid-lines"></div>
             <div class="chart-bars" aria-hidden="true">
               @foreach ($trendBars as $bar)
-                <span style="width: {{ $bar }}%"></span>
+                <span style="height: {{ $bar }}%"></span>
               @endforeach
             </div>
             <div class="chart-years" aria-hidden="true">
