@@ -36,6 +36,7 @@ class DashboardHistoryController extends Controller
                 $status === 'returned' => 'Returned',
                 $status === 'damaged' => 'Damaged',
                 $status === 'rejected' => 'Rejected',
+                $status === 'expired' => 'Expired',
                 str_starts_with($status, 'cancel') => 'Cancelled',
                 default => 'Pending',
             };

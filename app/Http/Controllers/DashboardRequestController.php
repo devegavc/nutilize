@@ -257,7 +257,7 @@ class DashboardRequestController extends Controller
     {
         if (is_null($reservationIds)) {
             $reservationIds = Reservation::query()
-                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled'])
+                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
                 ->orderByDesc('created_at')
                 ->limit(80)
                 ->pluck('reservation_id')

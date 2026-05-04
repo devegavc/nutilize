@@ -154,6 +154,9 @@ const equipmentCategoryDeleteEndpointBase =
     ? window.equipmentCategoryDeleteEndpointBase.trim().replace(/\/$/, '')
     : '';
 
+let requestListPollInterval = null;
+let requestListRefreshInFlight = false;
+
 let appNoticeResolver = null;
 
 function showAppNotice(message, options = {}) {
@@ -1434,6 +1437,59 @@ async function refreshRequestListPreservingTab(explicitUrl) {
   // Polling and visibility refresh already keep notifications in sync.
 }
 
+async function refreshRequestListSafely(explicitUrl) {
+  if (!requestListWrap || requestListRefreshInFlight) {
+    return;
+  }
+
+  requestListRefreshInFlight = true;
+  try {
+    await refreshRequestListPreservingTab(explicitUrl);
+  } finally {
+    requestListRefreshInFlight = false;
+  }
+}
+
+(function initRequestListPolling() {
+  const isPfAdmin = Boolean(window.isPfAdmin === true);
+
+  if (!requestListWrap || !isPfAdmin) {
+    return;
+  }
+
+  const poll = async () => {
+    if (document.visibilityState !== 'visible') {
+      return;
+    }
+
+    try {
+      await refreshRequestListSafely();
+    } catch (error) {
+      console.error('Error polling request list:', error);
+    }
+  };
+
+  if (requestListPollInterval) {
+    clearInterval(requestListPollInterval);
+  }
+
+  poll();
+  requestListPollInterval = setInterval(poll, 5000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      poll();
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (requestListPollInterval) {
+      clearInterval(requestListPollInterval);
+      requestListPollInterval = null;
+    }
+  });
+})();
+
 async function submitRequestDecision(item, button, status) {
   const approvalId = button ? button.dataset.approvalId : '';
 
@@ -1492,7 +1548,7 @@ async function submitRequestDecision(item, button, status) {
     await fetchNotifications().catch((error) => console.error('Error refreshing notifications after decision:', error));
     refreshNotificationPopover();
 
-    await refreshRequestListPreservingTab();
+    await refreshRequestListSafely();
   } catch (error) {
     window.console.error('Request approval error:', error);
     showAppNotice('An error occurred while processing the request.');
@@ -1568,7 +1624,7 @@ async function submitFinalRequestDecision(item, button, status) {
     await fetchNotifications().catch((error) => console.error('Error refreshing notifications after final decision:', error));
     refreshNotificationPopover();
 
-    await refreshRequestListPreservingTab();
+    await refreshRequestListSafely();
   } catch (error) {
     window.console.error('Final request approval error:', error);
     showAppNotice('An error occurred while processing the request.');
@@ -1649,7 +1705,7 @@ async function submitReturnDecision(item, button, status) {
       status === 'returned' ? 'Request marked as returned.' : 'Request marked as damaged.',
       status === 'returned' ? 'approved' : 'rejected',
     );
-    await refreshRequestListPreservingTab();
+    await refreshRequestListSafely();
   } catch (error) {
     window.console.error('Return decision error:', error);
     showAppNotice('An error occurred while processing the request.');
@@ -4731,7 +4787,7 @@ if (requestListWrap) {
       return;
     }
 
-    refreshRequestListPreservingTab(pageLink.href).catch((error) => {
+    refreshRequestListSafely(pageLink.href).catch((error) => {
       window.console.error('Request list pagination refresh error:', error);
       showAppNotice('Unable to load the selected page. Please try again.');
     });

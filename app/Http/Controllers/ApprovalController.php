@@ -39,7 +39,7 @@ class ApprovalController extends Controller
         }
 
         $openReservationIds = Reservation::query()
-            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled'])
+            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
             ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
             ->pluck('reservation_id')
             ->all();
@@ -341,7 +341,7 @@ class ApprovalController extends Controller
                 $this->recordEquipmentUnitUsageForApprovedReservation((int) $reservation->reservation_id);
             }
 
-            if (in_array($status, ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled'], true)) {
+            if (in_array($status, ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled', 'expired'], true)) {
                 $this->clearAllApprovalNotificationsForReservation((int) $reservation->reservation_id);
             }
 
@@ -361,6 +361,53 @@ class ApprovalController extends Controller
 
             return response()->json([
                 'error' => $throwable->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Allow a user to cancel their own reservation request
+     */
+    public function cancelReservation($reservationId)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $reservation = Reservation::findOrFail($reservationId);
+
+            // Only allow the requester to cancel their own reservation
+            if ((int) $reservation->user_id !== (int) $user->user_id) {
+                return response()->json(['error' => 'You can only cancel your own requests.'], 403);
+            }
+
+            // Check if reservation can be cancelled
+            if (!$reservation->canBeCancelled()) {
+                return response()->json([
+                    'error' => 'This request cannot be cancelled. It may have already been approved, rejected, or expired.',
+                ], 422);
+            }
+
+            DB::transaction(function () use ($reservation) {
+                $reservation->update(['overall_status' => 'cancelled']);
+                
+                // Clear all approval notifications for this reservation
+                $this->clearAllApprovalNotificationsForReservation((int) $reservation->reservation_id);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Request cancelled successfully.',
+                'reservation_id' => $reservation->reservation_id,
+            ]);
+        } catch (Throwable $throwable) {
+            report($throwable);
+
+            return response()->json([
+                'error' => $throwable->getMessage() ?: 'Unable to cancel request.',
             ], 500);
         }
     }
@@ -754,7 +801,7 @@ class ApprovalController extends Controller
     {
         if (is_null($reservationIds)) {
             $reservationIds = Reservation::query()
-                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled'])
+                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
                 ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
                 ->orderByDesc('created_at')
                 ->limit(80)
@@ -1475,7 +1522,7 @@ class ApprovalController extends Controller
         // Exclude closed reservations.
         $candidateReservationIds = Reservation::query()
             ->whereIn('reservation_id', $candidateReservationIds)
-            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled'])
+            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled', 'expired'])
             ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
             ->pluck('reservation_id')
             ->map(fn ($id) => (int) $id)

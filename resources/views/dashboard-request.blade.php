@@ -21,6 +21,7 @@
       role: '{{ auth()->user()->role ?? 'user' }}',
       office_short_code: '{{ auth()->user()?->office?->short_code ?? '' }}'
     };
+    window.isPfAdmin = @json($isPfAdmin);
     window.dashboardNavComponent = @json($isPfAdmin ? '/components/navbar.html' : '/components/navbar-office.html');
   </script>
   <header class="top-header">

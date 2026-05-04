@@ -102,5 +102,6 @@ Route::middleware('auth')->group(function () {
         Route::patch('/request/{reservationId}/final-reject', [ApprovalController::class, 'finalRejectReservation'])->name('request.final.reject');
         Route::patch('/request/{reservationId}/final-return', [ApprovalController::class, 'finalReturnReservation'])->name('request.final.return');
         Route::patch('/request/{reservationId}/final-damaged', [ApprovalController::class, 'finalDamagedReservation'])->name('request.final.damaged');
+        Route::patch('/request/{reservationId}/cancel', [ApprovalController::class, 'cancelReservation'])->name('request.cancel');
     });
 });

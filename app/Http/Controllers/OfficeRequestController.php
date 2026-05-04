@@ -62,7 +62,7 @@ class OfficeRequestController extends Controller
     private function buildOfficeHomeData($user): array
     {
         $openReservationIds = Reservation::query()
-            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled'])
+            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
             ->pluck('reservation_id')
             ->all();
 
@@ -112,7 +112,7 @@ class OfficeRequestController extends Controller
     {
         if (is_null($reservationIds)) {
             $reservationIds = Reservation::query()
-                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled'])
+                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
                 ->orderByDesc('created_at')
                 ->limit(80)
                 ->pluck('reservation_id')
