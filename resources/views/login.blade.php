@@ -104,9 +104,6 @@
           Login
         </button>
 
-        <p class="text-center mt-3 mb-0">
-          Don't have an account? <a href="/register">Create account</a>
-        </p>
       </form>
     </div>
 
