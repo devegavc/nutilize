@@ -187,9 +187,17 @@
   <section class="schedule-modal" id="schedule-request-modal" aria-hidden="true">
     <div class="schedule-modal-overlay" data-close-schedule-modal="true"></div>
     <article class="schedule-modal-card" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-date">
-      <div class="schedule-modal-top"></div>
+      <header class="schedule-modal-header">
+        <div class="schedule-modal-header-icon"><i class="bi bi-calendar-check"></i></div>
+        <div class="schedule-modal-header-text">
+          <span class="schedule-modal-header-label">Approved Requests</span>
+          <span class="schedule-modal-date" id="schedule-modal-date">--</span>
+        </div>
+        <button class="schedule-modal-close" data-close-schedule-modal="true" aria-label="Close">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </header>
       <div class="schedule-modal-body">
-        <div class="schedule-modal-date" id="schedule-modal-date">Date of Activity: --</div>
         <div class="schedule-modal-table-wrap">
           <table class="schedule-modal-table">
             <thead>
@@ -197,7 +205,7 @@
                 <th>Reservation ID</th>
                 <th>Requester</th>
                 <th>Resources</th>
-                <th>View</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="schedule-request-body"></tbody>

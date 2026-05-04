@@ -70,7 +70,6 @@
                   <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>
                   <th>Room Number</th>
                   <th>Classification</th>
-                  <th>Location</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -80,12 +79,11 @@
                   <td>{{ $facility['asset_id'] }}</td>
                   <td>{{ $facility['item_name'] }}</td>
                   <td>{{ $facility['classification'] }}</td>
-                  <td>{{ $facility['location'] }}</td>
                   <td><button class="table-edit-btn" type="button">Edit</button></td>
                 </tr>
                 @empty
                 <tr>
-                  <td colspan="5">No rooms found in the database.</td>
+                  <td colspan="4">No rooms found in the database.</td>
                 </tr>
                 @endforelse
               </tbody>

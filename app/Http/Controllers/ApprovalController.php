@@ -27,6 +27,8 @@ class ApprovalController extends Controller
     private ?array $batchGymLookup = null;
     /** @var array<int, true>|null */
     private ?array $batchGymWithItemsLookup = null;
+    /** @var array<string, bool> — static cache so Schema::hasTable() only queries DB once per process */
+    private static array $tableExistsCache = [];
 
     public function index()
     {
@@ -37,7 +39,8 @@ class ApprovalController extends Controller
         }
 
         $openReservationIds = Reservation::query()
-            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected'])
+            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled'])
+            ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
             ->pluck('reservation_id')
             ->all();
 
@@ -175,24 +178,29 @@ class ApprovalController extends Controller
                 return response()->json(['error' => 'This request is waiting for a previous office approval.'], 422);
             }
 
+            $now = now();
             $approval->update([
                 'status' => 'approved',
-                'approved_at' => now(),
+                'approved_at' => $now,
                 'approved_by_user_id' => (int) $user->user_id,
             ]);
 
             $this->recordApprovalHistory($approval);
 
-            $this->syncReservationApprovals((int) $approval->reservation_id);
+            // Fix any null-status rows without the expensive full sync (rows already exist from workflow setup).
+            $this->fixNullApprovalStatuses((int) $approval->reservation_id);
+
+            // Load reservation once and reuse across all subsequent helpers.
+            $reservation = Reservation::with('user')->find((int) $approval->reservation_id);
 
             // This office has acted already; remove its approval request notifications.
             $this->clearOfficeApprovalNotifications((int) $approval->reservation_id, (int) $approval->office_id);
 
             // Notify the next actionable office when workflow advances
-            $this->notifyNextActionableOffice((int) $approval->reservation_id, (int) $approval->office_id);
+            $this->notifyNextActionableOfficeWithReservation($reservation, (int) $approval->office_id);
 
             // Update the overall reservation status if all office approvals are done
-            $this->updateReservationStatus($approval->reservation_id);
+            $this->updateReservationStatus($approval->reservation_id, $reservation);
 
             return response()->json([
                 'success' => true,
@@ -235,7 +243,7 @@ class ApprovalController extends Controller
 
             $this->recordApprovalHistory($approval);
 
-            $this->syncReservationApprovals((int) $approval->reservation_id);
+            $this->fixNullApprovalStatuses((int) $approval->reservation_id);
 
             // Update the overall reservation status
             $this->updateReservationStatus($approval->reservation_id);
@@ -333,7 +341,7 @@ class ApprovalController extends Controller
                 $this->recordEquipmentUnitUsageForApprovedReservation((int) $reservation->reservation_id);
             }
 
-            if (in_array($status, ['approved', 'rejected', 'returned', 'damaged'], true)) {
+            if (in_array($status, ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled'], true)) {
                 $this->clearAllApprovalNotificationsForReservation((int) $reservation->reservation_id);
             }
 
@@ -357,9 +365,43 @@ class ApprovalController extends Controller
         }
     }
 
-    private function updateReservationStatus($reservationId)
+    /**
+     * Lightweight alternative to syncReservationApprovals() — only fixes NULL status rows.
+     * Used after an approve/reject action when rows already exist from the initial workflow setup.
+     */
+    private function fixNullApprovalStatuses(int $reservationId): void
     {
-        $reservation = Reservation::findOrFail($reservationId);
+        DB::table('reservation_approvals')
+            ->where('reservation_id', $reservationId)
+            ->whereNull('status')
+            ->update(['status' => 'pending', 'updated_at' => now()]);
+    }
+
+    private function notifyNextActionableOfficeWithReservation(?Reservation $reservation, ?int $fromApprovingOfficeId = null): void
+    {
+        if (!$reservation) {
+            return;
+        }
+        $nextActionableOfficeId = $this->getCurrentActionableOfficeId((int) $reservation->reservation_id);
+        if (is_null($nextActionableOfficeId)) {
+            return;
+        }
+        $pfOfficeId = $this->getOfficeIdsByShortCode()['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
+        if (!is_null($fromApprovingOfficeId) && (int) $fromApprovingOfficeId !== (int) $nextActionableOfficeId) {
+            ReservationApprovalNotifier::notifyOfficeAfterPriorApproval(
+                $reservation,
+                (int) $nextActionableOfficeId,
+                (int) $fromApprovingOfficeId,
+                $pfOfficeId,
+            );
+            return;
+        }
+        $this->createApprovalNotifications($reservation, $nextActionableOfficeId, $nextActionableOfficeId, $pfOfficeId);
+    }
+
+    private function updateReservationStatus($reservationId, ?Reservation $reservation = null)
+    {
+        $reservation = $reservation ?? Reservation::findOrFail($reservationId);
         $approvals = ReservationApproval::where('reservation_id', $reservationId)->get();
         $physicalFacilitiesOfficeId = $this->getPhysicalFacilitiesOfficeId();
 
@@ -407,10 +449,10 @@ class ApprovalController extends Controller
     private function recordEquipmentUnitUsageForApprovedReservation(int $reservationId): void
     {
         if (
-            !Schema::hasTable('item_units')
-            || !Schema::hasTable('reservation_item_units')
-            || !Schema::hasTable('reservation_details')
-            || !Schema::hasTable('reservation_items')
+            !$this->tableExists('item_units')
+            || !$this->tableExists('reservation_item_units')
+            || !$this->tableExists('reservation_details')
+            || !$this->tableExists('reservation_items')
         ) {
             return;
         }
@@ -712,7 +754,8 @@ class ApprovalController extends Controller
     {
         if (is_null($reservationIds)) {
             $reservationIds = Reservation::query()
-                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected'])
+                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled'])
+                ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
                 ->orderByDesc('created_at')
                 ->limit(80)
                 ->pluck('reservation_id')
@@ -954,7 +997,6 @@ class ApprovalController extends Controller
     private function resolveWorkflowOfficeIds(int $reservationId, bool $includePf): array
     {
         $ids = $this->getOfficeIdsByShortCode();
-        $idsMulti = $this->getOfficeIdsByShortCodeMulti();
         $actionSequence = $this->getActionSequenceOfficeIds();
 
         if (empty($actionSequence)) {
@@ -962,26 +1004,25 @@ class ApprovalController extends Controller
         }
 
         $pfOfficeId = $ids['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
-        $ioOfficeIds = $idsMulti['IO'] ?? (isset($ids['IO']) ? [(int) $ids['IO']] : []);
         $ownerOfficeId = $this->resolveOwnerOfficeId($reservationId, $ids, $pfOfficeId);
         $pcOfficeId = $ids['PC'] ?? null;
         $genEdOfficeId = $ids['GENED'] ?? null;
         $startOfficeId = $ownerOfficeId;
 
         if ($this->isGymRoomRequest($reservationId) && !is_null($genEdOfficeId)) {
-            if ($this->isGymRoomRequestWithItems($reservationId) && !empty($ioOfficeIds)) {
-                $actionSequence = array_values(array_filter(array_merge(
-                    [
-                        $genEdOfficeId,
-                    ],
-                    $ioOfficeIds,
-                    [
-                        $pcOfficeId,
-                        $ids['SDAO'] ?? null,
-                        $ids['DO'] ?? null,
-                        $ids['SEC'] ?? null,
-                    ]
-                )));
+            $gymOwnerOfficeId = (!is_null($ownerOfficeId) && (is_null($pfOfficeId) || (int) $ownerOfficeId !== (int) $pfOfficeId))
+                ? (int) $ownerOfficeId
+                : null;
+
+            if ($this->isGymRoomRequestWithItems($reservationId) && !is_null($gymOwnerOfficeId)) {
+                $actionSequence = array_values(array_filter([
+                    $genEdOfficeId,
+                    $gymOwnerOfficeId,
+                    $pcOfficeId,
+                    $ids['SDAO'] ?? null,
+                    $ids['DO'] ?? null,
+                    $ids['SEC'] ?? null,
+                ]));
             } else {
                 $actionSequence = array_values(array_filter([
                     $genEdOfficeId,
@@ -1434,7 +1475,8 @@ class ApprovalController extends Controller
         // Exclude closed reservations.
         $candidateReservationIds = Reservation::query()
             ->whereIn('reservation_id', $candidateReservationIds)
-            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'returned', 'damaged'])
+            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled'])
+            ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
             ->pluck('reservation_id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -1725,7 +1767,7 @@ class ApprovalController extends Controller
 
         return DB::table('users')
             ->where('office_id', $officeId)
-            ->whereRaw('LOWER(role) IN (?, ?)', ['admin', 'pf_admin'])
+            ->whereRaw('LOWER(role) IN (?, ?, ?)', ['admin', 'pc_admin', 'pf_admin'])
             ->pluck('user_id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -1792,5 +1834,16 @@ class ApprovalController extends Controller
             'success' => true,
             'reservation' => $reservationData,
         ]);
+    }
+
+    /**
+     * Cached Schema::hasTable() — avoids repeated information_schema queries per request.
+     */
+    private function tableExists(string $table): bool
+    {
+        if (!isset(self::$tableExistsCache[$table])) {
+            self::$tableExistsCache[$table] = Schema::hasTable($table);
+        }
+        return self::$tableExistsCache[$table];
     }
 }

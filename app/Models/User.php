@@ -55,7 +55,7 @@ class User extends Authenticatable
 
         $role = strtolower((string) $this->role);
 
-        if ($role === 'admin') {
+        if (in_array($role, ['admin', 'pc_admin'], true)) {
             return true;
         }
 

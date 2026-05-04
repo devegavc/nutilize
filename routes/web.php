@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardHistoryController;
 use App\Http\Controllers\DashboardInventoryController;
 use App\Http\Controllers\DashboardScheduleController;
 use App\Http\Controllers\DashboardRequestController;
+use App\Http\Controllers\DashboardUserController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\OfficeArchiveController;
 use App\Http\Controllers\OfficeItemController;
@@ -74,6 +75,10 @@ Route::middleware('auth')->group(function () {
             Route::patch('/maintenance/units/{unitId}', [DashboardInventoryController::class, 'updateMaintenanceUnit'])->name('dashboard.maintenance.units.update');
             Route::view('/messages', 'dashboard-messages')->name('dashboard.messages');
             Route::get('/schedule', [DashboardScheduleController::class, 'index'])->name('dashboard.schedule');
+            Route::get('/users', [DashboardUserController::class, 'index'])->name('dashboard.users');
+            Route::post('/users', [DashboardUserController::class, 'store'])->name('dashboard.users.store');
+            Route::patch('/users/{userId}', [DashboardUserController::class, 'update'])->name('dashboard.users.update');
+            Route::delete('/users/{userId}', [DashboardUserController::class, 'destroy'])->name('dashboard.users.destroy');
         });
 
         Route::get('/history', [DashboardHistoryController::class, 'index'])->name('dashboard.history');
@@ -85,6 +90,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/notifications', [ApprovalController::class, 'getNotifications'])->name('notifications.index');
         Route::patch('/notification/{notificationId}/read', [ApprovalController::class, 'markNotificationAsRead'])->name('notification.read');
         Route::get('/reservation/{reservationId}/details', [ApprovalController::class, 'getReservationDetails'])->name('reservation.details');
+
+        // Supabase storage proxy (serves private bucket images)
+        Route::get('/storage/proof/{filename}', [DashboardInventoryController::class, 'proxyProofImage'])->name('dashboard.storage.proof');
 
         // Approval routes for Physical Facilities admin
         Route::get('/approvals', [ApprovalController::class, 'index'])->name('dashboard.approvals');

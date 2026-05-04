@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
@@ -372,6 +373,7 @@ class DashboardInventoryController extends Controller
         $rowsByTab = [
             'maintenance' => [],
             'damaged' => [],
+            'reported' => [],
         ];
 
         if (!Schema::hasTable('item_units')) {
@@ -432,23 +434,27 @@ class DashboardInventoryController extends Controller
             $reportRows = DB::table('reports as reports')
                 ->leftJoin('items as items', 'items.item_id', '=', 'reports.item_id')
                 ->leftJoin('rooms as rooms', 'rooms.room_id', '=', 'reports.room_id')
+                ->leftJoin('users as users', 'users.user_id', '=', 'reports.user_id')
                 ->select([
                     'reports.report_id',
                     'reports.report_info',
                     'reports.generated_at',
                     'reports.created_at',
+                    'reports.description',
+                    'reports.proof_image_url',
+                    'reports.reservation_id',
                     'items.item_name',
                     'rooms.room_number',
+                    'users.full_name as reporter_full_name',
+                    'users.first_name as reporter_first_name',
+                    'users.last_name as reporter_last_name',
+                    'users.username as reporter_username',
                 ])
                 ->orderByDesc('reports.generated_at')
                 ->get();
 
             foreach ($reportRows as $report) {
                 $reportText = trim((string) ($report->report_info ?? ''));
-                $isDamagedReport = stripos($reportText, 'damaged') !== false
-                    || stripos($reportText, 'damage') !== false
-                    || stripos($reportText, 'broken') !== false;
-                $tab = $isDamagedReport ? 'damaged' : 'maintenance';
                 $itemLabel = trim((string) ($report->item_name ?? ''));
 
                 if ($itemLabel === '') {
@@ -456,17 +462,52 @@ class DashboardInventoryController extends Controller
                     $itemLabel = $roomNumber !== '' ? ('Room ' . $roomNumber) : 'Reported Issue';
                 }
 
+                $reporterName = trim((string) ($report->reporter_full_name ?? ''));
+                if ($reporterName === '') {
+                    $first = trim((string) ($report->reporter_first_name ?? ''));
+                    $last  = trim((string) ($report->reporter_last_name ?? ''));
+                    $reporterName = trim("$first $last");
+                }
+                if ($reporterName === '') {
+                    $reporterName = trim((string) ($report->reporter_username ?? 'Unknown'));
+                }
+
+                $description = trim((string) ($report->description ?? ''));
+                if ($description === '') {
+                    // Fall back to parsing desc= from report_info
+                    if (preg_match('/desc=([^|]+)/', $reportText, $m)) {
+                        $description = trim($m[1]);
+                    }
+                }
+
+                $proofUrl = trim((string) ($report->proof_image_url ?? ''));
+                // Only pass the URL if it looks like an actual http URL (Supabase); skip local device paths
+                if ($proofUrl !== '' && !str_starts_with($proofUrl, 'http')) {
+                    $proofUrl = '';
+                }
+
+                // Convert Supabase storage URL to local proxy URL so private bucket images load correctly
+                if ($proofUrl !== '') {
+                    $filename = basename(parse_url($proofUrl, PHP_URL_PATH));
+                    if ($filename !== '') {
+                        $proofUrl = route('dashboard.storage.proof', ['filename' => $filename]);
+                    }
+                }
+
                 $dateValue = $report->generated_at ?? $report->created_at;
-                $rowsByTab[$tab][] = [
+                $rowsByTab['reported'][] = [
                     'unit_id' => 0,
                     'id' => 'report_' . (int) $report->report_id,
                     'item' => $itemLabel,
                     'count' => '1',
                     'date' => $dateValue ? date('d/m/Y', strtotime((string) $dateValue)) : date('d/m/Y'),
                     'status' => 'Reported',
-                    'statusClass' => $isDamagedReport ? 'damaged' : 'maintenance',
+                    'statusClass' => 'reported',
                     'location' => strpos($itemLabel, 'Room ') === 0 ? 'Room' : 'Reported',
                     'reason' => $reportText !== '' ? $reportText : 'Reported issue',
+                    'reporter' => $reporterName,
+                    'description' => $description,
+                    'proof_image_url' => $proofUrl,
                 ];
             }
         }
@@ -1326,6 +1367,37 @@ class DashboardInventoryController extends Controller
             6 => 'Sixth Floor',
             default => 'Ground Floor',
         };
+    }
+
+    public function proxyProofImage(string $filename)
+    {
+        $serviceKey = env('SUPABASE_SERVICE_ROLE_KEY', '');
+        $supabaseUrl = env('SUPABASE_URL', 'https://uszlgigsuseomkwmqwan.supabase.co');
+
+        if (empty($serviceKey)) {
+            abort(503, 'Storage proxy not configured.');
+        }
+
+        // Only allow safe filenames (alphanumeric, dash, underscore, dot)
+        if (!preg_match('/^[\w\-\.]+$/', $filename)) {
+            abort(400, 'Invalid filename.');
+        }
+
+        $url = rtrim($supabaseUrl, '/') . '/storage/v1/object/assets/issues/' . rawurlencode($filename);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $serviceKey,
+        ])->get($url);
+
+        if (!$response->successful()) {
+            abort(404, 'Image not found.');
+        }
+
+        $contentType = $response->header('Content-Type') ?? 'image/jpeg';
+
+        return response($response->body(), 200)
+            ->header('Content-Type', $contentType)
+            ->header('Cache-Control', 'private, max-age=3600');
     }
 }
 

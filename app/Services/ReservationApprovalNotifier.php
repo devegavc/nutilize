@@ -43,7 +43,7 @@ class ReservationApprovalNotifier
         $adminUsers = User::query()
             ->where('office_id', $officeId)
             ->where(function ($query) use ($isPfOffice) {
-                $query->whereRaw('LOWER(role) = ?', ['admin']);
+                $query->whereRaw('LOWER(role) IN (?, ?)', ['admin', 'pc_admin']);
                 if ($isPfOffice) {
                     $query->orWhereRaw('LOWER(role) = ?', ['pf_admin']);
                 }
@@ -57,15 +57,22 @@ class ReservationApprovalNotifier
         $requesterName = $reservation->user->full_name ?? $reservation->user->username ?? 'Unknown';
         $activityName = trim((string) $reservation->activity_name) ?: 'Reservation request';
 
-        foreach ($adminUsers as $admin) {
-            $exists = Notification::query()
-                ->where('user_id', $admin->user_id)
-                ->where('related_id', $reservation->reservation_id)
-                ->where('type', 'reservation_approval_request')
-                ->whereRaw('"read" = false')
-                ->exists();
+        $adminUserIds = $adminUsers->pluck('user_id')->map(fn ($id) => (int) $id)->all();
 
-            if ($exists) {
+        // Batch check: fetch all user_ids that already have an unread notification for this reservation
+        $alreadyNotified = DB::table('notifications')
+            ->whereIn('user_id', $adminUserIds)
+            ->where('related_id', $reservation->reservation_id)
+            ->where('type', 'reservation_approval_request')
+            ->whereRaw('"read" = false')
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->flip()
+            ->all();
+
+        $now = now();
+        foreach ($adminUsers as $admin) {
+            if (isset($alreadyNotified[(int) $admin->user_id])) {
                 continue;
             }
 
@@ -77,8 +84,8 @@ class ReservationApprovalNotifier
                     'message' => "Request '{$activityName}' by {$requesterName} is waiting for your approval.",
                     'related_id' => (int) $reservation->reservation_id,
                     'read' => DB::raw('false'),
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]);
             } catch (\Throwable $throwable) {
                 \Log::error('Failed to create notification', [
@@ -115,7 +122,7 @@ class ReservationApprovalNotifier
         $adminUsers = User::query()
             ->where('office_id', $targetOfficeId)
             ->where(function ($query) use ($isPfOffice) {
-                $query->whereRaw('LOWER(role) = ?', ['admin']);
+                $query->whereRaw('LOWER(role) IN (?, ?)', ['admin', 'pc_admin']);
                 if ($isPfOffice) {
                     $query->orWhereRaw('LOWER(role) = ?', ['pf_admin']);
                 }

@@ -255,7 +255,15 @@
 
       const resolveUrl = (action, approvalId) => {
         const template = window.officeApprovalRoutes?.[action] || '';
-        return template.replace('__APPROVAL_ID__', String(approvalId));
+        const resolved = template.replace('__APPROVAL_ID__', String(approvalId));
+
+        // Always call same-origin endpoint to avoid host/port mismatches from absolute route URLs.
+        try {
+          const parsed = new URL(resolved, window.location.origin);
+          return `${parsed.pathname}${parsed.search}`;
+        } catch (_error) {
+          return resolved;
+        }
       };
 
       const setButtonsDisabled = (state) => {
@@ -293,14 +301,25 @@
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': token,
+                'X-Requested-With': 'XMLHttpRequest',
               },
               body: JSON.stringify({}),
             });
 
-            const payload = await response.json().catch(() => ({}));
+            const responseText = await response.text();
+            let payload = {};
+
+            if (responseText) {
+              try {
+                payload = JSON.parse(responseText);
+              } catch (_error) {
+                payload = { error: responseText };
+              }
+            }
 
             if (!response.ok) {
-              showAppNotice(payload.error || 'Action failed. Please try again.');
+              const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
+              showAppNotice((payload.error || payload.message || 'Action failed. Please try again.') + statusMessage);
               setButtonsDisabled(false);
               return;
             }

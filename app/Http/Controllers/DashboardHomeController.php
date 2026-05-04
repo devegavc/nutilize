@@ -36,7 +36,7 @@ class DashboardHomeController extends Controller
 
         if (Schema::hasTable('reservations')) {
             $stats['total_requests'] = (int) DB::table('reservations')
-                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected'])
+                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled'])
                 ->count();
         }
 

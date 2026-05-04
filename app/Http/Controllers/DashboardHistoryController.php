@@ -31,11 +31,12 @@ class DashboardHistoryController extends Controller
             $endDate = $latestApprovalDate instanceof Carbon ? $latestApprovalDate : $requestDate;
 
             $status = strtolower((string) $reservation->overall_status);
-            $statusLabel = match ($status) {
-                'approved' => 'Approved',
-                'returned' => 'Returned',
-                'damaged' => 'Damaged',
-                'rejected' => 'Rejected',
+            $statusLabel = match (true) {
+                $status === 'approved' => 'Approved',
+                $status === 'returned' => 'Returned',
+                $status === 'damaged' => 'Damaged',
+                $status === 'rejected' => 'Rejected',
+                str_starts_with($status, 'cancel') => 'Cancelled',
                 default => 'Pending',
             };
 

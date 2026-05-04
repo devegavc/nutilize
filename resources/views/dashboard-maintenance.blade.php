@@ -49,15 +49,30 @@
       <section class="content-card maintenance-content-card">
         <h1 class="section-title">MAINTENANCE DASHBOARD</h1>
 
+        <section class="maintenance-head-row">
+          <div>
+            <p><i class="bi bi-tools"></i> Maintenance Details</p>
+          </div>
+        </section>
+
         <section class="maintenance-filter-row">
           <div class="maintenance-tab-group" role="tablist" aria-label="Maintenance status">
             <button class="maintenance-tab active" type="button" data-maintenance-tab="maintenance">Maintenance</button>
             <button class="maintenance-tab" type="button" data-maintenance-tab="damaged">Damaged</button>
+            <button class="maintenance-tab" type="button" data-maintenance-tab="reported">Reported</button>
           </div>
 
-          <div class="maintenance-inline-search">
-            <i class="bi bi-search"></i>
-            <input id="maintenance-inline-search" type="text" placeholder="Search" />
+          <div class="maintenance-head-actions">
+            <button class="maintenance-print-btn" type="button" onclick="window.print()">
+              <i class="bi bi-printer-fill"></i> Print File
+            </button>
+            <button
+              class="maintenance-email-btn"
+              type="button"
+              onclick="window.location.href='mailto:?subject=NUtilize%20Maintenance%20Report&body=Please%20review%20the%20attached%20maintenance%20and%20damage%20report.'"
+            >
+              <i class="bi bi-envelope-fill"></i> Send to Email
+            </button>
           </div>
         </section>
 
@@ -68,6 +83,7 @@
                 <tr>
                   <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>
                   <th>Item Name</th>
+                  <th>Reported By</th>
                   <th>Count</th>
                   <th>Date</th>
                   <th>Status</th>
@@ -156,8 +172,18 @@
         <span>Name of Item:</span>
         <span id="maintenance-eval-item-name">-</span>
 
-        <span>Maintenance Reason:</span>
-        <span id="maintenance-eval-reason">10x Used</span>
+        <span>Reported By:</span>
+        <span id="maintenance-eval-reporter">-</span>
+
+        <span>Description:</span>
+        <span id="maintenance-eval-description">-</span>
+      </div>
+
+      <div class="maintenance-eval-proof" id="maintenance-eval-proof-wrap" style="display:none">
+        <span class="maintenance-eval-proof-label">Proof Image:</span>
+        <a id="maintenance-eval-proof-link" href="#" target="_blank" rel="noopener">
+          <img id="maintenance-eval-proof-img" src="" alt="Proof of report" />
+        </a>
       </div>
 
       <div class="maintenance-eval-actions">
@@ -195,7 +221,7 @@
   </section>
 
   <script>
-    window.maintenanceRowsByTab = @json($maintenanceRowsByTab ?? ['maintenance' => [], 'damaged' => []]);
+    window.maintenanceRowsByTab = @json($maintenanceRowsByTab ?? ['maintenance' => [], 'damaged' => [], 'reported' => []]);
   </script>
   <script src="/js/dashboard.js"></script>
 </body>

@@ -54,10 +54,6 @@
           <div>
             <p><i class="bi bi-clock-history"></i> Lending Details</p>
           </div>
-
-          <div class="history-head-actions">
-            <button class="history-print-btn" type="button" onclick="window.print()">Print File</button>
-          </div>
         </section>
 
         <section class="history-filter-row">
@@ -66,13 +62,18 @@
             <button class="history-tab" type="button" data-history-tab="oldest">Oldest</button>
             <button class="history-tab" type="button" data-history-tab="damaged">Damaged</button>
           </div>
-          <button
-            class="history-email-btn"
-            type="button"
-            onclick="window.location.href='mailto:?subject=NU-TILIZE%20Lending%20History&body=Please%20review%20the%20latest%20lending%20history%20report.'"
-          >
-            Send to Email
-          </button>
+          <div class="history-head-actions">
+            <button class="history-print-btn" type="button" onclick="window.print()">
+              <i class="bi bi-printer-fill"></i> Print File
+            </button>
+            <button
+              class="history-email-btn"
+              type="button"
+              onclick="window.location.href='mailto:?subject=NU-TILIZE%20Lending%20History&body=Please%20review%20the%20latest%20lending%20history%20report.'"
+            >
+              <i class="bi bi-envelope-fill"></i> Send to Email
+            </button>
+          </div>
         </section>
 
         <section class="inventory-grid history-grid">

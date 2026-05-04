@@ -257,7 +257,7 @@ class DashboardRequestController extends Controller
     {
         if (is_null($reservationIds)) {
             $reservationIds = Reservation::query()
-                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected'])
+                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled'])
                 ->orderByDesc('created_at')
                 ->limit(80)
                 ->pluck('reservation_id')
@@ -541,7 +541,6 @@ class DashboardRequestController extends Controller
     private function resolveWorkflowOfficeIds(int $reservationId, bool $includePf): array
     {
         $ids = $this->getOfficeIdsByShortCode();
-        $idsMulti = $this->getOfficeIdsByShortCodeMulti();
         $actionSequence = $this->getActionSequenceOfficeIds();
 
         if (empty($actionSequence)) {
@@ -549,26 +548,25 @@ class DashboardRequestController extends Controller
         }
 
         $pfOfficeId = $ids['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
-        $ioOfficeIds = $idsMulti['IO'] ?? (isset($ids['IO']) ? [(int) $ids['IO']] : []);
         $ownerOfficeId = $this->resolveOwnerOfficeId($reservationId, $ids, $pfOfficeId);
         $pcOfficeId = $ids['PC'] ?? null;
         $genEdOfficeId = $ids['GENED'] ?? null;
         $startOfficeId = $ownerOfficeId;
 
         if ($this->isGymRoomRequest($reservationId) && !is_null($genEdOfficeId)) {
-            if ($this->isGymRoomRequestWithItems($reservationId) && !empty($ioOfficeIds)) {
-                $actionSequence = array_values(array_filter(array_merge(
-                    [
-                        $genEdOfficeId,
-                    ],
-                    $ioOfficeIds,
-                    [
-                        $pcOfficeId,
-                        $ids['SDAO'] ?? null,
-                        $ids['DO'] ?? null,
-                        $ids['SEC'] ?? null,
-                    ]
-                )));
+            $gymOwnerOfficeId = (!is_null($ownerOfficeId) && (is_null($pfOfficeId) || (int) $ownerOfficeId !== (int) $pfOfficeId))
+                ? (int) $ownerOfficeId
+                : null;
+
+            if ($this->isGymRoomRequestWithItems($reservationId) && !is_null($gymOwnerOfficeId)) {
+                $actionSequence = array_values(array_filter([
+                    $genEdOfficeId,
+                    $gymOwnerOfficeId,
+                    $pcOfficeId,
+                    $ids['SDAO'] ?? null,
+                    $ids['DO'] ?? null,
+                    $ids['SEC'] ?? null,
+                ]));
             } else {
                 $actionSequence = array_values(array_filter([
                     $genEdOfficeId,

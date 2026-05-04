@@ -763,6 +763,7 @@ const maintenanceRowsByTab = (window.maintenanceRowsByTab && typeof window.maint
     { id: '#9A7MzxQ', item: 'Extension Cords', count: '1', date: '28/03/2025', status: 'Damaged', statusClass: 'damaged', location: 'Storage B' },
     { id: '#W5DkF8R', item: 'Wired Mic', count: '2', date: '26/03/2025', status: 'Damaged', statusClass: 'damaged', location: 'Storage A' },
   ],
+  reported: [],
 };
 
 const fallbackHistoryRowsByTab = {
@@ -858,7 +859,7 @@ function applyMaintenanceFilters() {
   if (!filteredRows.length) {
     maintenanceTableBody.innerHTML = `
       <tr>
-        <td colspan="7">No maintenance records found.</td>
+        <td colspan="8">No maintenance records found.</td>
       </tr>
     `;
     return;
@@ -866,9 +867,10 @@ function applyMaintenanceFilters() {
 
   maintenanceTableBody.innerHTML = filteredRows
     .map((row) => `
-      <tr data-unit-id="${row.unit_id || ''}" data-maintenance-reason="${String(row.reason || '').replace(/"/g, '&quot;')}">
+      <tr data-unit-id="${row.unit_id || ''}" data-maintenance-reason="${String(row.reason || '').replace(/"/g, '&quot;')}" data-reporter="${String(row.reporter || '').replace(/"/g, '&quot;')}" data-description="${String(row.description || '').replace(/"/g, '&quot;')}" data-proof-image="${String(row.proof_image_url || '').replace(/"/g, '&quot;')}">
         <td>${row.id}</td>
         <td>${row.item}</td>
+        <td>${row.reporter ? `<span class="maintenance-reporter-cell">${row.reporter}</span>` : '<span class="maintenance-reporter-cell muted">—</span>'}</td>
         <td>${row.count}</td>
         <td>${row.date}</td>
         <td><span class="maintenance-status ${row.statusClass}">${row.status}</span></td>
@@ -901,14 +903,49 @@ function openMaintenanceEvalModal(row) {
   const itemName = itemCell ? itemCell.textContent.trim() : 'Podium';
   const itemCount = countCell ? countCell.textContent.trim() : '10';
   const reason = row && row.dataset.maintenanceReason ? row.dataset.maintenanceReason.trim() : '';
+  const reporter = row && row.dataset.reporter ? row.dataset.reporter.trim() : '';
+  const description = row && row.dataset.description ? row.dataset.description.trim() : '';
+  const proofImage = row && row.dataset.proofImage ? row.dataset.proofImage.trim() : '';
   const itemDisplay = unitCode ? `${itemName || '-'} (${unitCode})` : (itemName || '-');
 
   if (maintenanceEvalItemName) {
     maintenanceEvalItemName.textContent = itemDisplay;
   }
 
-  if (maintenanceEvalReason) {
-    maintenanceEvalReason.textContent = reason || `${itemCount || '1'}x Used`;
+  const evalReporter = document.getElementById('maintenance-eval-reporter');
+  if (evalReporter) {
+    evalReporter.textContent = reporter || '-';
+    evalReporter.closest('.maintenance-eval-grid') && (evalReporter.parentElement.style.display = reporter ? '' : 'none');
+    // show/hide the row via the label span
+    const labelSpan = evalReporter.previousElementSibling;
+    if (labelSpan) {
+      labelSpan.style.display = reporter ? '' : 'none';
+      evalReporter.style.display = reporter ? '' : 'none';
+    }
+  }
+
+  const evalDescription = document.getElementById('maintenance-eval-description');
+  if (evalDescription) {
+    evalDescription.textContent = description || '-';
+    const labelSpan = evalDescription.previousElementSibling;
+    if (labelSpan) {
+      labelSpan.style.display = description ? '' : 'none';
+      evalDescription.style.display = description ? '' : 'none';
+    }
+  }
+
+  const proofWrap = document.getElementById('maintenance-eval-proof-wrap');
+  const proofImg = document.getElementById('maintenance-eval-proof-img');
+  const proofLink = document.getElementById('maintenance-eval-proof-link');
+  if (proofWrap && proofImg && proofLink) {
+    if (proofImage) {
+      proofImg.src = proofImage;
+      proofLink.href = proofImage;
+      proofWrap.style.display = '';
+    } else {
+      proofWrap.style.display = 'none';
+      proofImg.src = '';
+    }
   }
 
   if (maintenanceFormItemName) {
@@ -1128,7 +1165,7 @@ function openScheduleRequestModal(day) {
     : dayRequests.filter((request) => Array.isArray(request.categories) && request.categories.includes(activeScheduleCategory));
   visibleScheduleRequests = filteredRequests;
 
-  scheduleModalDate.textContent = `Date Used: ${dateLabel}`;
+  scheduleModalDate.textContent = dateLabel;
 
   if (!filteredRequests.length) {
     scheduleRequestBody.innerHTML = `
@@ -1568,31 +1605,43 @@ async function submitReturnDecision(item, button, status) {
   }
 
   try {
-    const response = await fetch(`/dashboard/request/${reservationId}/final-${action}`, {
-      method: 'PATCH',
-      headers: {
-        'X-CSRF-TOKEN': csrfToken,
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const responseText = await response.text();
+    let response = null;
     let data = {};
+    let finalStatus = 0;
 
-    if (responseText) {
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        data = { error: responseText };
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      response = await fetch(`/dashboard/request/${reservationId}/final-${action}`, {
+        method: 'PATCH',
+        headers: {
+          'X-CSRF-TOKEN': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      finalStatus = response.status || 0;
+      const responseText = await response.text();
+      data = {};
+
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          data = { error: responseText };
+        }
       }
-    }
 
-    if (!response.ok || !data.success) {
-      const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
-      showAppNotice((data.error || data.message || 'Unable to process this request.') + statusMessage);
-      return;
+      if (response.ok && data.success) {
+        break;
+      }
+
+      const isTransientServerError = finalStatus >= 500 && finalStatus < 600;
+      if (!(isTransientServerError && attempt < 2)) {
+        const statusMessage = finalStatus ? ` (HTTP ${finalStatus})` : '';
+        showAppNotice((data.error || data.message || 'Unable to process this request.') + statusMessage);
+        return;
+      }
     }
 
     applyRequestDecision(item, status === 'returned' ? 'approved' : 'rejected');
@@ -2588,7 +2637,9 @@ function setActiveNavByPage() {
               ? 'schedule'
               : path.includes('/dashboard/request')
                 ? 'requests'
-                : 'home';
+                : path.includes('/dashboard/users')
+                  ? 'users'
+                  : 'home';
   const navItems = document.querySelectorAll('.nav-item[data-nav]');
   const subNavItems = document.querySelectorAll('.nav-subitem[data-subnav]');
   const subTarget = path.includes('/dashboard/inventory/facilities')
@@ -2706,10 +2757,18 @@ async function loadNavbar() {
 
     const currentUsername = String(window.authUser?.username || '').toLowerCase();
     const currentOfficeCode = String(window.authUser?.office_short_code || '').toLowerCase();
+    const currentRole = String(window.authUser?.role || '').toLowerCase();
     const isIoAdmin = currentUsername === 'io_admin' || currentOfficeCode === 'io';
+    const isPfAdmin = ['admin', 'pf_admin'].includes(currentRole);
 
     navbarContainer.querySelectorAll('[data-visible-for="io-admin"]').forEach((item) => {
       if (!isIoAdmin) {
+        item.remove();
+      }
+    });
+
+    navbarContainer.querySelectorAll('[data-visible-for="pf-admin"]').forEach((item) => {
+      if (!isPfAdmin) {
         item.remove();
       }
     });
@@ -5111,7 +5170,7 @@ if (scheduleRequestModal) {
   scheduleRequestModal.addEventListener('click', (event) => {
     const target = event.target;
 
-    if (target instanceof HTMLElement && target.dataset.closeScheduleModal === 'true') {
+    if (target instanceof HTMLElement && (target.dataset.closeScheduleModal === 'true' || target.closest('[data-close-schedule-modal="true"]'))) {
       closeScheduleRequestModal();
     }
   });
