@@ -52,7 +52,11 @@
 
       <section class="content-card office-requests-card">
         <h1 class="section-title">OFFICE APPROVAL DASHBOARD</h1>
-        <p class="office-subtitle">Pending approvals for your office only, based on sequence.</p>
+        @if(!empty($officeName))
+          <p class="office-subtitle">Approving on behalf of: <strong>{{ $officeName }}</strong></p>
+        @else
+          <p class="office-subtitle">Pending approvals for your office only, based on sequence.</p>
+        @endif
 
         <section class="office-request-summary-grid" aria-label="Request summaries">
           <article class="office-request-summary-tile">

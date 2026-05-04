@@ -90,6 +90,8 @@ class OfficeRequestController extends Controller
             ->orderByDesc('created_at')
             ->paginate(10);
 
+        $user->loadMissing('office');
+
         return [
             'requests' => $requests,
             'totalRequests' => count($actionableReservationIds),
@@ -105,6 +107,7 @@ class OfficeRequestController extends Controller
                 ->whereNotNull('approved_at')
                 ->count(),
             'authUser' => $user,
+            'officeName' => $user->office?->department_name ?? null,
         ];
     }
 
