@@ -176,6 +176,8 @@
       let isRefreshing = false;
       let isActing = false;
       let refreshVersion = 0;
+      let pendingRefreshRequest = false;
+      let pendingManualRefresh = false;
       const refreshIntervalMs = 30000;
 
       const resolveUrl = (action, approvalId) => {
@@ -332,8 +334,6 @@
         }
       };
 
-      const getRefreshStatusEl = () => document.getElementById('office-request-refresh-status');
-
       const setReloadButtonState = (isLoading, isManual = false) => {
         if (!isManual) {
           return; // Only update button for manual refreshes
@@ -356,15 +356,6 @@
         }
       };
 
-      const updateRefreshStatus = () => {
-        const statusEl = getRefreshStatusEl();
-        if (!(statusEl instanceof HTMLElement)) {
-          return;
-        }
-        const now = new Date();
-        statusEl.textContent = `Last updated ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      };
-
       const initOfficeQueueReloadButton = () => {
         const reloadButton = document.getElementById('office-queue-reload');
         if (!(reloadButton instanceof HTMLElement)) {
@@ -372,7 +363,7 @@
         }
 
         reloadButton.addEventListener('click', () => {
-          softRefreshQueue(true); // Mark as manual
+          softRefreshQueue(true, true); // Mark as manual and force fetch while action requests are running
         });
       };
 
@@ -408,6 +399,8 @@
 
       const softRefreshQueue = async (isManual = false, forceWhileActing = false) => {
         if (isRefreshing || (isActing && !forceWhileActing)) {
+          pendingRefreshRequest = true;
+          pendingManualRefresh = pendingManualRefresh || isManual;
           return;
         }
 
@@ -416,16 +409,24 @@
         setReloadButtonState(true, isManual);
 
         try {
-          const snapshotUrl = (typeof window.officeQueueSnapshotUrl === 'string' && window.officeQueueSnapshotUrl)
+          const snapshotBaseUrl = (typeof window.officeQueueSnapshotUrl === 'string' && window.officeQueueSnapshotUrl)
             ? window.officeQueueSnapshotUrl
             : '/dashboard/office/requests/snapshot';
 
-          const response = await fetch(snapshotUrl, {
+          const snapshotUrl = new URL(snapshotBaseUrl, window.location.origin);
+          const pageFromQuery = new URLSearchParams(window.location.search).get('page');
+          if (pageFromQuery) {
+            snapshotUrl.searchParams.set('page', pageFromQuery);
+          }
+          snapshotUrl.searchParams.set('_ts', String(Date.now()));
+
+          const response = await fetch(snapshotUrl.toString(), {
             method: 'GET',
             headers: {
               'X-Requested-With': 'XMLHttpRequest',
               'Accept': 'application/json',
               'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache',
             },
             cache: 'no-store',
           });
@@ -450,12 +451,18 @@
           }
 
           applyQueueSnapshotPayload(payload);
-          updateRefreshStatus();
         } catch (_error) {
           // Silent fail: keep UI usable and try again on next interval.
         } finally {
           isRefreshing = false;
           setReloadButtonState(false, isManual);
+
+          if (pendingRefreshRequest) {
+            const shouldRunManualRefresh = pendingManualRefresh;
+            pendingRefreshRequest = false;
+            pendingManualRefresh = false;
+            softRefreshQueue(shouldRunManualRefresh, true);
+          }
         }
       };
 
@@ -521,10 +528,6 @@
           const fallbackMessage = `Request ${decisionWord} by ${actorName}.`;
           showActionToast(payload.message || fallbackMessage, decisionWord === 'approved' ? 'approved' : 'rejected');
           applyLocalQueueDecision(button, action);
-          const statusEl = getRefreshStatusEl();
-          if (statusEl instanceof HTMLElement) {
-            statusEl.textContent = 'Syncing latest changes...';
-          }
 
           softRefreshQueue(false, true);
         } catch (_error) {
@@ -601,13 +604,6 @@
 
     .office-queue-reload-icon.is-loading {
       transform: rotate(90deg);
-    }
-
-    .office-request-refresh-status {
-      display: block;
-      margin-top: 0.25rem;
-      color: #64748b;
-      font-size: 0.88rem;
     }
 
     .office-request-history-head-inner {

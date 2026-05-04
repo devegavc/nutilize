@@ -72,7 +72,7 @@
 
         <section class="inventory-grid facilities-grid">
           <div class="table-wrap">
-            <table class="inventory-table">
+            <table class="inventory-table equipment-inventory-table">
               <thead>
                 <tr>
                   <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>

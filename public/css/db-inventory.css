@@ -330,6 +330,47 @@
   table-layout: fixed;
 }
 
+.facilities-grid .equipment-inventory-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.facilities-grid .equipment-inventory-table th:nth-child(1),
+.facilities-grid .equipment-inventory-table td:nth-child(1) {
+  width: 15%;
+  text-align: left;
+}
+
+.facilities-grid .equipment-inventory-table th:nth-child(2),
+.facilities-grid .equipment-inventory-table td:nth-child(2) {
+  width: 38%;
+  text-align: left;
+}
+
+.facilities-grid .equipment-inventory-table th:nth-child(3),
+.facilities-grid .equipment-inventory-table td:nth-child(3) {
+  width: 12%;
+  text-align: left;
+}
+
+.facilities-grid .equipment-inventory-table th:nth-child(4),
+.facilities-grid .equipment-inventory-table td:nth-child(4) {
+  width: 10%;
+  text-align: left;
+}
+
+.facilities-grid .equipment-inventory-table th:nth-child(5),
+.facilities-grid .equipment-inventory-table td:nth-child(5) {
+  width: 13%;
+  text-align: left;
+}
+
+.facilities-grid .equipment-inventory-table th:nth-child(6),
+.facilities-grid .equipment-inventory-table td:nth-child(6) {
+  width: 12%;
+  text-align: center;
+}
+
 /* Asset ID */
 .facilities-grid .inventory-table th:nth-child(1),
 .facilities-grid .inventory-table td:nth-child(1) {
