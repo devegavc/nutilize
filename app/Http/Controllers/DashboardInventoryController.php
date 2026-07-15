@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DashboardInventoryCacheService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,12 +16,12 @@ class DashboardInventoryController extends Controller
 
     public function index()
     {
-        return view('dashboard-inventory', $this->buildInventoryDashboardData());
+        return view('dashboard-inventory', DashboardInventoryCacheService::getInventoryData());
     }
 
     public function analytics()
     {
-        return view('dashboard-inventory-analytics', $this->buildAnalyticsDashboardData());
+        return view('dashboard-inventory-analytics', DashboardInventoryCacheService::getAnalyticsData());
     }
 
     private function buildInventoryDashboardData(): array
