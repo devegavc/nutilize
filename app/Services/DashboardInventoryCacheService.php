@@ -219,6 +219,10 @@ class DashboardInventoryCacheService
                 'owners.owner_name',
             ])
             ->selectRaw('COALESCE(SUM(details.quantity), 0) as usage_count')
+            ->whereBetween('reservations.created_at', [
+                now()->startOfMonth(),
+                now()->endOfMonth(),
+            ])
             ->groupBy(['items.item_id', 'items.item_name', 'owners.owner_name']);
 
         if ($approvedOnly) {
@@ -235,6 +239,7 @@ class DashboardInventoryCacheService
             return [];
         }
 
+        // Calculate max for percentage normalization
         $maxUsage = max(1, (int) $rows->max('usage_count'));
 
         return $rows->map(function ($row) use ($maxUsage) {
@@ -245,6 +250,7 @@ class DashboardInventoryCacheService
                 'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
                 'location' => trim((string) ($row->owner_name ?? 'Storage')),
                 'category' => 'Equipment',
+                'usage_count' => $usageCount,
                 'usage_percent' => min(100, (int) round(($usageCount / $maxUsage) * 100)),
             ];
         })->all();

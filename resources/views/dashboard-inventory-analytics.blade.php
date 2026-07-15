@@ -10,6 +10,7 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/db-inventory.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <script>
@@ -50,17 +51,9 @@
         <h1 class="section-title">INSIGHTS DASHBOARD</h1>
 
         <section class="analytics-top-row">
-          <article class="analytics-chart-card" aria-label="Borrow trend chart">
-            <div class="chart-grid-lines"></div>
-            <div class="chart-bars" aria-hidden="true">
-              @foreach ($trendBars as $bar)
-                <span style="height: {{ $bar }}%"></span>
-              @endforeach
-            </div>
-            <div class="chart-years" aria-hidden="true">
-              @foreach ($yearLabels as $yearLabel)
-                <span>{{ $yearLabel }}</span>
-              @endforeach
+          <article class="analytics-chart-card" aria-label="Top Items Distribution Pie Chart">
+            <div style="max-width: 400px; margin: 0 auto;">
+              <canvas id="topItemsChart"></canvas>
             </div>
           </article>
 
@@ -89,6 +82,90 @@
           </article>
         </section>
 
+        <script>
+          // Prepare data for pie chart
+          const topItems = @json($topItems);
+          const labels = topItems.map(item => item.item_name);
+          const data = topItems.map(item => item.usage_count);
+          
+          // Define vibrant colors for pie slices
+          const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+            '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788',
+            '#D62828', '#F77F00', '#FCBF49', '#EAE2B7', '#003049'
+          ];
+          
+          const ctx = document.getElementById('topItemsChart').getContext('2d');
+          new Chart(ctx, {
+            type: 'pie',
+            data: {
+              labels: labels,
+              datasets: [{
+                data: data,
+                backgroundColor: colors.slice(0, labels.length),
+                borderColor: '#fff',
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: true,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    font: {
+                      size: 11,
+                      weight: '500'
+                    },
+                    padding: 12,
+                    usePointStyle: true
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return context.label + ': ' + context.parsed + ' borrowed';
+                    }
+                  }
+                },
+                datalabels: {
+                  color: '#fff',
+                  font: {
+                    weight: 'bold',
+                    size: 12
+                  }
+                }
+              }
+            },
+            plugins: [{
+              id: 'textCenter',
+              beforeDatasetsDraw(chart) {
+                const {width, height, ctx} = chart;
+                ctx.restore();
+                
+                const fontSize = (height / 200).toFixed(2);
+                ctx.font = fontSize + "em sans-serif";
+                ctx.textBaseline = "middle";
+                
+                chart.data.datasets.forEach((dataSet) => {
+                  const meta = chart.getDatasetMeta(0);
+                  meta.data.forEach((datapoint, index) => {
+                    const {x, y} = datapoint.tooltipPosition();
+                    const data = datapoint.$context.raw;
+                    
+                    ctx.fillStyle = 'white';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText(data, x, y);
+                  });
+                });
+              }
+            }]
+          });
+        </script>
+
         <section class="inventory-grid analytics-table-grid">
           <div class="inventory-grid-head analytics-grid-head">
             <h2>Top Leading Borrowed items</h2>
@@ -101,7 +178,7 @@
                   <th>Category</th>
                   <th>Location</th>
                   <th>ID</th>
-                  <th>Usage Percentage</th>
+                  <th>Times Borrowed (This Month)</th>
                 </tr>
               </thead>
               <tbody>
@@ -111,7 +188,7 @@
                     <td>{{ $item['category'] }}</td>
                     <td>{{ $item['location'] }}</td>
                     <td class="asset-id">{{ $item['asset_id'] }}</td>
-                    <td><span class="freq-bar"><span style="width: {{ $item['usage_percent'] }}%"></span></span></td>
+                    <td><strong>{{ $item['usage_count'] }}</strong></td>
                   </tr>
                 @empty
                   <tr>
