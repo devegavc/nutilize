@@ -107,6 +107,7 @@ const profileAdminIdInput = document.getElementById('profile-admin-id');
 const profileEmailInput = document.getElementById('profile-email');
 const profileContactInput = document.getElementById('profile-contact');
 const profilePhoneInput = document.getElementById('profile-phone');
+const profileProgramInput = document.getElementById('profile-program');
 const profileEditModal = document.getElementById('profile-edit-modal');
 const profileModalFirstNameInput = document.getElementById('profile-modal-first-name');
 const profileModalMiddleNameInput = document.getElementById('profile-modal-middle-name');
@@ -116,6 +117,7 @@ const profileModalAdminIdInput = document.getElementById('profile-modal-admin-id
 const profileModalEmailInput = document.getElementById('profile-modal-email');
 const profileModalContactInput = document.getElementById('profile-modal-contact');
 const profileModalPhoneInput = document.getElementById('profile-modal-phone');
+const profileModalProgramIdInput = document.getElementById('profile-modal-program-id');
 const profileEditCancelButton = document.getElementById('profile-edit-cancel-btn');
 const profileEditSaveButton = document.getElementById('profile-edit-save-btn');
 const profileEditAvatar = document.getElementById('profile-edit-avatar');
@@ -3334,6 +3336,13 @@ function openProfileEditModal() {
     profileModalPhoneInput.value = profilePhoneInput ? profilePhoneInput.value : '';
   }
 
+  if (profileModalProgramIdInput && profileProgramInput) {
+    const selectedProgramId = window.authUser && window.authUser.program_id
+      ? String(window.authUser.program_id)
+      : '';
+    profileModalProgramIdInput.value = selectedProgramId;
+  }
+
   pendingProfileAvatarDataUrl = profileAvatarImage && profileAvatarImage.src ? profileAvatarImage.src : '';
 
   if (profileEditAvatar && profileEditAvatarImage) {
@@ -3378,6 +3387,10 @@ if (profileEditSaveButton) {
       contact_number: profileModalContactInput ? profileModalContactInput.value.trim() : '',
       phone_number: profileModalPhoneInput ? profileModalPhoneInput.value.trim() : '',
     };
+
+    if (window.authUser && window.authUser.should_select_program && profileModalProgramIdInput) {
+      payload.program_id = profileModalProgramIdInput.value.trim();
+    }
 
     try {
       profileEditSaveButton.disabled = true;
@@ -3433,6 +3446,13 @@ if (profileEditSaveButton) {
         profilePhoneInput.value = user.phone_number || payload.phone_number || 'Not Set';
       }
 
+      if (profileProgramInput && profileModalProgramIdInput) {
+        const selectedOption = profileModalProgramIdInput.selectedOptions[0];
+        profileProgramInput.value = selectedOption && selectedOption.value
+          ? selectedOption.textContent.trim()
+          : 'Not Set';
+      }
+
       if (window.authUser) {
         window.authUser.first_name = user.first_name || firstName || window.authUser.first_name;
         window.authUser.middle_initial = user.middle_initial || middleInitial || window.authUser.middle_initial;
@@ -3442,6 +3462,9 @@ if (profileEditSaveButton) {
         window.authUser.suffix = user.suffix || '';
         window.authUser.contact_number = user.contact_number || '';
         window.authUser.phone_number = user.phone_number || '';
+        if (Object.prototype.hasOwnProperty.call(user, 'program_id')) {
+          window.authUser.program_id = user.program_id;
+        }
       }
 
       if (profileAvatar && profileAvatarImage) {

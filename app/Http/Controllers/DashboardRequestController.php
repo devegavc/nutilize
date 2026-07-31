@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Reservation;
 use App\Models\ReservationApproval;
+use App\Services\ProgramChairOfficeResolver;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -186,6 +187,11 @@ class DashboardRequestController extends Controller
             }
         }
 
+        $legacyProgramChairOfficeId = ProgramChairOfficeResolver::defaultTemplateOfficeId();
+        if (!is_null($legacyProgramChairOfficeId)) {
+            $ids['PC'] = $legacyProgramChairOfficeId;
+        }
+
         $this->officeIdsByShortCodeCache = $ids;
 
         return $this->officeIdsByShortCodeCache;
@@ -287,6 +293,8 @@ class DashboardRequestController extends Controller
         $now = now();
 
         foreach ($reservationIds as $reservationId) {
+            ProgramChairOfficeResolver::reconcilePendingLegacyPcApproval((int) $reservationId);
+
             $workflowOfficeIds = $this->resolveWorkflowOfficeIds($reservationId, true);
             if (empty($workflowOfficeIds)) {
                 continue;
@@ -326,6 +334,8 @@ class DashboardRequestController extends Controller
 
     private function syncReservationApprovals(int $reservationId): void
     {
+        ProgramChairOfficeResolver::reconcilePendingLegacyPcApproval($reservationId);
+
         $workflowOfficeIds = $this->resolveWorkflowOfficeIds($reservationId, true);
 
         if (empty($workflowOfficeIds)) {
@@ -515,7 +525,7 @@ class DashboardRequestController extends Controller
             };
 
             $stageLabel = match ($officeCode) {
-                'PC' => 'Program Chair',
+                'PC' => $officeMap[$officeId]['name'] ?? 'Program Chair',
                 'SDAO' => 'Student Development and Activities Office',
                 'DO' => 'Discipline Office',
                 'SEC' => 'Security',
@@ -549,7 +559,15 @@ class DashboardRequestController extends Controller
 
         $pfOfficeId = $ids['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
         $ownerOfficeId = $this->resolveOwnerOfficeId($reservationId, $ids, $pfOfficeId);
-        $pcOfficeId = $ids['PC'] ?? null;
+        $templatePcOfficeId = $ids['PC'] ?? null;
+        $pcOfficeId = ProgramChairOfficeResolver::resolveForReservation($reservationId) ?? $templatePcOfficeId;
+        if (!is_null($templatePcOfficeId) && !is_null($pcOfficeId)) {
+            $actionSequence = ProgramChairOfficeResolver::replaceTemplatePcInSequence(
+                $actionSequence,
+                (int) $templatePcOfficeId,
+                (int) $pcOfficeId,
+            );
+        }
         $genEdOfficeId = $ids['GENED'] ?? null;
         $startOfficeId = $ownerOfficeId;
 

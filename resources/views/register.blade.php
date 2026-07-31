@@ -88,7 +88,7 @@
           </div>
 
           <!-- Last Name -->
-          <div class="mb-4">
+          <div class="mb-3">
             <div class="input-group input-group-lg">
               <span class="input-group-text">
                 <i class="bi bi-person"></i>
@@ -100,6 +100,33 @@
                      placeholder="Enter your last name"
                      value="{{ old('last_name') }}"
                      required>
+            </div>
+          </div>
+
+          <!-- Academic Program -->
+          <div class="mb-4">
+            <div class="input-group input-group-lg">
+              <span class="input-group-text">
+                <i class="bi bi-mortarboard"></i>
+              </span>
+              <select id="program-id"
+                      name="program_id"
+                      class="form-select"
+                      required>
+                <option value="" disabled {{ old('program_id') ? '' : 'selected' }}>Select your program</option>
+                @php
+                  $programsBySchool = ($programs ?? collect())->groupBy('school_name');
+                @endphp
+                @foreach ($programsBySchool as $schoolName => $schoolPrograms)
+                  <optgroup label="{{ $schoolName }}">
+                    @foreach ($schoolPrograms as $program)
+                      <option value="{{ $program->program_id }}" @selected((string) old('program_id') === (string) $program->program_id)>
+                        {{ $program->name }}
+                      </option>
+                    @endforeach
+                  </optgroup>
+                @endforeach
+              </select>
             </div>
           </div>
 

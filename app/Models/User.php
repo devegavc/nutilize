@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['first_name', 'middle_initial', 'last_name', 'full_name', 'username', 'email', 'password', 'role', 'office_id', 'suffix', 'contact_number', 'phone_number'])]
+#[Fillable(['first_name', 'middle_initial', 'last_name', 'full_name', 'username', 'email', 'password', 'role', 'office_id', 'program_id', 'suffix', 'contact_number', 'phone_number'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -34,6 +34,11 @@ class User extends Authenticatable
     public function office()
     {
         return $this->belongsTo(Office::class, 'office_id', 'office_id');
+    }
+
+    public function academicProgram()
+    {
+        return $this->belongsTo(AcademicProgram::class, 'program_id', 'program_id');
     }
 
     public function isPhysicalFacilitiesAdmin()
@@ -60,6 +65,17 @@ class User extends Authenticatable
         }
 
         return $role === 'pf_admin' && $this->office && $this->office->isPhysicalFacilities();
+    }
+
+    public function shouldSelectProgram(): bool
+    {
+        if (!is_null($this->office_id)) {
+            return false;
+        }
+
+        $role = strtolower((string) $this->role);
+
+        return in_array($role, ['user', 'student'], true);
     }
 
     public function reservations()

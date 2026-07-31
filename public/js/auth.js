@@ -7,6 +7,7 @@ const backStepBtn = document.getElementById("back-step-btn");
 const firstNameInput = document.getElementById("first-name");
 const middleInitialInput = document.getElementById("middle-initial");
 const lastNameInput = document.getElementById("last-name");
+const programIdInput = document.getElementById("program-id");
 const emailInput = document.getElementById("email");
 const emailWarning = document.getElementById("email-warning");
 const passwordInput = document.getElementById("password");
@@ -118,6 +119,7 @@ function validateStepOne() {
   const firstNameValid = firstNameInput.value.trim().length > 0;
   const lastNameValid = lastNameInput.value.trim().length > 0;
   const middleInitialValid = !middleInitialInput || middleInitialInput.value.trim().length <= 1;
+  const programValid = !programIdInput || programIdInput.value.trim().length > 0;
 
   firstNameInput.classList.toggle("is-invalid", !firstNameValid);
   lastNameInput.classList.toggle("is-invalid", !lastNameValid);
@@ -126,7 +128,11 @@ function validateStepOne() {
     middleInitialInput.classList.toggle("is-invalid", !middleInitialValid);
   }
 
-  return firstNameValid && lastNameValid && middleInitialValid;
+  if (programIdInput) {
+    programIdInput.classList.toggle("is-invalid", !programValid);
+  }
+
+  return firstNameValid && lastNameValid && middleInitialValid && programValid;
 }
 
 function showRegisterStep(step) {

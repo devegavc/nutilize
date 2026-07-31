@@ -19,6 +19,8 @@
     $firstName = $authUser->first_name ?? ($nameParts[0] ?? '');
     $lastName = $authUser->last_name ?? (count($nameParts) > 1 ? $nameParts[count($nameParts) - 1] : '');
     $middleInitial = $authUser->middle_initial ?? '';
+    $shouldSelectProgram = method_exists($authUser, 'shouldSelectProgram') && $authUser->shouldSelectProgram();
+    $programName = $authUser->academicProgram?->name ?? 'Not Set';
 
     $authUserPayload = [
       'id' => $authUser->user_id ?? null,
@@ -32,6 +34,8 @@
       'suffix' => $authUser->suffix ?? '',
       'contact_number' => $authUser->contact_number ?? '',
       'phone_number' => $authUser->phone_number ?? '',
+      'program_id' => $authUser->program_id ?? null,
+      'should_select_program' => $shouldSelectProgram,
       'profile_update_url' => route('dashboard.profile.update'),
     ];
 
@@ -41,6 +45,7 @@
   @endphp
   <script>
     window.authUser = @json($authUserPayload);
+    window.academicPrograms = @json($programs ?? []);
     window.dashboardNavComponent = @json($profileNavComponent);
   </script>
   <header class="top-header">
@@ -99,6 +104,11 @@
 
                   <label for="profile-suffix">Suffix</label>
                   <input id="profile-suffix" type="text" value="{{ $authUser->suffix ?? 'Not Set' }}" readonly />
+
+                  @if ($shouldSelectProgram)
+                    <label for="profile-program">Program</label>
+                    <input id="profile-program" type="text" value="{{ $programName }}" readonly />
+                  @endif
                 </div>
               </div>
             </article>
@@ -214,6 +224,25 @@
 
             <label class="profile-edit-label" for="profile-modal-suffix">Suffix</label>
             <input id="profile-modal-suffix" class="profile-edit-input" type="text" />
+
+            @if ($shouldSelectProgram)
+              <label class="profile-edit-label" for="profile-modal-program-id">Program</label>
+              <select id="profile-modal-program-id" class="profile-edit-input">
+                <option value="">Select your program</option>
+                @php
+                  $programsBySchool = ($programs ?? collect())->groupBy('school_name');
+                @endphp
+                @foreach ($programsBySchool as $schoolName => $schoolPrograms)
+                  <optgroup label="{{ $schoolName }}">
+                    @foreach ($schoolPrograms as $program)
+                      <option value="{{ $program->program_id }}" @selected((string) ($authUser->program_id ?? '') === (string) $program->program_id)>
+                        {{ $program->name }}
+                      </option>
+                    @endforeach
+                  </optgroup>
+                @endforeach
+              </select>
+            @endif
           </section>
 
           <section class="profile-edit-column">

@@ -21,7 +21,7 @@ Route::view('/', 'index')->name('index');
 Route::view('/login', 'login')->name('login');
 Route::post('/login', [LoginController::class, 'authenticate'])->name('login.authenticate');
 
-Route::view('/register', 'register')->name('register');
+Route::get('/register', [RegisterController::class, 'create'])->name('register');
 Route::post('/register', [RegisterController::class, 'store'])->name('register.store');
 
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
@@ -82,7 +82,7 @@ Route::middleware('auth')->group(function () {
         });
 
         Route::get('/history', [DashboardHistoryController::class, 'index'])->name('dashboard.history');
-        Route::view('/profile', 'dashboard-profile')->name('dashboard.profile');
+        Route::get('/profile', [ProfileController::class, 'show'])->name('dashboard.profile');
         Route::get('/request', [DashboardRequestController::class, 'index'])->name('dashboard.request');
         Route::get('/request/list', [DashboardRequestController::class, 'requestList'])->name('dashboard.request.list');
 

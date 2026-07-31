@@ -6,6 +6,7 @@ use App\Models\Notification;
 use App\Models\Office;
 use App\Models\Reservation;
 use App\Services\ReservationApprovalNotifier;
+use App\Services\ProgramChairOfficeResolver;
 use App\Models\ReservationApproval;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -816,6 +817,8 @@ class ApprovalController extends Controller
 
     private function syncReservationApprovals(int $reservationId): void
     {
+        ProgramChairOfficeResolver::reconcilePendingLegacyPcApproval($reservationId);
+
         $workflowOfficeIds = $this->resolveWorkflowOfficeIds($reservationId, true);
 
         if (empty($workflowOfficeIds)) {
@@ -1052,7 +1055,15 @@ class ApprovalController extends Controller
 
         $pfOfficeId = $ids['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
         $ownerOfficeId = $this->resolveOwnerOfficeId($reservationId, $ids, $pfOfficeId);
-        $pcOfficeId = $ids['PC'] ?? null;
+        $templatePcOfficeId = $ids['PC'] ?? null;
+        $pcOfficeId = ProgramChairOfficeResolver::resolveForReservation($reservationId) ?? $templatePcOfficeId;
+        if (!is_null($templatePcOfficeId) && !is_null($pcOfficeId)) {
+            $actionSequence = ProgramChairOfficeResolver::replaceTemplatePcInSequence(
+                $actionSequence,
+                (int) $templatePcOfficeId,
+                (int) $pcOfficeId,
+            );
+        }
         $genEdOfficeId = $ids['GENED'] ?? null;
         $startOfficeId = $ownerOfficeId;
 
@@ -1135,6 +1146,11 @@ class ApprovalController extends Controller
             if ($code !== '') {
                 $ids[$code] = (int) $row->office_id;
             }
+        }
+
+        $legacyProgramChairOfficeId = ProgramChairOfficeResolver::defaultTemplateOfficeId();
+        if (!is_null($legacyProgramChairOfficeId)) {
+            $ids['PC'] = $legacyProgramChairOfficeId;
         }
 
         $this->officeIdsByShortCodeCache = $ids;

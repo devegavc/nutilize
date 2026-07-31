@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call(OfficeSeeder::class);
+        $this->call(AcademicProgramSeeder::class);
         $this->call(OfficeAdminSeeder::class);
         $this->call(FacilitiesRoomsSeeder::class);
     }
