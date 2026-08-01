@@ -946,6 +946,8 @@ class DashboardInventoryController extends Controller
             $validated['status']
         );
 
+        DashboardInventoryCacheService::clearCache();
+
         $normalizedCategory = $this->normalizeCategory($databaseCategory);
         return response()->json([
             'success' => true,
@@ -1038,6 +1040,8 @@ class DashboardInventoryController extends Controller
             $validated['status']
         );
 
+        DashboardInventoryCacheService::clearCache();
+
         $normalizedCategory = $this->normalizeCategory($databaseCategory);
 
         return response()->json([
@@ -1076,6 +1080,8 @@ class DashboardInventoryController extends Controller
         DB::table('items')
             ->where('item_id', $itemId)
             ->delete();
+
+        DashboardInventoryCacheService::clearCache();
 
         return response()->json([
             'success' => true,

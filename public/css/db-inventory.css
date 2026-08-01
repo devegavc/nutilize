@@ -1282,6 +1282,449 @@
   font-weight: 700;
 }
 
+/* ---------- Insights: procurement intelligence ---------- */
+
+/*
+ * The insights page is a long scrolling report, unlike the other inventory
+ * screens that fit a single viewport-height card. Let the shell scroll instead
+ * of clipping the content inside a fixed-height card.
+ */
+.page-insights .dashboard-shell {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.page-insights .workspace-grid {
+  height: auto;
+  min-height: calc(100% - 10px);
+}
+
+.page-insights .analytics-content-card {
+  height: auto;
+  overflow: visible;
+}
+
+.page-insights .insight-section .table-wrap {
+  max-height: none;
+  overflow: visible;
+}
+
+.insights-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 22px 0;
+}
+
+.insights-subtitle {
+  margin: 2px 0 0;
+  color: #5c6795;
+  font-size: 0.82rem;
+}
+
+.insight-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  padding: 14px 22px 4px;
+}
+
+.insight-kpi {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: linear-gradient(165deg, #f9faff 0%, #edf2ff 100%);
+  border: 1px solid #cdd6ee;
+  border-radius: 13px;
+  box-shadow: 0 8px 16px rgba(34, 50, 111, 0.12);
+  padding: 11px 13px;
+}
+
+.insight-kpi.is-critical {
+  border-color: #f0b4b4;
+  background: linear-gradient(165deg, #fff7f7 0%, #ffecec 100%);
+}
+
+.insight-kpi.is-action {
+  border-color: #f2d9a0;
+  background: linear-gradient(165deg, #fffcf3 0%, #fff5e0 100%);
+}
+
+.insight-kpi-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 10px;
+  background: #4457ab;
+  color: var(--white);
+  font-size: 1rem;
+}
+
+.insight-kpi.is-critical .insight-kpi-icon {
+  background: #d62c2c;
+}
+
+.insight-kpi.is-action .insight-kpi-icon {
+  background: #d99300;
+}
+
+.insight-kpi div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.insight-kpi strong {
+  font-size: 1.32rem;
+  line-height: 1.1;
+  color: #121a3f;
+}
+
+.insight-kpi span:last-child {
+  font-size: 0.71rem;
+  color: #4a5588;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.insight-section {
+  margin: 14px 22px 0;
+}
+
+.insight-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.insight-head p {
+  margin: 2px 0 0;
+  color: #5c6795;
+  font-size: 0.79rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.insight-head-badge {
+  background: #4457ab;
+  color: var(--white);
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.restock-table tbody td {
+  vertical-align: top;
+}
+
+.restock-item-name {
+  font-weight: 700;
+  color: #17224e;
+}
+
+.restock-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: #6b76a3;
+}
+
+.restock-reason {
+  margin-top: 4px;
+  font-size: 0.76rem;
+  color: #5c6795;
+  line-height: 1.35;
+  max-width: 330px;
+}
+
+.restock-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: #7b85ad;
+  font-weight: 500;
+}
+
+.restock-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fff4d9;
+  border: 1px solid #f0cf87;
+  color: #8a5a00;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.79rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.restock-ok {
+  color: #229a3a;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.utilisation-bar {
+  width: 78px;
+  height: 7px;
+  border-radius: 999px;
+  background: #dde3f3;
+  overflow: hidden;
+}
+
+.utilisation-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #4457ab;
+}
+
+.utilisation-fill.critical {
+  background: #d62c2c;
+}
+
+.utilisation-fill.high {
+  background: #e8781f;
+}
+
+.utilisation-fill.medium {
+  background: #d99300;
+}
+
+.utilisation-fill.low {
+  background: #3f9d54;
+}
+
+.utilisation-value {
+  display: inline-block;
+  margin-top: 3px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #3a4573;
+}
+
+.priority-pill {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.priority-pill.critical {
+  background: #fde3e3;
+  color: #b31f1f;
+}
+
+.priority-pill.high {
+  background: #ffeada;
+  color: #a2530b;
+}
+
+.priority-pill.medium {
+  background: #fff3d1;
+  color: #8a6100;
+}
+
+.priority-pill.low {
+  background: #e2f4e6;
+  color: #227a37;
+}
+
+.turnover-value {
+  font-weight: 700;
+  color: #3a4573;
+}
+
+.turnover-value.hot {
+  color: #b31f1f;
+}
+
+.insight-empty {
+  text-align: center;
+  color: #6b76a3;
+  font-size: 0.88rem;
+  padding: 18px 8px;
+}
+
+.insight-empty i {
+  color: #3f9d54;
+  margin-right: 5px;
+}
+
+.insight-empty-inline {
+  margin: 8px 0 0;
+  color: #6b76a3;
+  font-size: 0.83rem;
+}
+
+.insight-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  padding: 14px 22px 0;
+}
+
+.insight-split:last-of-type {
+  padding-bottom: 20px;
+}
+
+.insight-panel {
+  background: linear-gradient(180deg, #f5f7ff 0%, #edf1fc 100%);
+  border: 1px solid #cfd8ee;
+  border-radius: 14px;
+  box-shadow: 0 10px 18px rgba(29, 45, 103, 0.14);
+  padding: 14px 16px 16px;
+  min-width: 0;
+}
+
+.insight-card-title {
+  margin: 0;
+  color: #1b2b6a;
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.insight-panel-hint {
+  margin: 3px 0 10px;
+  color: #6b76a3;
+  font-size: 0.77rem;
+}
+
+/* Chart.js needs a definite height when maintainAspectRatio is off. */
+.insight-chart-frame {
+  position: relative;
+  height: 230px;
+  margin-top: 10px;
+}
+
+.insight-subhead {
+  margin: 16px 0 7px;
+  color: #39457f;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.analytics-chart-card .insight-card-title {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.weekday-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.weekday-list li {
+  display: grid;
+  grid-template-columns: 34px 1fr 28px;
+  align-items: center;
+  gap: 9px;
+}
+
+.weekday-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #39457f;
+}
+
+.weekday-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: #dde3f3;
+  overflow: hidden;
+}
+
+.weekday-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #5166bd 0%, #2f3f88 100%);
+}
+
+.weekday-count {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #3a4573;
+  text-align: right;
+}
+
+.busy-date-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.busy-date-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.81rem;
+  color: #4a5588;
+  padding: 5px 9px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+}
+
+.busy-date-list strong {
+  color: #1b2b6a;
+}
+
+.compact-table {
+  margin-top: 4px;
+}
+
+.compact-table thead th {
+  font-size: 0.74rem;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.compact-table tbody td {
+  font-size: 0.84rem;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+@media (max-width: 900px) {
+  .restock-reason {
+    max-width: none;
+  }
+
+  .insight-section,
+  .insight-split,
+  .insight-kpi-strip,
+  .insights-header {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .insight-section {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+}
+
 .history-content-card {
   padding: 0;
   display: flex;

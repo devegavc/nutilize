@@ -35,7 +35,7 @@ class DashboardInventoryCacheService
         $cacheKey = 'dashboard.inventory.analytics';
 
         return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () {
-            return [
+            return array_merge([
                 'yearLabels' => self::getYearLabels(),
                 'trendBars' => self::getTrendBars(),
                 'totalBorrowers' => self::getTotalBorrowers(),
@@ -44,8 +44,8 @@ class DashboardInventoryCacheService
                 'engagementGrowth' => self::getEngagementGrowth(),
                 'newUsers' => self::getNewUsers(),
                 'newUsersGrowth' => self::getNewUsersGrowth(),
-                'topItems' => self::getTopRequestedItems(5, true),
-            ];
+                'topItems' => self::getTopBorrowedItems(8),
+            ], InventoryInsightsService::build());
         });
     }
 
@@ -200,6 +200,58 @@ class DashboardInventoryCacheService
             ->count();
 
         return self::percentChange($previous, $current);
+    }
+
+    /**
+     * Borrowing leaderboard for the insights page. Unlike the inventory widget this
+     * spans the full analysis window and counts every booking that reserved stock,
+     * not just the ones that finished the approval chain.
+     */
+    private static function getTopBorrowedItems(int $limit, int $lookbackDays = 90): array
+    {
+        if (!Schema::hasTable('reservation_details') || !Schema::hasTable('reservation_items')) {
+            return [];
+        }
+
+        $rows = DB::table('reservation_details as details')
+            ->join('reservations', 'reservations.reservation_id', '=', 'details.reservation_id')
+            ->join('reservation_items as bookedItems', 'bookedItems.reservation_items_id', '=', 'details.reservation_items_id')
+            ->join('items', 'items.item_id', '=', 'bookedItems.item_id')
+            ->leftJoin('item_owners as owners', 'owners.owner_id', '=', 'items.owner_id')
+            ->whereNotNull('details.reservation_items_id')
+            ->where('reservations.created_at', '>=', now()->subDays($lookbackDays))
+            ->whereNotIn(DB::raw("LOWER(TRIM(COALESCE(reservations.overall_status, '')))"), ['cancelled', 'canceled'])
+            ->select(['items.item_id', 'items.item_name', 'items.quantity_total', 'owners.owner_name'])
+            ->selectRaw('COALESCE(SUM(details.quantity), 0) as usage_count')
+            ->selectRaw('COUNT(DISTINCT reservations.reservation_id) as booking_count')
+            ->groupBy(['items.item_id', 'items.item_name', 'items.quantity_total', 'owners.owner_name'])
+            ->orderByDesc('usage_count')
+            ->orderBy('items.item_name')
+            ->limit($limit)
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $maxUsage = max(1, (int) $rows->max('usage_count'));
+
+        return $rows->map(function ($row) use ($maxUsage) {
+            $usageCount = max(0, (int) ($row->usage_count ?? 0));
+            $stock = max(0, (int) ($row->quantity_total ?? 0));
+
+            return [
+                'asset_id' => '#ITEM-' . str_pad((string) $row->item_id, 4, '0', STR_PAD_LEFT),
+                'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
+                'location' => trim((string) ($row->owner_name ?? '')) ?: 'Storage',
+                'category' => 'Equipment',
+                'stock' => $stock,
+                'booking_count' => (int) ($row->booking_count ?? 0),
+                'turnover' => $stock > 0 ? round($usageCount / $stock, 1) : null,
+                'usage_count' => $usageCount,
+                'usage_percent' => min(100, (int) round(($usageCount / $maxUsage) * 100)),
+            ];
+        })->all();
     }
 
     private static function getTopRequestedItems(int $limit, bool $approvedOnly = false): array
