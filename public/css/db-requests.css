@@ -170,6 +170,17 @@
   color: #b6becc;
 }
 
+.status-dots .dot-current {
+  border-color: #3468ff;
+  background: #3468ff;
+  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(52, 104, 255, 0.2);
+}
+
+.status-dots .dot-current:not(:last-child)::after {
+  background: #c5ccda;
+}
+
 .status-dots .dot-approved {
   border-color: #2fbc60;
   background: #2fbc60;
@@ -280,6 +291,43 @@
 .status-step.dot-pending .status-step-node {
   border-color: #c5ccda;
   color: #b6becc;
+}
+
+.status-step.dot-current .status-step-node {
+  border-color: #3468ff;
+  background: #3468ff;
+  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(52, 104, 255, 0.2);
+}
+
+.status-step.dot-current:not(:last-child)::after {
+  background: #c5ccda;
+}
+
+.request-current-stage {
+  margin: 8px 0 0;
+  color: #4b5677;
+  font-size: 0.88rem;
+}
+
+.request-current-stage strong {
+  color: #1c2c6d;
+}
+
+.request-content-card.pending-mode .request-item.pending-only .status-dots {
+  display: none;
+}
+
+.request-content-card.pending-mode .request-item.pending-only .status-timeline {
+  display: grid;
+  grid-template-columns: repeat(var(--timeline-steps), minmax(0, 1fr));
+  position: relative;
+  margin: 10px 0 4px;
+  width: 100%;
+  transform: none;
+  left: auto;
+  top: auto;
+  z-index: 1;
 }
 
 .request-owner,
@@ -539,70 +587,136 @@
 .inventory-confirm-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(22, 34, 75, 0.52);
+  background:
+    radial-gradient(circle at 20% 22%, rgba(48, 64, 138, 0.28) 0%, rgba(48, 64, 138, 0) 50%),
+    radial-gradient(circle at 82% 80%, rgba(11, 138, 11, 0.24) 0%, rgba(11, 138, 11, 0) 48%),
+    rgba(20, 22, 28, 0.78);
+  backdrop-filter: blur(5px);
+}
+
+.inventory-confirm-modal[data-confirm-variant="danger"] .inventory-confirm-overlay,
+.inventory-confirm-modal[data-confirm-variant="delete"] .inventory-confirm-overlay {
+  background:
+    radial-gradient(circle at 18% 20%, rgba(120, 34, 34, 0.24) 0%, rgba(120, 34, 34, 0) 52%),
+    rgba(20, 22, 28, 0.78);
 }
 
 .inventory-confirm-card {
   position: relative;
-  width: min(420px, calc(100% - 32px));
-  border-radius: 18px;
-  background: #ffffff;
-  box-shadow: 0 28px 80px rgba(36, 56, 108, 0.2);
-  padding: 24px;
+  width: min(500px, calc(100% - 32px));
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fcfcff 0%, #f0f2fa 100%);
+  border: 1px solid #c8d0e8;
+  box-shadow: 0 18px 34px rgba(16, 24, 63, 0.42);
+  overflow: hidden;
   z-index: 1;
+  animation: requestConfirmPop 0.22s ease-out;
+}
+
+.inventory-confirm-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(90deg, #0b8a0b 0%, #1fa51f 45%, #78c878 100%);
+}
+
+.inventory-confirm-modal[data-confirm-variant="danger"] .inventory-confirm-card::before,
+.inventory-confirm-modal[data-confirm-variant="delete"] .inventory-confirm-card::before {
+  background: linear-gradient(90deg, #ce1111 0%, #e61616 48%, #ff5d5d 100%);
+}
+
+@keyframes requestConfirmPop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.inventory-confirm-head {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid #d8ddee;
+  background: #fbfcff;
 }
 
 .inventory-confirm-head h2 {
-  margin: 0 0 10px;
-  color: #1f2d5d;
-  font-size: 1.2rem;
+  margin: 0;
+  color: #0b8a0b;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.inventory-confirm-modal[data-confirm-variant="danger"] .inventory-confirm-head h2,
+.inventory-confirm-modal[data-confirm-variant="delete"] .inventory-confirm-head h2 {
+  color: #d91212;
+}
+
+.inventory-confirm-body {
+  padding: 14px 16px;
+  border-bottom: 1px solid #d8ddee;
+  background: #ffffff;
 }
 
 .inventory-confirm-body p {
   margin: 0;
-  color: #4b5677;
-  line-height: 1.75;
+  color: #1f2432;
+  line-height: 1.45;
   font-size: 0.98rem;
 }
 
 .inventory-confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 22px;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #fbfcff;
 }
 
 .inventory-confirm-btn {
-  border: 0;
-  border-radius: 999px;
-  min-width: 100px;
-  padding: 10px 16px;
-  font-size: 0.95rem;
+  border: 1px solid #a9b0c1;
+  border-radius: 8px;
+  min-width: 104px;
+  height: 36px;
+  padding: 0 16px;
+  font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
 }
 
 .inventory-confirm-btn.cancel {
-  background: #eef0f5;
-  color: #4c556e;
+  background: linear-gradient(180deg, #f4f5f8 0%, #d9dde7 100%);
+  color: #3b4458;
+  box-shadow: 0 6px 12px rgba(59, 70, 113, 0.14);
 }
 
-.inventory-confirm-btn.confirm,
-.inventory-confirm-btn.delete,
-.inventory-confirm-btn.danger {
-  background: #1f3eb6;
+.inventory-confirm-btn.approve,
+.inventory-confirm-btn.confirm {
+  border-color: #158a31;
+  background: linear-gradient(135deg, #19a219 0%, #0d850d 100%);
   color: #ffffff;
+  box-shadow: 0 8px 14px rgba(11, 138, 11, 0.32);
 }
 
 .inventory-confirm-btn.delete,
 .inventory-confirm-btn.danger {
-  background: #dc2626;
+  border-color: #cf3b3b;
+  background: linear-gradient(135deg, #e61616 0%, #cf3b3b 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 14px rgba(207, 59, 59, 0.28);
 }
 
 .inventory-confirm-btn:hover {
   transform: translateY(-1px);
-  filter: saturate(1.08);
+  filter: brightness(1.02);
 }
 
 .pending-only {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AdminActivityService;
 use App\Services\ProgramChairOfficeResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,9 @@ class ProfileController extends Controller
                 ->get(['program_id', 'name', 'school_name'])
             : collect();
 
-        return view('dashboard-profile', compact('programs'));
+        $activityLogs = AdminActivityService::recentForUser((int) ($authUser->user_id ?? 0));
+
+        return view('dashboard-profile', compact('programs', 'activityLogs'));
     }
 
     public function update(Request $request): JsonResponse
@@ -74,6 +77,8 @@ class ProfileController extends Controller
         }
 
         $user->save();
+
+        AdminActivityService::log((int) $user->user_id, 'Updated profile', 'Account');
 
         if ($user->shouldSelectProgram()) {
             ProgramChairOfficeResolver::reconcilePendingLegacyPcApprovalsForUser((int) $user->user_id);

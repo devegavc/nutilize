@@ -7,51 +7,72 @@ use PHPUnit\Framework\TestCase;
 
 class InventoryInsightsServiceTest extends TestCase
 {
-    public function test_it_reports_no_peak_without_any_bookings(): void
+    public function test_shortage_when_more_units_are_out_than_owned(): void
     {
-        $this->assertSame(0, InventoryInsightsService::peakConcurrentQuantity([]));
+        $result = InventoryInsightsService::calculateRestockSuggestion(
+            stock: 1,
+            inUse: 6,
+            timesBorrowed: 0,
+            unitsBorrowed: 0,
+        );
+
+        $this->assertSame(6, $result['suggested_qty']);
+        $this->assertSame(5, $result['gap']);
+        $this->assertSame('6 out − 1 owned + 1 spare', $result['formula']);
+        $this->assertSame('critical', $result['priority']);
     }
 
-    public function test_sequential_bookings_do_not_stack(): void
+    public function test_shortage_when_borrowed_units_exceed_stock(): void
     {
-        $intervals = [
-            [100, 200, 1],
-            [200, 300, 1],
-            [300, 400, 1],
-        ];
+        $result = InventoryInsightsService::calculateRestockSuggestion(
+            stock: 5,
+            inUse: 2,
+            timesBorrowed: 8,
+            unitsBorrowed: 8,
+        );
 
-        $this->assertSame(1, InventoryInsightsService::peakConcurrentQuantity($intervals));
+        $this->assertSame(4, $result['suggested_qty']);
+        $this->assertSame(3, $result['gap']);
+        $this->assertSame('8 borrowed − 5 owned + 1 spare', $result['formula']);
     }
 
-    public function test_overlapping_bookings_stack_into_a_peak(): void
+    public function test_suggests_one_spare_when_all_units_are_out(): void
     {
-        $intervals = [
-            [100, 300, 1],
-            [200, 400, 1],
-            [250, 260, 2],
-        ];
+        $result = InventoryInsightsService::calculateRestockSuggestion(
+            stock: 2,
+            inUse: 2,
+            timesBorrowed: 3,
+            unitsBorrowed: 2,
+        );
 
-        $this->assertSame(4, InventoryInsightsService::peakConcurrentQuantity($intervals));
+        $this->assertSame(1, $result['suggested_qty']);
+        $this->assertSame('All units out + 1 spare', $result['formula']);
+        $this->assertSame('medium', $result['priority']);
     }
 
-    public function test_peak_reflects_the_busiest_window_not_the_total(): void
+    public function test_suggests_one_spare_when_borrowed_units_hit_high_demand_threshold(): void
     {
-        $intervals = [
-            [100, 150, 3],
-            [400, 450, 5],
-            [420, 430, 2],
-        ];
+        $result = InventoryInsightsService::calculateRestockSuggestion(
+            stock: 5,
+            inUse: 1,
+            timesBorrowed: 4,
+            unitsBorrowed: 4,
+        );
 
-        $this->assertSame(7, InventoryInsightsService::peakConcurrentQuantity($intervals));
+        $this->assertSame(1, $result['suggested_qty']);
+        $this->assertSame('4 borrowed of 5 owned + 1 spare', $result['formula']);
     }
 
-    public function test_a_fully_contained_booking_adds_to_the_surrounding_one(): void
+    public function test_no_suggestion_when_stock_covers_demand(): void
     {
-        $intervals = [
-            [100, 900, 2],
-            [300, 400, 3],
-        ];
+        $result = InventoryInsightsService::calculateRestockSuggestion(
+            stock: 10,
+            inUse: 2,
+            timesBorrowed: 3,
+            unitsBorrowed: 3,
+        );
 
-        $this->assertSame(5, InventoryInsightsService::peakConcurrentQuantity($intervals));
+        $this->assertSame(0, $result['suggested_qty']);
+        $this->assertSame('', $result['formula']);
     }
 }

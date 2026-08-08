@@ -9,7 +9,6 @@
   <title>NUtilize | Office Home</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/dashboard.css" />
   <link rel="stylesheet" href="/css/office.css" />
 </head>
 <body>
@@ -20,7 +19,9 @@
       email: '{{ auth()->user()->email ?? '' }}',
       full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
       role: '{{ auth()->user()->role ?? 'user' }}',
-      office_name: '{{ auth()->user()?->office?->department_name ?? 'Office' }}'
+      office_name: '{{ auth()->user()?->office?->department_name ?? 'Office' }}',
+      office_short_code: '{{ auth()->user()?->office?->short_code ?? '' }}',
+      is_item_owner: @json(auth()->user()?->isItemOwnerAdmin() ?? false)
     };
     window.dashboardNavComponent = '/components/navbar-office.html';
   </script>
@@ -53,7 +54,7 @@
       <section class="content-card office-requests-card">
         <h1 class="section-title">OFFICE APPROVAL DASHBOARD</h1>
         @if(!empty($officeName))
-          <p class="office-subtitle">Approving on behalf of: <strong>{{ $officeName }}</strong></p>
+          <p class="office-subtitle">Approving on behalf of: <strong>{{ $officeName === 'DO' ? 'Student discipline office' : ($officeName === 'SDAO' ? 'Student Development and Activities Office' : $officeName) }}</strong></p>
         @else
           <p class="office-subtitle">Pending approvals for your office only, based on sequence.</p>
         @endif
@@ -116,7 +117,12 @@
                 </tr>
               </thead>
               <tbody id="office-request-history-body">
-                @include('partials.office-request-rows', ['requests' => $requests])
+                @include('partials.office-request-rows', [
+                  'requests' => $requests,
+                  'actionableReservationIds' => $actionableReservationIds ?? [],
+                  'waitingOnByReservation' => $waitingOnByReservation ?? [],
+                  'showWaitingQueueContext' => $showWaitingQueueContext ?? false,
+                ])
               </tbody>
             </table>
           </div>

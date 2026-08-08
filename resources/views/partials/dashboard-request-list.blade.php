@@ -33,6 +33,9 @@
           </div>
         @endforeach
       </div>
+      @if($requestData['tab'] === 'pending' && !empty($requestData['current_stage_label']))
+        <p class="request-current-stage">Currently at: <strong>{{ $requestData['current_stage_label'] }}</strong></p>
+      @endif
       <p class="request-owner">{{ $requesterName }}</p>
       <p class="request-phone">{{ $displayPhone }}</p>
       <div class="request-event-row">

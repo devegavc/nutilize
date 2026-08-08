@@ -190,16 +190,19 @@
 }
 
 .facilities-filter-row {
-  display: grid;
-  grid-template-columns: auto minmax(220px, 1fr) auto;
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 12px;
   padding: 12px 22px 10px;
 }
 
 .facilities-tab-group {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  flex: 1 1 280px;
+  min-width: 0;
 }
 
 .facilities-tab {
@@ -224,6 +227,9 @@
   border-radius: 999px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   padding: 5px 11px;
+  flex: 1 1 200px;
+  min-width: 180px;
+  max-width: 100%;
 }
 
 .facilities-inline-search i {
@@ -255,6 +261,8 @@
   gap: 8px;
   box-shadow: 0 12px 24px rgba(255, 183, 0, 0.18);
   transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.15s ease;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .facilities-add-btn:hover,
@@ -280,6 +288,8 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .facilities-add-category-btn {
@@ -293,7 +303,7 @@
 }
 
 .facilities-grid {
-  margin: 0 0 22px 0;
+  margin: 0 22px 22px;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -304,8 +314,9 @@
   flex: 1;
   max-height: none;
   min-height: 0;
+  overflow-x: auto;
   overflow-y: auto;
-  padding: 0;
+  padding: 12px 16px 16px;
 }
 
 .facilities-grid .inventory-table thead th {
@@ -369,6 +380,11 @@
 .facilities-grid .equipment-inventory-table td:nth-child(6) {
   width: 12%;
   text-align: center;
+}
+
+.facilities-grid .equipment-inventory-table td[colspan] {
+  text-align: center;
+  color: #4b567f;
 }
 
 /* Asset ID */
@@ -729,9 +745,11 @@
   position: fixed;
   inset: 0;
   display: none;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 1600;
+  padding: 16px;
+  overflow-y: auto;
 }
 
 .facilities-modal.is-open {
@@ -747,10 +765,15 @@
 .facilities-modal-card {
   position: relative;
   width: min(92vw, 500px);
+  max-height: calc(100vh - 32px);
   background: #f0f0f0;
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  margin: auto 0;
 }
 
 .equipment-category-modal-card {
@@ -851,10 +874,30 @@
   background: var(--blue);
   border-bottom: 5px solid var(--yellow);
   height: 46px;
+  flex-shrink: 0;
 }
 
 .facilities-modal-body {
   padding: 16px 28px 22px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--third) #d0d3dc;
+}
+
+.facilities-modal-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.facilities-modal-body::-webkit-scrollbar-track {
+  background: #d0d3dc;
+  border-radius: 999px;
+}
+
+.facilities-modal-body::-webkit-scrollbar-thumb {
+  background: var(--third);
+  border-radius: 999px;
 }
 
 .facilities-modal-body h2 {
@@ -1007,6 +1050,8 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  padding-bottom: 4px;
+  flex-wrap: wrap;
 }
 
 .facilities-action-btn {
@@ -1315,6 +1360,54 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 22px 0;
+}
+
+.insight-how-it-works {
+  margin: 12px 22px 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #cdd6ee;
+  background: linear-gradient(165deg, #fffef8 0%, #f5f8ff 100%);
+  box-shadow: 0 6px 14px rgba(34, 50, 111, 0.08);
+}
+
+.insight-how-it-works h3 {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  color: #1b2b6a;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.insight-how-it-works h3 i {
+  color: #d99300;
+}
+
+.insight-how-it-works ol {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #4a5588;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.insight-how-it-works li + li {
+  margin-top: 4px;
+}
+
+.restock-formula {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.72rem;
+  color: #6b5880;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.restock-sub.over-allocated {
+  color: #b31f1f;
+  font-weight: 700;
 }
 
 .insights-subtitle {
@@ -2764,4 +2857,14 @@
   .inventory-confirm-body {
     font-size: 0.96rem;
   }
+}
+
+.field-optional {
+  color: #6b7280;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.equipment-generate-codes-btn {
+  margin: 8px 0 14px;
 }

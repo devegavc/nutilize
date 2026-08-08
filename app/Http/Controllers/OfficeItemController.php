@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AdminActivityService;
+use App\Services\ItemOwnerService;
+use App\Services\ItemUnitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +19,7 @@ class OfficeItemController extends Controller
     {
         $user = $request->user();
 
-        if (!$this->isIoAdmin($user?->office_id, (string) ($user?->username ?? ''), (string) ($user?->role ?? ''))) {
+        if (!$this->isIoAdminUser($user)) {
             abort(403);
         }
 
@@ -45,6 +48,8 @@ class OfficeItemController extends Controller
                 $inUseCount = max(0, min($totalCount, (int) ($row->quantity_in_use ?? 0)));
                 $maintenanceCount = (bool) $row->maintenance_status ? 1 : 0;
 
+                $unitCodes = ItemUnitService::loadUnitCodesForItem((int) $row->item_id);
+
                 $statusKey = 'good';
                 $statusLabel = 'Good';
 
@@ -58,7 +63,8 @@ class OfficeItemController extends Controller
 
                 return [
                     'item_id' => (int) $row->item_id,
-                    'asset_id' => '#ITEM-' . str_pad((string) $row->item_id, 4, '0', STR_PAD_LEFT),
+                    'asset_id' => ItemUnitService::listAssetLabel($unitCodes, (int) $row->item_id),
+                    'unit_codes' => $unitCodes,
                     'category' => $category,
                     'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
                     'total_count' => $totalCount,
@@ -80,7 +86,7 @@ class OfficeItemController extends Controller
     {
         $user = $request->user();
 
-        if (!$this->isIoAdmin($user?->office_id, (string) ($user?->username ?? ''), (string) ($user?->role ?? ''))) {
+        if (!$this->isIoAdminUser($user)) {
             return response()->json(['error' => 'Unauthorized.'], 403);
         }
 
@@ -93,6 +99,8 @@ class OfficeItemController extends Controller
         }
 
         $validated = $request->validate([
+            'unit_codes' => ['nullable', 'array'],
+            'unit_codes.*' => ['nullable', 'string', 'max:64'],
             'item_name' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', Rule::in($categoryKeys)],
             'total_count' => ['required', 'integer', 'min:0'],
@@ -142,20 +150,30 @@ class OfficeItemController extends Controller
             $itemInsertPayload['category_id'] = (int) $categoryRecord['id'];
         }
 
-        $itemId = DB::table('items')->insertGetId($itemInsertPayload, 'item_id');
+        $itemId = DB::transaction(function () use ($itemInsertPayload, $validated) {
+            $itemId = DB::table('items')->insertGetId($itemInsertPayload, 'item_id');
 
-        $this->syncItemUnitsForItem(
-            (int) $itemId,
-            (int) $validated['total_count'],
-            (int) $validated['in_use'],
-            $validated['status']
-        );
+            ItemUnitService::ensureUnitsForItem(
+                (int) $itemId,
+                $validated['unit_codes'] ?? [],
+                (int) $validated['total_count'],
+                (int) $validated['in_use'],
+                $validated['status'],
+            );
+
+            return $itemId;
+        });
+
+        $unitCodes = ItemUnitService::loadUnitCodesForItem((int) $itemId);
+
+        AdminActivityService::log((int) ($user->user_id ?? 0), 'Added inventory item', 'Inventory');
 
         return response()->json([
             'success' => true,
             'item' => [
                 'item_id' => (int) $itemId,
-                'asset_id' => '#ITEM-' . str_pad((string) $itemId, 4, '0', STR_PAD_LEFT),
+                'asset_id' => ItemUnitService::listAssetLabel($unitCodes, (int) $itemId),
+                'unit_codes' => $unitCodes,
                 'category' => $this->normalizeCategory($databaseCategory),
                 'item_name' => $validated['item_name'],
                 'total_count' => (int) $validated['total_count'],
@@ -170,7 +188,7 @@ class OfficeItemController extends Controller
     {
         $user = $request->user();
 
-        if (!$this->isIoAdmin($user?->office_id, (string) ($user?->username ?? ''), (string) ($user?->role ?? ''))) {
+        if (!$this->isIoAdminUser($user)) {
             return response()->json(['error' => 'Unauthorized.'], 403);
         }
 
@@ -183,6 +201,8 @@ class OfficeItemController extends Controller
         }
 
         $validated = $request->validate([
+            'unit_codes' => ['nullable', 'array'],
+            'unit_codes.*' => ['nullable', 'string', 'max:64'],
             'item_name' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', Rule::in($categoryKeys)],
             'total_count' => ['required', 'integer', 'min:0'],
@@ -238,23 +258,29 @@ class OfficeItemController extends Controller
             $itemUpdatePayload['category_id'] = (int) $categoryRecord['id'];
         }
 
-        DB::table('items')
-            ->where('item_id', $itemId)
-            ->where('owner_id', $ownerId)
-            ->update($itemUpdatePayload);
+        $unitCodes = DB::transaction(function () use ($itemId, $ownerId, $itemUpdatePayload, $validated) {
+            DB::table('items')
+                ->where('item_id', $itemId)
+                ->where('owner_id', $ownerId)
+                ->update($itemUpdatePayload);
 
-        $this->syncItemUnitsForItem(
-            $itemId,
-            (int) $validated['total_count'],
-            (int) $validated['in_use'],
-            $validated['status']
-        );
+            return ItemUnitService::ensureUnitsForItem(
+                $itemId,
+                $validated['unit_codes'] ?? [],
+                (int) $validated['total_count'],
+                (int) $validated['in_use'],
+                $validated['status'],
+            );
+        });
+
+        AdminActivityService::log((int) ($user->user_id ?? 0), 'Updated inventory item', 'Inventory');
 
         return response()->json([
             'success' => true,
             'item' => [
                 'item_id' => $itemId,
-                'asset_id' => '#ITEM-' . str_pad((string) $itemId, 4, '0', STR_PAD_LEFT),
+                'asset_id' => ItemUnitService::listAssetLabel($unitCodes, $itemId),
+                'unit_codes' => $unitCodes,
                 'category' => $this->normalizeCategory($databaseCategory),
                 'item_name' => $validated['item_name'],
                 'total_count' => (int) $validated['total_count'],
@@ -269,7 +295,7 @@ class OfficeItemController extends Controller
     {
         $user = $request->user();
 
-        if (!$this->isIoAdmin($user?->office_id, (string) ($user?->username ?? ''), (string) ($user?->role ?? ''))) {
+        if (!$this->isIoAdminUser($user)) {
             return response()->json(['error' => 'Unauthorized.'], 403);
         }
 
@@ -307,7 +333,7 @@ class OfficeItemController extends Controller
     {
         $user = $request->user();
 
-        if (!$this->isIoAdmin($user?->office_id, (string) ($user?->username ?? ''), (string) ($user?->role ?? ''))) {
+        if (!$this->isIoAdminUser($user)) {
             abort(403);
         }
 
@@ -374,7 +400,7 @@ class OfficeItemController extends Controller
     {
         $user = $request->user();
 
-        if (!$this->isIoAdmin($user?->office_id, (string) ($user?->username ?? ''), (string) ($user?->role ?? ''))) {
+        if (!$this->isIoAdminUser($user)) {
             return response()->json(['error' => 'Unauthorized.'], 403);
         }
 
@@ -464,53 +490,47 @@ class OfficeItemController extends Controller
         ]);
     }
 
+    private function isIoAdminUser($user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if (strtolower((string) ($user->username ?? '')) === 'io_admin') {
+            return true;
+        }
+
+        return ItemOwnerService::isItemOwnerUser($user);
+    }
+
     private function isIoAdmin($officeId, string $username, string $role): bool
     {
+        if (strtolower($username) === 'io_admin') {
+            return true;
+        }
+
         if (strtolower($role) !== 'admin' || is_null($officeId)) {
             return false;
         }
 
-        $shortCode = DB::table('offices')
-            ->where('office_id', $officeId)
-            ->value('short_code');
+        $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
 
-        return strtolower((string) $shortCode) === 'io' || strtolower($username) === 'io_admin';
+        return !is_null($itemOwnerOfficeId) && (int) $officeId === $itemOwnerOfficeId;
     }
 
     private function resolveOwnerIdForUser($user, bool $createIfMissing): int
     {
-        $userId = (int) ($user?->user_id ?? 0);
-        $username = trim((string) ($user?->username ?? ''));
-        $fullName = trim((string) ($user?->full_name ?? ''));
-
-        if ($userId <= 0 || $username === '') {
-            abort(422, 'User details are missing for item ownership mapping.');
-        }
-
-        // Per-user ownership key ensures one item owner cannot see another owner's items.
-        $ownerKey = 'user:' . $userId;
-        $ownerDisplayName = $fullName !== '' ? $fullName : $username;
-
-        $ownerId = DB::table('item_owners')
-            ->whereRaw('LOWER(department_affiliation) = ?', [strtolower($ownerKey)])
-            ->value('owner_id');
-
-        if ($ownerId) {
-            return (int) $ownerId;
-        }
-
         if (!$createIfMissing) {
-            abort(422, 'No item owner is configured for this account yet.');
+            $ownerId = ItemOwnerService::ownerIdForUser((int) ($user?->user_id ?? 0));
+
+            if (!$ownerId) {
+                abort(422, 'No item owner is configured for this account yet.');
+            }
+
+            return $ownerId;
         }
 
-        DB::statement("SELECT setval(pg_get_serial_sequence('item_owners', 'owner_id'), COALESCE(MAX(owner_id), 0) + 1, false) FROM item_owners");
-
-        return (int) DB::table('item_owners')->insertGetId([
-            'owner_name' => $ownerDisplayName,
-            'department_affiliation' => $ownerKey,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ], 'owner_id');
+        return ItemOwnerService::ensureForUser($user);
     }
 
     private function statusLabel(string $status): string
@@ -638,71 +658,5 @@ class OfficeItemController extends Controller
             'utility' => 'Storage C',
             default => 'Storage A',
         };
-    }
-
-    private function syncItemUnitsForItem(int $itemId, int $totalCount, int $inUseCount, string $status): void
-    {
-        if (!Schema::hasTable('item_units')) {
-            return;
-        }
-
-        $total = max(0, $totalCount);
-        $inUseTarget = max(0, min($total, $inUseCount));
-        $specialStatus = $status === 'maintenance' ? 'maintenance' : ($status === 'damaged' ? 'damaged' : null);
-
-        $units = DB::table('item_units')
-            ->where('item_id', $itemId)
-            ->orderBy('unit_number')
-            ->get(['unit_id', 'unit_number']);
-
-        $existingByNumber = [];
-        foreach ($units as $unit) {
-            $existingByNumber[(int) $unit->unit_number] = (int) $unit->unit_id;
-        }
-
-        for ($unitNumber = 1; $unitNumber <= $total; $unitNumber++) {
-            if (!isset($existingByNumber[$unitNumber])) {
-                DB::table('item_units')->insert([
-                    'item_id' => $itemId,
-                    'unit_number' => $unitNumber,
-                    'unit_code' => sprintf('ITM%04d-U%03d', $itemId, $unitNumber),
-                    'status' => 'available',
-                    'condition_notes' => null,
-                    'last_maintenance_at' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-        }
-
-        $orderedUnits = DB::table('item_units')
-            ->where('item_id', $itemId)
-            ->orderBy('unit_number')
-            ->get(['unit_id', 'unit_number']);
-
-        $inUseRemaining = $inUseTarget;
-        foreach ($orderedUnits as $unit) {
-            $unitNumber = (int) $unit->unit_number;
-            $unitStatus = 'available';
-            $maintenanceAt = null;
-
-            if (!is_null($specialStatus) && $unitNumber === 1) {
-                $unitStatus = $specialStatus;
-                $maintenanceAt = $specialStatus === 'maintenance' ? now() : null;
-            } elseif ($unitNumber <= $total && $inUseRemaining > 0) {
-                $unitStatus = 'in_use';
-                $inUseRemaining--;
-            } elseif ($unitNumber > $total) {
-                $unitStatus = 'retired';
-            }
-
-            DB::table('item_units')
-                ->where('unit_id', (int) $unit->unit_id)
-                ->update([
-                    'status' => $unitStatus,
-                    'last_maintenance_at' => $maintenanceAt,
-                    'updated_at' => now(),
-                ]);
-        }
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\ItemAsset;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -234,14 +235,20 @@ class DashboardInventoryCacheService
             return [];
         }
 
+        $unitCodesByItem = ItemUnitService::loadUnitCodesGroupedByItem(
+            $rows->pluck('item_id')->map(fn ($id) => (int) $id)->all()
+        );
+
         $maxUsage = max(1, (int) $rows->max('usage_count'));
 
-        return $rows->map(function ($row) use ($maxUsage) {
+        return $rows->map(function ($row) use ($maxUsage, $unitCodesByItem) {
+            $itemId = (int) $row->item_id;
             $usageCount = max(0, (int) ($row->usage_count ?? 0));
             $stock = max(0, (int) ($row->quantity_total ?? 0));
+            $unitCodes = $unitCodesByItem[$itemId] ?? [];
 
             return [
-                'asset_id' => '#ITEM-' . str_pad((string) $row->item_id, 4, '0', STR_PAD_LEFT),
+                'asset_id' => ItemUnitService::listAssetLabel($unitCodes, $itemId),
                 'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
                 'location' => trim((string) ($row->owner_name ?? '')) ?: 'Storage',
                 'category' => 'Equipment',
@@ -291,14 +298,20 @@ class DashboardInventoryCacheService
             return [];
         }
 
+        $unitCodesByItem = ItemUnitService::loadUnitCodesGroupedByItem(
+            $rows->pluck('item_id')->map(fn ($id) => (int) $id)->all()
+        );
+
         // Calculate max for percentage normalization
         $maxUsage = max(1, (int) $rows->max('usage_count'));
 
-        return $rows->map(function ($row) use ($maxUsage) {
+        return $rows->map(function ($row) use ($maxUsage, $unitCodesByItem) {
+            $itemId = (int) $row->item_id;
             $usageCount = max(0, (int) ($row->usage_count ?? 0));
+            $unitCodes = $unitCodesByItem[$itemId] ?? [];
 
             return [
-                'asset_id' => '#ITEM-' . str_pad((string) $row->item_id, 4, '0', STR_PAD_LEFT),
+                'asset_id' => ItemUnitService::listAssetLabel($unitCodes, $itemId),
                 'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
                 'location' => trim((string) ($row->owner_name ?? 'Storage')),
                 'category' => 'Equipment',

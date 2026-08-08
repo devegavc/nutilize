@@ -75,7 +75,7 @@
             <table class="inventory-table equipment-inventory-table">
               <thead>
                 <tr>
-                  <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>
+                  <th><i class="bi bi-credit-card-2-front-fill"></i> Unit Code(s)</th>
                   <th>Item Name</th>
                   <th>Total Count</th>
                   <th>In Use</th>
@@ -85,7 +85,7 @@
               </thead>
               <tbody id="equipment-table-body">
                 @forelse(($equipmentRows ?? []) as $equipment)
-                <tr data-equipment-row="{{ $equipment['category'] }}" data-item-id="{{ $equipment['item_id'] }}">
+                <tr data-equipment-row="{{ $equipment['category'] }}" data-item-id="{{ $equipment['item_id'] }}" data-unit-codes='@json($equipment['unit_codes'] ?? [])'>
                   <td>{{ $equipment['asset_id'] }}</td>
                   <td>{{ $equipment['item_name'] }}</td>
                   <td>{{ $equipment['total_count'] }}</td>
@@ -128,6 +128,17 @@
       <div class="facilities-modal-top"></div>
       <div class="facilities-modal-body">
         <h2 id="equipment-modal-title">Add Equipment</h2>
+
+        <label class="facilities-field-label" for="equipment-unit-code-single">Unit Code <span class="field-optional">(optional)</span></label>
+        <input id="equipment-unit-code-single" class="facilities-input" type="text" placeholder="Leave blank to auto-generate e.g. #TMP-0007-U001" maxlength="64" />
+
+        <div id="equipment-unit-codes-multi-wrap" hidden>
+          <label class="facilities-field-label" for="equipment-unit-codes-multi">Unit Codes <span class="field-optional">(optional)</span></label>
+          <textarea id="equipment-unit-codes-multi" class="facilities-input facilities-textarea" rows="8" placeholder="One code per line, or leave blank to auto-generate temporary codes"></textarea>
+          <small id="equipment-unit-codes-hint" class="facilities-input-note">Enter your own codes (one per physical unit), or leave blank and the system will create temporary codes like #TMP-0007-U001. You can replace them later when official asset IDs are ready.</small>
+        </div>
+
+        <button type="button" class="facilities-action-btn cancel equipment-generate-codes-btn" id="equipment-generate-unit-codes-btn">Preview temporary codes</button>
 
         <label class="facilities-field-label" for="equipment-item-name">Item Name</label>
         <input id="equipment-item-name" class="facilities-input" type="text" placeholder="Item Name" />

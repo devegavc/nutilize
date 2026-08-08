@@ -15,9 +15,15 @@
   @php
     $authUser = auth()->user();
     $fullName = trim((string) ($authUser->full_name ?? $authUser->username ?? ''));
-    $nameParts = preg_split('/\s+/', $fullName) ?: [];
-    $firstName = $authUser->first_name ?? ($nameParts[0] ?? '');
-    $lastName = $authUser->last_name ?? (count($nameParts) > 1 ? $nameParts[count($nameParts) - 1] : '');
+    $firstName = trim((string) ($authUser->first_name ?? ''));
+    $lastName = trim((string) ($authUser->last_name ?? ''));
+
+    if ($firstName === '' || $lastName === '') {
+        $nameParts = preg_split('/\s+/', $fullName) ?: [];
+        $firstName = $firstName !== '' ? $firstName : ($nameParts[0] ?? '');
+        $lastName = $lastName !== '' ? $lastName : (count($nameParts) > 1 ? $nameParts[count($nameParts) - 1] : '');
+    }
+
     $middleInitial = $authUser->middle_initial ?? '';
     $shouldSelectProgram = method_exists($authUser, 'shouldSelectProgram') && $authUser->shouldSelectProgram();
     $programName = $authUser->academicProgram?->name ?? 'Not Set';
@@ -94,13 +100,13 @@
 
                 <div class="profile-fields">
                   <label for="profile-first-name">First Name</label>
-                  <input id="profile-first-name" type="text" value="{{ $firstName !== '' ? $firstName : ($authUser->username ?? '') }}" readonly />
+                  <input id="profile-first-name" type="text" value="{{ $firstName !== '' ? $firstName : 'Not Set' }}" readonly />
 
                   <label for="profile-middle-name">Middle Initial</label>
-                  <input id="profile-middle-name" type="text" value="{{ $middleInitial }}" readonly />
+                  <input id="profile-middle-name" type="text" value="{{ $middleInitial !== '' ? $middleInitial : 'Not Set' }}" readonly />
 
                   <label for="profile-last-name">Last Name</label>
-                  <input id="profile-last-name" type="text" value="{{ $lastName }}" readonly />
+                  <input id="profile-last-name" type="text" value="{{ $lastName !== '' ? $lastName : 'Not Set' }}" readonly />
 
                   <label for="profile-suffix">Suffix</label>
                   <input id="profile-suffix" type="text" value="{{ $authUser->suffix ?? 'Not Set' }}" readonly />
@@ -142,48 +148,18 @@
                   </tr>
                 </thead>
                 <tbody>
+                  @forelse(($activityLogs ?? []) as $log)
                   <tr>
-                    <td>31/10/2024</td>
-                    <td>Approve request</td>
-                    <td>Schedule</td>
-                    <td><span class="profile-log-status">Success</span></td>
+                    <td>{{ $log['date'] }}</td>
+                    <td>{{ $log['action'] }}</td>
+                    <td>{{ $log['module'] }}</td>
+                    <td><span class="profile-log-status">{{ $log['status'] }}</span></td>
                   </tr>
+                  @empty
                   <tr>
-                    <td>02/04/2023</td>
-                    <td>Updated inventory</td>
-                    <td>Inventory</td>
-                    <td><span class="profile-log-status">Success</span></td>
+                    <td colspan="4">No activity recorded for this account yet.</td>
                   </tr>
-                  <tr>
-                    <td>16/10/2025</td>
-                    <td>Added new user</td>
-                    <td>Account</td>
-                    <td><span class="profile-log-status">Success</span></td>
-                  </tr>
-                  <tr>
-                    <td>22/11/2019</td>
-                    <td>Added new user</td>
-                    <td>Account</td>
-                    <td><span class="profile-log-status">Success</span></td>
-                  </tr>
-                  <tr>
-                    <td>08/02/2026</td>
-                    <td>Updated rooms</td>
-                    <td>Rooms</td>
-                    <td><span class="profile-log-status">Success</span></td>
-                  </tr>
-                  <tr>
-                    <td>31/03/2025</td>
-                    <td>Approved request</td>
-                    <td>Schedule</td>
-                    <td><span class="profile-log-status">Success</span></td>
-                  </tr>
-                  <tr>
-                    <td>31/03/2025</td>
-                    <td>Updated schedule</td>
-                    <td>Schedule</td>
-                    <td><span class="profile-log-status">Success</span></td>
-                  </tr>
+                  @endforelse
                 </tbody>
               </table>
             </div>

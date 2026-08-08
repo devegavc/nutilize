@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\DashboardInventoryCacheService;
+use App\Services\ItemUnitService;
+use App\Support\ItemAsset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -216,8 +218,14 @@ class DashboardInventoryController extends Controller
 
         $maxUsage = max(1, (int) $rows->max('usage_count'));
 
-        return $rows->map(function ($row) use ($maxUsage) {
+        $unitCodesByItem = ItemUnitService::loadUnitCodesGroupedByItem(
+            $rows->pluck('item_id')->map(fn ($id) => (int) $id)->all()
+        );
+
+        return $rows->map(function ($row) use ($maxUsage, $unitCodesByItem) {
+            $itemId = (int) $row->item_id;
             $usageCount = max(0, (int) ($row->usage_count ?? 0));
+            $unitCodes = $unitCodesByItem[$itemId] ?? [];
             $normalizedCategory = $this->normalizeCategory((string) ($row->category_key ?? $row->legacy_category ?? ''));
             $resolvedCategory = trim((string) ($row->category_display ?? ''));
 
@@ -230,7 +238,7 @@ class DashboardInventoryController extends Controller
             $ownerName = trim((string) ($row->owner_name ?? ''));
 
             return [
-                'asset_id' => '#ITEM-' . str_pad((string) $row->item_id, 4, '0', STR_PAD_LEFT),
+                'asset_id' => ItemUnitService::listAssetLabel($unitCodes, $itemId),
                 'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
                 'location' => $ownerName !== '' ? $ownerName : $this->locationFromCategory($normalizedCategory),
                 'category' => $resolvedCategory,
@@ -424,6 +432,7 @@ class DashboardInventoryController extends Controller
             $dateLabel = $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y');
 
             $rowsByTab[$tab][] = [
+                'row_type' => 'unit',
                 'unit_id' => (int) $unit->unit_id,
                 'id' => (string) ($unit->unit_code ?? ''),
                 'item' => (string) ($unit->item_name ?? 'Unnamed Item'),
@@ -437,25 +446,36 @@ class DashboardInventoryController extends Controller
         }
 
         if (Schema::hasTable('reports')) {
+            $reportSelect = [
+                'reports.report_id',
+                'reports.report_info',
+                'reports.generated_at',
+                'reports.created_at',
+                'reports.item_id',
+                'reports.room_id',
+                'items.item_name',
+                'rooms.room_number',
+                'users.full_name as reporter_full_name',
+                'users.first_name as reporter_first_name',
+                'users.last_name as reporter_last_name',
+                'users.username as reporter_username',
+            ];
+
+            if (Schema::hasColumn('reports', 'description')) {
+                $reportSelect[] = 'reports.description';
+            }
+            if (Schema::hasColumn('reports', 'proof_image_url')) {
+                $reportSelect[] = 'reports.proof_image_url';
+            }
+            if (Schema::hasColumn('reports', 'reservation_id')) {
+                $reportSelect[] = 'reports.reservation_id';
+            }
+
             $reportRows = DB::table('reports as reports')
                 ->leftJoin('items as items', 'items.item_id', '=', 'reports.item_id')
                 ->leftJoin('rooms as rooms', 'rooms.room_id', '=', 'reports.room_id')
                 ->leftJoin('users as users', 'users.user_id', '=', 'reports.user_id')
-                ->select([
-                    'reports.report_id',
-                    'reports.report_info',
-                    'reports.generated_at',
-                    'reports.created_at',
-                    'reports.description',
-                    'reports.proof_image_url',
-                    'reports.reservation_id',
-                    'items.item_name',
-                    'rooms.room_number',
-                    'users.full_name as reporter_full_name',
-                    'users.first_name as reporter_first_name',
-                    'users.last_name as reporter_last_name',
-                    'users.username as reporter_username',
-                ])
+                ->select($reportSelect)
                 ->orderByDesc('reports.generated_at')
                 ->get();
 
@@ -501,8 +521,20 @@ class DashboardInventoryController extends Controller
                 }
 
                 $dateValue = $report->generated_at ?? $report->created_at;
+                $linkedUnitId = 0;
+
+                if (!empty($report->item_id) && Schema::hasTable('item_units')) {
+                    $linkedUnitId = (int) (DB::table('item_units')
+                        ->where('item_id', (int) $report->item_id)
+                        ->whereIn('status', ['damaged', 'maintenance', 'in_use'])
+                        ->orderByRaw("CASE status WHEN 'damaged' THEN 1 WHEN 'maintenance' THEN 2 WHEN 'in_use' THEN 3 ELSE 4 END")
+                        ->value('unit_id') ?? 0);
+                }
+
                 $rowsByTab['reported'][] = [
-                    'unit_id' => 0,
+                    'row_type' => $linkedUnitId > 0 ? 'unit' : 'report',
+                    'unit_id' => $linkedUnitId,
+                    'report_id' => (int) $report->report_id,
                     'id' => 'report_' . (int) $report->report_id,
                     'item' => $itemLabel,
                     'count' => '1',
@@ -510,7 +542,7 @@ class DashboardInventoryController extends Controller
                     'status' => 'Reported',
                     'statusClass' => 'reported',
                     'location' => strpos($itemLabel, 'Room ') === 0 ? 'Room' : 'Reported',
-                    'reason' => $reportText !== '' ? $reportText : 'Reported issue',
+                    'reason' => $description !== '' ? $description : ($reportText !== '' ? $reportText : 'Reported issue'),
                     'reporter' => $reporterName,
                     'description' => $description,
                     'proof_image_url' => $proofUrl,
@@ -525,6 +557,7 @@ class DashboardInventoryController extends Controller
                 ->whereNull('maintenance.date_resolved')
                 ->select([
                     'maintenance.maintenance_id',
+                    'maintenance.room_id',
                     'rooms.room_number',
                     'maintenance.issue_description',
                     'maintenance.updated_at',
@@ -538,9 +571,12 @@ class DashboardInventoryController extends Controller
                 $dateLabel = $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y');
 
                 $rowsByTab['damaged'][] = [
+                    'row_type' => 'room',
                     'unit_id' => 0,
+                    'room_id' => (int) ($row->room_id ?? 0),
+                    'maintenance_id' => (int) $row->maintenance_id,
                     'id' => 'room_' . (int) $row->maintenance_id,
-                    'item' => 'Room ' . trim((string) ($row->room_number ?? '')), 
+                    'item' => 'Room ' . trim((string) ($row->room_number ?? '')),
                     'count' => '1',
                     'date' => $dateLabel,
                     'status' => 'Damaged',
@@ -559,7 +595,10 @@ class DashboardInventoryController extends Controller
                 $dateLabel = $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y');
 
                 $rowsByTab['maintenance'][] = [
+                    'row_type' => 'room',
                     'unit_id' => 0,
+                    'room_id' => (int) $room->room_id,
+                    'maintenance_id' => 0,
                     'id' => 'room_' . (int) $room->room_id,
                     'item' => 'Room ' . trim((string) ($room->room_number ?? '')),
                     'count' => '1',
@@ -640,12 +679,24 @@ class DashboardInventoryController extends Controller
                 'updated_at' => now(),
             ]);
 
+        if ($targetStatus === 'available' && Schema::hasTable('maintenance')) {
+            DB::table('maintenance')
+                ->where('item_id', (int) $unit->item_id)
+                ->whereNull('date_resolved')
+                ->update([
+                    'date_resolved' => now()->toDateString(),
+                    'action_taken' => $validated['assessment'],
+                    'updated_at' => now(),
+                ]);
+        }
+
         $normalizedCategory = $this->normalizeCategory((string) ($unit->category ?? 'multimedia'));
         $isDamaged = $targetStatus === 'damaged';
 
         return response()->json([
             'success' => true,
             'unit' => [
+                'row_type' => 'unit',
                 'unit_id' => (int) $unit->unit_id,
                 'id' => (string) $unit->unit_code,
                 'item' => (string) $unit->item_name,
@@ -656,6 +707,89 @@ class DashboardInventoryController extends Controller
                 'location' => $this->locationFromCategory($normalizedCategory),
                 'reason' => $validated['assessment'],
                 'resolved' => $targetStatus === 'available',
+            ],
+        ]);
+    }
+
+    public function updateMaintenanceRoom(Request $request, int $roomId): JsonResponse
+    {
+        if (!Schema::hasTable('rooms')) {
+            return response()->json(['error' => 'Rooms table is not available.'], 422);
+        }
+
+        $validated = $request->validate([
+            'assessment' => ['required', 'string', 'max:255'],
+            'status' => ['required', 'in:maintenance,damaged,fixed'],
+        ]);
+
+        $room = DB::table('rooms')->where('room_id', $roomId)->first();
+
+        if (!$room) {
+            return response()->json(['error' => 'Room not found.'], 404);
+        }
+
+        $isFixed = $validated['status'] === 'fixed';
+
+        DB::table('rooms')
+            ->where('room_id', $roomId)
+            ->update([
+                'maintenance_status' => $isFixed ? false : true,
+                'availability_status' => $isFixed ? true : false,
+                'date_reserved' => null,
+                'updated_at' => now(),
+            ]);
+
+        if (Schema::hasTable('maintenance')) {
+            DB::table('maintenance')
+                ->where('room_id', $roomId)
+                ->whereNull('date_resolved')
+                ->update([
+                    'date_resolved' => $isFixed ? now()->toDateString() : null,
+                    'action_taken' => $validated['assessment'],
+                    'updated_at' => now(),
+                ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'room' => [
+                'row_type' => 'room',
+                'room_id' => $roomId,
+                'id' => 'room_' . $roomId,
+                'item' => 'Room ' . trim((string) ($room->room_number ?? '')),
+                'count' => '1',
+                'date' => date('d/m/Y'),
+                'status' => $isFixed ? 'Fixed' : ($validated['status'] === 'damaged' ? 'Damaged' : 'Maintenance'),
+                'statusClass' => $isFixed ? 'maintenance' : ($validated['status'] === 'damaged' ? 'damaged' : 'maintenance'),
+                'location' => 'Room',
+                'reason' => $validated['assessment'],
+                'resolved' => $isFixed,
+            ],
+        ]);
+    }
+
+    public function dismissMaintenanceReport(Request $request, int $reportId): JsonResponse
+    {
+        if (!Schema::hasTable('reports')) {
+            return response()->json(['error' => 'Reports table is not available.'], 422);
+        }
+
+        $validated = $request->validate([
+            'assessment' => ['required', 'string', 'max:255'],
+        ]);
+
+        $deleted = DB::table('reports')->where('report_id', $reportId)->delete();
+
+        if (!$deleted) {
+            return response()->json(['error' => 'Report not found.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'report' => [
+                'row_type' => 'report',
+                'report_id' => $reportId,
+                'resolved' => true,
             ],
         ]);
     }
@@ -684,6 +818,7 @@ class DashboardInventoryController extends Controller
                 $totalCount = max(0, (int) ($row->quantity_total ?? 0));
                 $inUseCount = max(0, min($totalCount, (int) ($row->quantity_in_use ?? 0)));
                 $maintenanceCount = (bool) $row->maintenance_status ? 1 : 0;
+                $unitCodes = ItemUnitService::loadUnitCodesForItem((int) $row->item_id);
 
                 $statusKey = 'good';
                 $statusLabel = 'Good';
@@ -698,7 +833,8 @@ class DashboardInventoryController extends Controller
 
                 return [
                     'item_id' => (int) $row->item_id,
-                    'asset_id' => '#ITEM-' . str_pad((string) $row->item_id, 4, '0', STR_PAD_LEFT),
+                    'asset_id' => ItemUnitService::listAssetLabel($unitCodes, (int) $row->item_id),
+                    'unit_codes' => $unitCodes,
                     'category' => $category,
                     'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
                     'total_count' => $totalCount,
@@ -885,6 +1021,8 @@ class DashboardInventoryController extends Controller
         }
 
         $validated = $request->validate([
+            'unit_codes' => ['nullable', 'array'],
+            'unit_codes.*' => ['nullable', 'string', 'max:64'],
             'item_name' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', Rule::in($categoryKeys)],
             'total_count' => ['required', 'integer', 'min:0'],
@@ -935,16 +1073,19 @@ class DashboardInventoryController extends Controller
             $itemUpdatePayload['category_id'] = (int) $categoryRecord['id'];
         }
 
-        DB::table('items')
-            ->where('item_id', $itemId)
-            ->update($itemUpdatePayload);
+        $unitCodes = DB::transaction(function () use ($itemId, $itemUpdatePayload, $validated) {
+            DB::table('items')
+                ->where('item_id', $itemId)
+                ->update($itemUpdatePayload);
 
-        $this->syncItemUnitsForItem(
-            $itemId,
-            (int) $validated['total_count'],
-            (int) $validated['in_use'],
-            $validated['status']
-        );
+            return ItemUnitService::ensureUnitsForItem(
+                $itemId,
+                $validated['unit_codes'] ?? [],
+                (int) $validated['total_count'],
+                (int) $validated['in_use'],
+                $validated['status'],
+            );
+        });
 
         DashboardInventoryCacheService::clearCache();
 
@@ -953,7 +1094,8 @@ class DashboardInventoryController extends Controller
             'success' => true,
             'item' => [
                 'item_id' => $itemId,
-                'asset_id' => '#ITEM-' . str_pad((string) $itemId, 4, '0', STR_PAD_LEFT),
+                'asset_id' => ItemUnitService::listAssetLabel($unitCodes, $itemId),
+                'unit_codes' => $unitCodes,
                 'category' => $normalizedCategory,
                 'item_name' => $validated['item_name'],
                 'total_count' => (int) $validated['total_count'],
@@ -975,6 +1117,8 @@ class DashboardInventoryController extends Controller
         }
 
         $validated = $request->validate([
+            'unit_codes' => ['nullable', 'array'],
+            'unit_codes.*' => ['nullable', 'string', 'max:64'],
             'item_name' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', Rule::in($categoryKeys)],
             'total_count' => ['required', 'integer', 'min:0'],
@@ -1031,14 +1175,21 @@ class DashboardInventoryController extends Controller
             $itemInsertPayload['category_id'] = (int) $categoryRecord['id'];
         }
 
-        $itemId = DB::table('items')->insertGetId($itemInsertPayload, 'item_id');
+        $itemId = DB::transaction(function () use ($itemInsertPayload, $validated) {
+            $itemId = DB::table('items')->insertGetId($itemInsertPayload, 'item_id');
 
-        $this->syncItemUnitsForItem(
-            (int) $itemId,
-            (int) $validated['total_count'],
-            (int) $validated['in_use'],
-            $validated['status']
-        );
+            ItemUnitService::ensureUnitsForItem(
+                (int) $itemId,
+                $validated['unit_codes'] ?? [],
+                (int) $validated['total_count'],
+                (int) $validated['in_use'],
+                $validated['status'],
+            );
+
+            return $itemId;
+        });
+
+        $unitCodes = ItemUnitService::loadUnitCodesForItem((int) $itemId);
 
         DashboardInventoryCacheService::clearCache();
 
@@ -1048,7 +1199,8 @@ class DashboardInventoryController extends Controller
             'success' => true,
             'item' => [
                 'item_id' => (int) $itemId,
-                'asset_id' => '#ITEM-' . str_pad((string) $itemId, 4, '0', STR_PAD_LEFT),
+                'asset_id' => ItemUnitService::listAssetLabel($unitCodes, (int) $itemId),
+                'unit_codes' => $unitCodes,
                 'category' => $normalizedCategory,
                 'item_name' => $validated['item_name'],
                 'total_count' => (int) $validated['total_count'],
@@ -1096,72 +1248,6 @@ class DashboardInventoryController extends Controller
             'damaged' => 'Damaged',
             default => 'Good',
         };
-    }
-
-    private function syncItemUnitsForItem(int $itemId, int $totalCount, int $inUseCount, string $status): void
-    {
-        if (!Schema::hasTable('item_units')) {
-            return;
-        }
-
-        $total = max(0, $totalCount);
-        $inUseTarget = max(0, min($total, $inUseCount));
-        $specialStatus = $status === 'maintenance' ? 'maintenance' : ($status === 'damaged' ? 'damaged' : null);
-
-        $units = DB::table('item_units')
-            ->where('item_id', $itemId)
-            ->orderBy('unit_number')
-            ->get(['unit_id', 'unit_number']);
-
-        $existingByNumber = [];
-        foreach ($units as $unit) {
-            $existingByNumber[(int) $unit->unit_number] = (int) $unit->unit_id;
-        }
-
-        for ($unitNumber = 1; $unitNumber <= $total; $unitNumber++) {
-            if (!isset($existingByNumber[$unitNumber])) {
-                DB::table('item_units')->insert([
-                    'item_id' => $itemId,
-                    'unit_number' => $unitNumber,
-                    'unit_code' => sprintf('ITM%04d-U%03d', $itemId, $unitNumber),
-                    'status' => 'available',
-                    'condition_notes' => null,
-                    'last_maintenance_at' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-        }
-
-        $orderedUnits = DB::table('item_units')
-            ->where('item_id', $itemId)
-            ->orderBy('unit_number')
-            ->get(['unit_id', 'unit_number']);
-
-        $inUseRemaining = $inUseTarget;
-        foreach ($orderedUnits as $unit) {
-            $unitNumber = (int) $unit->unit_number;
-            $unitStatus = 'available';
-            $maintenanceAt = null;
-
-            if (!is_null($specialStatus) && $unitNumber === 1) {
-                $unitStatus = $specialStatus;
-                $maintenanceAt = $specialStatus === 'maintenance' ? now() : null;
-            } elseif ($unitNumber <= $total && $inUseRemaining > 0) {
-                $unitStatus = 'in_use';
-                $inUseRemaining--;
-            } elseif ($unitNumber > $total) {
-                $unitStatus = 'retired';
-            }
-
-            DB::table('item_units')
-                ->where('unit_id', (int) $unit->unit_id)
-                ->update([
-                    'status' => $unitStatus,
-                    'last_maintenance_at' => $maintenanceAt,
-                    'updated_at' => now(),
-                ]);
-        }
     }
 
     private function normalizeCategory(string $rawCategory): string

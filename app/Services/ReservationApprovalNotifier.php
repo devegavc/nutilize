@@ -6,6 +6,8 @@ use App\Models\Notification;
 use App\Models\Office;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\ItemOwnerService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class ReservationApprovalNotifier
@@ -54,6 +56,27 @@ class ReservationApprovalNotifier
             return;
         }
 
+        $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
+        if (
+            !is_null($itemOwnerOfficeId)
+            && $officeId === $itemOwnerOfficeId
+            && ItemOwnerService::reservationRequiresItemOwnerApproval((int) $reservation->reservation_id)
+        ) {
+            $adminUsers = $adminUsers->filter(
+                fn (User $admin) => ItemOwnerService::reservationIncludesOwnerItems(
+                    (int) $reservation->reservation_id,
+                    (int) $admin->user_id,
+                ) && ItemOwnerService::itemOwnerHasPendingApproval(
+                    $admin,
+                    (int) $reservation->reservation_id,
+                )
+            )->values();
+        }
+
+        if ($adminUsers->isEmpty()) {
+            return;
+        }
+
         $requesterName = $reservation->user->full_name ?? $reservation->user->username ?? 'Unknown';
         $activityName = trim((string) $reservation->activity_name) ?: 'Reservation request';
 
@@ -87,6 +110,7 @@ class ReservationApprovalNotifier
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
+                Cache::forget('approval_notification_sync.user.' . (int) $admin->user_id);
             } catch (\Throwable $throwable) {
                 \Log::error('Failed to create notification', [
                     'error' => $throwable->getMessage(),
@@ -133,6 +157,27 @@ class ReservationApprovalNotifier
             return;
         }
 
+        $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
+        if (
+            !is_null($itemOwnerOfficeId)
+            && $targetOfficeId === $itemOwnerOfficeId
+            && ItemOwnerService::reservationRequiresItemOwnerApproval((int) $reservation->reservation_id)
+        ) {
+            $adminUsers = $adminUsers->filter(
+                fn (User $admin) => ItemOwnerService::reservationIncludesOwnerItems(
+                    (int) $reservation->reservation_id,
+                    (int) $admin->user_id,
+                ) && ItemOwnerService::itemOwnerHasPendingApproval(
+                    $admin,
+                    (int) $reservation->reservation_id,
+                )
+            )->values();
+        }
+
+        if ($adminUsers->isEmpty()) {
+            return;
+        }
+
         $requesterName = $reservation->user->full_name ?? $reservation->user->username ?? 'Unknown';
         $activityName = trim((string) $reservation->activity_name) ?: 'Reservation request';
         $fromLabel = self::officeHandoffLabel($fromOffice);
@@ -159,6 +204,7 @@ class ReservationApprovalNotifier
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+                Cache::forget('approval_notification_sync.user.' . (int) $admin->user_id);
             } catch (\Throwable $throwable) {
                 \Log::error('Failed to create handoff notification', [
                     'error' => $throwable->getMessage(),
@@ -177,7 +223,7 @@ class ReservationApprovalNotifier
         if ($code !== '') {
             return match ($code) {
                 'PC' => 'Program Chair',
-                'SDAO' => 'SDAO',
+                'SDAO' => 'Student Development and Activities Office',
                 'IO' => 'Inventory Office',
                 'DO' => 'Discipline Office',
                 'SEC' => 'Security',

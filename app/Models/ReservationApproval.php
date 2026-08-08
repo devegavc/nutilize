@@ -10,7 +10,7 @@ class ReservationApproval extends Model
     use HasFactory;
 
     protected $primaryKey = 'approval_id';
-    protected $fillable = ['reservation_id', 'office_id', 'approved_by_user_id', 'status', 'approved_at'];
+    protected $fillable = ['reservation_id', 'office_id', 'owner_id', 'approved_by_user_id', 'status', 'approved_at'];
 
     public function reservation()
     {

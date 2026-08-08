@@ -25,7 +25,7 @@ class DashboardCacheService
             return [
                 'stats' => self::getStats(),
                 'quickReports' => self::getQuickReports(),
-                'upcomingRequests' => self::getUpcomingRequestsForToday(),
+                'upcomingRequests' => self::getUpcomingRequests(),
                 'tasks' => self::getTasks($officeId),
                 'dailyHighlights' => self::getDailyHighlights(),
             ];
@@ -174,15 +174,13 @@ class DashboardCacheService
     }
 
     /**
-     * Get upcoming requests for today
+     * Get open reservation requests for the PF dashboard (all active workflows).
      */
-    private static function getUpcomingRequestsForToday(int $limit = 6): array
+    private static function getUpcomingRequests(int $limit = 50): array
     {
         if (!self::hasTable('reservations')) {
             return [];
         }
-
-        $today = now()->toDateString();
 
         $rows = DB::table('reservations as reservations')
             ->leftJoin('users as users', 'users.user_id', '=', 'reservations.user_id')
@@ -190,10 +188,12 @@ class DashboardCacheService
                 'reservations.reservation_id',
                 'reservations.activity_name',
                 'reservations.created_at',
+                'reservations.overall_status',
                 'users.full_name as requester_full_name',
                 'users.username as requester_username',
             ])
-            ->whereDate('reservations.created_at', $today)
+            ->whereNotIn(DB::raw("LOWER(COALESCE(reservations.overall_status, ''))"), ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled', 'expired'])
+            ->whereRaw("LOWER(COALESCE(reservations.overall_status, '')) NOT LIKE ?", ['cancel%'])
             ->orderByDesc('reservations.created_at')
             ->limit($limit)
             ->get();
@@ -210,11 +210,13 @@ class DashboardCacheService
                 $createdAt = Carbon::parse($row->created_at);
                 $requester = trim((string) ($row->requester_full_name ?? $row->requester_username ?? 'Unknown'));
                 $resources = $resourceSummaryMap[(int) $row->reservation_id] ?? 'No resources listed';
+                $status = trim((string) ($row->overall_status ?? ''));
+                $statusSuffix = $status !== '' ? ' | Status: ' . str_replace('_', ' ', $status) : '';
 
                 return [
                     'time_label' => $createdAt->format('F j, g:i A'),
                     'title' => (string) ($row->activity_name ?? 'Untitled Request'),
-                    'subtitle' => 'Requester: ' . $requester . ' | Resources: ' . $resources,
+                    'subtitle' => 'Requester: ' . $requester . ' | Resources: ' . $resources . $statusSuffix,
                 ];
             })
             ->values()

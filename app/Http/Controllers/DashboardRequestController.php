@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Reservation;
 use App\Models\ReservationApproval;
 use App\Services\ProgramChairOfficeResolver;
+use App\Services\ItemOwnerService;
+use App\Services\ReservationApprovalWorkflowService;
+use App\Services\ReservationApprovalDeduper;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -15,11 +18,15 @@ class DashboardRequestController extends Controller
     private ?int $physicalFacilitiesOfficeIdCache = null;
     private ?array $officeIdByDepartmentNameCache = null;
     private ?array $officeMetaByIdCache = null;
+    private ?array $programChairOfficeIdsCache = null;
     private array $ownerOfficeIdCache = [];
     /** @var array<int, true>|null */
     private ?array $batchGymLookup = null;
     /** @var array<int, true>|null */
     private ?array $batchGymWithItemsLookup = null;
+
+    /** @var array<string, array<int, int>> */
+    private array $workflowOfficeIdsCache = [];
 
     public function index()
     {
@@ -58,17 +65,48 @@ class DashboardRequestController extends Controller
 
         $isPfAdmin = $user->isPhysicalFacilitiesAdmin();
 
-        $reservations = Reservation::query()
+        $reservationsQuery = Reservation::query()
             ->with(['user', 'approvals'])
-            ->orderByDesc('created_at')
+            ->orderByDesc('created_at');
+
+        if ($isPfAdmin) {
+            $reservationsQuery->where(function ($query) {
+                $query->whereIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), [
+                    'awaiting_physical_facilities',
+                    'approved',
+                    'returned',
+                    'damaged',
+                    'rejected',
+                    'pending_office_approvals',
+                    'pending',
+                ])->orWhereNull('overall_status')
+                    ->orWhere('overall_status', '');
+            });
+        }
+
+        $reservations = $reservationsQuery
             ->paginate(20)
             ->withQueryString();
 
-        $reservationIds = $reservations->getCollection()->pluck('reservation_id')->map(fn($id) => (int) $id)->all();
+        $syncReservationIds = $reservations->getCollection()
+            ->filter(function (Reservation $reservation) {
+                $status = strtolower((string) $reservation->overall_status);
 
-        $this->syncReservationApprovalsForReservationIds($reservationIds);
+                return !in_array($status, ['returned', 'damaged', 'rejected', 'cancelled', 'canceled', 'expired', 'approved'], true);
+            })
+            ->pluck('reservation_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($syncReservationIds !== []) {
+            ProgramChairOfficeResolver::reconcileOpenReservationPcApprovals($syncReservationIds);
+            ReservationApprovalDeduper::deduplicatePendingForReservations($syncReservationIds);
+            $this->syncReservationApprovalsForReservationIds($syncReservationIds);
+        }
 
         $reservations->getCollection()->load('approvals');
+
+        $reservationIds = $reservations->getCollection()->pluck('reservation_id')->map(fn($id) => (int) $id)->all();
 
         $resourceMap = $this->buildResourceMap($reservationIds);
         $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($reservationIds);
@@ -81,9 +119,16 @@ class DashboardRequestController extends Controller
             $isClosed = in_array($overallStatus, ['returned', 'damaged'], true);
             $isPfActionable = !is_null($pfOfficeId)
                 && (($actionableOfficeIds[(int) $reservation->reservation_id] ?? null) === (int) $pfOfficeId);
-            $isFinal = $isPfActionable && !$isFinalDecision;
+            $isFinal = ($isPfActionable || $overallStatus === 'awaiting_physical_facilities')
+                && !$isFinalDecision
+                && !$isWaitingReturn
+                && !$isClosed;
             $resources = $resourceMap[$reservation->reservation_id] ?? [];
-            $workflow = $this->buildWorkflowForReservation($reservation);
+            $currentActionableOfficeId = $actionableOfficeIds[(int) $reservation->reservation_id] ?? null;
+            $workflow = $this->buildWorkflowForReservation($reservation, $currentActionableOfficeId);
+            $workflowSteps = collect($workflow['steps']);
+            $currentStageLabel = data_get($workflowSteps->firstWhere('dot_class', 'dot-current'), 'stage_label')
+                ?? data_get($workflowSteps->firstWhere('dot_class', 'dot-pending'), 'stage_label');
 
             $tab = $isClosed
                 ? 'closed'
@@ -95,6 +140,7 @@ class DashboardRequestController extends Controller
                 'reservation' => $reservation,
                 'tab' => $tab,
                 'workflow_steps' => $workflow['steps'],
+                'current_stage_label' => $currentStageLabel,
                 'resources' => $resources,
                 'decision_badge' => $tab === 'return'
                     ? 'Waiting Return'
@@ -283,44 +329,12 @@ class DashboardRequestController extends Controller
 
         $reservationIds = array_values(array_unique(array_map('intval', $reservationIds)));
         $this->warmBatchWorkflowLookups($reservationIds);
-
-        $existingApprovals = ReservationApproval::query()
-            ->whereIn('reservation_id', $reservationIds)
-            ->get(['reservation_id', 'office_id', 'status', 'approved_at'])
-            ->groupBy('reservation_id');
-
-        $insertRows = [];
         $now = now();
 
         foreach ($reservationIds as $reservationId) {
             ProgramChairOfficeResolver::reconcilePendingLegacyPcApproval((int) $reservationId);
-
-            $workflowOfficeIds = $this->resolveWorkflowOfficeIds($reservationId, true);
-            if (empty($workflowOfficeIds)) {
-                continue;
-            }
-
-            $approvalsForReservation = $existingApprovals->get($reservationId, collect())->keyBy(fn (ReservationApproval $row) => (int) $row->office_id);
-
-            foreach ($workflowOfficeIds as $officeId) {
-                $officeId = (int) $officeId;
-                if ($officeId <= 0 || $approvalsForReservation->has($officeId)) {
-                    continue;
-                }
-
-                $insertRows[] = [
-                    'reservation_id' => $reservationId,
-                    'office_id' => $officeId,
-                    'status' => 'pending',
-                    'approved_at' => null,
-                    'updated_at' => $now,
-                    'created_at' => $now,
-                ];
-            }
-        }
-
-        if (!empty($insertRows)) {
-            DB::table('reservation_approvals')->insert($insertRows);
+            $workflowOfficeIds = $this->resolveWorkflowOfficeIdsCached($reservationId, true);
+            ReservationApprovalWorkflowService::ensureApprovalRows((int) $reservationId, $workflowOfficeIds);
         }
 
         DB::table('reservation_approvals')
@@ -342,23 +356,7 @@ class DashboardRequestController extends Controller
             return;
         }
 
-        foreach ($workflowOfficeIds as $officeId) {
-            $exists = DB::table('reservation_approvals')
-                ->where('reservation_id', $reservationId)
-                ->where('office_id', $officeId)
-                ->exists();
-
-            if (!$exists) {
-                DB::table('reservation_approvals')->insert([
-                    'reservation_id' => $reservationId,
-                    'office_id' => $officeId,
-                    'status' => 'pending',
-                    'approved_at' => null,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]);
-            }
-        }
+        ReservationApprovalWorkflowService::ensureApprovalRows($reservationId, $workflowOfficeIds);
 
         DB::table('reservation_approvals')
             ->where('reservation_id', $reservationId)
@@ -381,7 +379,7 @@ class DashboardRequestController extends Controller
             ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
             ->leftJoin('item_owners as owners', 'owners.owner_id', '=', 'items.owner_id')
             ->where('details.reservation_id', $reservationId)
-            ->select(['owners.owner_name', 'owners.department_affiliation'])
+            ->select(['owners.owner_name', 'owners.department_affiliation', 'owners.user_id'])
             ->get();
 
         return $this->ownerOfficeIdCache[$reservationId] = $this->computeOwnerOfficeIdFromItemOwnerRows(
@@ -406,12 +404,12 @@ class DashboardRequestController extends Controller
         $hasNonPfOwner = false;
 
         foreach ($ownerRows as $row) {
-            $affiliation = strtolower(trim((string) ($row->department_affiliation ?? '')));
-            $ownerName = strtolower(trim((string) ($row->owner_name ?? '')));
-
-            if ($affiliation !== '' && str_starts_with($affiliation, 'user:')) {
+            if (ItemOwnerService::isUserLinkedOwner($row)) {
                 return $ioOfficeId ?? $fallbackOfficeId;
             }
+
+            $affiliation = strtolower(trim((string) ($row->department_affiliation ?? '')));
+            $ownerName = strtolower(trim((string) ($row->owner_name ?? '')));
 
             if ($ownerName === '' && $affiliation === '') {
                 continue;
@@ -496,41 +494,49 @@ class DashboardRequestController extends Controller
         );
     }
 
-    private function buildWorkflowForReservation(Reservation $reservation): array
+    private function buildWorkflowForReservation(Reservation $reservation, ?int $currentActionableOfficeId = null): array
     {
         $officeMap = $this->getOfficeMetaById();
 
-        $actionOfficeIds = $this->resolveWorkflowOfficeIds((int) $reservation->reservation_id, false);
+        $actionOfficeIds = $this->resolveWorkflowOfficeIdsCached((int) $reservation->reservation_id, false);
+        $collapsedApprovals = ReservationApprovalDeduper::collapseByOfficeId(
+            collect($reservation->approvals->all())
+        );
         $steps = [];
 
         foreach ($actionOfficeIds as $officeId) {
-            $approval = $reservation->approvals->firstWhere('office_id', $officeId);
-            $status = strtolower((string) ($approval?->status ?? 'pending'));
+            $officeId = (int) $officeId;
             $officeCode = strtoupper((string) ($officeMap[$officeId]['code'] ?? 'OFF'));
+            $approval = $this->resolveWorkflowStepApproval($officeId, $officeCode, $collapsedApprovals);
+            $status = strtolower((string) ($approval?->status ?? 'pending'));
 
             $dotClass = 'dot-pending';
             if ($status === 'approved' && !is_null($approval?->approved_at)) {
                 $dotClass = 'dot-approved';
             } elseif ($status === 'rejected' && !is_null($approval?->approved_at)) {
                 $dotClass = 'dot-rejected';
+            } elseif (!is_null($currentActionableOfficeId) && $officeId === (int) $currentActionableOfficeId) {
+                $dotClass = 'dot-current';
             }
 
             $officeIcon = match ($officeCode) {
-                'PC' => 'bi-person-badge',
+                'PC' => 'bi-phone',
                 'IO' => 'bi-box-seam',
                 'PF' => 'bi-building-gear',
                 'SDAO' => 'bi-people',
                 'DO' => 'bi-clipboard-check',
+                'SEC' => 'bi-building',
                 default => 'bi-building',
             };
 
             $stageLabel = match ($officeCode) {
+                'IO' => 'Item Owner',
                 'PC' => $officeMap[$officeId]['name'] ?? 'Program Chair',
                 'SDAO' => 'Student Development and Activities Office',
                 'DO' => 'Discipline Office',
                 'SEC' => 'Security',
                 'PF' => 'Physical Facilities',
-                default => $officeMap[$officeId]['name'] ?? 'Item Owner',
+                default => $officeMap[$officeId]['name'] ?? 'Office',
             };
 
             $steps[] = [
@@ -546,6 +552,53 @@ class DashboardRequestController extends Controller
         return [
             'steps' => $steps,
         ];
+    }
+
+    private function resolveWorkflowStepApproval(int $officeId, string $officeCode, \Illuminate\Support\Collection $collapsedApprovals): ?object
+    {
+        $approval = $collapsedApprovals->get($officeId);
+        if ($approval) {
+            return $approval;
+        }
+
+        if ($officeCode !== 'PC') {
+            return null;
+        }
+
+        foreach ($this->getProgramChairOfficeIds() as $programChairOfficeId) {
+            $candidate = $collapsedApprovals->get($programChairOfficeId);
+            if ($candidate) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function getProgramChairOfficeIds(): array
+    {
+        if (!is_null($this->programChairOfficeIdsCache)) {
+            return $this->programChairOfficeIdsCache;
+        }
+
+        $this->programChairOfficeIdsCache = DB::table('offices')
+            ->whereRaw('LOWER(TRIM(short_code)) = ?', ['pc'])
+            ->pluck('office_id')
+            ->map(fn ($officeId) => (int) $officeId)
+            ->all();
+
+        return $this->programChairOfficeIdsCache;
+    }
+
+    private function resolveWorkflowOfficeIdsCached(int $reservationId, bool $includePf): array
+    {
+        $cacheKey = $reservationId . ':' . ($includePf ? '1' : '0');
+
+        if (!array_key_exists($cacheKey, $this->workflowOfficeIdsCache)) {
+            $this->workflowOfficeIdsCache[$cacheKey] = $this->resolveWorkflowOfficeIds($reservationId, $includePf);
+        }
+
+        return $this->workflowOfficeIdsCache[$cacheKey];
     }
 
     private function resolveWorkflowOfficeIds(int $reservationId, bool $includePf): array
@@ -668,21 +721,22 @@ class DashboardRequestController extends Controller
         try {
             $approvalsByReservation = ReservationApproval::query()
                 ->whereIn('reservation_id', $reservationIds)
-                ->get(['reservation_id', 'office_id', 'status', 'approved_at'])
+                ->get(['reservation_id', 'office_id', 'owner_id', 'status', 'approved_at'])
                 ->groupBy('reservation_id');
 
             $actionableOfficeIds = [];
 
             foreach ($reservationIds as $reservationId) {
                 $reservationId = (int) $reservationId;
-                $actionSequence = $this->resolveWorkflowOfficeIds($reservationId, true);
+                $actionSequence = $this->resolveWorkflowOfficeIdsCached($reservationId, true);
 
                 if (empty($actionSequence)) {
                     continue;
                 }
 
-                $approvals = ($approvalsByReservation->get($reservationId) ?? collect())
-                    ->keyBy(fn (ReservationApproval $row) => (int) $row->office_id);
+                $approvals = ReservationApprovalDeduper::collapseByOfficeId(
+                    $approvalsByReservation->get($reservationId) ?? collect()
+                );
 
                 foreach ($actionSequence as $officeId) {
                     $officeId = (int) $officeId;
@@ -754,7 +808,7 @@ class DashboardRequestController extends Controller
             ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
             ->leftJoin('item_owners as owners', 'owners.owner_id', '=', 'items.owner_id')
             ->whereIn('details.reservation_id', $reservationIds)
-            ->select(['details.reservation_id', 'owners.owner_name', 'owners.department_affiliation'])
+            ->select(['details.reservation_id', 'owners.owner_name', 'owners.department_affiliation', 'owners.user_id'])
             ->get();
 
         $groupedOwnerRows = [];

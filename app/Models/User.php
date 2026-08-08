@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ItemOwnerService;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -65,6 +66,16 @@ class User extends Authenticatable
         }
 
         return $role === 'pf_admin' && $this->office && $this->office->isPhysicalFacilities();
+    }
+
+    public function isProgramChairAdmin(): bool
+    {
+        return strtolower((string) $this->role) === 'pc_admin' && !is_null($this->office_id);
+    }
+
+    public function isItemOwnerAdmin(): bool
+    {
+        return ItemOwnerService::isItemOwnerUser($this);
     }
 
     public function shouldSelectProgram(): bool

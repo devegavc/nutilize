@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ItemOwnerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class OfficeArchiveController extends Controller
 {
@@ -11,7 +13,7 @@ class OfficeArchiveController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || strtolower((string) $user->role) !== 'admin' || is_null($user->office_id)) {
+        if (!$user || !$user->isOfficeApprover()) {
             abort(403);
         }
 
@@ -22,14 +24,27 @@ class OfficeArchiveController extends Controller
 
         $fromDate = $request->query('from_date');
         $toDate = $request->query('to_date');
+        $isItemOwner = ItemOwnerService::isItemOwnerUser($user);
+        $ownerReservationIds = $isItemOwner
+            ? ItemOwnerService::reservationIdsIncludingOwnerItems((int) $user->user_id)
+            : [];
 
         $historyQuery = DB::table('reservation_approval_histories as history')
             ->join('reservations', 'reservations.reservation_id', '=', 'history.reservation_id')
             ->leftJoin('users as requester', 'requester.user_id', '=', 'reservations.user_id')
             ->leftJoin('users as approver', 'approver.user_id', '=', 'history.approved_by_user_id')
-            ->where('history.office_id', (int) $user->office_id)
             ->whereNotNull('history.approved_at')
             ->whereIn(DB::raw("LOWER(COALESCE(history.status, ''))"), ['approved', 'rejected']);
+
+        if ($isItemOwner) {
+            if ($ownerReservationIds === []) {
+                $historyQuery->whereRaw('1 = 0');
+            } else {
+                $historyQuery->whereIn('history.reservation_id', $ownerReservationIds);
+            }
+        } else {
+            $historyQuery->where('history.office_id', (int) $user->office_id);
+        }
 
         if ($decision !== 'all') {
             $historyQuery->where(DB::raw("LOWER(COALESCE(history.status, ''))"), $decision);
@@ -59,7 +74,10 @@ class OfficeArchiveController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $resourceMap = $this->buildResourceMap($historyRows->pluck('reservation_id')->all());
+        $resourceMap = $this->buildResourceMap(
+            $historyRows->pluck('reservation_id')->all(),
+            $isItemOwner ? (int) $user->user_id : null,
+        );
 
         $records = $historyRows->getCollection()->map(function ($row) use ($resourceMap) {
             $status = strtolower((string) ($row->status ?? 'pending'));
@@ -81,9 +99,18 @@ class OfficeArchiveController extends Controller
         $historyRows->setCollection($records);
 
         $countQuery = DB::table('reservation_approval_histories')
-            ->where('office_id', (int) $user->office_id)
             ->whereNotNull('approved_at')
             ->whereIn(DB::raw("LOWER(COALESCE(status, ''))"), ['approved', 'rejected']);
+
+        if ($isItemOwner) {
+            if ($ownerReservationIds === []) {
+                $countQuery->whereRaw('1 = 0');
+            } else {
+                $countQuery->whereIn('reservation_id', $ownerReservationIds);
+            }
+        } else {
+            $countQuery->where('office_id', (int) $user->office_id);
+        }
 
         if ($decision !== 'all') {
             $countQuery->where(DB::raw("LOWER(COALESCE(status, ''))"), $decision);
@@ -104,10 +131,20 @@ class OfficeArchiveController extends Controller
         $totalTransactions = $allStatuses->count();
         $approvedCount = $allStatuses->filter(fn ($status) => $status === 'approved')->count();
         $rejectedCount = $allStatuses->filter(fn ($status) => $status === 'rejected')->count();
+
         $todayQuery = DB::table('reservation_approval_histories')
-            ->where('office_id', (int) $user->office_id)
             ->whereDate('approved_at', now()->toDateString())
             ->whereIn(DB::raw("LOWER(COALESCE(status, ''))"), ['approved', 'rejected']);
+
+        if ($isItemOwner) {
+            if ($ownerReservationIds === []) {
+                $todayQuery->whereRaw('1 = 0');
+            } else {
+                $todayQuery->whereIn('reservation_id', $ownerReservationIds);
+            }
+        } else {
+            $todayQuery->where('office_id', (int) $user->office_id);
+        }
 
         if ($decision !== 'all') {
             $todayQuery->where(DB::raw("LOWER(COALESCE(status, ''))"), $decision);
@@ -135,7 +172,7 @@ class OfficeArchiveController extends Controller
         ]);
     }
 
-    private function buildResourceMap(array $reservationIds): array
+    private function buildResourceMap(array $reservationIds, ?int $itemOwnerUserId = null): array
     {
         if (empty($reservationIds)) {
             return [];
@@ -146,13 +183,26 @@ class OfficeArchiveController extends Controller
             ->leftJoin('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
             ->leftJoin('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
             ->leftJoin('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+            ->leftJoin('item_owners as owners', 'owners.owner_id', '=', 'items.owner_id')
             ->whereIn('details.reservation_id', $reservationIds)
             ->select([
                 'details.reservation_id',
                 'rooms.room_number',
                 'items.item_name',
-            ])
-            ->get();
+            ]);
+
+        if (!is_null($itemOwnerUserId) && $itemOwnerUserId > 0) {
+            if (Schema::hasColumn('item_owners', 'user_id')) {
+                $resourceRows->where('owners.user_id', $itemOwnerUserId);
+            } else {
+                $resourceRows->whereRaw(
+                    'LOWER(COALESCE(owners.department_affiliation, \'\')) = ?',
+                    [strtolower('user:' . $itemOwnerUserId)]
+                );
+            }
+        }
+
+        $resourceRows = $resourceRows->get();
 
         $resourceMap = [];
 
@@ -160,6 +210,10 @@ class OfficeArchiveController extends Controller
             $label = !is_null($row->room_number)
                 ? 'Room ' . (string) $row->room_number
                 : ((string) ($row->item_name ?? 'Resource'));
+
+            if ($label === 'Resource') {
+                continue;
+            }
 
             $resourceMap[(int) $row->reservation_id][] = $label;
         }

@@ -93,67 +93,7 @@
               </thead>
               <tbody id="maintenance-table-body">
                 <tr>
-                  <td>#9985fht</td>
-                  <td>Podium</td>
-                  <td>1</td>
-                  <td>31/03/2025</td>
-                  <td><span class="maintenance-status maintenance">Maintenance</span></td>
-                  <td>Storage A</td>
-                  <td><button class="maintenance-action-btn" type="button">Address</button></td>
-                </tr>
-                <tr>
-                  <td>#X9D2k8A</td>
-                  <td>HDMI</td>
-                  <td>3</td>
-                  <td>30/03/2025</td>
-                  <td><span class="maintenance-status maintenance">Maintenance</span></td>
-                  <td>Storage B</td>
-                  <td><button class="maintenance-action-btn" type="button">Address</button></td>
-                </tr>
-                <tr>
-                  <td>#4fHqWZ7</td>
-                  <td>Tripod</td>
-                  <td>1</td>
-                  <td>29/03/2025</td>
-                  <td><span class="maintenance-status maintenance">Maintenance</span></td>
-                  <td>Storage A</td>
-                  <td><button class="maintenance-action-btn" type="button">Address</button></td>
-                </tr>
-                <tr>
-                  <td>#R8A3xM9</td>
-                  <td>Lapel Mics</td>
-                  <td>2</td>
-                  <td>28/03/2025</td>
-                  <td><span class="maintenance-status maintenance">Maintenance</span></td>
-                  <td>Storage A</td>
-                  <td><button class="maintenance-action-btn" type="button">Address</button></td>
-                </tr>
-                <tr>
-                  <td>#3Fq8Dk2</td>
-                  <td>Speaker</td>
-                  <td>1</td>
-                  <td>27/03/2025</td>
-                  <td><span class="maintenance-status maintenance">Maintenance</span></td>
-                  <td>Storage A</td>
-                  <td><button class="maintenance-action-btn" type="button">Address</button></td>
-                </tr>
-                <tr>
-                  <td>#9A7MzxQ</td>
-                  <td>Tripod</td>
-                  <td>2</td>
-                  <td>28/03/2025</td>
-                  <td><span class="maintenance-status maintenance">Maintenance</span></td>
-                  <td>Storage A</td>
-                  <td><button class="maintenance-action-btn" type="button">Address</button></td>
-                </tr>
-                <tr>
-                  <td>#W5DkF8R</td>
-                  <td>Camera</td>
-                  <td>1</td>
-                  <td>26/03/2025</td>
-                  <td><span class="maintenance-status maintenance">Maintenance</span></td>
-                  <td>Storage A</td>
-                  <td><button class="maintenance-action-btn" type="button">Address</button></td>
+                  <td colspan="8">Loading maintenance records...</td>
                 </tr>
               </tbody>
             </table>
@@ -222,6 +162,9 @@
 
   <script>
     window.maintenanceRowsByTab = @json($maintenanceRowsByTab ?? ['maintenance' => [], 'damaged' => [], 'reported' => []]);
+    window.maintenanceUnitsEndpointBase = '{{ url('/dashboard/maintenance/units') }}';
+    window.maintenanceRoomsEndpointBase = '{{ url('/dashboard/maintenance/rooms') }}';
+    window.maintenanceReportsEndpointBase = '{{ url('/dashboard/maintenance/reports') }}';
   </script>
   <script src="/js/dashboard.js"></script>
 </body>

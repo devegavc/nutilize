@@ -8,11 +8,26 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardHistoryController extends Controller
 {
+    /** @var list<string> */
+    private const COMPLETED_STATUSES = [
+        'returned',
+        'damaged',
+        'rejected',
+        'expired',
+        'cancelled',
+        'canceled',
+    ];
+
     public function index()
     {
         $reservations = Reservation::query()
             ->with(['user', 'approvals'])
-            ->orderByDesc('created_at')
+            ->where(function ($query) {
+                foreach (self::COMPLETED_STATUSES as $status) {
+                    $query->orWhereRaw('LOWER(COALESCE(overall_status, \'\')) = ?', [$status]);
+                }
+            })
+            ->orderByDesc('updated_at')
             ->limit(200)
             ->get();
 
@@ -20,46 +35,94 @@ class DashboardHistoryController extends Controller
         $resourceMap = $this->buildResourceMap($reservationIds);
 
         $latestRows = $reservations->map(function (Reservation $reservation) use ($resourceMap) {
-            $requestDate = Carbon::parse($reservation->created_at);
-            $latestApprovalDate = $reservation->approvals
-                ->pluck('approved_at')
-                ->filter()
-                ->map(fn ($value) => Carbon::parse($value))
-                ->sortByDesc(fn (Carbon $date) => $date->timestamp)
-                ->first();
-
-            $endDate = $latestApprovalDate instanceof Carbon ? $latestApprovalDate : $requestDate;
-
             $status = strtolower((string) $reservation->overall_status);
             $statusLabel = match (true) {
-                $status === 'approved' => 'Approved',
                 $status === 'returned' => 'Returned',
                 $status === 'damaged' => 'Damaged',
                 $status === 'rejected' => 'Rejected',
                 $status === 'expired' => 'Expired',
                 str_starts_with($status, 'cancel') => 'Cancelled',
-                default => 'Pending',
+                default => ucfirst($status),
             };
+
+            $startDate = $this->resolveActivityStartDate($reservation);
+            $endDate = $this->resolveHistoryEndDate($reservation, $status);
 
             return [
                 'id' => '#RES-' . str_pad((string) $reservation->reservation_id, 4, '0', STR_PAD_LEFT),
                 'user' => trim((string) ($reservation->user?->full_name ?? $reservation->user?->username ?? 'Unknown user')),
-                'date' => $requestDate->format('m/d/Y') . ' - ' . $endDate->format('m/d/Y'),
+                'date' => $startDate->format('m/d/Y') . ' - ' . $endDate->format('m/d/Y'),
                 'item' => $resourceMap[(int) $reservation->reservation_id] ?? 'No resource details',
                 'status' => $statusLabel,
                 'raw_status' => $status,
+                'sort_ts' => $endDate->timestamp,
             ];
-        })->values()->all();
+        })->sortByDesc('sort_ts')->values()->map(function (array $row) {
+            unset($row['sort_ts']);
+
+            return $row;
+        })->all();
 
         $historyRowsByTab = [
             'latest' => $latestRows,
             'oldest' => array_values(array_reverse($latestRows)),
-            'damaged' => array_values(array_filter($latestRows, fn (array $row) => strtolower((string) ($row['raw_status'] ?? '')) === 'damaged')),
+            'damaged' => array_values(array_filter($latestRows, fn (array $row) => ($row['raw_status'] ?? '') === 'damaged')),
         ];
 
         return view('dashboard-history', [
             'historyRowsByTab' => $historyRowsByTab,
         ]);
+    }
+
+    private function resolveActivityStartDate(Reservation $reservation): Carbon
+    {
+        $candidates = [
+            $reservation->start_of_activity,
+            $reservation->Start_of_activity,
+            $reservation->date_of_activity,
+            $reservation->Date_of_Activity,
+            $reservation->created_at,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (!is_null($candidate)) {
+                return Carbon::parse($candidate);
+            }
+        }
+
+        return Carbon::parse($reservation->created_at);
+    }
+
+    private function resolveHistoryEndDate(Reservation $reservation, string $status): Carbon
+    {
+        $matchingApproval = $reservation->approvals
+            ->filter(fn ($approval) => strtolower((string) ($approval->status ?? '')) === $status)
+            ->pluck('approved_at')
+            ->filter()
+            ->map(fn ($value) => Carbon::parse($value))
+            ->sortByDesc(fn (Carbon $date) => $date->timestamp)
+            ->first();
+
+        if ($matchingApproval instanceof Carbon) {
+            return $matchingApproval;
+        }
+
+        $latestApprovalDate = $reservation->approvals
+            ->pluck('approved_at')
+            ->filter()
+            ->map(fn ($value) => Carbon::parse($value))
+            ->sortByDesc(fn (Carbon $date) => $date->timestamp)
+            ->first();
+
+        if ($latestApprovalDate instanceof Carbon) {
+            return $latestApprovalDate;
+        }
+
+        if (!is_null($reservation->updated_at)) {
+            return Carbon::parse($reservation->updated_at);
+        }
+
+        return $this->resolveActivityStartDate($reservation);
     }
 
     private function buildResourceMap(array $reservationIds): array

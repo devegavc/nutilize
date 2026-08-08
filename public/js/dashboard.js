@@ -24,6 +24,11 @@ const facilitiesUploadButton = document.getElementById('facility-upload-btn');
 const facilitiesUploadName = document.getElementById('facility-upload-name');
 const equipmentEditModal = document.getElementById('equipment-edit-modal');
 const equipmentItemNameInput = document.getElementById('equipment-item-name');
+const equipmentUnitCodeSingleInput = document.getElementById('equipment-unit-code-single');
+const equipmentUnitCodesMultiInput = document.getElementById('equipment-unit-codes-multi');
+const equipmentUnitCodesMultiWrap = document.getElementById('equipment-unit-codes-multi-wrap');
+const equipmentUnitCodesHint = document.getElementById('equipment-unit-codes-hint');
+const equipmentGenerateUnitCodesButton = document.getElementById('equipment-generate-unit-codes-btn');
 const equipmentCategoryInput = document.getElementById('equipment-category');
 const equipmentTotalCountInput = document.getElementById('equipment-total-count');
 const equipmentInUseInput = document.getElementById('equipment-in-use');
@@ -143,6 +148,14 @@ const maintenanceUnitsEndpointBase =
   (typeof window.maintenanceUnitsEndpointBase === 'string' && window.maintenanceUnitsEndpointBase.trim())
     ? window.maintenanceUnitsEndpointBase.trim().replace(/\/$/, '')
     : '/dashboard/maintenance/units';
+const maintenanceRoomsEndpointBase =
+  (typeof window.maintenanceRoomsEndpointBase === 'string' && window.maintenanceRoomsEndpointBase.trim())
+    ? window.maintenanceRoomsEndpointBase.trim().replace(/\/$/, '')
+    : '/dashboard/maintenance/rooms';
+const maintenanceReportsEndpointBase =
+  (typeof window.maintenanceReportsEndpointBase === 'string' && window.maintenanceReportsEndpointBase.trim())
+    ? window.maintenanceReportsEndpointBase.trim().replace(/\/$/, '')
+    : '/dashboard/maintenance/reports';
 const equipmentCategoryCreateEndpoint =
   (typeof window.equipmentCategoryCreateEndpoint === 'string' && window.equipmentCategoryCreateEndpoint.trim())
     ? window.equipmentCategoryCreateEndpoint.trim().replace(/\/$/, '')
@@ -473,10 +486,47 @@ let equipmentCategoriesCache = Array.isArray(window.equipmentCategories)
 let notificationItems = [];
 let notificationsLoaded = false;
 let notificationUnreadCount = 0;
+let lastNotificationFetchAt = 0;
 
-async function fetchNotifications() {
+async function fetchNotificationUnreadCount() {
   try {
-    const response = await fetch('/dashboard/notifications', {
+    const response = await fetch('/dashboard/notifications/unread-count', {
+      method: 'GET',
+      headers: {
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const data = await response.json();
+    notificationUnreadCount = Number.parseInt(String(data.unread_count ?? 0), 10) || 0;
+    updateNotificationBadge();
+  } catch (error) {
+    console.error('Error fetching notification unread count:', error);
+  }
+}
+
+async function fetchNotifications({ sync = false, force = false } = {}) {
+  const now = Date.now();
+  if (!force && !sync && notificationsLoaded && now - lastNotificationFetchAt < 30000) {
+    return;
+  }
+
+  try {
+    const params = new URLSearchParams();
+    if (sync) {
+      params.set('sync', '1');
+    }
+    if (force) {
+      params.set('force', '1');
+    }
+    const query = params.toString();
+    const url = `/dashboard/notifications${query ? `?${query}` : ''}`;
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
@@ -494,8 +544,10 @@ async function fetchNotifications() {
         created_at: notification.created_at,
         related_id: notification.related_id,
       }));
-      notificationUnreadCount = notificationItems.filter((item) => item.unread).length;
+      notificationUnreadCount = Number.parseInt(String(data.unread_count ?? 0), 10)
+        || notificationItems.filter((item) => item.unread).length;
       notificationsLoaded = true;
+      lastNotificationFetchAt = Date.now();
       updateNotificationBadge();
     } else {
       console.error('Failed to fetch notifications');
@@ -510,8 +562,9 @@ async function fetchNotifications() {
 }
 
 (async function preloadNotifications() {
-  // Poll for new notifications every 60 seconds when page is visible
   let notificationPollInterval = null;
+  let lastUnreadPollAt = 0;
+
   const startNotificationPolling = () => {
     if (notificationPollInterval) {
       clearInterval(notificationPollInterval);
@@ -519,12 +572,13 @@ async function fetchNotifications() {
     notificationPollInterval = setInterval(async () => {
       if (document.visibilityState === 'visible') {
         try {
-          await fetchNotifications();
+          lastUnreadPollAt = Date.now();
+          await fetchNotificationUnreadCount();
         } catch (error) {
           console.error('Error polling notifications:', error);
         }
       }
-    }, 10000); // 10 seconds (faster feedback)
+    }, 45000);
   };
 
   const stopNotificationPolling = () => {
@@ -535,28 +589,25 @@ async function fetchNotifications() {
   };
 
   const bootstrapNotifications = () => {
-    fetchNotifications().catch((error) => console.error('Error preloading notifications:', error));
+    fetchNotifications({ sync: true, force: true }).catch((error) => console.error('Error preloading notifications:', error));
     startNotificationPolling();
   };
 
-  // Fetch immediately so notifications don't feel delayed.
-  setTimeout(bootstrapNotifications, 0);
+  setTimeout(bootstrapNotifications, 2000);
 
-  // Polling and visibility handlers
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      // Refresh immediately when page becomes visible
-      fetchNotifications().catch(error => console.error('Error refreshing notifications on visibility:', error));
+    if (document.visibilityState !== 'visible' || Date.now() - lastUnreadPollAt < 60000) {
+      return;
     }
+
+    lastUnreadPollAt = Date.now();
+    fetchNotificationUnreadCount().catch((error) => console.error('Error refreshing notifications on visibility:', error));
   });
 
-  // Clean up on page unload
   window.addEventListener('beforeunload', stopNotificationPolling);
 })();
 
 function updateNotificationBadge() {
-  notificationUnreadCount = notificationItems.filter((item) => item.unread).length;
-
   toolbarNotificationButtons.forEach(button => {
     let badge = button.querySelector('.notification-badge');
     if (!badge) {
@@ -748,28 +799,16 @@ const messagePreviewItems = [
 ];
 
 const maintenanceRowsByTab = (window.maintenanceRowsByTab && typeof window.maintenanceRowsByTab === 'object')
-  ? window.maintenanceRowsByTab
+  ? {
+    maintenance: Array.isArray(window.maintenanceRowsByTab.maintenance) ? window.maintenanceRowsByTab.maintenance : [],
+    damaged: Array.isArray(window.maintenanceRowsByTab.damaged) ? window.maintenanceRowsByTab.damaged : [],
+    reported: Array.isArray(window.maintenanceRowsByTab.reported) ? window.maintenanceRowsByTab.reported : [],
+  }
   : {
-  maintenance: [
-    { id: '#9985fht', item: 'Podium', count: '1', date: '31/03/2025', status: 'Maintenance', statusClass: 'maintenance', location: 'Storage A' },
-    { id: '#X9D2k8A', item: 'HDMI', count: '3', date: '30/03/2025', status: 'Maintenance', statusClass: 'maintenance', location: 'Storage B' },
-    { id: '#4fHqWZ7', item: 'Tripod', count: '1', date: '29/03/2025', status: 'Maintenance', statusClass: 'maintenance', location: 'Storage A' },
-    { id: '#R8A3xM9', item: 'Lapel Mics', count: '2', date: '28/03/2025', status: 'Maintenance', statusClass: 'maintenance', location: 'Storage A' },
-    { id: '#3Fq8Dk2', item: 'Speaker', count: '1', date: '27/03/2025', status: 'Maintenance', statusClass: 'maintenance', location: 'Storage A' },
-    { id: '#9A7MzxQ', item: 'Tripod', count: '2', date: '28/03/2025', status: 'Maintenance', statusClass: 'maintenance', location: 'Storage A' },
-    { id: '#W5DkF8R', item: 'Camera', count: '1', date: '26/03/2025', status: 'Maintenance', statusClass: 'maintenance', location: 'Storage A' },
-  ],
-  damaged: [
-    { id: '#9985fht', item: 'Projector', count: '1', date: '31/03/2025', status: 'Damaged', statusClass: 'damaged', location: 'Storage A' },
-    { id: '#X9D2k8A', item: 'Port Dongle', count: '2', date: '30/03/2025', status: 'Damaged', statusClass: 'damaged', location: 'Storage B' },
-    { id: '#4fHqWZ7', item: 'Industrial fan', count: '4', date: '29/03/2025', status: 'Damaged', statusClass: 'damaged', location: 'Storage C' },
-    { id: '#R8A3xM9', item: 'Lapel Mics', count: '2', date: '28/03/2025', status: 'Damaged', statusClass: 'damaged', location: 'Storage A' },
-    { id: '#3Fq8Dk2', item: 'power strip', count: '2', date: '27/03/2025', status: 'Damaged', statusClass: 'damaged', location: 'Storage B' },
-    { id: '#9A7MzxQ', item: 'Extension Cords', count: '1', date: '28/03/2025', status: 'Damaged', statusClass: 'damaged', location: 'Storage B' },
-    { id: '#W5DkF8R', item: 'Wired Mic', count: '2', date: '26/03/2025', status: 'Damaged', statusClass: 'damaged', location: 'Storage A' },
-  ],
-  reported: [],
-};
+    maintenance: [],
+    damaged: [],
+    reported: [],
+  };
 
 const fallbackHistoryRowsByTab = {
   latest: [
@@ -832,15 +871,30 @@ function applyHistoryFilters() {
   }
 
   historyTableBody.innerHTML = filteredRows
-    .map((row) => `
+    .map((row) => {
+      const statusClass = String(row.raw_status || row.status || '').toLowerCase();
+      const statusBadgeClass = statusClass === 'damaged'
+        ? 'damaged'
+        : statusClass === 'returned'
+          ? 'maintenance'
+          : statusClass === 'rejected' || statusClass.startsWith('cancel')
+            ? 'reported'
+            : '';
+
+      const statusMarkup = statusBadgeClass
+        ? `<span class="maintenance-status ${statusBadgeClass}">${row.status}</span>`
+        : row.status;
+
+      return `
       <tr>
         <td>${row.id}</td>
         <td>${row.user}</td>
         <td>${row.date}</td>
         <td>${row.item}</td>
-        <td>${row.status}</td>
+        <td>${statusMarkup}</td>
       </tr>
-    `)
+    `;
+    })
     .join('');
 }
 
@@ -872,7 +926,16 @@ function applyMaintenanceFilters() {
 
   maintenanceTableBody.innerHTML = filteredRows
     .map((row) => `
-      <tr data-unit-id="${row.unit_id || ''}" data-maintenance-reason="${String(row.reason || '').replace(/"/g, '&quot;')}" data-reporter="${String(row.reporter || '').replace(/"/g, '&quot;')}" data-description="${String(row.description || '').replace(/"/g, '&quot;')}" data-proof-image="${String(row.proof_image_url || '').replace(/"/g, '&quot;')}">
+      <tr
+        data-row-type="${row.row_type || 'unit'}"
+        data-unit-id="${row.unit_id || ''}"
+        data-room-id="${row.room_id || ''}"
+        data-report-id="${row.report_id || ''}"
+        data-maintenance-reason="${String(row.reason || '').replace(/"/g, '&quot;')}"
+        data-reporter="${String(row.reporter || '').replace(/"/g, '&quot;')}"
+        data-description="${String(row.description || '').replace(/"/g, '&quot;')}"
+        data-proof-image="${String(row.proof_image_url || '').replace(/"/g, '&quot;')}"
+      >
         <td>${row.id}</td>
         <td>${row.item}</td>
         <td>${row.reporter ? `<span class="maintenance-reporter-cell">${row.reporter}</span>` : '<span class="maintenance-reporter-cell muted">—</span>'}</td>
@@ -901,12 +964,8 @@ function openMaintenanceEvalModal(row) {
   }
 
   activeMaintenanceAddressRow = row;
-  const unitCodeCell = row ? row.children[0] : null;
-  const itemCell = row ? row.children[1] : null;
-  const countCell = row ? row.children[2] : null;
-  const unitCode = unitCodeCell ? unitCodeCell.textContent.trim() : '';
-  const itemName = itemCell ? itemCell.textContent.trim() : 'Podium';
-  const itemCount = countCell ? countCell.textContent.trim() : '10';
+  const unitCode = row && row.children[0] ? row.children[0].textContent.trim() : '';
+  const itemName = row && row.children[1] ? row.children[1].textContent.trim() : '-';
   const reason = row && row.dataset.maintenanceReason ? row.dataset.maintenanceReason.trim() : '';
   const reporter = row && row.dataset.reporter ? row.dataset.reporter.trim() : '';
   const description = row && row.dataset.description ? row.dataset.description.trim() : '';
@@ -931,11 +990,12 @@ function openMaintenanceEvalModal(row) {
 
   const evalDescription = document.getElementById('maintenance-eval-description');
   if (evalDescription) {
-    evalDescription.textContent = description || '-';
+    evalDescription.textContent = description || reason || '-';
     const labelSpan = evalDescription.previousElementSibling;
     if (labelSpan) {
-      labelSpan.style.display = description ? '' : 'none';
-      evalDescription.style.display = description ? '' : 'none';
+      const hasDetails = Boolean(description || reason);
+      labelSpan.style.display = hasDetails ? '' : 'none';
+      evalDescription.style.display = hasDetails ? '' : 'none';
     }
   }
 
@@ -1476,7 +1536,7 @@ async function refreshRequestListSafely(explicitUrl) {
   }
 
   poll();
-  requestListPollInterval = setInterval(poll, 5000);
+  requestListPollInterval = setInterval(poll, 15000);
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
@@ -1547,7 +1607,7 @@ async function submitRequestDecision(item, button, status) {
     }
 
     // Refresh notifications immediately after a decision so the badge/popover updates without waiting for polling.
-    await fetchNotifications().catch((error) => console.error('Error refreshing notifications after decision:', error));
+    await fetchNotifications({ force: true }).catch((error) => console.error('Error refreshing notifications after decision:', error));
     refreshNotificationPopover();
 
     await refreshRequestListSafely();
@@ -1587,30 +1647,43 @@ async function submitFinalRequestDecision(item, button, status) {
   }
 
   try {
-    const response = await fetch(`/dashboard/request/${reservationId}/${action}`, {
-      method: 'PATCH',
-      headers: {
-        'X-CSRF-TOKEN': csrfToken,
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const responseText = await response.text();
+    let response = null;
     let data = {};
+    let finalStatus = 0;
 
-    if (responseText) {
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        data = { error: responseText };
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      response = await fetch(`/dashboard/request/${reservationId}/${action}`, {
+        method: 'PATCH',
+        headers: {
+          'X-CSRF-TOKEN': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      finalStatus = response.status || 0;
+      const responseText = await response.text();
+      data = {};
+
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          data = { error: responseText };
+        }
       }
-    }
-    if (!response.ok || !data.success) {
-      const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
-      showAppNotice((data.error || data.message || 'Unable to process this request.') + statusMessage);
-      return;
+
+      if (response.ok && data.success) {
+        break;
+      }
+
+      const isTransientServerError = finalStatus >= 500 && finalStatus < 600;
+      if (!(isTransientServerError && attempt < 2)) {
+        const statusMessage = finalStatus ? ` (HTTP ${finalStatus})` : '';
+        showAppNotice((data.error || data.message || 'Unable to process this request.') + statusMessage);
+        return;
+      }
     }
 
     applyRequestDecision(item, status);
@@ -1618,15 +1691,28 @@ async function submitFinalRequestDecision(item, button, status) {
       status === 'approved' ? 'Request approved successfully.' : 'Request rejected successfully.',
       status,
     );
+
+    item.querySelectorAll('.approve-btn, .reject-btn').forEach((node) => {
+      if (node instanceof HTMLButtonElement) {
+        node.disabled = true;
+        node.hidden = true;
+      }
+    });
+
     if (status === 'approved') {
-      await markNotificationsReadForReservation(reservationId);
+      markNotificationsReadForReservation(reservationId).catch((error) => {
+        console.error('Error marking notifications read after final decision:', error);
+      });
       clearNotificationsForReservation(reservationId);
     }
 
-    await fetchNotifications().catch((error) => console.error('Error refreshing notifications after final decision:', error));
-    refreshNotificationPopover();
+    fetchNotifications({ force: true })
+      .catch((error) => console.error('Error refreshing notifications after final decision:', error))
+      .finally(() => refreshNotificationPopover());
 
-    await refreshRequestListSafely();
+    refreshRequestListSafely().catch((error) => {
+      console.error('Error refreshing request list after final decision:', error);
+    });
   } catch (error) {
     window.console.error('Final request approval error:', error);
     showAppNotice('An error occurred while processing the request.');
@@ -2374,8 +2460,16 @@ function openInventoryConfirmModal(options = {}) {
   inventoryConfirmTitle.textContent = title;
   inventoryConfirmMessage.textContent = message;
   inventoryConfirmSubmit.textContent = confirmText;
-  inventoryConfirmSubmit.classList.toggle('delete', variant === 'delete');
-  inventoryConfirmSubmit.classList.toggle('danger', variant === 'danger');
+  inventoryConfirmSubmit.classList.remove('approve', 'confirm', 'delete', 'danger');
+
+  if (variant === 'delete') {
+    inventoryConfirmSubmit.classList.add('delete');
+  } else if (variant === 'danger') {
+    inventoryConfirmSubmit.classList.add('danger');
+  } else {
+    inventoryConfirmSubmit.classList.add('approve');
+  }
+
   inventoryConfirmModal.dataset.confirmVariant = variant;
   inventoryConfirmModal.classList.add('is-open');
   inventoryConfirmModal.setAttribute('aria-hidden', 'false');
@@ -2540,6 +2634,142 @@ async function submitEquipmentDelete() {
   }
 }
 
+function parseEquipmentUnitCodesFromDataset(row) {
+  if (!(row instanceof HTMLElement)) {
+    return [];
+  }
+
+  const raw = row.dataset.unitCodes;
+
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map((code) => String(code).trim()).filter(Boolean) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function syncEquipmentUnitCodesUi() {
+  const totalCount = Number.parseInt(equipmentTotalCountInput?.value || '1', 10);
+  const useMulti = Number.isInteger(totalCount) && totalCount > 1;
+  const singleLabel = document.querySelector('label[for="equipment-unit-code-single"]');
+
+  if (singleLabel instanceof HTMLElement) {
+    singleLabel.hidden = useMulti;
+  }
+
+  if (equipmentUnitCodeSingleInput) {
+    equipmentUnitCodeSingleInput.hidden = useMulti;
+  }
+
+  if (equipmentUnitCodesMultiWrap) {
+    equipmentUnitCodesMultiWrap.hidden = !useMulti;
+  }
+
+  if (equipmentUnitCodesHint && Number.isInteger(totalCount) && totalCount > 1) {
+    equipmentUnitCodesHint.textContent = `Optional: enter up to ${totalCount} custom codes (one per line). Blank lines are filled with temporary codes like #TMP-0007-U001 on save.`;
+  }
+}
+
+function buildPreviewTemporaryUnitCodes(totalCount) {
+  const parsedTotal = Number.parseInt(String(totalCount), 10);
+
+  if (!Number.isInteger(parsedTotal) || parsedTotal <= 0) {
+    return [];
+  }
+
+  const itemId = activeEquipmentEditingRow?.dataset?.itemId || '0000';
+  const paddedId = String(itemId).padStart(4, '0');
+
+  return Array.from({ length: parsedTotal }, (_, index) => `#TMP-${paddedId}-U${String(index + 1).padStart(3, '0')}`);
+}
+
+function previewTemporaryEquipmentUnitCodes() {
+  const totalCount = Number.parseInt(equipmentTotalCountInput?.value || '0', 10);
+
+  if (!Number.isInteger(totalCount) || totalCount <= 0) {
+    showAppNotice('Set Total Count first before previewing temporary codes.');
+    return;
+  }
+
+  const previewCodes = buildPreviewTemporaryUnitCodes(totalCount);
+
+  if (totalCount <= 1) {
+    if (equipmentUnitCodeSingleInput) {
+      equipmentUnitCodeSingleInput.value = previewCodes[0] || '';
+    }
+    return;
+  }
+
+  if (equipmentUnitCodesMultiInput) {
+    equipmentUnitCodesMultiInput.value = previewCodes.join('\n');
+  }
+}
+
+function collectEquipmentUnitCodes() {
+  const totalCount = Number.parseInt(equipmentTotalCountInput?.value || '0', 10);
+
+  if (!Number.isInteger(totalCount) || totalCount <= 0) {
+    return [];
+  }
+
+  if (totalCount <= 1) {
+    const singleCode = equipmentUnitCodeSingleInput ? equipmentUnitCodeSingleInput.value.trim() : '';
+    return singleCode ? [singleCode] : [];
+  }
+
+  const raw = equipmentUnitCodesMultiInput ? equipmentUnitCodesMultiInput.value : '';
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+
+  while (lines.length < totalCount) {
+    lines.push('');
+  }
+
+  return lines.slice(0, totalCount);
+}
+
+function equipmentSaveSuccessMessage(item) {
+  const codes = Array.isArray(item?.unit_codes) ? item.unit_codes : [];
+  const hasTemporaryCodes = codes.some((code) => String(code).startsWith('#TMP-'));
+
+  if (hasTemporaryCodes) {
+    return 'Item saved. Temporary unit codes were auto-generated where codes were left blank.';
+  }
+
+  return 'Equipment has been saved successfully.';
+}
+
+function setEquipmentUnitCodesInForm(unitCodes) {
+  const codes = Array.isArray(unitCodes) ? unitCodes : [];
+  const totalCount = Number.parseInt(equipmentTotalCountInput?.value || String(Math.max(codes.length, 1)), 10);
+
+  syncEquipmentUnitCodesUi();
+
+  if (totalCount <= 1) {
+    if (equipmentUnitCodeSingleInput) {
+      equipmentUnitCodeSingleInput.value = codes[0] || '';
+    }
+    if (equipmentUnitCodesMultiInput) {
+      equipmentUnitCodesMultiInput.value = '';
+    }
+    return;
+  }
+
+  if (equipmentUnitCodeSingleInput) {
+    equipmentUnitCodeSingleInput.value = '';
+  }
+
+  if (equipmentUnitCodesMultiInput) {
+    equipmentUnitCodesMultiInput.value = codes.join('\n');
+  }
+}
+
 function openEquipmentEditModal(row) {
   if (!equipmentEditModal) {
     return;
@@ -2547,6 +2777,12 @@ function openEquipmentEditModal(row) {
 
   const cells = row.querySelectorAll('td');
   activeEquipmentEditingRow = row;
+
+  if (equipmentTotalCountInput) {
+    equipmentTotalCountInput.value = cells[2] ? cells[2].textContent.trim() : '0';
+  }
+
+  setEquipmentUnitCodesInForm(parseEquipmentUnitCodesFromDataset(row));
 
   if (equipmentItemNameInput) {
     equipmentItemNameInput.value = cells[1] ? cells[1].textContent.trim() : '';
@@ -2561,10 +2797,6 @@ function openEquipmentEditModal(row) {
 
     ensureEquipmentCategoryInUi(rowCategoryKey, fallbackLabel || rowCategoryKey);
     equipmentCategoryInput.value = rowCategoryKey;
-  }
-
-  if (equipmentTotalCountInput) {
-    equipmentTotalCountInput.value = cells[2] ? cells[2].textContent.trim() : '0';
   }
 
   if (equipmentInUseInput) {
@@ -2622,6 +2854,16 @@ function openEquipmentAddModal() {
 
   activeEquipmentEditingRow = null;
 
+  if (equipmentUnitCodeSingleInput) {
+    equipmentUnitCodeSingleInput.value = '';
+  }
+
+  if (equipmentUnitCodesMultiInput) {
+    equipmentUnitCodesMultiInput.value = '';
+  }
+
+  syncEquipmentUnitCodesUi();
+
   if (equipmentItemNameInput) {
     equipmentItemNameInput.value = '';
   }
@@ -2633,6 +2875,8 @@ function openEquipmentAddModal() {
   if (equipmentTotalCountInput) {
     equipmentTotalCountInput.value = '1';
   }
+
+  syncEquipmentUnitCodesUi();
 
   if (equipmentInUseInput) {
     equipmentInUseInput.value = '0';
@@ -2679,6 +2923,8 @@ function setActiveNavByPage() {
     ? 'manage-maintenance'
     : path.includes('/dashboard/office/items')
     ? 'manage-items'
+    : path.includes('/dashboard/office/users')
+    ? 'users'
     : path.includes('/dashboard/office/history')
     ? 'history'
     : path.includes('/dashboard/messages')
@@ -2816,11 +3062,21 @@ async function loadNavbar() {
     const currentUsername = String(window.authUser?.username || '').toLowerCase();
     const currentOfficeCode = String(window.authUser?.office_short_code || '').toLowerCase();
     const currentRole = String(window.authUser?.role || '').toLowerCase();
-    const isIoAdmin = currentUsername === 'io_admin' || currentOfficeCode === 'io';
+    const isIoAdmin = window.authUser?.is_item_owner === true
+      || currentUsername === 'io_admin'
+      || currentOfficeCode === 'io'
+      || (currentRole === 'admin' && currentOfficeCode === 'io');
     const isPfAdmin = ['admin', 'pf_admin'].includes(currentRole);
+    const isPcAdmin = currentRole === 'pc_admin';
 
     navbarContainer.querySelectorAll('[data-visible-for="io-admin"]').forEach((item) => {
       if (!isIoAdmin) {
+        item.remove();
+      }
+    });
+
+    navbarContainer.querySelectorAll('[data-visible-for="pc-admin"]').forEach((item) => {
+      if (!isPcAdmin) {
         item.remove();
       }
     });
@@ -3213,7 +3469,7 @@ async function buildNotificationsPopover() {
 
   (async function refreshPopoverNotifications() {
     try {
-      await fetchNotifications();
+      await fetchNotifications({ sync: true, force: true });
       renderList();
     } catch (_error) {
       // No-op: errors already logged
@@ -4371,17 +4627,14 @@ if (maintenanceFormSubmitButton) {
 
     const assessmentValue = maintenanceAssessmentInput.value.trim();
     const statusValue = maintenanceStatusSelect.value.trim();
+    const rowType = activeMaintenanceAddressRow?.dataset.rowType || 'unit';
+    const unitId = Number.parseInt(activeMaintenanceAddressRow?.dataset.unitId || '', 10);
+    const roomId = Number.parseInt(activeMaintenanceAddressRow?.dataset.roomId || '', 10);
+    const reportId = Number.parseInt(activeMaintenanceAddressRow?.dataset.reportId || '', 10);
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     if (!assessmentValue || !statusValue) {
       showAppNotice('Please complete Assessment and Status.');
-      return;
-    }
-
-    const unitId = Number.parseInt(activeMaintenanceAddressRow?.dataset.unitId || '', 10);
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-    if (!Number.isInteger(unitId) || unitId <= 0) {
-      showAppNotice('Unable to identify the selected item unit.');
       return;
     }
 
@@ -4390,10 +4643,28 @@ if (maintenanceFormSubmitButton) {
       return;
     }
 
+    let endpoint = '';
+    let requestBody = {
+      assessment: assessmentValue,
+      status: statusValue,
+    };
+
+    if (rowType === 'room' && Number.isInteger(roomId) && roomId > 0) {
+      endpoint = `${maintenanceRoomsEndpointBase}/${encodeURIComponent(roomId)}`;
+    } else if (rowType === 'report' && Number.isInteger(reportId) && reportId > 0) {
+      endpoint = `${maintenanceReportsEndpointBase}/${encodeURIComponent(reportId)}`;
+      requestBody = { assessment: assessmentValue };
+    } else if (Number.isInteger(unitId) && unitId > 0) {
+      endpoint = `${maintenanceUnitsEndpointBase}/${encodeURIComponent(unitId)}`;
+    } else {
+      showAppNotice('Unable to identify the selected maintenance record.');
+      return;
+    }
+
     maintenanceFormSubmitButton.disabled = true;
 
     try {
-      const response = await fetch(`${maintenanceUnitsEndpointBase}/${encodeURIComponent(unitId)}`, {
+      const response = await fetch(endpoint, {
         method: 'PATCH',
         headers: {
           'X-CSRF-TOKEN': csrfToken,
@@ -4401,10 +4672,7 @@ if (maintenanceFormSubmitButton) {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          assessment: assessmentValue,
-          status: statusValue,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const responseText = await response.text();
@@ -4417,30 +4685,39 @@ if (maintenanceFormSubmitButton) {
       }
 
       if (!response.ok || !payload.success) {
-        showAppNotice(payload.error || `Unable to update maintenance unit. (HTTP ${response.status})`);
+        showAppNotice(payload.error || `Unable to update maintenance record. (HTTP ${response.status})`);
         return;
       }
 
-      const unitRow = payload.unit;
+      const resolvedRecord = payload.unit || payload.room || payload.report || {};
+      const resolved = Boolean(resolvedRecord.resolved);
 
       for (const key of Object.keys(maintenanceRowsByTab)) {
         const currentRows = Array.isArray(maintenanceRowsByTab[key]) ? maintenanceRowsByTab[key] : [];
-        maintenanceRowsByTab[key] = currentRows.filter((row) => Number.parseInt(String(row.unit_id || ''), 10) !== unitId);
+        maintenanceRowsByTab[key] = currentRows.filter((row) => {
+          if (rowType === 'room') {
+            return Number.parseInt(String(row.room_id || ''), 10) !== roomId;
+          }
+          if (rowType === 'report') {
+            return Number.parseInt(String(row.report_id || ''), 10) !== reportId;
+          }
+          return Number.parseInt(String(row.unit_id || ''), 10) !== unitId;
+        });
       }
 
-      if (!unitRow.resolved) {
-        const targetTab = unitRow.statusClass === 'damaged' ? 'damaged' : 'maintenance';
+      if (!resolved && resolvedRecord.item) {
+        const targetTab = resolvedRecord.statusClass === 'damaged' ? 'damaged' : 'maintenance';
         if (!Array.isArray(maintenanceRowsByTab[targetTab])) {
           maintenanceRowsByTab[targetTab] = [];
         }
-        maintenanceRowsByTab[targetTab].unshift(unitRow);
+        maintenanceRowsByTab[targetTab].unshift(resolvedRecord);
       }
 
       closeMaintenanceFormModal();
       closeMaintenanceEvalModal();
       activeMaintenanceAddressRow = null;
       applyMaintenanceFilters();
-      showAppNotice('Maintenance evaluation submitted.');
+      showAppNotice(resolved ? 'Maintenance record resolved.' : 'Maintenance evaluation submitted.');
     } catch (error) {
       showAppNotice('Unable to submit maintenance update right now.');
     } finally {
@@ -4657,6 +4934,14 @@ if (equipmentCategoryNameInput) {
 
 if (equipmentAddButton && equipmentEditModal) {
   equipmentAddButton.addEventListener('click', openEquipmentAddModal);
+}
+
+if (equipmentTotalCountInput) {
+  equipmentTotalCountInput.addEventListener('input', syncEquipmentUnitCodesUi);
+}
+
+if (equipmentGenerateUnitCodesButton) {
+  equipmentGenerateUnitCodesButton.addEventListener('click', previewTemporaryEquipmentUnitCodes);
 }
 
 if (scheduleMonthSelect && scheduleYearSelect) {
@@ -4945,6 +5230,9 @@ if (equipmentSaveButton) {
       return;
     }
 
+    syncEquipmentUnitCodesUi();
+
+    const unitCodes = collectEquipmentUnitCodes();
     const itemName = equipmentItemNameInput.value.trim();
     const category = equipmentCategoryInput.value.trim();
     const totalCount = equipmentTotalCountInput.value.trim() || '0';
@@ -4991,6 +5279,7 @@ if (equipmentSaveButton) {
             'X-Requested-With': 'XMLHttpRequest',
           },
           body: JSON.stringify({
+            unit_codes: unitCodes,
             item_name: itemName,
             category,
             total_count: parsedTotalCount,
@@ -5009,7 +5298,8 @@ if (equipmentSaveButton) {
         }
 
         if (!response.ok || !payload.success) {
-          showAppNotice(payload.error || `Unable to save equipment changes. (HTTP ${response.status})`);
+          const unitCodeError = Array.isArray(payload.errors?.unit_codes) ? payload.errors.unit_codes[0] : '';
+          showAppNotice(unitCodeError || payload.error || payload.message || `Unable to save equipment changes. (HTTP ${response.status})`);
           return;
         }
 
@@ -5018,6 +5308,7 @@ if (equipmentSaveButton) {
         const row = document.createElement('tr');
         row.dataset.equipmentRow = createdItem.category;
         row.dataset.itemId = createdItem.item_id;
+        row.dataset.unitCodes = JSON.stringify(createdItem.unit_codes || []);
         row.innerHTML = `
           <td>${createdItem.asset_id}</td>
           <td>${createdItem.item_name}</td>
@@ -5030,7 +5321,7 @@ if (equipmentSaveButton) {
         equipmentTableBody.prepend(row);
         closeEquipmentEditModal();
         applyEquipmentFilters();
-        showSaveSuccessToast('Equipment has been added successfully.');
+        showSaveSuccessToast(equipmentSaveSuccessMessage(createdItem));
         return;
       } catch (error) {
         showAppNotice('Unable to save equipment changes right now. Please check your connection and try again.');
@@ -5061,6 +5352,7 @@ if (equipmentSaveButton) {
             'X-Requested-With': 'XMLHttpRequest',
           },
           body: JSON.stringify({
+            unit_codes: unitCodes,
             item_name: itemName,
             category,
             total_count: parsedTotalCount,
@@ -5079,7 +5371,8 @@ if (equipmentSaveButton) {
         }
 
         if (!response.ok || !payload.success) {
-          showAppNotice(payload.error || `Unable to save equipment changes. (HTTP ${response.status})`);
+          const unitCodeError = Array.isArray(payload.errors?.unit_codes) ? payload.errors.unit_codes[0] : '';
+          showAppNotice(unitCodeError || payload.error || payload.message || `Unable to save equipment changes. (HTTP ${response.status})`);
           return;
         }
 
@@ -5087,6 +5380,7 @@ if (equipmentSaveButton) {
         const cells = activeEquipmentEditingRow.querySelectorAll('td');
 
         activeEquipmentEditingRow.dataset.equipmentRow = updatedItem.category;
+        activeEquipmentEditingRow.dataset.unitCodes = JSON.stringify(updatedItem.unit_codes || []);
 
         if (cells[0]) {
           cells[0].textContent = updatedItem.asset_id;
@@ -5110,7 +5404,7 @@ if (equipmentSaveButton) {
 
         closeEquipmentEditModal();
         applyEquipmentFilters();
-        showSaveSuccessToast('Equipment has been updated successfully.');
+        showSaveSuccessToast(equipmentSaveSuccessMessage(updatedItem));
         return;
       } catch (error) {
         showAppNotice('Unable to save equipment changes right now. Please check your connection and try again.');
@@ -5120,6 +5414,13 @@ if (equipmentSaveButton) {
 
     const cells = activeEquipmentEditingRow.querySelectorAll('td');
     activeEquipmentEditingRow.dataset.equipmentRow = category;
+    activeEquipmentEditingRow.dataset.unitCodes = JSON.stringify(unitCodes);
+
+    if (cells[0]) {
+      cells[0].textContent = unitCodes.length <= 1
+        ? (unitCodes[0] || '')
+        : `${unitCodes[0]} (+${unitCodes.length - 1} units)`;
+    }
 
     if (cells[1]) {
       cells[1].textContent = itemName;

@@ -10,6 +10,7 @@ use App\Http\Controllers\DashboardUserController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\OfficeArchiveController;
 use App\Http\Controllers\OfficeItemController;
+use App\Http\Controllers\OfficeProgramUserController;
 use App\Http\Controllers\OfficeRequestController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegisterController;
@@ -55,6 +56,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/office/items/maintenance', [OfficeItemController::class, 'maintenance'])->name('office.items.maintenance');
     Route::patch('/dashboard/office/items/maintenance/units/{unitId}', [OfficeItemController::class, 'updateMaintenanceUnit'])->name('office.items.maintenance.units.update');
     Route::get('/dashboard/office/history', [OfficeArchiveController::class, 'index'])->name('office.history');
+    Route::get('/dashboard/office/users', [OfficeProgramUserController::class, 'index'])->name('office.users');
+    Route::post('/dashboard/office/users', [OfficeProgramUserController::class, 'store'])->name('office.users.store');
+    Route::patch('/dashboard/office/users/{userId}', [OfficeProgramUserController::class, 'update'])->name('office.users.update');
+    Route::delete('/dashboard/office/users/{userId}', [OfficeProgramUserController::class, 'destroy'])->name('office.users.destroy');
 
     Route::prefix('dashboard')->group(function () {
         Route::middleware('pf-admin')->group(function () {
@@ -73,6 +78,8 @@ Route::middleware('auth')->group(function () {
             Route::patch('/inventory/facilities/{roomId}', [DashboardInventoryController::class, 'updateFacility'])->name('dashboard.inventory.facilities.update');
             Route::get('/maintenance', [DashboardInventoryController::class, 'maintenance'])->name('dashboard.maintenance');
             Route::patch('/maintenance/units/{unitId}', [DashboardInventoryController::class, 'updateMaintenanceUnit'])->name('dashboard.maintenance.units.update');
+            Route::patch('/maintenance/rooms/{roomId}', [DashboardInventoryController::class, 'updateMaintenanceRoom'])->name('dashboard.maintenance.rooms.update');
+            Route::patch('/maintenance/reports/{reportId}', [DashboardInventoryController::class, 'dismissMaintenanceReport'])->name('dashboard.maintenance.reports.dismiss');
             Route::view('/messages', 'dashboard-messages')->name('dashboard.messages');
             Route::get('/schedule', [DashboardScheduleController::class, 'index'])->name('dashboard.schedule');
             Route::get('/users', [DashboardUserController::class, 'index'])->name('dashboard.users');
@@ -88,6 +95,7 @@ Route::middleware('auth')->group(function () {
 
         // Notification routes
         Route::get('/notifications', [ApprovalController::class, 'getNotifications'])->name('notifications.index');
+        Route::get('/notifications/unread-count', [ApprovalController::class, 'getNotificationUnreadCount'])->name('notifications.unread-count');
         Route::patch('/notification/{notificationId}/read', [ApprovalController::class, 'markNotificationAsRead'])->name('notification.read');
         Route::get('/reservation/{reservationId}/details', [ApprovalController::class, 'getReservationDetails'])->name('reservation.details');
 

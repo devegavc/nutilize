@@ -12,6 +12,15 @@
   <link rel="stylesheet" href="/css/db-home.css" />
 </head>
 <body>
+  <script>
+    window.authUser = {
+      id: {{ auth()->user()->user_id ?? 'null' }},
+      username: '{{ auth()->user()->username ?? 'User' }}',
+      email: '{{ auth()->user()->email ?? '' }}',
+      full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
+      role: '{{ auth()->user()->role ?? 'user' }}'
+    };
+  </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
       <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
@@ -37,16 +46,7 @@
     <section class="workspace-grid">
       <div id="navbar-container"></div>
 
-      <section class="content-card">
-        <script>
-          window.authUser = {
-            id: {{ auth()->user()->user_id ?? 'null' }},
-            username: '{{ auth()->user()->username ?? 'User' }}',
-            email: '{{ auth()->user()->email ?? '' }}',
-            full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
-            role: '{{ auth()->user()->role ?? 'user' }}'
-          };
-        </script>
+      <section class="content-card home-dashboard-card">
         <h1 class="section-title">PHYSICAL FACILITIES DASHBOARD</h1>
 
         <section class="stats-grid">
@@ -135,8 +135,8 @@
               @empty
                 <li>
                   <span>{{ now()->format('F j') }}</span>
-                  <strong>No requests submitted today</strong>
-                  <small>New requests created today will appear here first.</small>
+                  <strong>No open requests</strong>
+                  <small>Active reservation requests across all offices will appear here.</small>
                 </li>
               @endforelse
             </ul>

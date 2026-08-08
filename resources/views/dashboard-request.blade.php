@@ -87,7 +87,7 @@
       </div>
       <div class="inventory-confirm-actions">
         <button type="button" class="inventory-confirm-btn cancel" id="inventory-confirm-cancel">Cancel</button>
-        <button type="button" class="inventory-confirm-btn confirm" id="inventory-confirm-submit">Confirm</button>
+        <button type="button" class="inventory-confirm-btn approve" id="inventory-confirm-submit">Confirm</button>
       </div>
     </article>
   </div>

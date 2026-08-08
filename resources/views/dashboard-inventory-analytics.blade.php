@@ -100,12 +100,22 @@
           </article>
         </section>
 
+        {{-- How the buy suggestion works --}}
+        <section class="insight-how-it-works">
+          <h3><i class="bi bi-lightbulb-fill"></i> How buy suggestions work</h3>
+          <ol>
+            <li><strong>Shortage</strong> — more units are out or were borrowed than you own → buy the difference <em>plus 1 spare</em>.</li>
+            <li><strong>All units out</strong> — every unit is currently borrowed → buy 1 spare for the next request.</li>
+            <li><strong>High demand</strong> — borrowed units reached 80%+ of stock, or bookings exceed stock → buy 1 spare.</li>
+          </ol>
+        </section>
+
         {{-- Headline feature: what to restock --}}
         <section class="inventory-grid analytics-table-grid insight-section">
           <div class="inventory-grid-head analytics-grid-head insight-head">
             <div>
               <h2>Restock Recommendations</h2>
-              <p>Items where booking demand is outpacing available stock</p>
+              <p>Items where borrowing demand exceeds what you have on hand</p>
             </div>
             @if ($restockSummary['items_needing_action'] > 0)
               <span class="insight-head-badge">{{ $restockSummary['items_needing_action'] }} need attention</span>
@@ -116,10 +126,10 @@
               <thead>
                 <tr>
                   <th>Item</th>
-                  <th>Category</th>
                   <th>On Hand</th>
-                  <th>Peak Need</th>
-                  <th>Utilisation</th>
+                  <th>Times Borrowed</th>
+                  <th>Units Borrowed</th>
+                  <th>Currently Out</th>
                   <th>Recommendation</th>
                   <th>Priority</th>
                 </tr>
@@ -131,25 +141,23 @@
                       <div class="restock-item-name">{{ $item['item_name'] }}</div>
                       <div class="restock-item-meta">
                         <span class="asset-id">{{ $item['asset_id'] }}</span>
-                        <span>{{ $item['location'] }}</span>
+                        <span>{{ $item['category'] }}</span>
                       </div>
                       <div class="restock-reason">{{ $item['reason'] }}</div>
                     </td>
-                    <td>{{ $item['category'] }}</td>
                     <td>
                       <strong>{{ $item['serviceable'] }}</strong>
                       @if ($item['unavailable_units'] > 0)
-                        <span class="restock-sub">of {{ $item['stock'] }} usable</span>
+                        <span class="restock-sub">{{ $item['unavailable_units'] }} in maintenance</span>
                       @endif
                     </td>
-                    <td><strong>{{ $item['pressure'] }}</strong></td>
+                    <td><strong>{{ $item['times_borrowed'] }}</strong></td>
+                    <td><strong>{{ $item['units_borrowed'] }}</strong></td>
                     <td>
-                      <div class="utilisation-bar" role="img"
-                           aria-label="{{ $item['utilisation_percent'] }} percent utilised">
-                        <span class="utilisation-fill {{ $item['priority'] }}"
-                              style="width: {{ min(100, $item['utilisation_percent']) }}%"></span>
-                      </div>
-                      <span class="utilisation-value">{{ $item['utilisation_percent'] }}%</span>
+                      <strong>{{ $item['in_use'] }}</strong>
+                      @if ($item['over_allocated'])
+                        <span class="restock-sub over-allocated">exceeds stock</span>
+                      @endif
                     </td>
                     <td>
                       @if ($item['suggested_qty'] > 0)
@@ -157,6 +165,9 @@
                           <i class="bi bi-plus-circle-fill"></i>
                           Buy {{ $item['suggested_qty'] }} more
                         </span>
+                        @if ($item['suggestion_formula'])
+                          <span class="restock-formula">{{ $item['suggestion_formula'] }}</span>
+                        @endif
                       @else
                         <span class="restock-ok">Adequate</span>
                       @endif
@@ -203,7 +214,7 @@
               </em>
             </p>
             <p>
-              <span>New Users</span>
+              <span>Current Users</span>
               <strong>{{ number_format($newUsers) }}</strong>
               <em class="{{ $newUsersGrowth >= 0 ? 'up' : 'down' }}">
                 {{ $newUsersGrowth > 0 ? '+' : '' }}{{ number_format($newUsersGrowth, 1) }}%

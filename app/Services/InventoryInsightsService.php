@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\ItemAsset;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -13,11 +14,8 @@ class InventoryInsightsService
 {
     private const LOOKBACK_DAYS = 90;
 
-    /** Extra units kept on top of peak demand so a single new booking does not cause a shortage. */
-    private const SAFETY_BUFFER_RATIO = 0.2;
-
-    /** Utilisation at which an item is considered to have no practical headroom left. */
-    private const TIGHT_UTILISATION = 0.8;
+    /** When borrowed units reach this share of owned stock, suggest buying 1 spare. */
+    private const HIGH_DEMAND_RATIO = 0.8;
 
     private const CANCELLED_STATUSES = ['cancelled', 'canceled'];
 
@@ -54,8 +52,8 @@ class InventoryInsightsService
 
             $categoryKey = $profile['category'];
             $categoryDemand[$categoryKey] ??= ['category' => $categoryKey, 'demand_qty' => 0, 'requests' => 0, 'stock' => 0];
-            $categoryDemand[$categoryKey]['demand_qty'] += $profile['demand_qty'];
-            $categoryDemand[$categoryKey]['requests'] += $profile['requests'];
+            $categoryDemand[$categoryKey]['demand_qty'] += $profile['units_borrowed'];
+            $categoryDemand[$categoryKey]['requests'] += $profile['times_borrowed'];
             $categoryDemand[$categoryKey]['stock'] += $profile['stock'];
 
             if ($profile['suggested_qty'] > 0) {
@@ -66,8 +64,8 @@ class InventoryInsightsService
         }
 
         usort($recommendations, static function (array $a, array $b): int {
-            return [$b['priority_rank'], $b['shortfall'], $b['demand_qty']]
-                <=> [$a['priority_rank'], $a['shortfall'], $a['demand_qty']];
+            return [$b['priority_rank'], $b['gap'], $b['units_borrowed']]
+                <=> [$a['priority_rank'], $a['gap'], $a['units_borrowed']];
         });
 
         usort($idleStock, static fn (array $a, array $b): int => $b['stock'] <=> $a['stock']);
@@ -122,6 +120,14 @@ class InventoryInsightsService
             ];
         }
 
+        $unitCodesByItem = ItemUnitService::loadUnitCodesGroupedByItem(array_keys($items));
+
+        foreach ($items as $itemId => &$item) {
+            $unitCodes = $unitCodesByItem[$itemId] ?? [];
+            $item['asset_id'] = ItemUnitService::listAssetLabel($unitCodes, $itemId);
+        }
+        unset($item);
+
         return $items;
     }
 
@@ -136,10 +142,6 @@ class InventoryInsightsService
             return [];
         }
 
-        $dateColumn = self::reservationColumn('Date_of_Activity');
-        $startColumn = self::reservationColumn('Start_of_activity');
-        $endColumn = self::reservationColumn('End_of_Activity');
-
         $select = [
             'items.item_id',
             'details.quantity',
@@ -147,12 +149,6 @@ class InventoryInsightsService
             'reservations.overall_status',
             'reservations.created_at',
         ];
-
-        foreach ([$dateColumn, $startColumn, $endColumn] as $column) {
-            if ($column !== null) {
-                $select[] = 'reservations.' . $column;
-            }
-        }
 
         $rows = DB::table('reservation_details as details')
             ->join('reservations', 'reservations.reservation_id', '=', 'details.reservation_id')
@@ -178,7 +174,6 @@ class InventoryInsightsService
                 'rejected_qty' => 0,
                 'recent_qty' => 0,
                 'earlier_qty' => 0,
-                'intervals' => [],
             ];
 
             if (in_array($status, self::CANCELLED_STATUSES, true)) {
@@ -200,80 +195,104 @@ class InventoryInsightsService
             } else {
                 $demand[$itemId]['earlier_qty'] += $quantity;
             }
-
-            $window = self::resolveBookingWindow($row, $dateColumn, $startColumn, $endColumn);
-            if ($window !== null) {
-                $demand[$itemId]['intervals'][] = [$window[0], $window[1], $quantity];
-            }
         }
 
         foreach ($demand as $itemId => $stats) {
             $demand[$itemId]['requests'] = count($stats['requests']);
-            $demand[$itemId]['peak_concurrent'] = self::peakConcurrentQuantity($stats['intervals']);
-            unset($demand[$itemId]['intervals']);
         }
 
         return $demand;
     }
 
     /**
-     * Highest quantity of a single item reserved at any overlapping moment.
-     * This is what a purchase decision hinges on: two bookings of one unit each
-     * only require a second unit when their time windows actually overlap.
+     * Simple restock rule used on the analytics page:
+     *   shortage  → (demand − stock) + 1 spare unit
+     *   high use  → add 1 spare when everything is out or demand is very high
      *
-     * @param  array<int, array{0:int,1:int,2:int}>  $intervals
+     * @return array{
+     *     suggested_qty:int,
+     *     gap:int,
+     *     formula:string,
+     *     reason:string,
+     *     priority:string,
+     *     priority_rank:int,
+     *     priority_label:string,
+     *     demand_vs_stock_percent:int
+     * }
      */
-    public static function peakConcurrentQuantity(array $intervals): int
-    {
-        if ($intervals === []) {
-            return 0;
+    public static function calculateRestockSuggestion(
+        int $stock,
+        int $inUse,
+        int $timesBorrowed,
+        int $unitsBorrowed
+    ): array {
+        $stock = max(0, $stock);
+        $inUse = max(0, $inUse);
+        $timesBorrowed = max(0, $timesBorrowed);
+        $unitsBorrowed = max(0, $unitsBorrowed);
+
+        $demandLevel = max($unitsBorrowed, $inUse);
+        $gap = max(0, $demandLevel - $stock);
+
+        $suggestedQty = 0;
+        $formula = '';
+        $reason = '';
+        $priority = 'low';
+        $priorityRank = 1;
+        $priorityLabel = 'Low';
+
+        if ($gap > 0) {
+            $suggestedQty = $gap + 1;
+
+            if ($inUse > $stock) {
+                $formula = sprintf('%d out − %d owned + 1 spare', $inUse, $stock);
+                $reason = sprintf('%d unit(s) are out but you only own %d.', $inUse, $stock);
+                $priority = $inUse >= ($stock * 2) ? 'critical' : 'high';
+            } else {
+                $formula = sprintf('%d borrowed − %d owned + 1 spare', $unitsBorrowed, $stock);
+                $reason = sprintf('%d units were borrowed recently but you only have %d.', $unitsBorrowed, $stock);
+                $priority = $gap >= $stock ? 'critical' : 'high';
+            }
+
+            $priorityRank = $priority === 'critical' ? 4 : 3;
+            $priorityLabel = ucfirst($priority);
+        } elseif ($stock > 0 && $inUse >= $stock) {
+            $suggestedQty = 1;
+            $formula = 'All units out + 1 spare';
+            $reason = sprintf('All %d unit(s) are borrowed right now — none left for the next request.', $stock);
+            $priority = 'medium';
+            $priorityRank = 2;
+            $priorityLabel = 'Medium';
+        } elseif ($stock > 0 && $unitsBorrowed >= (int) ceil($stock * self::HIGH_DEMAND_RATIO)) {
+            $suggestedQty = 1;
+            $formula = sprintf('%d borrowed of %d owned + 1 spare', $unitsBorrowed, $stock);
+            $reason = sprintf('High demand: %d units borrowed with only %d owned.', $unitsBorrowed, $stock);
+            $priority = 'medium';
+            $priorityRank = 2;
+            $priorityLabel = 'Medium';
+        } elseif ($stock > 0 && $timesBorrowed > $stock) {
+            $suggestedQty = 1;
+            $formula = sprintf('%d bookings for %d unit(s) + 1 spare', $timesBorrowed, $stock);
+            $reason = sprintf('Booked %d times but only %d unit(s) available — users may have to wait.', $timesBorrowed, $stock);
+            $priority = 'medium';
+            $priorityRank = 2;
+            $priorityLabel = 'Medium';
         }
 
-        $events = [];
-        foreach ($intervals as [$start, $end, $quantity]) {
-            $events[] = [$start, $quantity];
-            $events[] = [$end, -$quantity];
-        }
+        $demandVsStockPercent = $stock > 0
+            ? min(200, (int) round(($demandLevel / $stock) * 100))
+            : ($demandLevel > 0 ? 200 : 0);
 
-        // Releases are applied before pickups at the same timestamp so back-to-back
-        // bookings are not counted as a conflict.
-        usort($events, static fn (array $a, array $b): int => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
-
-        $running = 0;
-        $peak = 0;
-
-        foreach ($events as [, $delta]) {
-            $running += $delta;
-            $peak = max($peak, $running);
-        }
-
-        return $peak;
-    }
-
-    /**
-     * @return array{0:int,1:int}|null
-     */
-    private static function resolveBookingWindow(object $row, ?string $dateColumn, ?string $startColumn, ?string $endColumn): ?array
-    {
-        $start = $startColumn !== null ? strtotime((string) ($row->{$startColumn} ?? '')) : false;
-        $end = $endColumn !== null ? strtotime((string) ($row->{$endColumn} ?? '')) : false;
-
-        if ($start !== false && $end !== false && $end > $start) {
-            return [$start, $end];
-        }
-
-        $activityDate = $dateColumn !== null ? strtotime((string) ($row->{$dateColumn} ?? '')) : false;
-        if ($activityDate === false) {
-            $activityDate = strtotime((string) ($row->created_at ?? ''));
-        }
-
-        if ($activityDate === false) {
-            return null;
-        }
-
-        $dayStart = strtotime('midnight', $activityDate);
-
-        return [$dayStart, $dayStart + 86400];
+        return [
+            'suggested_qty' => $suggestedQty,
+            'gap' => $gap,
+            'formula' => $formula,
+            'reason' => $reason,
+            'priority' => $priority,
+            'priority_rank' => $priorityRank,
+            'priority_label' => $priorityLabel,
+            'demand_vs_stock_percent' => $demandVsStockPercent,
+        ];
     }
 
     /**
@@ -286,35 +305,23 @@ class InventoryInsightsService
         $stock = $item['stock'];
         $serviceable = max(0, $stock - $unavailableUnits);
 
-        $requests = (int) ($stats['requests'] ?? 0);
-        $demandQty = (int) ($stats['demand_qty'] ?? 0);
+        $timesBorrowed = (int) ($stats['requests'] ?? 0);
+        $unitsBorrowed = (int) ($stats['demand_qty'] ?? 0);
         $cancelledQty = (int) ($stats['cancelled_qty'] ?? 0);
         $rejectedQty = (int) ($stats['rejected_qty'] ?? 0);
         $recentQty = (int) ($stats['recent_qty'] ?? 0);
         $earlierQty = (int) ($stats['earlier_qty'] ?? 0);
-        $peakConcurrent = (int) ($stats['peak_concurrent'] ?? 0);
 
-        // A stock ledger showing more units out than owned is itself proof of a shortage.
-        $pressure = max($peakConcurrent, $item['in_use']);
-        $shortfall = max(0, $pressure - $serviceable);
-
-        $utilisation = $serviceable > 0
-            ? $pressure / $serviceable
-            : ($pressure > 0 ? 1.5 : 0.0);
-
-        $suggested = 0;
-        if ($shortfall > 0) {
-            $suggested = $shortfall + max(1, (int) ceil($pressure * self::SAFETY_BUFFER_RATIO));
-        } elseif ($pressure > 0 && $utilisation >= self::TIGHT_UTILISATION) {
-            $suggested = max(1, (int) ceil($pressure * self::SAFETY_BUFFER_RATIO));
-        }
-
-        [$priority, $priorityRank, $priorityLabel] = self::classifyPriority($shortfall, $utilisation, $serviceable, $pressure);
-        $pressureSource = $peakConcurrent >= $item['in_use'] && $peakConcurrent > 0 ? 'bookings' : 'ledger';
+        $suggestion = self::calculateRestockSuggestion(
+            $serviceable,
+            (int) $item['in_use'],
+            $timesBorrowed,
+            $unitsBorrowed,
+        );
 
         return [
             'item_id' => $item['item_id'],
-            'asset_id' => '#ITEM-' . str_pad((string) $item['item_id'], 4, '0', STR_PAD_LEFT),
+            'asset_id' => $item['asset_id'] ?? ItemAsset::fallbackCode((int) $item['item_id']),
             'item_name' => $item['item_name'],
             'category' => $item['category'],
             'location' => $item['location'],
@@ -322,110 +329,21 @@ class InventoryInsightsService
             'serviceable' => $serviceable,
             'unavailable_units' => $unavailableUnits,
             'in_use' => $item['in_use'],
-            'requests' => $requests,
-            'demand_qty' => $demandQty,
+            'times_borrowed' => $timesBorrowed,
+            'units_borrowed' => $unitsBorrowed,
             'cancelled_qty' => $cancelledQty,
             'rejected_qty' => $rejectedQty,
-            'peak_concurrent' => $peakConcurrent,
-            'pressure' => $pressure,
-            'shortfall' => $shortfall,
-            'suggested_qty' => $suggested,
-            'utilisation_percent' => (int) round(min(2.0, $utilisation) * 100),
+            'gap' => $suggestion['gap'],
+            'suggested_qty' => $suggestion['suggested_qty'],
+            'suggestion_formula' => $suggestion['formula'],
+            'demand_vs_stock_percent' => $suggestion['demand_vs_stock_percent'],
             'demand_change_percent' => self::percentChange($earlierQty, $recentQty),
             'over_allocated' => $item['in_use'] > $stock,
-            'pressure_source' => $pressureSource,
-            'priority' => $priority,
-            'priority_rank' => $priorityRank,
-            'priority_label' => $priorityLabel,
-            'reason' => self::explain(
-                $item,
-                $peakConcurrent,
-                $shortfall,
-                $serviceable,
-                $utilisation,
-                $requests,
-                $unavailableUnits,
-                $pressureSource
-            ),
+            'priority' => $suggestion['priority'],
+            'priority_rank' => $suggestion['priority_rank'],
+            'priority_label' => $suggestion['priority_label'],
+            'reason' => $suggestion['reason'],
         ];
-    }
-
-    /**
-     * @return array{0:string,1:int,2:string}
-     */
-    private static function classifyPriority(int $shortfall, float $utilisation, int $serviceable, int $pressure): array
-    {
-        if ($pressure > 0 && $serviceable <= 0) {
-            return ['critical', 4, 'Critical'];
-        }
-
-        if ($shortfall > 0 && $utilisation >= 1.5) {
-            return ['critical', 4, 'Critical'];
-        }
-
-        if ($shortfall > 0) {
-            return ['high', 3, 'High'];
-        }
-
-        if ($utilisation >= self::TIGHT_UTILISATION) {
-            return ['medium', 2, 'Medium'];
-        }
-
-        return ['low', 1, 'Low'];
-    }
-
-    /**
-     * @param  array<string, mixed>  $item
-     */
-    private static function explain(
-        array $item,
-        int $peakConcurrent,
-        int $shortfall,
-        int $serviceable,
-        float $utilisation,
-        int $requests,
-        int $unavailableUnits,
-        string $pressureSource
-    ): string {
-        $parts = [];
-
-        if ($shortfall > 0) {
-            $parts[] = $pressureSource === 'bookings'
-                ? sprintf(
-                    'Overlapping bookings need %d unit%s at once but only %d %s on hand — short by %d.',
-                    $peakConcurrent,
-                    $peakConcurrent === 1 ? '' : 's',
-                    $serviceable,
-                    $serviceable === 1 ? 'is' : 'are',
-                    $shortfall
-                )
-                : sprintf(
-                    '%d unit%s recorded as out against %d owned — short by %d.',
-                    $item['in_use'],
-                    $item['in_use'] === 1 ? '' : 's',
-                    $item['stock'],
-                    $shortfall
-                );
-        } elseif ($utilisation >= self::TIGHT_UTILISATION) {
-            $parts[] = sprintf(
-                'Running at %d%% of capacity, leaving no spare unit for the next request.',
-                (int) round($utilisation * 100)
-            );
-        }
-
-        if ($unavailableUnits > 0) {
-            $parts[] = sprintf(
-                '%d unit%s out of service for maintenance.',
-                $unavailableUnits,
-                $unavailableUnits === 1 ? '' : 's'
-            );
-        }
-
-        if ($requests > 0) {
-            $parts[] = sprintf('%d booking%s in the period.', $requests, $requests === 1 ? '' : 's');
-        }
-
-        return $parts === [] ? 'Stock is keeping up with demand.' : implode(' ', $parts);
     }
 
     /**
@@ -434,9 +352,8 @@ class InventoryInsightsService
     private static function isIdle(array $profile): bool
     {
         return $profile['stock'] > 0
-            && $profile['requests'] === 0
-            && $profile['in_use'] === 0
-            && $profile['pressure'] === 0;
+            && $profile['times_borrowed'] === 0
+            && $profile['in_use'] === 0;
     }
 
     /**
@@ -449,13 +366,13 @@ class InventoryInsightsService
         $critical = 0;
         $high = 0;
         $unitsToProcure = 0;
-        $unmetRequests = 0;
+        $unmetUnits = 0;
 
         foreach ($recommendations as $recommendation) {
             $critical += $recommendation['priority'] === 'critical' ? 1 : 0;
             $high += $recommendation['priority'] === 'high' ? 1 : 0;
             $unitsToProcure += $recommendation['suggested_qty'];
-            $unmetRequests += $recommendation['shortfall'];
+            $unmetUnits += $recommendation['gap'];
         }
 
         return [
@@ -463,7 +380,7 @@ class InventoryInsightsService
             'high' => $high,
             'items_needing_action' => count($recommendations),
             'units_to_procure' => $unitsToProcure,
-            'unmet_units' => $unmetRequests,
+            'unmet_units' => $unmetUnits,
             'idle_items' => count($idleStock),
         ];
     }
@@ -527,7 +444,7 @@ class InventoryInsightsService
 
             $watch[] = [
                 'item_id' => $itemId,
-                'asset_id' => '#ITEM-' . str_pad((string) $itemId, 4, '0', STR_PAD_LEFT),
+                'asset_id' => $item['asset_id'] ?? ItemAsset::fallbackCode($itemId),
                 'item_name' => $item['item_name'],
                 'category' => $item['category'],
                 'stock' => $item['stock'],

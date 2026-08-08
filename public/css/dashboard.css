@@ -13,7 +13,7 @@
   --success: #74bf72;
   --message-popover-bg-start: #2a385b;
   --message-popover-bg-end: #1c2742;
-  --top-header-height: 82px;
+  --top-header-height: 90px;
   --dashboard-top-gap: 10px;
   --dashboard-bottom-gap: 10px;
 }
@@ -536,7 +536,7 @@ body {
 .workspace-grid {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: minmax(220px, 220px) minmax(0, 1fr);
   gap: 22px;
   height: calc(100% - 10px);
   min-height: 0;
@@ -726,6 +726,39 @@ body {
 }
 
 @media (min-width: 1101px) {
+  #navbar-container {
+    grid-column: 1;
+    grid-row: 1;
+    position: relative;
+    z-index: 4;
+    min-width: 220px;
+    max-width: 220px;
+    pointer-events: auto;
+    align-self: stretch;
+    height: 100%;
+  }
+
+  #navbar-container .side-nav {
+    height: 100%;
+  }
+
+  .workspace-grid > .content-card,
+  .workspace-grid > .history-content-card,
+  .workspace-grid > .maintenance-content-card,
+  .workspace-grid > .facilities-content-card,
+  .workspace-grid > .request-content-card,
+  .workspace-grid > .schedule-content-card,
+  .workspace-grid > .profile-content-card,
+  .workspace-grid > .messages-content-card,
+  .workspace-grid > .analytics-content-card {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+    position: relative;
+    z-index: 1;
+  }
+
   .content-card {
     overflow-y: auto;
     overflow-x: hidden;

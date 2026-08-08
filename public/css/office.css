@@ -340,7 +340,15 @@
 	flex-direction: column;
 	gap: 14px;
 	padding: 0 0 20px;
+	overflow-x: hidden;
 	overflow-y: auto;
+	min-width: 0;
+	max-width: 100%;
+}
+
+.workspace-grid > .office-requests-card {
+	min-width: 0;
+	max-width: 100%;
 }
 
 .office-request-summary-grid {
@@ -413,13 +421,14 @@
 }
 
 .office-request-history-wrap {
-	max-height: 420px;
-	overflow-y: auto;
+	max-height: min(560px, 62vh);
+	overflow: auto;
 }
 
 .office-request-history-table {
 	width: 100%;
 	border-collapse: collapse;
+	table-layout: auto;
 }
 
 .office-request-history-table th,
@@ -428,6 +437,109 @@
 	border-bottom: 1px solid #cfd4e5;
 	text-align: center;
 	font-size: 0.95rem;
+	vertical-align: middle;
+}
+
+.office-request-history-table .office-queue-requester {
+	max-width: 180px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.office-request-history-table .office-queue-activity {
+	max-width: 140px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.office-request-history-table .office-queue-actions-cell {
+	min-width: 148px;
+	max-width: 190px;
+}
+
+.office-request-history-table .badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	min-width: 108px;
+	padding: 4px 10px;
+	font-size: 0.82rem;
+	font-weight: 700;
+	line-height: 1.2;
+	white-space: nowrap;
+}
+
+.office-request-history-table .badge::before {
+	content: "";
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.office-request-history-table .badge.pending {
+	background: #f7cf95;
+	color: #8a5b07;
+}
+
+.office-request-history-table .badge.pending::before {
+	background: #f59e0b;
+}
+
+.office-request-history-table .badge.queue-waiting {
+	background: #dfe6f8;
+	color: #3a4f96;
+}
+
+.office-request-history-table .badge.queue-waiting::before {
+	background: #5b7fd6;
+}
+
+.office-request-history-table .badge.solved {
+	background: #a8d8a6;
+	color: #135a26;
+}
+
+.office-request-history-table .badge.solved::before {
+	background: #159227;
+}
+
+.office-request-history-table .badge.rejected {
+	background: #f4b4b4;
+	color: #8a0f0f;
+}
+
+.office-request-history-table .badge.rejected::before {
+	background: #d31212;
+}
+
+.office-queue-action-group {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	justify-content: center;
+}
+
+.office-queue-waiting-tag {
+	display: inline-block;
+	max-width: 100%;
+	padding: 5px 10px;
+	border-radius: 999px;
+	background: #eef2fc;
+	border: 1px solid #c6d0ea;
+	color: #334a8a;
+	font-size: 0.78rem;
+	font-weight: 700;
+	line-height: 1.25;
+	white-space: normal;
+	word-break: break-word;
+}
+
+.office-queue-empty-action {
+	color: #6a728f;
 }
 
 .office-request-history-table th {

@@ -9,7 +9,6 @@
   <title>NUtilize | Item Maintenance</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/dashboard.css" />
   <link rel="stylesheet" href="/css/db-inventory.css" />
   <style>
     .office-maintenance-subtitle {
@@ -30,7 +29,8 @@
       full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
       role: '{{ auth()->user()->role ?? 'user' }}',
       office_name: '{{ auth()->user()?->office?->department_name ?? 'Office' }}',
-      office_short_code: '{{ auth()->user()?->office?->short_code ?? '' }}'
+      office_short_code: '{{ auth()->user()?->office?->short_code ?? '' }}',
+      is_item_owner: @json(auth()->user()?->isItemOwnerAdmin() ?? false)
     };
     window.dashboardNavComponent = '/components/navbar-office.html';
     window.maintenanceUnitsEndpointBase = '/dashboard/office/items/maintenance/units';
