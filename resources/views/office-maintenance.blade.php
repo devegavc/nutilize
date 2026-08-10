@@ -34,7 +34,8 @@
     };
     window.dashboardNavComponent = '/components/navbar-office.html';
     window.maintenanceUnitsEndpointBase = '/dashboard/office/items/maintenance/units';
-    window.maintenanceRowsByTab = @json($maintenanceRowsByTab ?? ['maintenance' => [], 'damaged' => []]);
+    window.maintenanceReportsEndpointBase = '/dashboard/office/items/maintenance/reports';
+    window.maintenanceRowsByTab = @json($maintenanceRowsByTab ?? ['maintenance' => [], 'damaged' => [], 'reported' => []]);
   </script>
 
   <header class="top-header">
@@ -70,6 +71,7 @@
           <div class="maintenance-tab-group" role="tablist" aria-label="Maintenance status">
             <button class="maintenance-tab active" type="button" data-maintenance-tab="maintenance">Maintenance</button>
             <button class="maintenance-tab" type="button" data-maintenance-tab="damaged">Damaged</button>
+            <button class="maintenance-tab" type="button" data-maintenance-tab="reported">Reported</button>
           </div>
 
           <div class="maintenance-inline-search">
@@ -80,15 +82,15 @@
 
         <section class="inventory-grid maintenance-grid">
           <div class="table-wrap">
-            <table class="inventory-table maintenance-table">
+            <table class="inventory-table maintenance-table office-maintenance-table">
               <thead>
                 <tr>
                   <th><i class="bi bi-credit-card-2-front-fill"></i> Unit Code</th>
                   <th>Item Name</th>
                   <th>Count</th>
                   <th>Date</th>
+                  <th>Reported By</th>
                   <th>Status</th>
-                  <th>Location</th>
                   <th>Actions</th>
                 </tr>
               </thead>

@@ -9,6 +9,8 @@ use Illuminate\Validation\ValidationException;
 
 class ItemUnitService
 {
+    private const UNIT_UPSERT_CHUNK = 100;
+
     /**
      * Normalize admin input and fill any missing slots with unique temporary codes.
      *
@@ -28,24 +30,36 @@ class ItemUnitService
             : [];
 
         $resolved = [];
+        $needsTemporary = [];
 
         for ($index = 0; $index < $expectedCount; $index++) {
             $provided = ItemAsset::normalizeCode((string) ($rawCodes[$index] ?? ''));
             $existing = ItemAsset::normalizeCode((string) ($existingCodes[$index] ?? ''));
 
             if ($provided !== '') {
-                $resolved[] = $provided;
+                $resolved[$index] = $provided;
                 continue;
             }
 
             if ($existing !== '') {
-                $resolved[] = $existing;
+                $resolved[$index] = $existing;
                 continue;
             }
 
-            $resolved[] = self::generateUniqueTemporaryCode($itemId, $index + 1, $resolved);
+            $needsTemporary[$index] = $index + 1;
+            $resolved[$index] = '';
         }
 
+        if ($needsTemporary !== []) {
+            $taken = array_fill_keys(array_filter($resolved), true);
+            $generated = self::generateUniqueTemporaryCodes($itemId, $needsTemporary, $taken, $ignoreItemId);
+
+            foreach ($generated as $index => $code) {
+                $resolved[$index] = $code;
+            }
+        }
+
+        $resolved = array_values($resolved);
         self::assertUnitCodesAreValid($resolved, $itemId, $ignoreItemId);
 
         return $resolved;
@@ -85,38 +99,85 @@ class ItemUnitService
         }
     }
 
-    /** @param  list<string>  $reservedCodes */
-    private static function generateUniqueTemporaryCode(int $itemId, int $unitNumber, array $reservedCodes = []): string
-    {
-        $reserved = array_fill_keys($reservedCodes, true);
-        $candidate = ItemAsset::temporaryUnitCode($itemId, $unitNumber);
-        $attempt = 0;
+    /**
+     * Generate many temporary codes with a single conflict lookup instead of one DB hit per unit.
+     *
+     * @param  array<int, int>  $unitNumbersByIndex  index => unit_number
+     * @param  array<string, true>  $reserved
+     * @return array<int, string>
+     */
+    private static function generateUniqueTemporaryCodes(
+        int $itemId,
+        array $unitNumbersByIndex,
+        array $reserved,
+        ?int $ignoreItemId = null,
+    ): array {
+        $candidates = [];
 
-        while ($attempt < 1000) {
-            if (!isset($reserved[$candidate]) && !self::unitCodeExists($candidate, $itemId)) {
-                return $candidate;
+        foreach ($unitNumbersByIndex as $index => $unitNumber) {
+            $candidates[$index] = ItemAsset::temporaryUnitCode($itemId, $unitNumber);
+        }
+
+        $taken = $reserved;
+        foreach (self::existingUnitCodesAmong(array_values($candidates), $ignoreItemId) as $code) {
+            $taken[$code] = true;
+        }
+
+        $generated = [];
+
+        foreach ($unitNumbersByIndex as $index => $unitNumber) {
+            $candidate = ItemAsset::temporaryUnitCode($itemId, $unitNumber);
+            $attempt = 0;
+
+            while ($attempt < 1000 && isset($taken[$candidate])) {
+                $attempt++;
+                $candidate = ItemAsset::temporaryUnitCode($itemId, $unitNumber) . '-' . $attempt;
             }
 
-            $attempt++;
-            $candidate = ItemAsset::temporaryUnitCode($itemId, $unitNumber) . '-' . $attempt;
+            if (isset($taken[$candidate])) {
+                $candidate = ItemAsset::temporaryUnitCode($itemId, $unitNumber) . '-' . uniqid();
+            }
+
+            $taken[$candidate] = true;
+            $generated[$index] = $candidate;
         }
 
-        return ItemAsset::temporaryUnitCode($itemId, $unitNumber) . '-' . uniqid();
+        return $generated;
     }
 
-    private static function unitCodeExists(string $code, ?int $ignoreItemId = null): bool
+    /**
+     * @param  list<string>  $codes
+     * @return list<string>
+     */
+    private static function existingUnitCodesAmong(array $codes, ?int $ignoreItemId = null): array
     {
-        if (!Schema::hasTable('item_units')) {
-            return false;
+        if (!Schema::hasTable('item_units') || $codes === []) {
+            return [];
         }
 
-        $query = DB::table('item_units')->where('unit_code', $code);
+        $query = DB::table('item_units')->whereIn('unit_code', $codes);
 
         if (!is_null($ignoreItemId)) {
             $query->where('item_id', '<>', $ignoreItemId);
         }
 
-        return $query->exists();
+        return $query
+            ->pluck('unit_code')
+            ->map(fn ($code) => (string) $code)
+            ->all();
+    }
+
+    /** @param  list<string>  $reservedCodes */
+    private static function generateUniqueTemporaryCode(int $itemId, int $unitNumber, array $reservedCodes = []): string
+    {
+        $generated = self::generateUniqueTemporaryCodes(
+            $itemId,
+            [0 => $unitNumber],
+            array_fill_keys($reservedCodes, true),
+            null,
+        );
+
+        return $generated[0];
     }
 
     /** @return list<string> */
@@ -134,6 +195,36 @@ class ItemUnitService
             ->map(fn ($code) => (string) $code)
             ->values()
             ->all();
+    }
+
+    /**
+     * Codes keyed by zero-based index for unit_number 1..$upToUnitNumber.
+     * Includes retired rows so raising quantity again reuses the same physical codes.
+     *
+     * @return list<string|null>
+     */
+    private static function loadUnitCodesByNumber(int $itemId, int $upToUnitNumber): array
+    {
+        if (!Schema::hasTable('item_units') || $upToUnitNumber <= 0) {
+            return [];
+        }
+
+        $codes = array_fill(0, $upToUnitNumber, null);
+
+        $rows = DB::table('item_units')
+            ->where('item_id', $itemId)
+            ->where('unit_number', '<=', $upToUnitNumber)
+            ->orderBy('unit_number')
+            ->get(['unit_number', 'unit_code']);
+
+        foreach ($rows as $row) {
+            $index = ((int) $row->unit_number) - 1;
+            if ($index >= 0 && $index < $upToUnitNumber) {
+                $codes[$index] = (string) $row->unit_code;
+            }
+        }
+
+        return $codes;
     }
 
     /**
@@ -212,9 +303,21 @@ class ItemUnitService
         $inUse = max(0, min($total, $inUseCount ?? (int) ($item->quantity_in_use ?? 0)));
         $resolvedStatus = $status ?? ((bool) ($item->maintenance_status ?? false) ? 'maintenance' : 'good');
 
-        if ($rawUnitCodes === [] && $total > 0) {
-            $existingCodes = self::loadUnitCodesForItem($itemId);
-            $rawUnitCodes = array_pad($existingCodes, $total, null);
+        if ($total > 0) {
+            // Prefer codes already on file (including retired slots) so raising quantity
+            // reactivates the same physical units instead of inventing new codes.
+            $existingByNumber = self::loadUnitCodesByNumber($itemId, $total);
+
+            if ($rawUnitCodes === []) {
+                $rawUnitCodes = $existingByNumber;
+            } else {
+                for ($index = 0; $index < $total; $index++) {
+                    $provided = ItemAsset::normalizeCode((string) ($rawUnitCodes[$index] ?? ''));
+                    if ($provided === '' && !empty($existingByNumber[$index])) {
+                        $rawUnitCodes[$index] = $existingByNumber[$index];
+                    }
+                }
+            }
         }
 
         $unitCodes = self::resolveUnitCodes($rawUnitCodes, $total, $itemId, $itemId);
@@ -322,6 +425,15 @@ class ItemUnitService
     }
 
     /**
+     * Align item_units with the requested quantity using bulk upserts.
+     *
+     * Rules for units inside the active quantity (1..total):
+     * - New or previously retired units become `available` (borrowable again).
+     * - Units a PF admin marked `maintenance` / `damaged` keep that status.
+     * - `in_use` is assigned only to units that are not under repair/damage.
+     *
+     * Units beyond the active quantity stay/become `retired` (not borrowable).
+     *
      * @param  list<string>  $unitCodes
      */
     public static function syncForItem(int $itemId, int $totalCount, int $inUseCount, string $status, array $unitCodes): void
@@ -332,77 +444,122 @@ class ItemUnitService
 
         $total = max(0, $totalCount);
         $inUseTarget = max(0, min($total, $inUseCount));
-        $specialStatus = $status === 'maintenance' ? 'maintenance' : ($status === 'damaged' ? 'damaged' : null);
+        $itemLevelIssue = $status === 'maintenance' ? 'maintenance' : ($status === 'damaged' ? 'damaged' : null);
+        $now = now();
 
-        $units = DB::table('item_units')
+        if ($total === 0) {
+            // No active stock — remove physical unit rows rather than leaving a pile of
+            // `retired` leftovers that look like broken inventory in the database.
+            DB::table('item_units')->where('item_id', $itemId)->delete();
+
+            return;
+        }
+
+        $existing = DB::table('item_units')
             ->where('item_id', $itemId)
-            ->orderBy('unit_number')
-            ->get(['unit_id', 'unit_number']);
+            ->get(['unit_id', 'unit_number', 'unit_code', 'status', 'condition_notes', 'last_maintenance_at']);
 
         $existingByNumber = [];
-        foreach ($units as $unit) {
-            $existingByNumber[(int) $unit->unit_number] = (int) $unit->unit_id;
+        foreach ($existing as $unit) {
+            $existingByNumber[(int) $unit->unit_number] = $unit;
         }
 
-        for ($unitNumber = 1; $unitNumber <= $total; $unitNumber++) {
-            $unitCode = ItemAsset::normalizeCode((string) ($unitCodes[$unitNumber - 1] ?? ''));
+        // Preserve per-unit maintenance/damaged only when the equipment form is not
+        // explicitly setting the item back to Good. Choosing Good means PF cleared it.
+        $preservedIssueByNumber = [];
+        $clearIssues = strtolower($status) === 'good';
 
-            if ($unitCode === '') {
-                $unitCode = self::generateUniqueTemporaryCode($itemId, $unitNumber);
-            }
+        if (!$clearIssues) {
+            for ($unitNumber = 1; $unitNumber <= $total; $unitNumber++) {
+                $currentStatus = strtolower((string) ($existingByNumber[$unitNumber]->status ?? ''));
 
-            if (!isset($existingByNumber[$unitNumber])) {
-                DB::table('item_units')->insert([
-                    'item_id' => $itemId,
-                    'unit_number' => $unitNumber,
-                    'unit_code' => $unitCode,
-                    'status' => 'available',
-                    'condition_notes' => null,
-                    'last_maintenance_at' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-        }
-
-        $orderedUnits = DB::table('item_units')
-            ->where('item_id', $itemId)
-            ->orderBy('unit_number')
-            ->get(['unit_id', 'unit_number']);
-
-        $inUseRemaining = $inUseTarget;
-
-        foreach ($orderedUnits as $unit) {
-            $unitNumber = (int) $unit->unit_number;
-            $unitStatus = 'available';
-            $maintenanceAt = null;
-
-            if (!is_null($specialStatus) && $unitNumber === 1) {
-                $unitStatus = $specialStatus;
-                $maintenanceAt = $specialStatus === 'maintenance' ? now() : null;
-            } elseif ($unitNumber <= $total && $inUseRemaining > 0) {
-                $unitStatus = 'in_use';
-                $inUseRemaining--;
-            } elseif ($unitNumber > $total) {
-                $unitStatus = 'retired';
-            }
-
-            $updatePayload = [
-                'status' => $unitStatus,
-                'last_maintenance_at' => $maintenanceAt,
-                'updated_at' => now(),
-            ];
-
-            if ($unitNumber <= $total) {
-                $unitCode = ItemAsset::normalizeCode((string) ($unitCodes[$unitNumber - 1] ?? ''));
-                if ($unitCode !== '') {
-                    $updatePayload['unit_code'] = $unitCode;
+                if (in_array($currentStatus, ['maintenance', 'damaged'], true)) {
+                    $preservedIssueByNumber[$unitNumber] = $currentStatus;
                 }
             }
 
-            DB::table('item_units')
-                ->where('unit_id', (int) $unit->unit_id)
-                ->update($updatePayload);
+            // Item-level maintenance/damaged from the form tags unit 1 when needed.
+            if ($itemLevelIssue !== null && !isset($preservedIssueByNumber[1])) {
+                $preservedIssueByNumber[1] = $itemLevelIssue;
+            }
+        } elseif ($itemLevelIssue !== null) {
+            $preservedIssueByNumber[1] = $itemLevelIssue;
         }
+
+        $borrowableNumbers = [];
+        for ($unitNumber = 1; $unitNumber <= $total; $unitNumber++) {
+            if (!isset($preservedIssueByNumber[$unitNumber])) {
+                $borrowableNumbers[] = $unitNumber;
+            }
+        }
+
+        $inUseNumbers = array_slice($borrowableNumbers, 0, $inUseTarget);
+        $inUseNumberSet = array_fill_keys($inUseNumbers, true);
+
+        $upsertRows = [];
+
+        for ($unitNumber = 1; $unitNumber <= $total; $unitNumber++) {
+            $current = $existingByNumber[$unitNumber] ?? null;
+
+            $unitCode = ItemAsset::normalizeCode((string) ($unitCodes[$unitNumber - 1] ?? ''));
+            if ($unitCode === '') {
+                $unitCode = ItemAsset::normalizeCode((string) ($current->unit_code ?? ''));
+            }
+            if ($unitCode === '') {
+                $unitCode = ItemAsset::temporaryUnitCode($itemId, $unitNumber);
+            }
+
+            $unitStatus = 'available';
+            $maintenanceAt = $current->last_maintenance_at ?? null;
+            $conditionNotes = $current->condition_notes ?? null;
+
+            if (isset($preservedIssueByNumber[$unitNumber])) {
+                $unitStatus = $preservedIssueByNumber[$unitNumber];
+                if ($unitStatus === 'maintenance' && is_null($maintenanceAt)) {
+                    $maintenanceAt = $now;
+                }
+            } elseif (isset($inUseNumberSet[$unitNumber])) {
+                $unitStatus = 'in_use';
+                $maintenanceAt = null;
+            } else {
+                // New units, reactivated retired units, and freed stock are borrowable.
+                $unitStatus = 'available';
+                $maintenanceAt = null;
+            }
+
+            if (
+                $current
+                && (string) $current->unit_code === $unitCode
+                && strtolower((string) $current->status) === $unitStatus
+            ) {
+                continue;
+            }
+
+            $upsertRows[] = [
+                'item_id' => $itemId,
+                'unit_number' => $unitNumber,
+                'unit_code' => $unitCode,
+                'status' => $unitStatus,
+                'condition_notes' => $conditionNotes,
+                'last_maintenance_at' => $maintenanceAt,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        foreach (array_chunk($upsertRows, self::UNIT_UPSERT_CHUNK) as $chunk) {
+            DB::table('item_units')->upsert(
+                $chunk,
+                ['item_id', 'unit_number'],
+                ['unit_code', 'status', 'condition_notes', 'last_maintenance_at', 'updated_at']
+            );
+        }
+
+        // Excess slots are removed. Raising quantity later creates fresh `available` units.
+        // Keeping hundreds of `retired` rows made the table look like stock was still broken.
+        DB::table('item_units')
+            ->where('item_id', $itemId)
+            ->where('unit_number', '>', $total)
+            ->delete();
     }
 }

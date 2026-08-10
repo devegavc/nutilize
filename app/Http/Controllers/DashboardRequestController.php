@@ -8,6 +8,9 @@ use App\Services\ProgramChairOfficeResolver;
 use App\Services\ItemOwnerService;
 use App\Services\ReservationApprovalWorkflowService;
 use App\Services\ReservationApprovalDeduper;
+use App\Services\ReservationApprovalNotifier;
+use App\Support\HeavySyncGate;
+use App\Support\OpenReservationScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -111,6 +114,23 @@ class DashboardRequestController extends Controller
         $resourceMap = $this->buildResourceMap($reservationIds);
         $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($reservationIds);
         $pfOfficeId = $this->getOfficeIdsByShortCode()['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
+
+        if ($isPfAdmin && !is_null($pfOfficeId)) {
+            $pfActionableIds = [];
+            foreach ($actionableOfficeIds as $reservationId => $actionableOfficeId) {
+                if ((int) $actionableOfficeId === (int) $pfOfficeId) {
+                    $pfActionableIds[] = (int) $reservationId;
+                }
+            }
+
+            foreach ($reservations->getCollection() as $reservation) {
+                if (strtolower((string) $reservation->overall_status) === 'awaiting_physical_facilities') {
+                    $pfActionableIds[] = (int) $reservation->reservation_id;
+                }
+            }
+
+            ReservationApprovalNotifier::ensureUnreadForUser($user, $pfActionableIds, 40);
+        }
 
         $preparedRequests = $reservations->getCollection()->map(function (Reservation $reservation) use ($resourceMap, $actionableOfficeIds, $isPfAdmin, $pfOfficeId) {
             $overallStatus = strtolower((string) $reservation->overall_status);
@@ -308,10 +328,11 @@ class DashboardRequestController extends Controller
     private function syncReservationApprovalWorkflow(?array $reservationIds = null): void
     {
         if (is_null($reservationIds)) {
-            $reservationIds = Reservation::query()
-                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
+            $openQuery = Reservation::query();
+            OpenReservationScope::apply($openQuery);
+            $reservationIds = $openQuery
                 ->orderByDesc('created_at')
-                ->limit(80)
+                ->limit(40)
                 ->pluck('reservation_id')
                 ->all();
         }
@@ -328,22 +349,25 @@ class DashboardRequestController extends Controller
         }
 
         $reservationIds = array_values(array_unique(array_map('intval', $reservationIds)));
-        $this->warmBatchWorkflowLookups($reservationIds);
-        $now = now();
 
-        foreach ($reservationIds as $reservationId) {
-            ProgramChairOfficeResolver::reconcilePendingLegacyPcApproval((int) $reservationId);
-            $workflowOfficeIds = $this->resolveWorkflowOfficeIdsCached($reservationId, true);
-            ReservationApprovalWorkflowService::ensureApprovalRows((int) $reservationId, $workflowOfficeIds);
-        }
+        HeavySyncGate::attempt('office-workflow', function () use ($reservationIds) {
+            $this->warmBatchWorkflowLookups($reservationIds);
+            $now = now();
 
-        DB::table('reservation_approvals')
-            ->whereIn('reservation_id', $reservationIds)
-            ->whereNull('status')
-            ->update([
-                'status' => 'pending',
-                'updated_at' => $now,
-            ]);
+            foreach ($reservationIds as $reservationId) {
+                ProgramChairOfficeResolver::reconcilePendingLegacyPcApproval((int) $reservationId);
+                $workflowOfficeIds = $this->resolveWorkflowOfficeIdsCached($reservationId, true);
+                ReservationApprovalWorkflowService::ensureApprovalRows((int) $reservationId, $workflowOfficeIds);
+            }
+
+            DB::table('reservation_approvals')
+                ->whereIn('reservation_id', $reservationIds)
+                ->whereNull('status')
+                ->update([
+                    'status' => 'pending',
+                    'updated_at' => $now,
+                ]);
+        });
     }
 
     private function syncReservationApprovals(int $reservationId): void

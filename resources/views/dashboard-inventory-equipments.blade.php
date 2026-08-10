@@ -22,7 +22,7 @@
     window.equipmentCategoryUpdateEndpointBase = '{{ url('/dashboard/inventory/equipment-categories') }}';
     window.equipmentCategoryDeleteEndpointBase = '{{ url('/dashboard/inventory/equipment-categories') }}';
     window.equipmentCategories = @json($equipmentCategories ?? []);
-    window.defaultEquipmentCategory = '{{ $defaultEquipmentCategory ?? '' }}';
+    window.defaultEquipmentCategory = 'all';
   </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
@@ -54,8 +54,9 @@
 
         <section class="facilities-filter-row">
           <div class="facilities-tab-group" role="tablist" aria-label="Equipment category">
-            @foreach(($equipmentCategories ?? []) as $index => $category)
-              <button class="facilities-tab {{ $index === 0 ? 'active' : '' }}" type="button" data-equipment-tab="{{ $category['key'] }}">{{ $category['label'] }}</button>
+            <button class="facilities-tab active" type="button" data-equipment-tab="all">All Items</button>
+            @foreach(($equipmentCategories ?? []) as $category)
+              <button class="facilities-tab" type="button" data-equipment-tab="{{ $category['key'] }}">{{ $category['label'] }}</button>
             @endforeach
           </div>
 

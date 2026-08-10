@@ -342,57 +342,110 @@ class OfficeItemController extends Controller
         $rowsByTab = [
             'maintenance' => [],
             'damaged' => [],
+            'reported' => [],
         ];
 
-        if (!Schema::hasTable('item_units')) {
-            return view('office-maintenance', [
-                'maintenanceRowsByTab' => $rowsByTab,
-            ]);
+        if (Schema::hasTable('item_units')) {
+            $unitsNeedingAttention = DB::table('item_units')
+                ->join('items', 'items.item_id', '=', 'item_units.item_id')
+                ->leftJoin('item_categories as categories', 'categories.category_id', '=', 'items.category_id')
+                ->select([
+                    'item_units.unit_id',
+                    'item_units.unit_code',
+                    'item_units.status',
+                    'item_units.condition_notes',
+                    'item_units.last_maintenance_at',
+                    'item_units.updated_at as unit_updated_at',
+                    'item_units.created_at as unit_created_at',
+                    'items.item_id',
+                    'items.item_name',
+                    'categories.category_key as category_key',
+                ])
+                ->where('items.owner_id', $ownerId)
+                ->whereIn('item_units.status', ['maintenance', 'damaged'])
+                ->orderByDesc('item_units.updated_at')
+                ->get();
+
+            foreach ($unitsNeedingAttention as $unit) {
+                $category = $this->normalizeCategory((string) ($unit->category_key ?? ''));
+                $isDamaged = strtolower((string) $unit->status) === 'damaged';
+                $tab = $isDamaged ? 'damaged' : 'maintenance';
+
+                $dateSource = $unit->last_maintenance_at ?? $unit->unit_updated_at ?? $unit->unit_created_at;
+                $dateLabel = $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y');
+
+                $rowsByTab[$tab][] = [
+                    'row_type' => 'unit',
+                    'unit_id' => (int) $unit->unit_id,
+                    'id' => (string) ($unit->unit_code ?? ''),
+                    'item' => (string) ($unit->item_name ?? 'Unnamed Item'),
+                    'count' => '1',
+                    'date' => $dateLabel,
+                    'status' => $isDamaged ? 'Damaged' : 'Maintenance',
+                    'statusClass' => $isDamaged ? 'damaged' : 'maintenance',
+                    'location' => $this->locationFromCategory($category),
+                    'reason' => (string) ($unit->condition_notes ?? ''),
+                ];
+            }
         }
 
-        $unitsNeedingAttention = DB::table('item_units')
-            ->join('items', 'items.item_id', '=', 'item_units.item_id')
-            ->leftJoin('item_categories as categories', 'categories.category_id', '=', 'items.category_id')
-            ->select([
-                'item_units.unit_id',
-                'item_units.unit_code',
-                'item_units.status',
-                'item_units.condition_notes',
-                'item_units.last_maintenance_at',
-                'item_units.updated_at as unit_updated_at',
-                'item_units.created_at as unit_created_at',
-                'items.item_id',
-                'items.item_name',
-                'categories.category_key as category_key',
-            ])
-            ->where('items.owner_id', $ownerId)
-            ->whereIn('item_units.status', ['maintenance', 'damaged'])
-            ->orderByDesc('item_units.updated_at')
-            ->get();
-
-        foreach ($unitsNeedingAttention as $unit) {
-            $category = $this->normalizeCategory((string) ($unit->category_key ?? ''));
-            $isDamaged = strtolower((string) $unit->status) === 'damaged';
-            $tab = $isDamaged ? 'damaged' : 'maintenance';
-
-            $dateSource = $unit->last_maintenance_at ?? $unit->unit_updated_at ?? $unit->unit_created_at;
-            $dateLabel = $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y');
-
-            $rowsByTab[$tab][] = [
-                'unit_id' => (int) $unit->unit_id,
-                'id' => (string) ($unit->unit_code ?? ''),
-                'item' => (string) ($unit->item_name ?? 'Unnamed Item'),
-                'count' => '1',
-                'date' => $dateLabel,
-                'status' => $isDamaged ? 'Damaged' : 'Maintenance',
-                'statusClass' => $isDamaged ? 'damaged' : 'maintenance',
-                'location' => $this->locationFromCategory($category),
-                'reason' => (string) ($unit->condition_notes ?? ''),
-            ];
-        }
+        $rowsByTab['reported'] = $this->loadOwnerReservationIssueRows($ownerId);
 
         return view('office-maintenance', [
             'maintenanceRowsByTab' => $rowsByTab,
+        ]);
+    }
+
+    public function dismissMaintenanceReport(Request $request, int $reportId): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$this->isIoAdminUser($user)) {
+            return response()->json(['error' => 'Unauthorized.'], 403);
+        }
+
+        if (!Schema::hasTable('reservation_issues')) {
+            return response()->json(['error' => 'Reports table is not available.'], 422);
+        }
+
+        $validated = $request->validate([
+            'assessment' => ['required', 'string', 'max:255'],
+        ]);
+
+        $ownerId = $this->resolveOwnerIdForUser($user, true);
+        $issue = DB::table('reservation_issues')->where('issue_id', $reportId)->first();
+
+        if (!$issue) {
+            return response()->json(['error' => 'Report not found.'], 404);
+        }
+
+        if (!$this->reservationInvolvesOwner((int) ($issue->reservation_id ?? 0), $ownerId)) {
+            return response()->json(['error' => 'Report not found for your items.'], 404);
+        }
+
+        $update = [
+            'status' => 'Resolved',
+        ];
+
+        $existingDescription = trim((string) ($issue->description ?? ''));
+        $assessment = trim((string) $validated['assessment']);
+        if ($assessment !== '') {
+            $update['description'] = $existingDescription !== ''
+                ? ($existingDescription . "\n\nResolution: " . $assessment)
+                : ('Resolution: ' . $assessment);
+        }
+
+        DB::table('reservation_issues')
+            ->where('issue_id', $reportId)
+            ->update($update);
+
+        return response()->json([
+            'success' => true,
+            'report' => [
+                'row_type' => 'report',
+                'report_id' => $reportId,
+                'resolved' => true,
+            ],
         ]);
     }
 
@@ -488,6 +541,188 @@ class OfficeItemController extends Controller
                 'resolved' => $targetStatus === 'available',
             ],
         ]);
+    }
+
+    /**
+     * Open reservation issues that touch this owner's equipment.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadOwnerReservationIssueRows(int $ownerId): array
+    {
+        if (
+            $ownerId <= 0
+            || !Schema::hasTable('reservation_issues')
+            || !Schema::hasTable('reservation_details')
+            || !Schema::hasTable('reservation_items')
+            || !Schema::hasTable('items')
+        ) {
+            return [];
+        }
+
+        $issueQuery = DB::table('reservation_issues as issues')
+            ->leftJoin('users as users', 'users.user_id', '=', 'issues.user_id')
+            ->leftJoin('reservations as reservations', 'reservations.reservation_id', '=', 'issues.reservation_id')
+            ->select([
+                'issues.issue_id',
+                'issues.reservation_id',
+                'issues.user_id',
+                'issues.reported_by',
+                'issues.description',
+                'issues.image_url',
+                'issues.status',
+                'issues.created_at',
+                'reservations.activity_name',
+                'users.full_name as reporter_full_name',
+                'users.first_name as reporter_first_name',
+                'users.last_name as reporter_last_name',
+                'users.username as reporter_username',
+            ])
+            ->whereExists(function ($query) use ($ownerId) {
+                $query->select(DB::raw(1))
+                    ->from('reservation_details as details')
+                    ->join('reservation_items as bookedItems', 'bookedItems.reservation_items_id', '=', 'details.reservation_items_id')
+                    ->join('items as ownedItems', 'ownedItems.item_id', '=', 'bookedItems.item_id')
+                    ->whereColumn('details.reservation_id', 'issues.reservation_id')
+                    ->where('ownedItems.owner_id', $ownerId);
+            })
+            ->orderByDesc('issues.created_at');
+
+        if (Schema::hasColumn('reservation_issues', 'status')) {
+            $issueQuery->where(function ($query) {
+                $query->whereNull('issues.status')
+                    ->orWhereRaw("LOWER(COALESCE(issues.status, '')) NOT IN ('resolved', 'solved', 'fixed', 'closed', 'done', 'dismissed')");
+            });
+        }
+
+        $issueRows = $issueQuery->limit(100)->get();
+        if ($issueRows->isEmpty()) {
+            return [];
+        }
+
+        $reservationIds = $issueRows
+            ->pluck('reservation_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $ownedItemNamesByReservation = [];
+        if ($reservationIds !== []) {
+            $ownedItemNamesByReservation = DB::table('reservation_details as details')
+                ->join('reservation_items as bookedItems', 'bookedItems.reservation_items_id', '=', 'details.reservation_items_id')
+                ->join('items as ownedItems', 'ownedItems.item_id', '=', 'bookedItems.item_id')
+                ->whereIn('details.reservation_id', $reservationIds)
+                ->where('ownedItems.owner_id', $ownerId)
+                ->select(['details.reservation_id', 'ownedItems.item_name'])
+                ->get()
+                ->groupBy(fn ($row) => (int) $row->reservation_id)
+                ->map(function ($rows) {
+                    return $rows
+                        ->map(fn ($row) => trim((string) ($row->item_name ?? '')))
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
+                })
+                ->all();
+        }
+
+        $rows = [];
+
+        foreach ($issueRows as $issue) {
+            $description = trim((string) ($issue->description ?? ''));
+            $reservationId = (int) ($issue->reservation_id ?? 0);
+            $ownedNames = $ownedItemNamesByReservation[$reservationId] ?? [];
+            $itemLabel = $ownedNames !== []
+                ? implode(', ', $ownedNames)
+                : $this->itemLabelFromReservationIssue($description, (string) ($issue->activity_name ?? ''));
+
+            $reporterName = trim((string) ($issue->reporter_full_name ?? ''));
+            if ($reporterName === '') {
+                $first = trim((string) ($issue->reporter_first_name ?? ''));
+                $last = trim((string) ($issue->reporter_last_name ?? ''));
+                $reporterName = trim("{$first} {$last}");
+            }
+            if ($reporterName === '') {
+                $reporterName = trim((string) ($issue->reported_by ?? $issue->reporter_username ?? 'Unknown'));
+            }
+
+            $proofUrl = trim((string) ($issue->image_url ?? ''));
+            if ($proofUrl !== '' && !preg_match('#^https?://#i', $proofUrl)) {
+                $proofUrl = '';
+            }
+
+            $dateValue = $issue->created_at;
+            $displayId = $reservationId > 0
+                ? ('NU-' . str_pad((string) $reservationId, 6, '0', STR_PAD_LEFT))
+                : ('issue_' . (int) $issue->issue_id);
+
+            $rows[] = [
+                'row_type' => 'report',
+                'unit_id' => 0,
+                'report_id' => (int) $issue->issue_id,
+                'reservation_id' => $reservationId,
+                'id' => $displayId,
+                'item' => $itemLabel,
+                'count' => '1',
+                'date' => $dateValue ? date('d/m/Y', strtotime((string) $dateValue)) : date('d/m/Y'),
+                'status' => 'Reported',
+                'statusClass' => 'reported',
+                'location' => '',
+                'reason' => $description !== '' ? $description : 'Reported reservation issue',
+                'reporter' => $reporterName,
+                'description' => $description,
+                'proof_image_url' => $proofUrl,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function reservationInvolvesOwner(int $reservationId, int $ownerId): bool
+    {
+        if (
+            $reservationId <= 0
+            || $ownerId <= 0
+            || !Schema::hasTable('reservation_details')
+            || !Schema::hasTable('reservation_items')
+            || !Schema::hasTable('items')
+        ) {
+            return false;
+        }
+
+        return DB::table('reservation_details as details')
+            ->join('reservation_items as bookedItems', 'bookedItems.reservation_items_id', '=', 'details.reservation_items_id')
+            ->join('items as ownedItems', 'ownedItems.item_id', '=', 'bookedItems.item_id')
+            ->where('details.reservation_id', $reservationId)
+            ->where('ownedItems.owner_id', $ownerId)
+            ->exists();
+    }
+
+    private function itemLabelFromReservationIssue(string $description, string $activityName = ''): string
+    {
+        $description = trim($description);
+        $activityName = trim($activityName);
+
+        if ($description !== '' && preg_match('/reported items?:\s*(.+)$/im', $description, $matches)) {
+            $reportedItems = trim((string) ($matches[1] ?? ''));
+            if ($reportedItems !== '') {
+                return $reportedItems;
+            }
+        }
+
+        if ($activityName !== '') {
+            return $activityName;
+        }
+
+        if ($description !== '') {
+            $firstLine = trim((string) strtok($description, "\n"));
+            return $firstLine !== '' ? $firstLine : 'Reported Issue';
+        }
+
+        return 'Reported Issue';
     }
 
     private function isIoAdminUser($user): bool

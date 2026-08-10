@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Reservation;
-use Carbon\Carbon;
+use App\Services\ReservationApprovalWorkflowService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -17,35 +17,33 @@ class ExpireReservations extends Command
         $now = now();
         $this->info("Checking for expired reservations at {$now}...");
 
-        // Find reservations where:
-        // 1. Start_of_activity or start_of_activity has passed
-        // 2. overall_status is NOT already approved, rejected, or cancelled
-        $expiredCount = Reservation::query()
-            ->where(function ($query) {
-                $query->whereNotNull('Start_of_activity')
-                    ->where('Start_of_activity', '<', now())
-                    ->orWhere(function ($q) {
-                        $q->whereNotNull('start_of_activity')
-                            ->where('start_of_activity', '<', now());
-                    });
-            })
-            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), [
-                'approved',
-                'rejected',
-                'cancelled',
-                'canceled',
-                'expired',
-            ])
-            ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
-            ->get()
-            ->count();
+        $reservationIds = $this->expirableQuery()
+            ->pluck('reservation_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
-        if ($expiredCount === 0) {
+        if ($reservationIds === []) {
             $this->info('No reservations to expire.');
+
             return self::SUCCESS;
         }
 
         $updated = Reservation::query()
+            ->whereIn('reservation_id', $reservationIds)
+            ->update(['overall_status' => 'expired']);
+
+        // Without this the outstanding approval rows stay pending and the expired
+        // request keeps appearing in every approver queue it never reached.
+        $retired = ReservationApprovalWorkflowService::closePendingApprovals($reservationIds, 'expired');
+
+        $this->info("Successfully marked {$updated} reservation(s) as expired, retiring {$retired} pending approval row(s).");
+
+        return self::SUCCESS;
+    }
+
+    private function expirableQuery()
+    {
+        return Reservation::query()
             ->where(function ($query) {
                 $query->whereNotNull('Start_of_activity')
                     ->where('Start_of_activity', '<', now())
@@ -61,11 +59,6 @@ class ExpireReservations extends Command
                 'canceled',
                 'expired',
             ])
-            ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
-            ->update(['overall_status' => 'expired']);
-
-        $this->info("Successfully marked {$updated} reservation(s) as expired.");
-
-        return self::SUCCESS;
+            ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%']);
     }
 }

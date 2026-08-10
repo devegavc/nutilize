@@ -12,7 +12,7 @@ $programs = [
     ['name' => 'BS Civil Engineering', 'username' => 'CE_program_chair'],
     ['name' => 'BS Computer Science', 'username' => 'CS_program_chair'],
     ['name' => 'BS Computer Engineering', 'username' => 'ComEng_program_chair'],
-    ['name' => 'BS Information Technology with specialization in Mobile and Web Applications', 'username' => 'IT_program_chair'],
+    ['name' => 'BS Information Technology', 'username' => 'IT_program_chair'],
     ['name' => 'BS Accountancy', 'username' => 'BSA_program_chair'],
     ['name' => 'BSBA Major in Financial Management', 'username' => 'FinMan_program_chair'],
     ['name' => 'BSBA Major in Marketing Management', 'username' => 'BusinessAdd_program_chair'],

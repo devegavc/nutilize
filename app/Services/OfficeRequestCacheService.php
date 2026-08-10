@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\Reservation;
 use App\Models\ReservationApproval;
+use App\Support\OpenReservationScope;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 class OfficeRequestCacheService
 {
@@ -31,23 +31,25 @@ class OfficeRequestCacheService
     private static function getTotalActionableRequests(int $officeId, bool $isPfAdmin = false): int
     {
         if ($isPfAdmin) {
-            return (int) Reservation::query()
-                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
-                ->count();
+            $query = Reservation::query();
+            OpenReservationScope::apply($query);
+
+            return (int) $query->count();
         }
 
-        return (int) ReservationApproval::query()
-            ->where('office_id', $officeId)
-            ->whereNull('approved_at')
-            ->count();
+        return self::getPendingRequests($officeId);
     }
 
     private static function getPendingRequests(int $officeId): int
     {
-        return (int) ReservationApproval::query()
-            ->where('office_id', $officeId)
-            ->whereNull('approved_at')
-            ->count();
+        $query = ReservationApproval::query()
+            ->join('reservations', 'reservations.reservation_id', '=', 'reservation_approvals.reservation_id')
+            ->where('reservation_approvals.office_id', $officeId)
+            ->whereNull('reservation_approvals.approved_at');
+
+        OpenReservationScope::apply($query, 'reservations.overall_status');
+
+        return (int) $query->count();
     }
 
     private static function getApprovedRequests(int $officeId): int

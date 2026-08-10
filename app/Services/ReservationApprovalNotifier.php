@@ -13,6 +13,94 @@ use Illuminate\Support\Facades\DB;
 class ReservationApprovalNotifier
 {
     /**
+     * Cheap write-path seed: ensure the current approver has one unread/read notification
+     * per actionable reservation. Only inserts missing rows — no deletes, no workflow sync.
+     *
+     * @param  array<int, int>  $actionableReservationIds
+     * @return int number of notifications inserted
+     */
+    public static function ensureUnreadForUser(User $user, array $actionableReservationIds, int $limit = 20): int
+    {
+        $userId = (int) ($user->user_id ?? 0);
+        if ($userId <= 0) {
+            return 0;
+        }
+
+        $reservationIds = array_values(array_unique(array_filter(
+            array_map('intval', $actionableReservationIds),
+            static fn (int $id): bool => $id > 0
+        )));
+
+        if ($reservationIds === []) {
+            return 0;
+        }
+
+        $reservationIds = array_slice($reservationIds, 0, max(1, $limit));
+
+        $existingRelatedIds = DB::table('notifications')
+            ->where('user_id', $userId)
+            ->whereIn('type', ['reservation_approval_request', 'reservation_approval_handoff'])
+            ->whereIn('related_id', $reservationIds)
+            ->pluck('related_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $missingIds = array_values(array_diff($reservationIds, $existingRelatedIds));
+        if ($missingIds === []) {
+            return 0;
+        }
+
+        $reservations = Reservation::with('user')
+            ->whereIn('reservation_id', $missingIds)
+            ->get()
+            ->keyBy('reservation_id');
+
+        $now = now();
+        $inserted = 0;
+
+        foreach ($missingIds as $reservationId) {
+            $reservation = $reservations->get($reservationId);
+            if (!$reservation) {
+                continue;
+            }
+
+            $requester = $reservation->user;
+            $requesterName = $requester
+                ? (method_exists($requester, 'displayName') ? $requester->displayName() : ($requester->full_name ?? $requester->username ?? 'Unknown'))
+                : 'Unknown';
+            $activityName = trim((string) $reservation->activity_name) ?: 'Reservation request';
+
+            try {
+                DB::table('notifications')->insert([
+                    'user_id' => $userId,
+                    'type' => 'reservation_approval_request',
+                    'title' => 'Reservation approval needed',
+                    'message' => "Request '{$activityName}' by {$requesterName} is waiting for your approval.",
+                    'related_id' => (int) $reservationId,
+                    'read' => DB::raw('false'),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+                $inserted++;
+            } catch (\Throwable $throwable) {
+                \Log::error('Failed to seed approval notification', [
+                    'error' => $throwable->getMessage(),
+                    'user_id' => $userId,
+                    'reservation_id' => $reservationId,
+                ]);
+                report($throwable);
+            }
+        }
+
+        if ($inserted > 0) {
+            Cache::forget('notification_unread_count.user.' . $userId);
+            Cache::forget('approval_notification_sync.user.' . $userId);
+        }
+
+        return $inserted;
+    }
+
+    /**
      * Notify admins in $officeId when that office should be alerted:
      * - it is the current actionable approver, or
      * - it is the Physical Facilities office (PF visibility across requests).
@@ -111,6 +199,7 @@ class ReservationApprovalNotifier
                     'updated_at' => $now,
                 ]);
                 Cache::forget('approval_notification_sync.user.' . (int) $admin->user_id);
+                Cache::forget('notification_unread_count.user.' . (int) $admin->user_id);
             } catch (\Throwable $throwable) {
                 \Log::error('Failed to create notification', [
                     'error' => $throwable->getMessage(),
@@ -205,6 +294,7 @@ class ReservationApprovalNotifier
                     'updated_at' => now(),
                 ]);
                 Cache::forget('approval_notification_sync.user.' . (int) $admin->user_id);
+                Cache::forget('notification_unread_count.user.' . (int) $admin->user_id);
             } catch (\Throwable $throwable) {
                 \Log::error('Failed to create handoff notification', [
                     'error' => $throwable->getMessage(),

@@ -455,8 +455,18 @@
 }
 
 .office-request-history-table .office-queue-actions-cell {
-	min-width: 148px;
-	max-width: 190px;
+	min-width: 210px;
+	max-width: none;
+}
+
+.office-queue-action-btn.office-queue-view {
+	background: #eef2ff;
+	color: #2f3f88;
+	border: 1px solid #bcc8ec;
+}
+
+.office-queue-action-btn.office-queue-view:hover {
+	background: #dfe7ff;
 }
 
 .office-request-history-table .badge {
@@ -2318,4 +2328,27 @@ select.office-history-filter-control option {
 	.office-archive-history-head {
 		flex-wrap: wrap;
 	}
+}
+
+/* Office tables — comfortable spacing at 100% zoom */
+.office-table th,
+.office-table td {
+	padding: 13px 16px;
+	line-height: 1.45;
+	vertical-align: middle;
+	white-space: normal;
+	word-break: break-word;
+}
+
+.office-table-wrap {
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+.office-home-card {
+	padding: 20px 22px 22px;
+}
+
+.office-table-header {
+	padding: 12px 18px;
 }

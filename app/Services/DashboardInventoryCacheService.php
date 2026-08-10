@@ -250,7 +250,8 @@ class DashboardInventoryCacheService
             return [
                 'asset_id' => ItemUnitService::listAssetLabel($unitCodes, $itemId),
                 'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
-                'location' => trim((string) ($row->owner_name ?? '')) ?: 'Storage',
+                'owner' => trim((string) ($row->owner_name ?? '')) ?: 'Unassigned',
+                'location' => trim((string) ($row->owner_name ?? '')) ?: 'Unassigned',
                 'category' => 'Equipment',
                 'stock' => $stock,
                 'booking_count' => (int) ($row->booking_count ?? 0),
@@ -313,7 +314,8 @@ class DashboardInventoryCacheService
             return [
                 'asset_id' => ItemUnitService::listAssetLabel($unitCodes, $itemId),
                 'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
-                'location' => trim((string) ($row->owner_name ?? 'Storage')),
+                'owner' => trim((string) ($row->owner_name ?? '')) ?: 'Unassigned',
+                'location' => trim((string) ($row->owner_name ?? '')) ?: 'Unassigned',
                 'category' => 'Equipment',
                 'usage_count' => $usageCount,
                 'usage_percent' => min(100, (int) round(($usageCount / $maxUsage) * 100)),

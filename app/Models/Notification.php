@@ -25,6 +25,19 @@ class Notification extends Model
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
+    /**
+     * Postgres stores `read` as boolean — Laravel's where('read', false) binds 0 and fails.
+     */
+    public function scopeUnread($query)
+    {
+        return $query->whereRaw('"read" = false');
+    }
+
+    public function scopeRead($query)
+    {
+        return $query->whereRaw('"read" = true');
+    }
+
     public function markAsRead(): void
     {
         DB::table('notifications')

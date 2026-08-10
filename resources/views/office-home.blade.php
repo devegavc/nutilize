@@ -156,6 +156,7 @@
       reject: '{{ route('approval.reject', ['approvalId' => '__APPROVAL_ID__']) }}'
     };
     window.officeQueueSnapshotUrl = '{{ route('office.requests.snapshot') }}';
+    window.reservationDetailsUrlTemplate = '{{ route('reservation.details', ['reservationId' => '__RESERVATION_ID__']) }}';
   </script>
   <script src="/js/dashboard.js"></script>
   <script>
@@ -188,7 +189,8 @@
       let refreshVersion = 0;
       let pendingRefreshRequest = false;
       let pendingManualRefresh = false;
-      const refreshIntervalMs = 30000;
+      const refreshIntervalMs = 120000;
+      let lastVisibilityRefreshAt = 0;
 
       const resolveUrl = (action, approvalId) => {
         const template = window.officeApprovalRoutes?.[action] || '';
@@ -200,6 +202,121 @@
           return `${parsed.pathname}${parsed.search}`;
         } catch (_error) {
           return resolved;
+        }
+      };
+
+      const resolveReservationDetailsUrl = (reservationId) => {
+        const template = window.reservationDetailsUrlTemplate || '/dashboard/reservation/__RESERVATION_ID__/details';
+        const resolved = template.replace('__RESERVATION_ID__', String(reservationId));
+
+        try {
+          const parsed = new URL(resolved, window.location.origin);
+          return `${parsed.pathname}${parsed.search}`;
+        } catch (_error) {
+          return resolved;
+        }
+      };
+
+      const submitQueueAction = async (action, approvalId, sourceButton = null) => {
+        const confirmed = await openActionConfirmModal(action);
+
+        if (!confirmed) {
+          return false;
+        }
+
+        isActing = true;
+        refreshVersion += 1;
+        setButtonsDisabled(true);
+
+        try {
+          const response = await fetch(resolveUrl(action, approvalId), {
+            method: 'PATCH',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': token,
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({}),
+          });
+
+          const responseText = await response.text();
+          let payload = {};
+
+          if (responseText) {
+            try {
+              payload = JSON.parse(responseText);
+            } catch (_error) {
+              payload = { error: responseText };
+            }
+          }
+
+          if (!response.ok) {
+            const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
+            showAppNotice((payload.error || payload.message || 'Action failed. Please try again.') + statusMessage);
+            return false;
+          }
+
+          const actorName = window.authUser?.full_name || 'Admin';
+          const decisionWord = action === 'approve' ? 'approved' : 'rejected';
+          const fallbackMessage = `Request ${decisionWord} by ${actorName}.`;
+          showActionToast(payload.message || fallbackMessage, decisionWord === 'approved' ? 'approved' : 'rejected');
+
+          if (sourceButton instanceof HTMLButtonElement) {
+            applyLocalQueueDecision(sourceButton, action);
+          } else {
+            const queueButton = document.querySelector(`.office-queue-action-btn[data-approval-id="${approvalId}"][data-action="${action}"]`);
+            if (queueButton instanceof HTMLButtonElement) {
+              applyLocalQueueDecision(queueButton, action);
+            }
+          }
+
+          softRefreshQueue(false, true);
+          return true;
+        } catch (_error) {
+          showAppNotice('Request failed. Please check your connection and try again.');
+          return false;
+        } finally {
+          isActing = false;
+          setButtonsDisabled(false);
+        }
+      };
+
+      const openReservationDetails = async (reservationId, approvalId, canAct) => {
+        if (!reservationId) {
+          return;
+        }
+
+        try {
+          const response = await fetch(resolveReservationDetailsUrl(reservationId), {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'X-CSRF-TOKEN': token,
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+          });
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.success || !payload.reservation) {
+            showAppNotice(payload.message || 'Unable to load request details.');
+            return;
+          }
+
+          if (typeof showReservationDetailsModal !== 'function') {
+            showAppNotice('Details view is unavailable on this page.');
+            return;
+          }
+
+          showReservationDetailsModal(payload.reservation, {
+            approvalId,
+            canAct: canAct === '1' || canAct === true,
+            onAction: async (action, modalApprovalId) => {
+              await submitQueueAction(action, modalApprovalId);
+            },
+          });
+        } catch (_error) {
+          showAppNotice('Unable to load request details.');
         }
       };
 
@@ -331,7 +448,7 @@
 
         const hasRows = queueBody.querySelector('tr');
         if (!hasRows) {
-          queueBody.innerHTML = '<tr><td colspan="6">No actionable requests found for your office.</td></tr>';
+          queueBody.innerHTML = '<tr><td colspan="7">No actionable requests found for your office.</td></tr>';
         }
 
         // Keep summary tiles responsive while server-side refresh runs.
@@ -482,8 +599,18 @@
           return;
         }
 
+        const viewButton = target.closest('.office-queue-view');
+        if (viewButton instanceof HTMLButtonElement) {
+          await openReservationDetails(
+            viewButton.getAttribute('data-reservation-id'),
+            viewButton.getAttribute('data-approval-id'),
+            viewButton.getAttribute('data-can-act'),
+          );
+          return;
+        }
+
         const button = target.closest('.office-queue-action-btn');
-        if (!(button instanceof HTMLButtonElement)) {
+        if (!(button instanceof HTMLButtonElement) || button.classList.contains('office-queue-view')) {
           return;
         }
 
@@ -494,64 +621,21 @@
           return;
         }
 
-        const confirmed = await openActionConfirmModal(action);
-
-        if (!confirmed) {
-          return;
-        }
-
-        isActing = true;
-        refreshVersion += 1;
-        setButtonsDisabled(true);
-
-        try {
-          const response = await fetch(resolveUrl(action, approvalId), {
-            method: 'PATCH',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'X-CSRF-TOKEN': token,
-              'X-Requested-With': 'XMLHttpRequest',
-            },
-            body: JSON.stringify({}),
-          });
-
-          const responseText = await response.text();
-          let payload = {};
-
-          if (responseText) {
-            try {
-              payload = JSON.parse(responseText);
-            } catch (_error) {
-              payload = { error: responseText };
-            }
-          }
-
-          if (!response.ok) {
-            const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
-            showAppNotice((payload.error || payload.message || 'Action failed. Please try again.') + statusMessage);
-            return;
-          }
-
-          const actorName = window.authUser?.full_name || 'Admin';
-          const decisionWord = action === 'approve' ? 'approved' : 'rejected';
-          const fallbackMessage = `Request ${decisionWord} by ${actorName}.`;
-          showActionToast(payload.message || fallbackMessage, decisionWord === 'approved' ? 'approved' : 'rejected');
-          applyLocalQueueDecision(button, action);
-
-          softRefreshQueue(false, true);
-        } catch (_error) {
-          showAppNotice('Request failed. Please check your connection and try again.');
-        } finally {
-          isActing = false;
-          setButtonsDisabled(false);
-        }
+        await submitQueueAction(action, approvalId, button);
       });
 
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-          softRefreshQueue();
+        if (document.hidden) {
+          return;
         }
+
+        // Avoid a DB hit every time the user briefly switches tabs.
+        if (Date.now() - lastVisibilityRefreshAt < refreshIntervalMs) {
+          return;
+        }
+
+        lastVisibilityRefreshAt = Date.now();
+        softRefreshQueue();
       });
 
       initOfficeQueueReloadButton();

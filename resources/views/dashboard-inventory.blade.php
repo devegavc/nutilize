@@ -85,7 +85,7 @@
                 <tr>
                   <th>Asset ID</th>
                   <th>Item Name</th>
-                  <th>Location</th>
+                  <th>Owner</th>
                   <th>Category</th>
                   <th>Frequency Usage</th>
                 </tr>
@@ -95,7 +95,7 @@
                   <tr>
                     <td>{{ $item['asset_id'] }}</td>
                     <td>{{ $item['item_name'] }}</td>
-                    <td>{{ $item['location'] }}</td>
+                    <td>{{ $item['owner'] ?? $item['location'] ?? '—' }}</td>
                     <td>{{ $item['category'] }}</td>
                     <td>
                       <span class="freq-bar">

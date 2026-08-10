@@ -113,6 +113,58 @@ class DashboardCacheService
      */
     private static function getQuickReports(int $limit = 6): array
     {
+        if (self::hasTable('reservation_issues')) {
+            $query = DB::table('reservation_issues as issues')
+                ->leftJoin('users as users', 'users.user_id', '=', 'issues.user_id')
+                ->leftJoin('reservations as reservations', 'reservations.reservation_id', '=', 'issues.reservation_id')
+                ->select([
+                    'issues.issue_id',
+                    'issues.description',
+                    'issues.reported_by',
+                    'issues.image_url',
+                    'issues.status',
+                    'issues.created_at',
+                    'reservations.activity_name',
+                    'users.first_name',
+                    'users.middle_initial',
+                    'users.last_name',
+                    'users.suffix',
+                    'users.full_name as reporter_full_name',
+                    'users.username as reporter_username',
+                ])
+                ->orderByDesc('issues.created_at')
+                ->limit($limit);
+
+            return $query->get()
+                ->map(function ($row) {
+                    $statusRaw = strtolower(trim((string) ($row->status ?? 'pending')));
+                    $isSolved = in_array($statusRaw, ['solved', 'resolved', 'fixed', 'closed', 'done', 'dismissed'], true);
+
+                    $description = trim((string) ($row->description ?? ''));
+                    $itemLabel = 'Reported Issue';
+                    if (preg_match('/reported items?:\s*(.+)$/im', $description, $matches)) {
+                        $itemLabel = trim((string) $matches[1]);
+                    } elseif (trim((string) ($row->activity_name ?? '')) !== '') {
+                        $itemLabel = trim((string) $row->activity_name);
+                    } elseif ($description !== '') {
+                        $itemLabel = strtok($description, "\n") ?: $description;
+                    }
+
+                    $hasImage = trim((string) ($row->image_url ?? '')) !== '';
+
+                    return [
+                        'item' => $itemLabel,
+                        'reported_by' => \App\Models\User::formatDisplayName($row)
+                            ?: trim((string) ($row->reported_by ?? $row->reporter_username ?? 'Unknown')),
+                        'attachment_label' => $hasImage ? '1 Attachment' : 'No attachment',
+                        'status_label' => $isSolved ? 'Solved' : 'Pending',
+                        'status_class' => $isSolved ? 'solved' : 'pending',
+                    ];
+                })
+                ->values()
+                ->all();
+        }
+
         if (!self::hasTable('reports')) {
             return [];
         }
@@ -124,6 +176,10 @@ class DashboardCacheService
             ->select([
                 'reports.report_id',
                 'reports.report_info',
+                'users.first_name',
+                'users.middle_initial',
+                'users.last_name',
+                'users.suffix',
                 'users.full_name as reporter_full_name',
                 'users.username as reporter_username',
                 'items.item_name',
@@ -163,7 +219,7 @@ class DashboardCacheService
 
                 return [
                     'item' => $itemLabel,
-                    'reported_by' => trim((string) ($row->reporter_full_name ?? $row->reporter_username ?? 'Unknown')),
+                    'reported_by' => \App\Models\User::formatDisplayName($row),
                     'attachment_label' => $attachmentLabel,
                     'status_label' => $isSolved ? 'Solved' : 'Pending',
                     'status_class' => $isSolved ? 'solved' : 'pending',
@@ -189,6 +245,10 @@ class DashboardCacheService
                 'reservations.activity_name',
                 'reservations.created_at',
                 'reservations.overall_status',
+                'users.first_name',
+                'users.middle_initial',
+                'users.last_name',
+                'users.suffix',
                 'users.full_name as requester_full_name',
                 'users.username as requester_username',
             ])
@@ -208,7 +268,7 @@ class DashboardCacheService
         return $rows
             ->map(function ($row) use ($resourceSummaryMap) {
                 $createdAt = Carbon::parse($row->created_at);
-                $requester = trim((string) ($row->requester_full_name ?? $row->requester_username ?? 'Unknown'));
+                $requester = \App\Models\User::formatDisplayName($row);
                 $resources = $resourceSummaryMap[(int) $row->reservation_id] ?? 'No resources listed';
                 $status = trim((string) ($row->overall_status ?? ''));
                 $statusSuffix = $status !== '' ? ' | Status: ' . str_replace('_', ' ', $status) : '';
@@ -326,7 +386,14 @@ class DashboardCacheService
                 ->count();
         }
 
-        // If no maintenance records, check reports that were marked as solved today
+        // If no maintenance records, check reservation issues / legacy reports marked solved today.
+        if ($resolvedToday === 0 && self::hasTable('reservation_issues') && self::hasColumn('reservation_issues', 'status')) {
+            $resolvedToday = (int) DB::table('reservation_issues')
+                ->whereRaw("LOWER(COALESCE(status, '')) IN ('solved', 'resolved', 'fixed', 'closed', 'done', 'dismissed')")
+                ->whereDate('created_at', now()->toDateString())
+                ->count();
+        }
+
         if ($resolvedToday === 0 && self::hasTable('reports') && self::hasColumn('reports', 'status') && self::hasColumn('reports', 'updated_at')) {
             $resolvedToday = (int) DB::table('reports')
                 ->whereRaw("LOWER(COALESCE(status, '')) IN ('solved', 'resolved', 'fixed', 'closed', 'done')")
@@ -335,7 +402,14 @@ class DashboardCacheService
         }
 
         $pendingReports = 0;
-        if (self::hasTable('reports')) {
+        if (self::hasTable('reservation_issues')) {
+            $pendingReports = (int) DB::table('reservation_issues')
+                ->where(function ($query) {
+                    $query->whereNull('status')
+                        ->orWhereRaw("LOWER(COALESCE(status, '')) NOT IN ('resolved', 'solved', 'fixed', 'closed', 'done', 'dismissed')");
+                })
+                ->count();
+        } elseif (self::hasTable('reports')) {
             if (self::hasColumn('reports', 'status')) {
                 $pendingReports = (int) DB::table('reports')
                     ->whereRaw("LOWER(COALESCE(status, 'pending')) NOT IN ('solved', 'resolved', 'fixed', 'closed', 'done')")

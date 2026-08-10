@@ -24,7 +24,14 @@ class ApprovalController extends Controller
     /** After this many completed reservations touching a unit, flag it for maintenance. */
     private const EQUIPMENT_RESERVATION_USAGE_THRESHOLD = 5;
 
-    private const NOTIFICATION_SYNC_BATCH_LIMIT = 60;
+    public static function usageThresholdMaintenanceReason(?int $usageCount = null): string
+    {
+        $uses = max(self::EQUIPMENT_RESERVATION_USAGE_THRESHOLD, (int) ($usageCount ?? self::EQUIPMENT_RESERVATION_USAGE_THRESHOLD));
+
+        return "Scheduled maintenance required: this unit has completed {$uses} reservation uses and must be inspected before it can be borrowed again.";
+    }
+
+    private const NOTIFICATION_SYNC_BATCH_LIMIT = 40;
 
     private ?array $officeIdsByShortCodeCache = null;
     private ?int $physicalFacilitiesOfficeIdCache = null;
@@ -52,55 +59,7 @@ class ApprovalController extends Controller
             return redirect('/dashboard/home')->with('error', 'Unauthorized access.');
         }
 
-        $openReservationIds = Reservation::query()
-            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
-            ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
-            ->pluck('reservation_id')
-            ->all();
-
-        // Automatic workflow sync on every page load can time out on large datasets.
-        // For Physical Facilities admin, ensure final approval rows exist for the most recent open requests.
-        $actionableReservationIds = [];
-
-        if ($user->isPhysicalFacilitiesAdmin()) {
-            $actionableReservationIds = Reservation::query()
-                ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['awaiting_physical_facilities'])
-                ->pluck('reservation_id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-
-            if ($actionableReservationIds !== []) {
-                ReservationApprovalDeduper::deduplicatePendingForReservations($actionableReservationIds);
-            }
-        } else {
-            $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($openReservationIds);
-
-            if ($user->isProgramChairAdmin()) {
-                ProgramChairOfficeResolver::reconcileOpenReservationPcApprovals($openReservationIds);
-            } elseif (ItemOwnerService::isItemOwnerUser($user)) {
-                foreach (ItemOwnerService::openReservationIdsForItemOwner((int) $user->user_id) as $reservationId) {
-                    $this->syncReservationApprovals((int) $reservationId);
-                }
-
-                $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($openReservationIds);
-            }
-
-            $this->ensureActionableApprovalRows($actionableOfficeIds, (int) $user->office_id);
-
-            foreach ($actionableOfficeIds as $reservationId => $officeId) {
-                if ($officeId === (int) $user->office_id) {
-                    $actionableReservationIds[] = (int) $reservationId;
-                }
-            }
-
-            if (ItemOwnerService::isItemOwnerUser($user)) {
-                $actionableReservationIds = ItemOwnerService::filterActionableReservationIdsForItemOwner(
-                    $user,
-                    $actionableOfficeIds,
-                    $actionableReservationIds,
-                );
-            }
-        }
+        $actionableReservationIds = $this->getActionableReservationIdsForApprover($user);
 
         // For pf_admin, exclude reservations that have any office rejections
         $rejectedByOfficeReservationIds = [];
@@ -228,11 +187,23 @@ class ApprovalController extends Controller
             }
 
             $now = now();
-            $approval->update([
+            $updatePayload = [
                 'status' => 'approved',
                 'approved_at' => $now,
                 'approved_by_user_id' => (int) $user->user_id,
-            ]);
+            ];
+
+            if (
+                ItemOwnerService::isItemOwnerUser($user)
+                && ReservationApprovalWorkflowService::supportsOwnerScopedApprovals()
+            ) {
+                $ownerId = ItemOwnerService::ownerIdForUser((int) $user->user_id);
+                if ($ownerId && is_null($approval->owner_id)) {
+                    $updatePayload['owner_id'] = $ownerId;
+                }
+            }
+
+            $approval->update($updatePayload);
 
             $this->recordApprovalHistory($approval);
 
@@ -244,6 +215,8 @@ class ApprovalController extends Controller
 
             // Route program-chair rows to the correct office before notifying the next approver.
             $this->prepareReservationWorkflowHandoff((int) $approval->reservation_id);
+            ReservationApprovalWorkflowService::reconcileItemOwnerApprovals((int) $approval->reservation_id);
+            ReservationApprovalDeduper::deduplicatePendingForReservations([(int) $approval->reservation_id]);
             $this->actionableOfficeIdsRequestCache = null;
 
             // Clear only the acting approver's notification; other item owners may still need to act.
@@ -254,6 +227,8 @@ class ApprovalController extends Controller
 
             // Update the overall reservation status if all office approvals are done
             $this->updateReservationStatus($approval->reservation_id, $reservation);
+            Cache::forget('office.decision_count.' . (int) $approval->office_id . '.approved');
+            Cache::forget('notification_unread_count.user.' . (int) $user->user_id);
 
             return response()->json([
                 'success' => true,
@@ -307,6 +282,8 @@ class ApprovalController extends Controller
 
             // Request rejected: remove approval notifications tied to this reservation.
             $this->clearAllApprovalNotificationsForReservation((int) $approval->reservation_id);
+            Cache::forget('office.decision_count.' . (int) $approval->office_id . '.rejected');
+            Cache::forget('notification_unread_count.user.' . (int) $user->user_id);
 
             return response()->json([
                 'success' => true,
@@ -480,7 +457,14 @@ class ApprovalController extends Controller
 
             DB::transaction(function () use ($reservation) {
                 $reservation->update(['overall_status' => 'cancelled']);
-                
+
+                // Otherwise these rows stay pending and the request keeps showing up in
+                // every approver queue it had not reached a decision in yet.
+                ReservationApprovalWorkflowService::closePendingApprovals(
+                    (int) $reservation->reservation_id,
+                    'cancelled'
+                );
+
                 // Clear all approval notifications for this reservation
                 $this->clearAllApprovalNotificationsForReservation((int) $reservation->reservation_id);
             });
@@ -656,7 +640,7 @@ class ApprovalController extends Controller
                         ->where('status', '<>', 'retired')
                         ->update([
                             'status' => 'maintenance',
-                            'condition_notes' => 'Automatic maintenance after '.self::EQUIPMENT_RESERVATION_USAGE_THRESHOLD.' reservations — inspection or repair required.',
+                            'condition_notes' => self::usageThresholdMaintenanceReason($usageCount),
                             'last_maintenance_at' => now(),
                             'updated_at' => now(),
                         ]);
@@ -1005,11 +989,11 @@ class ApprovalController extends Controller
     private function syncReservationApprovalWorkflow(?array $reservationIds = null): void
     {
         if (is_null($reservationIds)) {
-            $reservationIds = Reservation::query()
-                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
-                ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
+            $openQuery = Reservation::query();
+            \App\Support\OpenReservationScope::apply($openQuery);
+            $reservationIds = $openQuery
                 ->orderByDesc('created_at')
-                ->limit(80)
+                ->limit(40)
                 ->pluck('reservation_id')
                 ->all();
         }
@@ -1069,7 +1053,11 @@ class ApprovalController extends Controller
         if (empty($reservationIds)) {
             return [];
         }
-        $reservationIds = array_values(array_unique(array_map('intval', $reservationIds)));
+        $reservationIds = array_slice(
+            array_values(array_unique(array_map('intval', $reservationIds))),
+            0,
+            self::NOTIFICATION_SYNC_BATCH_LIMIT
+        );
         $this->warmBatchWorkflowLookups($reservationIds);
 
         try {
@@ -1677,12 +1665,21 @@ class ApprovalController extends Controller
             $this->maybeSyncApprovalNotificationsForUser($user, $request->boolean('force'));
         }
 
-        $limit = min(max((int) $request->query('limit', 50), 1), 100);
+        $limit = min(max((int) $request->query('limit', 20), 1), 50);
+        $userId = (int) $user->user_id;
 
-        $notifications = Notification::where('user_id', $user->user_id)
+        $notifications = Notification::where('user_id', $userId)
             ->orderByDesc('created_at')
             ->limit($limit)
-            ->get()
+            ->get([
+                'notification_id',
+                'type',
+                'title',
+                'message',
+                'related_id',
+                'read',
+                'created_at',
+            ])
             ->map(function ($notification) {
                 return [
                     'id' => $notification->notification_id,
@@ -1695,9 +1692,7 @@ class ApprovalController extends Controller
                 ];
             });
 
-        $unreadCount = Notification::where('user_id', $user->user_id)
-            ->where('read', false)
-            ->count();
+        $unreadCount = $this->cachedUnreadNotificationCount($userId);
 
         return response()->json([
             'success' => true,
@@ -1710,14 +1705,25 @@ class ApprovalController extends Controller
     {
         $user = Auth::user();
 
-        $unreadCount = Notification::where('user_id', $user->user_id)
-            ->where('read', false)
-            ->count();
-
         return response()->json([
             'success' => true,
-            'unread_count' => $unreadCount,
+            'unread_count' => $this->cachedUnreadNotificationCount((int) $user->user_id),
         ]);
+    }
+
+    private function cachedUnreadNotificationCount(int $userId): int
+    {
+        if ($userId <= 0) {
+            return 0;
+        }
+
+        $cacheKey = 'notification_unread_count.user.' . $userId;
+
+        return (int) Cache::remember($cacheKey, now()->addSeconds(90), function () use ($userId) {
+            return Notification::where('user_id', $userId)
+                ->unread()
+                ->count();
+        });
     }
 
     private function maybeSyncApprovalNotificationsForUser(\App\Models\User $user, bool $force = false): void
@@ -1733,21 +1739,24 @@ class ApprovalController extends Controller
         }
 
         try {
-            if ($user->isProgramChairAdmin()) {
-                $reconcileIds = ProgramChairOfficeResolver::reservationIdsWithPendingPcApprovalsForProgram(
-                    (int) $user->office_id,
-                    self::NOTIFICATION_SYNC_BATCH_LIMIT
-                );
-                if ($reconcileIds !== []) {
-                    ProgramChairOfficeResolver::reconcileOpenReservationPcApprovals($reconcileIds);
+            \App\Support\HeavySyncGate::attempt('notification-sync.user.' . (int) $user->user_id, function () use ($user, $syncCacheKey) {
+                if ($user->isProgramChairAdmin()) {
+                    $reconcileIds = ProgramChairOfficeResolver::reservationIdsWithPendingPcApprovalsForProgram(
+                        (int) $user->office_id,
+                        self::NOTIFICATION_SYNC_BATCH_LIMIT
+                    );
+                    if ($reconcileIds !== []) {
+                        ProgramChairOfficeResolver::reconcileOpenReservationPcApprovals($reconcileIds);
+                    }
                 }
-            }
 
-            $actionableReservationIdsForUser = $this->getActionableReservationIdsForApprover($user);
-            $this->syncApprovalNotificationsForUser($user, $actionableReservationIdsForUser);
+                $actionableReservationIds = $this->getActionableReservationIdsForApprover($user);
+                $this->syncApprovalNotificationsForUser($user, $actionableReservationIds);
 
-            $syncTtlMinutes = $user->isProgramChairAdmin() ? 1 : 5;
-            Cache::put($syncCacheKey, true, now()->addMinutes($syncTtlMinutes));
+                // Keep sync rare — approvals already create notifications on handoff.
+                Cache::put($syncCacheKey, true, now()->addMinutes(15));
+                Cache::forget('notification_unread_count.user.' . (int) $user->user_id);
+            });
         } catch (Throwable $throwable) {
             report($throwable);
         }
@@ -1780,7 +1789,7 @@ class ApprovalController extends Controller
 
         if (ItemOwnerService::isItemOwnerUser($user)) {
             $ownerReservationIds = array_slice(
-                ItemOwnerService::openReservationIdsForItemOwner((int) $user->user_id),
+                ItemOwnerService::openReservationIdsForItemOwner((int) $user->user_id, self::NOTIFICATION_SYNC_BATCH_LIMIT),
                 0,
                 self::NOTIFICATION_SYNC_BATCH_LIMIT
             );
@@ -1816,10 +1825,9 @@ class ApprovalController extends Controller
         }
 
         // Exclude closed reservations.
-        $candidateReservationIds = Reservation::query()
-            ->whereIn('reservation_id', $candidateReservationIds)
-            ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled', 'expired'])
-            ->whereRaw("LOWER(COALESCE(overall_status, '')) NOT LIKE ?", ['cancel%'])
+        $openCandidates = Reservation::query()->whereIn('reservation_id', $candidateReservationIds);
+        \App\Support\OpenReservationScope::apply($openCandidates);
+        $candidateReservationIds = $openCandidates
             ->pluck('reservation_id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -1853,10 +1861,14 @@ class ApprovalController extends Controller
      */
     private function recentPendingReservationIdsForOffice(int $officeId, int $limit): array
     {
-        return ReservationApproval::query()
+        $query = ReservationApproval::query()
             ->join('reservations', 'reservations.reservation_id', '=', 'reservation_approvals.reservation_id')
             ->where('reservation_approvals.office_id', $officeId)
-            ->whereNull('reservation_approvals.approved_at')
+            ->whereNull('reservation_approvals.approved_at');
+
+        \App\Support\OpenReservationScope::apply($query, 'reservations.overall_status');
+
+        return $query
             ->orderByDesc('reservations.created_at')
             ->limit($limit)
             ->pluck('reservation_approvals.reservation_id')
@@ -1879,13 +1891,15 @@ class ApprovalController extends Controller
         $types = ['reservation_approval_request', 'reservation_approval_handoff'];
 
         // Option A (task inbox): show ONLY currently actionable requests.
-        // Clear anything that is not actionable anymore.
+        // Clear anything that is not actionable anymore — but never wipe the whole
+        // inbox when the actionable set resolves empty (that was deleting valid alerts
+        // whenever sync raced / gate-skipped / mis-scoped candidates).
         $cleanupQuery = Notification::query()
             ->where('user_id', $userId)
             ->whereIn('type', $types);
 
         if (empty($actionableReservationIds)) {
-            $cleanupQuery->delete();
+            $this->pruneClosedReservationNotificationsForUser($userId, $types);
             return;
         }
 
@@ -1942,6 +1956,49 @@ class ApprovalController extends Controller
                 'updated_at' => now(),
             ]);
         }
+    }
+
+    /**
+     * Remove approval notifications only when their related reservation is closed.
+     * Avoids wiping the inbox when actionable discovery returns an empty set.
+     *
+     * @param  array<int, string>  $types
+     */
+    private function pruneClosedReservationNotificationsForUser(int $userId, array $types): void
+    {
+        $relatedIds = Notification::query()
+            ->where('user_id', $userId)
+            ->whereIn('type', $types)
+            ->whereNotNull('related_id')
+            ->pluck('related_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($relatedIds === []) {
+            return;
+        }
+
+        $openQuery = Reservation::query()->whereIn('reservation_id', $relatedIds);
+        \App\Support\OpenReservationScope::apply($openQuery);
+        $openIds = $openQuery
+            ->pluck('reservation_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $closedIds = array_values(array_diff($relatedIds, $openIds));
+        if ($closedIds === []) {
+            return;
+        }
+
+        Notification::query()
+            ->where('user_id', $userId)
+            ->whereIn('type', $types)
+            ->whereIn('related_id', $closedIds)
+            ->delete();
+
+        Cache::forget('notification_unread_count.user.' . $userId);
     }
 
     private function ensureActionableOfficeNotificationsFromWorkflow(\App\Models\User $user, array $actionableReservationIds): void
@@ -2023,9 +2080,12 @@ class ApprovalController extends Controller
                 'updated_at' => now(),
             ]);
 
+        Cache::forget('notification_unread_count.user.' . (int) $user->user_id);
+
         return response()->json([
             'success' => true,
             'message' => 'Notification marked as read.',
+            'unread_count' => $this->cachedUnreadNotificationCount((int) $user->user_id),
         ]);
     }
 
@@ -2036,11 +2096,19 @@ class ApprovalController extends Controller
             return;
         }
 
-        $pendingApprovals = ReservationApproval::where('office_id', $officeId)
+        $pendingApprovalsQuery = ReservationApproval::query()
+            ->join('reservations', 'reservations.reservation_id', '=', 'reservation_approvals.reservation_id')
+            ->where('reservation_approvals.office_id', $officeId)
             // Match dashboard pending queue logic: actionable rows are not yet acted on.
-            ->whereNull('approved_at')
-            ->pluck('reservation_id')
+            ->whereNull('reservation_approvals.approved_at');
+
+        \App\Support\OpenReservationScope::apply($pendingApprovalsQuery, 'reservations.overall_status');
+
+        $pendingApprovals = $pendingApprovalsQuery
+            ->pluck('reservation_approvals.reservation_id')
             ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
             ->all();
 
         if (empty($pendingApprovals)) {
@@ -2134,10 +2202,22 @@ class ApprovalController extends Controller
             return;
         }
 
-        Notification::query()
+        $query = Notification::query()
             ->where('related_id', $reservationId)
-            ->whereIn('type', ['reservation_approval_request', 'reservation_approval_handoff'])
-            ->delete();
+            ->whereIn('type', ['reservation_approval_request', 'reservation_approval_handoff']);
+
+        $affectedUserIds = (clone $query)
+            ->distinct()
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $query->delete();
+
+        // The badge count is cached per user, so deleting the rows is not enough.
+        foreach ($affectedUserIds as $userId) {
+            Cache::forget('notification_unread_count.user.' . $userId);
+        }
     }
 
     private function getApproverUserIdsForOffice(int $officeId): array
@@ -2158,7 +2238,6 @@ class ApprovalController extends Controller
     {
         $user = Auth::user();
 
-        // Ensure the user is an admin
         if (!$user->isOfficeApprover()) {
             return response()->json([
                 'success' => false,
@@ -2166,49 +2245,99 @@ class ApprovalController extends Controller
             ], 403);
         }
 
-        $reservation = Reservation::with(['user', 'approvals.office', 'approvals.approvedByUser'])
-            ->findOrFail($reservationId);
+        $reservation = Reservation::with(['user'])->findOrFail($reservationId);
 
-        // Get reservation details with items
-        $details = DB::table('reservation_details as details')
+        $requester = $reservation->user;
+        $eventAt = $reservation->Start_of_activity
+            ?? $reservation->start_of_activity
+            ?? $reservation->Date_of_Activity
+            ?? $reservation->date_of_activity;
+
+        $eventEndAt = $reservation->End_of_Activity
+            ?? $reservation->end_of_activity
+            ?? null;
+
+        if ($eventEndAt && !($eventEndAt instanceof \DateTimeInterface)) {
+            try {
+                $eventEndAt = \Carbon\Carbon::parse($eventEndAt);
+            } catch (Throwable) {
+                $eventEndAt = null;
+            }
+        }
+
+        $proofOfConsentUrl = trim((string) ($reservation->proof_of_consent_url ?? ''));
+        if ($proofOfConsentUrl !== '' && !preg_match('#^https?://#i', $proofOfConsentUrl)) {
+            $proofOfConsentUrl = '';
+        }
+
+        $resourceRows = DB::table('reservation_details as details')
+            ->leftJoin('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+            ->leftJoin('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
             ->leftJoin('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
             ->leftJoin('items as items', 'items.item_id', '=', 'reservationItems.item_id')
-            ->leftJoin('item_units as units', 'units.unit_id', '=', 'items.unit_id')
             ->where('details.reservation_id', $reservationId)
             ->select([
-                'items.item_name as item_name',
                 'details.quantity',
-                'units.name as unit_name',
+                'rooms.room_number',
+                'items.item_name',
             ])
             ->get();
 
-        $items = $details->map(function ($detail) {
-            return [
-                'name' => $detail->item_name ?? 'Unknown Item',
-                'quantity' => $detail->quantity,
-                'unit' => $detail->unit_name ?? '',
+        $resources = [];
+        $seenResourceKeys = [];
+
+        foreach ($resourceRows as $row) {
+            $quantity = max(1, (int) ($row->quantity ?? 1));
+            $isRoom = !is_null($row->room_number) && trim((string) $row->room_number) !== '';
+
+            if ($isRoom) {
+                $label = 'Room ' . trim((string) $row->room_number);
+                $type = 'room';
+            } else {
+                $label = trim((string) ($row->item_name ?? '')) !== '' ? (string) $row->item_name : 'Resource';
+                $type = 'item';
+            }
+
+            $key = $type . ':' . strtolower($label);
+            if (isset($seenResourceKeys[$key])) {
+                continue;
+            }
+            $seenResourceKeys[$key] = true;
+
+            $resources[] = [
+                'label' => $label,
+                'quantity' => $quantity,
+                'unit' => '',
+                'type' => $type,
             ];
-        });
+        }
 
         $reservationData = [
-            'id' => $reservation->reservation_id,
-            'activity_name' => $reservation->activity_name,
-            'requester' => $reservation->user->full_name ?? $reservation->user->username,
-            'requested_date' => $reservation->created_at->format('M d, Y'),
-            'start_date' => $reservation->date_of_activity ? $reservation->date_of_activity->format('M d, Y') : 'N/A',
-            'end_date' => $reservation->date_of_activity ? $reservation->date_of_activity->format('M d, Y') : 'N/A', // Assuming same date
-            'start_time' => $reservation->start_of_activity ? $reservation->start_of_activity->format('H:i') : 'N/A',
-            'end_time' => $reservation->Start_of_activity ? $reservation->Start_of_activity->format('H:i') : 'N/A', // Note: inconsistent casing
-            'status' => $reservation->status ?? $reservation->overall_status ?? 'Unknown',
-            'items' => $items,
-            'approvals' => $reservation->approvals->map(function ($approval) {
-                return [
-                    'office' => $approval->office->name ?? 'Unknown Office',
-                    'status' => $approval->status,
-                    'approved_by' => $approval->approvedByUser->full_name ?? $approval->approvedByUser->username ?? null,
-                    'approved_at' => $approval->approved_at ? $approval->approved_at->format('M d, Y h:i A') : null,
-                ];
-            }),
+            'id' => (int) $reservation->reservation_id,
+            'reservation_code' => 'NU-' . str_pad((string) $reservation->reservation_id, 6, '0', STR_PAD_LEFT),
+            'activity_name' => (string) ($reservation->activity_name ?? 'Untitled Activity'),
+            'requester' => $requester ? $requester->displayName() : 'Unknown',
+            'requester_username' => (string) ($requester?->username ?? ''),
+            'requester_email' => (string) ($requester?->email ?? 'N/A'),
+            'requester_phone' => (string) ($requester?->phone_number ?? $requester?->contact_number ?? 'N/A'),
+            'requested_date' => $reservation->created_at
+                ? $reservation->created_at->format('M d, Y h:i A')
+                : 'N/A',
+            'event_date' => $eventAt ? $eventAt->format('M d, Y') : 'N/A',
+            'event_time' => $eventAt ? $eventAt->format('g:i A') : 'N/A',
+            'event_end_date' => $eventEndAt ? $eventEndAt->format('M d, Y') : ($eventAt ? $eventAt->format('M d, Y') : 'N/A'),
+            'event_end_time' => $eventEndAt ? $eventEndAt->format('g:i A') : 'N/A',
+            'event_schedule' => $this->formatReservationScheduleLabel($eventAt, $eventEndAt),
+            'start_date' => $eventAt ? $eventAt->format('M d, Y') : 'N/A',
+            'end_date' => $eventEndAt ? $eventEndAt->format('M d, Y') : ($eventAt ? $eventAt->format('M d, Y') : 'N/A'),
+            'start_time' => $eventAt ? $eventAt->format('g:i A') : 'N/A',
+            'end_time' => $eventEndAt ? $eventEndAt->format('g:i A') : 'N/A',
+            'status' => (string) ($reservation->overall_status ?? $reservation->status ?? 'Unknown'),
+            'proof_of_consent_url' => $proofOfConsentUrl,
+            'resources' => $resources,
+            'items' => array_values(array_filter($resources, fn ($resource) => ($resource['type'] ?? '') === 'item')),
+            // Approvers only need primary student + request details — not the full trail.
+            'approvals' => [],
         ];
 
         return response()->json([
@@ -2217,14 +2346,44 @@ class ApprovalController extends Controller
         ]);
     }
 
+    private function formatReservationScheduleLabel($eventAt, $eventEndAt): string
+    {
+        if (!$eventAt) {
+            return 'N/A';
+        }
+
+        $startDate = $eventAt->format('M d, Y');
+        $startTime = $eventAt->format('g:i A');
+
+        if (!$eventEndAt) {
+            return "{$startDate} · {$startTime}";
+        }
+
+        $endDate = $eventEndAt->format('M d, Y');
+        $endTime = $eventEndAt->format('g:i A');
+
+        if ($startDate === $endDate) {
+            return "{$startDate} · {$startTime} – {$endTime}";
+        }
+
+        return "{$startDate} {$startTime} – {$endDate} {$endTime}";
+    }
+
     /**
      * Cached Schema::hasTable() — avoids repeated information_schema queries per request.
      */
     private function tableExists(string $table): bool
     {
-        if (!isset(self::$tableExistsCache[$table])) {
-            self::$tableExistsCache[$table] = Schema::hasTable($table);
+        if (isset(self::$tableExistsCache[$table])) {
+            return self::$tableExistsCache[$table];
         }
+
+        self::$tableExistsCache[$table] = (bool) Cache::remember(
+            "schema.table.{$table}",
+            now()->addHours(6),
+            fn () => Schema::hasTable($table)
+        );
+
         return self::$tableExistsCache[$table];
     }
 }

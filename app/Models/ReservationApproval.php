@@ -26,4 +26,9 @@ class ReservationApproval extends Model
     {
         return $this->belongsTo(User::class, 'approved_by_user_id', 'user_id');
     }
+
+    public function approvedByUser()
+    {
+        return $this->belongsTo(User::class, 'approved_by_user_id', 'user_id');
+    }
 }

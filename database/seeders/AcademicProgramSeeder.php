@@ -15,7 +15,7 @@ class AcademicProgramSeeder extends Seeder
             ['code' => 'bs_civil_engineering', 'school' => 'School of Architecture, Computing and Engineering', 'name' => 'BS Civil Engineering', 'sort' => 3],
             ['code' => 'bs_computer_science', 'school' => 'School of Architecture, Computing and Engineering', 'name' => 'BS Computer Science', 'sort' => 4],
             ['code' => 'bs_computer_engineering', 'school' => 'School of Architecture, Computing and Engineering', 'name' => 'BS Computer Engineering', 'sort' => 5],
-            ['code' => 'bs_it_mobile_web', 'school' => 'School of Architecture, Computing and Engineering', 'name' => 'BS Information Technology with specialization in Mobile and Web Applications', 'sort' => 6],
+            ['code' => 'bs_it_mobile_web', 'school' => 'School of Architecture, Computing and Engineering', 'name' => 'BS Information Technology', 'sort' => 6],
             ['code' => 'bs_accountancy', 'school' => 'School of Accountancy, Business and Management', 'name' => 'BS Accountancy', 'sort' => 7],
             ['code' => 'bsba_financial_management', 'school' => 'School of Accountancy, Business and Management', 'name' => 'BSBA Major in Financial Management', 'sort' => 8],
             ['code' => 'bsba_marketing_management', 'school' => 'School of Accountancy, Business and Management', 'name' => 'BSBA Major in Marketing Management', 'sort' => 9],

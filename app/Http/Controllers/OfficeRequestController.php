@@ -9,6 +9,8 @@ use App\Services\ProgramChairOfficeResolver;
 use App\Services\ItemOwnerService;
 use App\Services\ReservationApprovalWorkflowService;
 use App\Services\ReservationApprovalDeduper;
+use App\Support\HeavySyncGate;
+use App\Support\OpenReservationScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +18,7 @@ use Illuminate\Support\Facades\Schema;
 
 class OfficeRequestController extends Controller
 {
-    private const WORKFLOW_BATCH_LIMIT = 60;
+    private const WORKFLOW_BATCH_LIMIT = 40;
 
     private ?array $officeIdsByShortCodeCache = null;
     private ?int $physicalFacilitiesOfficeIdCache = null;
@@ -129,7 +131,7 @@ class OfficeRequestController extends Controller
         } else {
             if (ItemOwnerService::isItemOwnerUser($user)) {
                 $ownerReservationIds = $this->capReservationIds(
-                    ItemOwnerService::openReservationIdsForItemOwner((int) $user->user_id)
+                    ItemOwnerService::openReservationIdsForItemOwner((int) $user->user_id, self::WORKFLOW_BATCH_LIMIT)
                 );
                 if ($shouldSync && $ownerReservationIds !== []) {
                     $this->syncReservationApprovalsForReservationIds($ownerReservationIds);
@@ -158,6 +160,15 @@ class OfficeRequestController extends Controller
             }
         }
 
+        // Seed missing inbox rows for this approver only (insert-if-missing). No deletes.
+        if ($actionableReservationIds !== []) {
+            ReservationApprovalNotifier::ensureUnreadForUser(
+                $user,
+                $actionableReservationIds,
+                self::WORKFLOW_BATCH_LIMIT
+            );
+        }
+
         $dedupeReservationIds = $queueReservationIds
             ?? ($user->isProgramChairAdmin() ? $candidateReservationIds : $actionableReservationIds);
 
@@ -182,14 +193,7 @@ class OfficeRequestController extends Controller
             ->whereIn('reservation_id', $queueFilterReservationIds);
 
         if (ItemOwnerService::isItemOwnerUser($user)) {
-            $ownerId = ItemOwnerService::ownerIdForUser((int) $user->user_id);
-            if ($ownerId) {
-                $pendingApprovalQuery->where(function ($query) use ($ownerId) {
-                    $query
-                        ->where('owner_id', $ownerId)
-                        ->orWhereNull('owner_id');
-                });
-            }
+            ItemOwnerService::applyItemOwnerPendingApprovalScope($pendingApprovalQuery, $user);
         }
 
         $distinctPendingApprovalIds = (clone $pendingApprovalQuery)
@@ -256,28 +260,39 @@ class OfficeRequestController extends Controller
             'pendingRequests' => $showWaitingQueueContext
                 ? $requests->total()
                 : count($actionableReservationIds),
-            'approvedRequests' => ReservationApproval::query()
-                ->where('office_id', $user->office_id)
-                ->where('status', 'approved')
-                ->whereNotNull('approved_at')
-                ->count(),
-            'rejectedRequests' => ReservationApproval::query()
-                ->where('office_id', $user->office_id)
-                ->where('status', 'rejected')
-                ->whereNotNull('approved_at')
-                ->count(),
+            'approvedRequests' => $this->cachedOfficeDecisionCount((int) $user->office_id, 'approved'),
+            'rejectedRequests' => $this->cachedOfficeDecisionCount((int) $user->office_id, 'rejected'),
             'authUser' => $user,
             'officeName' => $user->office?->department_name ?? null,
         ];
     }
 
+    private function cachedOfficeDecisionCount(int $officeId, string $status): int
+    {
+        if ($officeId <= 0) {
+            return 0;
+        }
+
+        $status = strtolower(trim($status));
+        $cacheKey = "office.decision_count.{$officeId}.{$status}";
+
+        return (int) Cache::remember($cacheKey, now()->addMinutes(5), function () use ($officeId, $status) {
+            return ReservationApproval::query()
+                ->where('office_id', $officeId)
+                ->where('status', $status)
+                ->whereNotNull('approved_at')
+                ->count();
+        });
+    }
+
     private function syncReservationApprovalWorkflow(?array $reservationIds = null): void
     {
         if (is_null($reservationIds)) {
-            $reservationIds = Reservation::query()
-                ->whereNotIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
+            $openQuery = Reservation::query();
+            OpenReservationScope::apply($openQuery);
+            $reservationIds = $openQuery
                 ->orderByDesc('created_at')
-                ->limit(80)
+                ->limit(self::WORKFLOW_BATCH_LIMIT)
                 ->pluck('reservation_id')
                 ->all();
         }
@@ -294,22 +309,29 @@ class OfficeRequestController extends Controller
         }
 
         $reservationIds = array_values(array_unique(array_map('intval', $reservationIds)));
-        $this->warmBatchWorkflowLookups($reservationIds);
-        $now = now();
 
-        foreach ($reservationIds as $reservationId) {
-            ProgramChairOfficeResolver::reconcilePendingLegacyPcApproval($reservationId);
-            $workflowOfficeIds = $this->resolveWorkflowOfficeIds($reservationId, true);
-            ReservationApprovalWorkflowService::ensureApprovalRows($reservationId, $workflowOfficeIds);
-        }
+        HeavySyncGate::attempt('office-workflow', function () use ($reservationIds) {
+            $this->warmBatchWorkflowLookups($reservationIds);
+            $now = now();
 
-        DB::table('reservation_approvals')
-            ->whereIn('reservation_id', $reservationIds)
-            ->whereNull('status')
-            ->update([
-                'status' => 'pending',
-                'updated_at' => $now,
-            ]);
+            foreach ($reservationIds as $reservationId) {
+                ProgramChairOfficeResolver::reconcilePendingLegacyPcApproval($reservationId);
+                $workflowOfficeIds = $this->resolveWorkflowOfficeIds($reservationId, true);
+                ReservationApprovalWorkflowService::ensureApprovalRows($reservationId, $workflowOfficeIds);
+            }
+
+            DB::table('reservation_approvals')
+                ->whereIn('reservation_id', $reservationIds)
+                ->whereNull('status')
+                ->update([
+                    'status' => 'pending',
+                    'updated_at' => $now,
+                ]);
+
+            if ($userId = (int) (Auth::user()->user_id ?? 0)) {
+                Cache::put(self::workflowSyncCacheKey($userId), true, now()->addMinutes(15));
+            }
+        });
     }
 
     private function syncReservationApprovals(int $reservationId): void
@@ -400,6 +422,7 @@ class OfficeRequestController extends Controller
     {
         $this->batchGymLookup = [];
         $this->batchGymWithItemsLookup = [];
+        $this->batchPcOfficeLookup = ProgramChairOfficeResolver::batchResolveForReservations($reservationIds);
 
         if (!Schema::hasTable('reservation_details')) {
             return;
@@ -462,20 +485,6 @@ class OfficeRequestController extends Controller
             $this->ownerOfficeIdCache[$rid] = $this->computeOwnerOfficeIdFromItemOwnerRows($rows, $officeIdsByCode, $pfOfficeId);
         }
 
-        if (Schema::hasTable('academic_programs') && Schema::hasColumn('users', 'program_id')) {
-            $pcRows = DB::table('reservations')
-                ->join('users', 'users.user_id', '=', 'reservations.user_id')
-                ->join('academic_programs', 'academic_programs.program_id', '=', 'users.program_id')
-                ->whereIn('reservations.reservation_id', $reservationIds)
-                ->whereNotNull('users.program_id')
-                ->whereNotNull('academic_programs.office_id')
-                ->select(['reservations.reservation_id', 'academic_programs.office_id'])
-                ->get();
-
-            foreach ($pcRows as $row) {
-                $this->batchPcOfficeLookup[(int) $row->reservation_id] = (int) $row->office_id;
-            }
-        }
     }
 
     private function ensureActionableApprovalRows(array $actionableOfficeIds, int $officeId): void
@@ -755,10 +764,14 @@ class OfficeRequestController extends Controller
      */
     private function recentPendingReservationIdsForOffice(int $officeId, int $limit): array
     {
-        return ReservationApproval::query()
+        $query = ReservationApproval::query()
             ->join('reservations', 'reservations.reservation_id', '=', 'reservation_approvals.reservation_id')
             ->where('reservation_approvals.office_id', $officeId)
-            ->whereNull('reservation_approvals.approved_at')
+            ->whereNull('reservation_approvals.approved_at');
+
+        OpenReservationScope::apply($query, 'reservations.overall_status');
+
+        return $query
             ->orderByDesc('reservations.created_at')
             ->limit($limit)
             ->pluck('reservation_approvals.reservation_id')
@@ -770,15 +783,27 @@ class OfficeRequestController extends Controller
 
     private function shouldSyncOfficeHomeWorkflow($user): bool
     {
-        $key = 'office_home_workflow_sync.user.' . (int) $user->user_id;
+        if (!request()->boolean('sync')) {
+            return false;
+        }
+
+        $key = self::workflowSyncCacheKey((int) $user->user_id);
 
         if (Cache::has($key)) {
             return false;
         }
 
-        Cache::put($key, true, now()->addMinutes(5));
+        // Short marker only. If HeavySyncGate turns the request away because another
+        // sync is already running, this user gets another chance in two minutes rather
+        // than being locked out for the full cooldown.
+        Cache::put($key, true, now()->addMinutes(2));
 
         return true;
+    }
+
+    private static function workflowSyncCacheKey(int $userId): string
+    {
+        return 'office_home_workflow_sync.user.' . $userId;
     }
 
     /**

@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/dashboard/office/items/{itemId}', [OfficeItemController::class, 'destroy'])->name('office.items.destroy');
     Route::get('/dashboard/office/items/maintenance', [OfficeItemController::class, 'maintenance'])->name('office.items.maintenance');
     Route::patch('/dashboard/office/items/maintenance/units/{unitId}', [OfficeItemController::class, 'updateMaintenanceUnit'])->name('office.items.maintenance.units.update');
+    Route::patch('/dashboard/office/items/maintenance/reports/{reportId}', [OfficeItemController::class, 'dismissMaintenanceReport'])->name('office.items.maintenance.reports.dismiss');
     Route::get('/dashboard/office/history', [OfficeArchiveController::class, 'index'])->name('office.history');
     Route::get('/dashboard/office/users', [OfficeProgramUserController::class, 'index'])->name('office.users');
     Route::post('/dashboard/office/users', [OfficeProgramUserController::class, 'store'])->name('office.users.store');

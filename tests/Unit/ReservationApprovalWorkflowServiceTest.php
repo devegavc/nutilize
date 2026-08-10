@@ -38,4 +38,19 @@ class ReservationApprovalWorkflowServiceTest extends TestCase
         $this->assertSame('approved', strtolower((string) $effective->status));
         $this->assertNotNull($effective->approved_at);
     }
+
+    public function test_owner_has_finalized_io_approval_when_owner_scoped_row_is_approved(): void
+    {
+        $ioOfficeId = 10;
+        $rows = collect([
+            (object) ['office_id' => $ioOfficeId, 'owner_id' => 101, 'status' => 'approved', 'approved_at' => '2026-08-01'],
+        ]);
+
+        $this->assertTrue(
+            ReservationApprovalWorkflowService::ownerHasFinalizedIoApproval($rows, $ioOfficeId, 101)
+        );
+        $this->assertFalse(
+            ReservationApprovalWorkflowService::ownerHasFinalizedIoApproval($rows, $ioOfficeId, 102)
+        );
+    }
 }

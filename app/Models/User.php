@@ -93,4 +93,59 @@ class User extends Authenticatable
     {
         return $this->hasMany(Reservation::class, 'user_id', 'user_id');
     }
+
+    /**
+     * Prefer the composed first/middle/last name. Many student accounts have those
+     * parts filled while `full_name` is left null (especially mobile registrations).
+     */
+    public function displayName(): string
+    {
+        $parts = array_filter([
+            trim((string) ($this->first_name ?? '')),
+            trim((string) ($this->middle_initial ?? '')) !== ''
+                ? rtrim(trim((string) $this->middle_initial), '.') . '.'
+                : '',
+            trim((string) ($this->last_name ?? '')),
+            trim((string) ($this->suffix ?? '')),
+        ], static fn (string $part): bool => $part !== '');
+
+        if ($parts !== []) {
+            return implode(' ', $parts);
+        }
+
+        $fullName = trim((string) ($this->full_name ?? ''));
+        if ($fullName !== '') {
+            return $fullName;
+        }
+
+        return trim((string) ($this->username ?? 'Unknown')) ?: 'Unknown';
+    }
+
+    /**
+     * Build a display name from a raw users-table row (query builder / join selects).
+     */
+    public static function formatDisplayName(object $row, string $fallback = 'Unknown'): string
+    {
+        $parts = array_filter([
+            trim((string) ($row->first_name ?? '')),
+            trim((string) ($row->middle_initial ?? '')) !== ''
+                ? rtrim(trim((string) $row->middle_initial), '.') . '.'
+                : '',
+            trim((string) ($row->last_name ?? '')),
+            trim((string) ($row->suffix ?? '')),
+        ], static fn (string $part): bool => $part !== '');
+
+        if ($parts !== []) {
+            return implode(' ', $parts);
+        }
+
+        $fullName = trim((string) ($row->full_name ?? $row->requester_full_name ?? $row->reporter_full_name ?? ''));
+        if ($fullName !== '') {
+            return $fullName;
+        }
+
+        $username = trim((string) ($row->username ?? $row->requester_username ?? $row->reporter_username ?? ''));
+
+        return $username !== '' ? $username : $fallback;
+    }
 }

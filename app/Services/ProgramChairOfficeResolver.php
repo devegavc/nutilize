@@ -80,15 +80,17 @@ class ProgramChairOfficeResolver
             return [];
         }
 
-        return DB::table('reservation_approvals as ra')
+        $query = DB::table('reservation_approvals as ra')
             ->join('reservations as r', 'r.reservation_id', '=', 'ra.reservation_id')
             ->join('users as u', 'u.user_id', '=', 'r.user_id')
             ->join('academic_programs as ap', 'ap.program_id', '=', 'u.program_id')
             ->where('ap.office_id', $programPcOfficeId)
             ->whereIn('ra.office_id', $pcOfficeIds)
-            ->whereNull('ra.approved_at')
-            ->whereNotIn(DB::raw("LOWER(COALESCE(r.overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
-            ->whereRaw("LOWER(COALESCE(r.overall_status, '')) NOT LIKE ?", ['cancel%'])
+            ->whereNull('ra.approved_at');
+
+        \App\Support\OpenReservationScope::apply($query, 'r.overall_status');
+
+        return $query
             ->orderByDesc('r.created_at')
             ->limit($limit)
             ->pluck('ra.reservation_id')
@@ -225,12 +227,16 @@ class ProgramChairOfficeResolver
             return [];
         }
 
-        return DB::table('reservations as r')
+        $query = DB::table('reservations as r')
             ->join('users as u', 'u.user_id', '=', 'r.user_id')
             ->join('academic_programs as ap', 'ap.program_id', '=', 'u.program_id')
-            ->where('ap.office_id', $programPcOfficeId)
-            ->whereNotIn(DB::raw("LOWER(COALESCE(r.overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
-            ->whereRaw("LOWER(COALESCE(r.overall_status, '')) NOT LIKE ?", ['cancel%'])
+            ->where('ap.office_id', $programPcOfficeId);
+
+        \App\Support\OpenReservationScope::apply($query, 'r.overall_status');
+
+        return $query
+            ->orderByDesc('r.created_at')
+            ->limit(80)
             ->pluck('r.reservation_id')
             ->map(fn ($reservationId) => (int) $reservationId)
             ->all();

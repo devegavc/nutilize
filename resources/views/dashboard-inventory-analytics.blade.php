@@ -235,7 +235,7 @@
               <thead>
                 <tr>
                   <th>Item Name</th>
-                  <th>Location</th>
+                  <th>Owner</th>
                   <th>ID</th>
                   <th>Bookings</th>
                   <th>Units Borrowed</th>
@@ -246,7 +246,7 @@
                 @forelse ($topItems as $item)
                   <tr>
                     <td>{{ $item['item_name'] }}</td>
-                    <td>{{ $item['location'] }}</td>
+                    <td>{{ $item['owner'] ?? $item['location'] ?? '—' }}</td>
                     <td class="asset-id">{{ $item['asset_id'] }}</td>
                     <td>{{ $item['booking_count'] }}</td>
                     <td><strong>{{ $item['usage_count'] }}</strong></td>

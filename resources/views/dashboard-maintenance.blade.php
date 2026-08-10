@@ -78,7 +78,7 @@
 
         <section class="inventory-grid maintenance-grid">
           <div class="table-wrap">
-            <table class="inventory-table maintenance-table">
+            <table class="inventory-table maintenance-table pf-maintenance-table">
               <thead>
                 <tr>
                   <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>
@@ -87,13 +87,12 @@
                   <th>Count</th>
                   <th>Date</th>
                   <th>Status</th>
-                  <th>Location</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="maintenance-table-body">
-                <tr>
-                  <td colspan="8">Loading maintenance records...</td>
+                <tr class="maintenance-empty-row">
+                  <td class="maintenance-empty-cell" colspan="7">Loading maintenance records...</td>
                 </tr>
               </tbody>
             </table>
@@ -106,24 +105,39 @@
   <section class="maintenance-eval-modal" id="maintenance-eval-modal" aria-hidden="true">
     <div class="maintenance-eval-overlay" data-close-maintenance-eval="true"></div>
     <article class="maintenance-eval-card" role="dialog" aria-modal="true" aria-labelledby="maintenance-eval-title">
-      <h2 id="maintenance-eval-title">Maintenance Evaluation</h2>
+      <header class="maintenance-eval-header">
+        <div>
+          <p class="maintenance-eval-kicker">Issue review</p>
+          <h2 id="maintenance-eval-title">Maintenance Evaluation</h2>
+        </div>
+        <button type="button" class="maintenance-eval-close" data-close-maintenance-eval="true" aria-label="Close">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </header>
 
       <div class="maintenance-eval-grid">
-        <span>Name of Item:</span>
+        <span>Name of Item</span>
         <span id="maintenance-eval-item-name">-</span>
 
-        <span>Reported By:</span>
+        <span>Reported By</span>
         <span id="maintenance-eval-reporter">-</span>
 
-        <span>Description:</span>
+        <span>Description</span>
         <span id="maintenance-eval-description">-</span>
       </div>
 
       <div class="maintenance-eval-proof" id="maintenance-eval-proof-wrap" style="display:none">
-        <span class="maintenance-eval-proof-label">Proof Image:</span>
-        <a id="maintenance-eval-proof-link" href="#" target="_blank" rel="noopener">
+        <div class="maintenance-eval-proof-head">
+          <span class="maintenance-eval-proof-label">Attached proof</span>
+          <a id="maintenance-eval-proof-link" class="maintenance-eval-proof-open" href="#" target="_blank" rel="noopener noreferrer">Open full image</a>
+        </div>
+        <div class="maintenance-eval-proof-frame">
           <img id="maintenance-eval-proof-img" src="" alt="Proof of report" />
-        </a>
+          <div class="maintenance-eval-proof-fallback" id="maintenance-eval-proof-fallback" hidden>
+            <i class="bi bi-image"></i>
+            <p>Proof image unavailable</p>
+          </div>
+        </div>
       </div>
 
       <div class="maintenance-eval-actions">

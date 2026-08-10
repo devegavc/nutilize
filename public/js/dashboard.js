@@ -427,9 +427,7 @@ function showAppNotice(message, options = {}) {
 }
 
 let activeFacilitiesTab = 'rooms';
-let activeEquipmentTab = (typeof window.defaultEquipmentCategory === 'string' && window.defaultEquipmentCategory)
-  ? window.defaultEquipmentCategory
-  : '';
+let activeEquipmentTab = 'all';
 let activeHistoryTab = 'latest';
 let activeMaintenanceTab = 'maintenance';
 let activeEditingRow = null;
@@ -487,8 +485,15 @@ let notificationItems = [];
 let notificationsLoaded = false;
 let notificationUnreadCount = 0;
 let lastNotificationFetchAt = 0;
+let lastNotificationSyncAt = 0;
 
 async function fetchNotificationUnreadCount() {
+  const now = Date.now();
+  // Client-side throttle: unread badge does not need sub-minute accuracy.
+  if (now - lastNotificationFetchAt < 90000 && notificationsLoaded) {
+    return;
+  }
+
   try {
     const response = await fetch('/dashboard/notifications/unread-count', {
       method: 'GET',
@@ -504,6 +509,7 @@ async function fetchNotificationUnreadCount() {
 
     const data = await response.json();
     notificationUnreadCount = Number.parseInt(String(data.unread_count ?? 0), 10) || 0;
+    lastNotificationFetchAt = Date.now();
     updateNotificationBadge();
   } catch (error) {
     console.error('Error fetching notification unread count:', error);
@@ -512,13 +518,17 @@ async function fetchNotificationUnreadCount() {
 
 async function fetchNotifications({ sync = false, force = false } = {}) {
   const now = Date.now();
-  if (!force && !sync && notificationsLoaded && now - lastNotificationFetchAt < 30000) {
+  // Avoid hammering Supabase: reuse recent notification payloads for 2 minutes.
+  if (!force && !sync && notificationsLoaded && now - lastNotificationFetchAt < 120000) {
     return;
   }
 
+  // Full sync is expensive — at most once every 15 minutes unless forced.
+  const shouldSync = Boolean(sync) && (force || now - lastNotificationSyncAt > 900000);
+
   try {
     const params = new URLSearchParams();
-    if (sync) {
+    if (shouldSync) {
       params.set('sync', '1');
     }
     if (force) {
@@ -544,20 +554,29 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
         created_at: notification.created_at,
         related_id: notification.related_id,
       }));
-      notificationUnreadCount = Number.parseInt(String(data.unread_count ?? 0), 10)
-        || notificationItems.filter((item) => item.unread).length;
+      const parsedUnread = Number.parseInt(String(data.unread_count ?? 0), 10);
+      notificationUnreadCount = Number.isFinite(parsedUnread)
+        ? parsedUnread
+        : notificationItems.filter((item) => item.unread).length;
       notificationsLoaded = true;
       lastNotificationFetchAt = Date.now();
+      if (shouldSync) {
+        lastNotificationSyncAt = Date.now();
+      }
       updateNotificationBadge();
     } else {
       console.error('Failed to fetch notifications');
-      notificationItems = [];
-      notificationUnreadCount = 0;
+      if (!notificationsLoaded) {
+        notificationItems = [];
+        notificationUnreadCount = 0;
+      }
     }
   } catch (error) {
     console.error('Error fetching notifications:', error);
-    notificationItems = [];
-    notificationUnreadCount = 0;
+    if (!notificationsLoaded) {
+      notificationItems = [];
+      notificationUnreadCount = 0;
+    }
   }
 }
 
@@ -578,7 +597,7 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
           console.error('Error polling notifications:', error);
         }
       }
-    }, 45000);
+    }, 180000);
   };
 
   const stopNotificationPolling = () => {
@@ -589,14 +608,15 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
   };
 
   const bootstrapNotifications = () => {
-    fetchNotifications({ sync: true, force: true }).catch((error) => console.error('Error preloading notifications:', error));
+    // Lightweight bootstrap: no forced workflow sync on every page load.
+    fetchNotifications({ sync: false, force: false }).catch((error) => console.error('Error preloading notifications:', error));
     startNotificationPolling();
   };
 
-  setTimeout(bootstrapNotifications, 2000);
+  setTimeout(bootstrapNotifications, 4000);
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible' || Date.now() - lastUnreadPollAt < 60000) {
+    if (document.visibilityState !== 'visible' || Date.now() - lastUnreadPollAt < 180000) {
       return;
     }
 
@@ -697,78 +717,150 @@ function clearNotificationsForReservation(reservationId) {
   refreshNotificationPopover();
 }
 
-function showReservationDetailsModal(reservation) {
-  // Create modal
+function escapeReservationDetailsHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function showReservationDetailsModal(reservation, options = {}) {
+  const resources = Array.isArray(reservation.resources) && reservation.resources.length
+    ? reservation.resources
+    : (Array.isArray(reservation.items) ? reservation.items.map((item) => ({
+      label: item.name || item.label || 'Resource',
+      quantity: item.quantity || 1,
+      unit: item.unit || '',
+      type: 'item',
+    })) : []);
+
+  const resourceMarkup = resources.length
+    ? resources.map((resource) => `
+        <div class="reservation-resource-chip ${resource.type === 'room' ? 'is-room' : 'is-item'}">
+          <span class="reservation-resource-label">${escapeReservationDetailsHtml(resource.label || resource.name || 'Resource')}</span>
+          <span class="reservation-resource-qty">×${escapeReservationDetailsHtml(resource.quantity || 1)}${resource.unit ? ` ${escapeReservationDetailsHtml(resource.unit)}` : ''}</span>
+        </div>
+      `).join('')
+    : '<p class="reservation-empty-note">No resources listed for this request.</p>';
+
+  const statusLabel = reservation.status || 'Unknown';
+  const statusClass = String(statusLabel).toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  const reservationCode = reservation.reservation_code
+    || (reservation.id ? `NU-${String(reservation.id).padStart(6, '0')}` : 'Reservation');
+  const proofUrl = String(reservation.proof_of_consent_url || '').trim();
+  const scheduleLabel = reservation.event_schedule
+    || [
+      reservation.event_date || reservation.start_date,
+      reservation.event_time || reservation.start_time,
+    ].filter(Boolean).join(' · ')
+    || 'N/A';
+
+  const canAct = Boolean(options.canAct && options.approvalId);
+  const actionFooter = canAct
+    ? `
+      <div class="reservation-details-footer">
+        <button type="button" class="reservation-details-action reject" data-modal-action="reject">Reject</button>
+        <button type="button" class="reservation-details-action approve" data-modal-action="approve">Approve</button>
+      </div>
+    `
+    : '';
+
+  const proofMarkup = proofUrl
+    ? `
+      <section class="reservation-details-panel reservation-proof-panel">
+        <div class="reservation-panel-heading">
+          <h3>Proof of Consent</h3>
+          <a class="reservation-proof-open" href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">Open full image</a>
+        </div>
+        <a class="reservation-proof-frame" href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">
+          <img src="${escapeReservationDetailsHtml(proofUrl)}" alt="Proof of consent for ${escapeReservationDetailsHtml(reservationCode)}" loading="lazy" />
+        </a>
+      </section>
+    `
+    : `
+      <section class="reservation-details-panel reservation-proof-panel is-empty">
+        <div class="reservation-panel-heading">
+          <h3>Proof of Consent</h3>
+        </div>
+        <p class="reservation-empty-note">No supporting image was attached to this request.</p>
+      </section>
+    `;
+
   const modal = document.createElement('div');
   modal.className = 'reservation-details-modal';
   modal.innerHTML = `
     <div class="reservation-details-overlay">
       <div class="reservation-details-content">
         <div class="reservation-details-header">
-          <h2>Reservation Details</h2>
+          <div class="reservation-details-heading">
+            <div class="reservation-details-meta">
+              <span class="reservation-details-kicker">Request ${escapeReservationDetailsHtml(reservationCode)}</span>
+              <span class="reservation-status-pill status-${escapeReservationDetailsHtml(statusClass)}">${escapeReservationDetailsHtml(statusLabel)}</span>
+            </div>
+            <h2>${escapeReservationDetailsHtml(reservation.activity_name || 'Reservation Details')}</h2>
+            <p class="reservation-details-submitted">Submitted ${escapeReservationDetailsHtml(reservation.requested_date || 'N/A')}</p>
+          </div>
           <button class="reservation-details-close" type="button" aria-label="Close">
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
         <div class="reservation-details-body">
-          <div class="reservation-info">
-            <div class="info-row">
-              <strong>Activity:</strong>
-              <span>${reservation.activity_name}</span>
-            </div>
-            <div class="info-row">
-              <strong>Requester:</strong>
-              <span>${reservation.requester}</span>
-            </div>
-            <div class="info-row">
-              <strong>Requested Date:</strong>
-              <span>${reservation.requested_date}</span>
-            </div>
-            <div class="info-row">
-              <strong>Duration:</strong>
-              <span>${reservation.start_date} to ${reservation.end_date}</span>
-            </div>
-            <div class="info-row">
-              <strong>Time:</strong>
-              <span>${reservation.start_time} - ${reservation.end_time}</span>
-            </div>
-            <div class="info-row">
-              <strong>Status:</strong>
-              <span class="status-${reservation.status.toLowerCase()}">${reservation.status}</span>
-            </div>
+          <div class="reservation-details-layout">
+            <section class="reservation-details-panel">
+              <div class="reservation-panel-heading">
+                <h3>Requester</h3>
+              </div>
+              <div class="reservation-info-grid">
+                <div class="info-row">
+                  <strong>Full Name</strong>
+                  <span>${escapeReservationDetailsHtml(reservation.requester || 'Unknown')}</span>
+                </div>
+                <div class="info-row">
+                  <strong>Email</strong>
+                  <span>${escapeReservationDetailsHtml(reservation.requester_email || 'N/A')}</span>
+                </div>
+                <div class="info-row">
+                  <strong>Phone</strong>
+                  <span>${escapeReservationDetailsHtml(reservation.requester_phone || 'N/A')}</span>
+                </div>
+              </div>
+
+              <div class="reservation-panel-heading reservation-panel-heading-spaced">
+                <h3>Schedule</h3>
+              </div>
+              <div class="reservation-info-grid">
+                <div class="info-row">
+                  <strong>When</strong>
+                  <span>${escapeReservationDetailsHtml(scheduleLabel)}</span>
+                </div>
+                <div class="info-row">
+                  <strong>Starts</strong>
+                  <span>${escapeReservationDetailsHtml((reservation.event_date || reservation.start_date || 'N/A') + ' · ' + (reservation.event_time || reservation.start_time || 'N/A'))}</span>
+                </div>
+                <div class="info-row">
+                  <strong>Ends</strong>
+                  <span>${escapeReservationDetailsHtml((reservation.event_end_date || reservation.end_date || 'N/A') + ' · ' + (reservation.event_end_time || reservation.end_time || 'N/A'))}</span>
+                </div>
+              </div>
+            </section>
+
+            ${proofMarkup}
           </div>
 
-          <div class="reservation-items">
-            <h3>Requested Items</h3>
-            <div class="items-list">
-              ${reservation.items.map(item => `
-                <div class="item-row">
-                  <span class="item-name">${item.name}</span>
-                  <span class="item-quantity">${item.quantity} ${item.unit}</span>
-                </div>
-              `).join('')}
+          <section class="reservation-details-panel reservation-resources-panel">
+            <div class="reservation-panel-heading">
+              <h3>Requested Resources</h3>
             </div>
-          </div>
-
-          <div class="reservation-approvals">
-            <h3>Approval Status</h3>
-            <div class="approvals-list">
-              ${reservation.approvals.map(approval => `
-                <div class="approval-row">
-                  <span class="office-name">${approval.office}</span>
-                  <span class="approval-status status-${approval.status.toLowerCase()}">${approval.status}</span>
-                  ${approval.approved_by ? `<span class="approved-by">by ${approval.approved_by}</span>` : ''}
-                  ${approval.approved_at ? `<span class="approved-at">${approval.approved_at}</span>` : ''}
-                </div>
-              `).join('')}
-            </div>
-          </div>
+            <div class="reservation-resource-list">${resourceMarkup}</div>
+          </section>
         </div>
+        ${actionFooter}
       </div>
     </div>
   `;
 
-  // Add event listeners
   const closeBtn = modal.querySelector('.reservation-details-close');
   const overlay = modal.querySelector('.reservation-details-overlay');
 
@@ -783,7 +875,20 @@ function showReservationDetailsModal(reservation) {
     }
   });
 
-  // Add to body
+  if (canAct && typeof options.onAction === 'function') {
+    modal.querySelectorAll('[data-modal-action]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const action = button.getAttribute('data-modal-action');
+        if (!action) {
+          return;
+        }
+
+        closeModal();
+        await options.onAction(action, options.approvalId);
+      });
+    });
+  }
+
   document.body.appendChild(modal);
 }
 
@@ -898,6 +1003,56 @@ function applyHistoryFilters() {
     .join('');
 }
 
+function getMaintenanceTable() {
+  return maintenanceTableBody ? maintenanceTableBody.closest('table') : null;
+}
+
+function isOfficeMaintenanceTable() {
+  const table = getMaintenanceTable();
+  return Boolean(table && table.classList.contains('office-maintenance-table'));
+}
+
+function maintenanceTableShowsReporter() {
+  const table = getMaintenanceTable();
+  if (!table) {
+    return true;
+  }
+
+  return Array.from(table.querySelectorAll('thead th')).some((th) => {
+    return th.textContent.trim().toLowerCase().includes('reported by');
+  });
+}
+
+function maintenanceTableShowsLocation() {
+  // Location was a synthetic label (Storage A / Reservation) — not a real field.
+  return false;
+}
+
+function formatMaintenanceDescription(raw) {
+  const text = String(raw || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (!text) {
+    return '';
+  }
+
+  const reportedMatch = text.match(/reported items?:\s*(.+)$/im);
+  if (reportedMatch) {
+    const reportedItems = reportedMatch[1].trim();
+    const notes = text.replace(/reported items?:\s*.+$/im, '').trim();
+    if (notes && reportedItems) {
+      return `${notes}\n\nReported items: ${reportedItems}`;
+    }
+    if (reportedItems) {
+      return `Reported items: ${reportedItems}`;
+    }
+  }
+
+  return text;
+}
+
 function applyMaintenanceFilters() {
   if (!maintenanceTableBody) {
     return;
@@ -906,9 +1061,12 @@ function applyMaintenanceFilters() {
   const rows = maintenanceRowsByTab[activeMaintenanceTab] || maintenanceRowsByTab.maintenance;
   const topTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
   const inlineTerm = maintenanceInlineSearchInput ? maintenanceInlineSearchInput.value.trim().toLowerCase() : '';
+  const showReporter = maintenanceTableShowsReporter();
+  const showLocation = maintenanceTableShowsLocation();
+  const columnCount = showReporter ? 7 : 6;
 
   const filteredRows = rows.filter((row) => {
-    const rowText = `${row.id} ${row.item} ${row.count} ${row.date} ${row.status} ${row.location}`.toLowerCase();
+    const rowText = `${row.id} ${row.item} ${row.count} ${row.date} ${row.status} ${row.reporter || ''} ${row.description || ''}`.toLowerCase();
     const matchesTopSearch = !topTerm || rowText.includes(topTerm);
     const matchesInlineSearch = !inlineTerm || rowText.includes(inlineTerm);
 
@@ -917,15 +1075,21 @@ function applyMaintenanceFilters() {
 
   if (!filteredRows.length) {
     maintenanceTableBody.innerHTML = `
-      <tr>
-        <td colspan="8">No maintenance records found.</td>
+      <tr class="maintenance-empty-row">
+        <td class="maintenance-empty-cell" colspan="${columnCount}">No maintenance records found.</td>
       </tr>
     `;
     return;
   }
 
   maintenanceTableBody.innerHTML = filteredRows
-    .map((row) => `
+    .map((row) => {
+      const reporterCell = showReporter
+        ? `<td>${row.reporter ? `<span class="maintenance-reporter-cell">${row.reporter}</span>` : '<span class="maintenance-reporter-cell muted">—</span>'}</td>`
+        : '';
+      const locationCell = showLocation ? `<td>${row.location || ''}</td>` : '';
+
+      return `
       <tr
         data-row-type="${row.row_type || 'unit'}"
         data-unit-id="${row.unit_id || ''}"
@@ -938,14 +1102,15 @@ function applyMaintenanceFilters() {
       >
         <td>${row.id}</td>
         <td>${row.item}</td>
-        <td>${row.reporter ? `<span class="maintenance-reporter-cell">${row.reporter}</span>` : '<span class="maintenance-reporter-cell muted">—</span>'}</td>
+        ${reporterCell}
         <td>${row.count}</td>
         <td>${row.date}</td>
         <td><span class="maintenance-status ${row.statusClass}">${row.status}</span></td>
-        <td>${row.location}</td>
+        ${locationCell}
         <td><button class="maintenance-action-btn" type="button">Address</button></td>
       </tr>
-    `)
+    `;
+    })
     .join('');
 }
 
@@ -976,6 +1141,10 @@ function openMaintenanceEvalModal(row) {
     maintenanceEvalItemName.textContent = itemDisplay;
   }
 
+  if (maintenanceEvalReason) {
+    maintenanceEvalReason.textContent = reason || 'No maintenance reason on record.';
+  }
+
   const evalReporter = document.getElementById('maintenance-eval-reporter');
   if (evalReporter) {
     evalReporter.textContent = reporter || '-';
@@ -990,10 +1159,11 @@ function openMaintenanceEvalModal(row) {
 
   const evalDescription = document.getElementById('maintenance-eval-description');
   if (evalDescription) {
-    evalDescription.textContent = description || reason || '-';
+    const formattedDescription = formatMaintenanceDescription(description || reason || '');
+    evalDescription.textContent = formattedDescription || '-';
     const labelSpan = evalDescription.previousElementSibling;
     if (labelSpan) {
-      const hasDetails = Boolean(description || reason);
+      const hasDetails = Boolean(formattedDescription);
       labelSpan.style.display = hasDetails ? '' : 'none';
       evalDescription.style.display = hasDetails ? '' : 'none';
     }
@@ -1002,14 +1172,35 @@ function openMaintenanceEvalModal(row) {
   const proofWrap = document.getElementById('maintenance-eval-proof-wrap');
   const proofImg = document.getElementById('maintenance-eval-proof-img');
   const proofLink = document.getElementById('maintenance-eval-proof-link');
+  const proofFallback = document.getElementById('maintenance-eval-proof-fallback');
   if (proofWrap && proofImg && proofLink) {
     if (proofImage) {
+      proofWrap.style.display = '';
+      if (proofFallback) {
+        proofFallback.hidden = true;
+      }
+      proofImg.hidden = false;
+      proofImg.onload = () => {
+        if (proofFallback) {
+          proofFallback.hidden = true;
+        }
+        proofImg.hidden = false;
+      };
+      proofImg.onerror = () => {
+        proofImg.hidden = true;
+        if (proofFallback) {
+          proofFallback.hidden = false;
+        }
+      };
       proofImg.src = proofImage;
       proofLink.href = proofImage;
-      proofWrap.style.display = '';
     } else {
       proofWrap.style.display = 'none';
-      proofImg.src = '';
+      proofImg.removeAttribute('src');
+      proofImg.hidden = false;
+      if (proofFallback) {
+        proofFallback.hidden = true;
+      }
     }
   }
 
@@ -1535,8 +1726,9 @@ async function refreshRequestListSafely(explicitUrl) {
     clearInterval(requestListPollInterval);
   }
 
+  // PF request list: poll infrequently to reduce Supabase Disk IO.
   poll();
-  requestListPollInterval = setInterval(poll, 15000);
+  requestListPollInterval = setInterval(poll, 120000);
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
@@ -1946,11 +2138,12 @@ function applyEquipmentFilters() {
   const rows = equipmentTableBody.querySelectorAll('tr');
   const topTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
   const inlineTerm = equipmentInlineSearchInput ? equipmentInlineSearchInput.value.trim().toLowerCase() : '';
+  const showAllCategories = !activeEquipmentTab || activeEquipmentTab === 'all';
 
   rows.forEach((row) => {
     const rowCategory = row.dataset.equipmentRow || '';
     const rowText = row.textContent.toLowerCase();
-    const matchesTab = !activeEquipmentTab || rowCategory === activeEquipmentTab;
+    const matchesTab = showAllCategories || rowCategory === activeEquipmentTab;
     const matchesTopSearch = !topTerm || rowText.includes(topTerm);
     const matchesInlineSearch = !inlineTerm || rowText.includes(inlineTerm);
 
@@ -1966,22 +2159,42 @@ function getEquipmentTabButtons() {
   return equipmentTabs;
 }
 
-function getDefaultEquipmentCategoryKey() {
-  const activeTabButton = document.querySelector('[data-equipment-tab].active');
-  if (activeTabButton instanceof HTMLElement && activeTabButton.dataset.equipmentTab) {
-    return activeTabButton.dataset.equipmentTab;
+function getFirstRealEquipmentCategoryKey() {
+  const categoryKeys = Array.isArray(equipmentCategoriesCache)
+    ? equipmentCategoriesCache.map((category) => String(category?.key ?? '').trim()).filter(Boolean)
+    : [];
+
+  if (categoryKeys.length) {
+    return categoryKeys[0];
   }
 
-  const firstTabButton = getEquipmentTabButtons()[0];
-  if (firstTabButton instanceof HTMLElement && firstTabButton.dataset.equipmentTab) {
-    return firstTabButton.dataset.equipmentTab;
-  }
+  const firstRealTab = Array.from(getEquipmentTabButtons()).find((button) => {
+    if (!(button instanceof HTMLElement)) {
+      return false;
+    }
 
-  if (typeof window.defaultEquipmentCategory === 'string' && window.defaultEquipmentCategory.trim()) {
-    return window.defaultEquipmentCategory.trim();
+    const key = (button.dataset.equipmentTab || '').trim();
+    return key && key !== 'all';
+  });
+
+  if (firstRealTab instanceof HTMLElement) {
+    return (firstRealTab.dataset.equipmentTab || '').trim();
   }
 
   return '';
+}
+
+function getDefaultEquipmentCategoryKey() {
+  // Prefer a real category for add/edit forms — "all" is only a filter tab.
+  const activeTabButton = document.querySelector('[data-equipment-tab].active');
+  if (activeTabButton instanceof HTMLElement) {
+    const activeKey = (activeTabButton.dataset.equipmentTab || '').trim();
+    if (activeKey && activeKey !== 'all') {
+      return activeKey;
+    }
+  }
+
+  return getFirstRealEquipmentCategoryKey();
 }
 
 function setActiveEquipmentTab(categoryKey) {
@@ -2109,6 +2322,13 @@ function syncEquipmentCategoriesInUi(categories, preferredActiveKey = '') {
   if (equipmentTabGroup) {
     equipmentTabGroup.innerHTML = '';
 
+    const allButton = document.createElement('button');
+    allButton.type = 'button';
+    allButton.className = 'facilities-tab';
+    allButton.dataset.equipmentTab = 'all';
+    allButton.textContent = 'All Items';
+    equipmentTabGroup.appendChild(allButton);
+
     equipmentCategoriesCache.forEach((category) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -2122,10 +2342,10 @@ function syncEquipmentCategoriesInUi(categories, preferredActiveKey = '') {
   renderEquipmentCategoryList();
 
   const categoryKeys = equipmentCategoriesCache.map((category) => category.key);
-  let nextActiveKey = (preferredActiveKey || activeEquipmentTab || '').trim();
+  let nextActiveKey = (preferredActiveKey || activeEquipmentTab || 'all').trim();
 
-  if (!categoryKeys.includes(nextActiveKey)) {
-    nextActiveKey = categoryKeys[0] || '';
+  if (nextActiveKey !== 'all' && !categoryKeys.includes(nextActiveKey)) {
+    nextActiveKey = 'all';
   }
 
   setActiveEquipmentTab(nextActiveKey);
@@ -2530,7 +2750,9 @@ function ensureEquipmentEmptyStateRow() {
   }
 
   const placeholder = document.createElement('tr');
-  placeholder.dataset.equipmentRow = activeEquipmentTab || getDefaultEquipmentCategoryKey() || '';
+  placeholder.dataset.equipmentRow = (activeEquipmentTab && activeEquipmentTab !== 'all')
+    ? activeEquipmentTab
+    : (getDefaultEquipmentCategoryKey() || '');
   placeholder.innerHTML = '<td colspan="6">No equipment records found in the database.</td>';
   equipmentTableBody.appendChild(placeholder);
 }
@@ -3425,6 +3647,7 @@ async function buildNotificationsPopover() {
     // Update UI immediately on click
     if (notification.unread) {
       notification.unread = false;
+      notificationUnreadCount = Math.max(0, notificationUnreadCount - 1);
       updateNotificationBadge();
       renderList();
     }
@@ -3451,17 +3674,26 @@ async function buildNotificationsPopover() {
 
     // Mark as read in database (don't fail if this errors, UI is already updated)
     try {
-      await fetch(`/dashboard/notification/${notificationId}/read`, {
+      const response = await fetch(`/dashboard/notification/${notificationId}/read`, {
         method: 'PATCH',
         headers: {
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
           'Accept': 'application/json',
         },
       });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (Number.isFinite(Number(data.unread_count))) {
+          notificationUnreadCount = Number(data.unread_count);
+          updateNotificationBadge();
+        }
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
       // Revert UI changes if API call failed
       notification.unread = true;
+      notificationUnreadCount += 1;
       updateNotificationBadge();
       renderList();
     }
@@ -3469,7 +3701,8 @@ async function buildNotificationsPopover() {
 
   (async function refreshPopoverNotifications() {
     try {
-      await fetchNotifications({ sync: true, force: true });
+      // Prefer a light list fetch; heavy sync runs at most every 15 minutes.
+      await fetchNotifications({ sync: true, force: false });
       renderList();
     } catch (_error) {
       // No-op: errors already logged
@@ -4807,11 +5040,11 @@ if (equipmentTableBody && (equipmentTabGroup || equipmentTabs.length)) {
         return;
       }
 
-      setActiveEquipmentTab(tabButton.dataset.equipmentTab || getDefaultEquipmentCategoryKey());
+      setActiveEquipmentTab(tabButton.dataset.equipmentTab || 'all');
     });
   }
 
-  setActiveEquipmentTab(getDefaultEquipmentCategoryKey());
+  setActiveEquipmentTab('all');
 
   if (equipmentInlineSearchInput) {
     equipmentInlineSearchInput.addEventListener('input', applyEquipmentFilters);
@@ -5194,10 +5427,6 @@ if (facilitiesSaveButton) {
         if (cells[2]) {
           cells[2].textContent = facility.classification;
         }
-
-        if (cells[3]) {
-          cells[3].textContent = facility.location;
-        }
       } else {
         const row = document.createElement('tr');
         row.dataset.facilityId = facility.room_id;
@@ -5207,7 +5436,6 @@ if (facilitiesSaveButton) {
           <td>${facility.asset_id}</td>
           <td>${facility.item_name}</td>
           <td>${facility.classification}</td>
-          <td>${facility.location}</td>
           <td><button class="table-edit-btn" type="button">Edit</button></td>
         `;
 
@@ -5570,7 +5798,11 @@ if (maintenanceEvalModal) {
   maintenanceEvalModal.addEventListener('click', (event) => {
     const target = event.target;
 
-    if (target instanceof HTMLElement && target.dataset.closeMaintenanceEval === 'true') {
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (target.closest('[data-close-maintenance-eval="true"]')) {
       closeMaintenanceEvalModal();
       activeMaintenanceAddressRow = null;
     }

@@ -37,9 +37,16 @@
     <td>{{ optional($reservation?->created_at)->format('M d, Y h:i A') }}</td>
     <td><span class="badge {{ $badgeClass }}">{{ $badgeText }}</span></td>
     <td class="office-queue-actions-cell">
-      @if($isOpenStep)
-        @if($isActionable)
-          <div class="office-queue-action-group">
+      <div class="office-queue-action-group">
+        <button
+          type="button"
+          class="office-queue-action-btn office-queue-view"
+          data-reservation-id="{{ (int) $request->reservation_id }}"
+          data-approval-id="{{ (int) $request->approval_id }}"
+          data-can-act="{{ ($isOpenStep && $isActionable) ? '1' : '0' }}"
+        >Details</button>
+        @if($isOpenStep)
+          @if($isActionable)
             <button
               type="button"
               class="office-queue-action-btn office-queue-approve"
@@ -52,26 +59,22 @@
               data-approval-id="{{ $request->approval_id }}"
               data-action="reject"
             >Reject</button>
-          </div>
-        @else
-          @if($showWaitingQueueContext)
-            <span
-              class="office-queue-waiting-tag"
-              title="{{ $waitingOnLabel ? 'Waiting for ' . $waitingOnLabel . ' to approve first.' : 'Waiting for a previous office to approve first.' }}"
-            >
-              @if($waitingOnLabel)
-                At {{ $waitingOnLabel }}
-              @else
-                Awaiting prior approval
-              @endif
-            </span>
           @else
-            <span class="office-queue-empty-action">-</span>
+            @if($showWaitingQueueContext)
+              <span
+                class="office-queue-waiting-tag"
+                title="{{ $waitingOnLabel ? 'Waiting for ' . $waitingOnLabel . ' to approve first.' : 'Waiting for a previous office to approve first.' }}"
+              >
+                @if($waitingOnLabel)
+                  At {{ $waitingOnLabel }}
+                @else
+                  Awaiting prior approval
+                @endif
+              </span>
+            @endif
           @endif
         @endif
-      @else
-        <span class="office-queue-empty-action">-</span>
-      @endif
+      </div>
     </td>
   </tr>
 @empty

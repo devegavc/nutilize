@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Services\DashboardInventoryCacheService;
+use App\Services\ItemOwnerService;
 use App\Services\ItemUnitService;
 use App\Support\ItemAsset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -35,7 +37,14 @@ class DashboardInventoryController extends Controller
         if (Schema::hasTable('maintenance')) {
             $maintenanceAndReportCount += DB::table('maintenance')->count();
         }
-        if (Schema::hasTable('reports')) {
+        if (Schema::hasTable('reservation_issues')) {
+            $maintenanceAndReportCount += (int) DB::table('reservation_issues')
+                ->where(function ($query) {
+                    $query->whereNull('status')
+                        ->orWhereRaw("LOWER(COALESCE(status, '')) NOT IN ('resolved', 'solved', 'fixed', 'closed', 'done', 'dismissed')");
+                })
+                ->count();
+        } elseif (Schema::hasTable('reports')) {
             $maintenanceAndReportCount += DB::table('reports')->count();
         }
 
@@ -240,7 +249,8 @@ class DashboardInventoryController extends Controller
             return [
                 'asset_id' => ItemUnitService::listAssetLabel($unitCodes, $itemId),
                 'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
-                'location' => $ownerName !== '' ? $ownerName : $this->locationFromCategory($normalizedCategory),
+                'owner' => $ownerName !== '' ? $ownerName : 'Unassigned',
+                'location' => $ownerName !== '' ? $ownerName : 'Unassigned',
                 'category' => $resolvedCategory,
                 'usage_percent' => min(100, (int) round(($usageCount / $maxUsage) * 100)),
             ];
@@ -259,11 +269,7 @@ class DashboardInventoryController extends Controller
     public function facilities()
     {
         $roomRows = DB::table('rooms')
-            ->select([
-                'room_id',
-                'room_number',
-                'room_type',
-            ])
+            ->select(['room_id', 'room_number', 'room_type'])
             ->orderBy('room_number')
             ->get()
             ->map(function ($room) {
@@ -409,6 +415,11 @@ class DashboardInventoryController extends Controller
             ])
             ->whereIn('item_units.status', ['maintenance', 'damaged']);
 
+        $pfOwnerIds = ItemOwnerService::physicalFacilitiesOwnerIds();
+        if ($pfOwnerIds !== []) {
+            $unitQuery->whereIn('items.owner_id', $pfOwnerIds);
+        }
+
         if (Schema::hasColumn('items', 'category')) {
             $unitQuery->addSelect('items.category');
         } elseif (Schema::hasColumn('items', 'category_id') && Schema::hasTable('item_categories')) {
@@ -445,7 +456,82 @@ class DashboardInventoryController extends Controller
             ];
         }
 
-        if (Schema::hasTable('reports')) {
+        if (Schema::hasTable('reservation_issues')) {
+            $issueQuery = DB::table('reservation_issues as issues')
+                ->leftJoin('users as users', 'users.user_id', '=', 'issues.user_id')
+                ->leftJoin('reservations as reservations', 'reservations.reservation_id', '=', 'issues.reservation_id')
+                ->select([
+                    'issues.issue_id',
+                    'issues.reservation_id',
+                    'issues.user_id',
+                    'issues.reported_by',
+                    'issues.description',
+                    'issues.image_name',
+                    'issues.image_url',
+                    'issues.status',
+                    'issues.created_at',
+                    'reservations.activity_name',
+                    'users.full_name as reporter_full_name',
+                    'users.first_name as reporter_first_name',
+                    'users.last_name as reporter_last_name',
+                    'users.username as reporter_username',
+                ])
+                ->orderByDesc('issues.created_at');
+
+            if (Schema::hasColumn('reservation_issues', 'status')) {
+                $issueQuery->where(function ($query) {
+                    $query->whereNull('issues.status')
+                        ->orWhereRaw("LOWER(COALESCE(issues.status, '')) NOT IN ('resolved', 'solved', 'fixed', 'closed', 'done', 'dismissed')");
+                });
+            }
+
+            $issueRows = $issueQuery->limit(100)->get();
+
+            foreach ($issueRows as $issue) {
+                $description = trim((string) ($issue->description ?? ''));
+                $itemLabel = $this->itemLabelFromReservationIssue($description, (string) ($issue->activity_name ?? ''));
+
+                $reporterName = trim((string) ($issue->reporter_full_name ?? ''));
+                if ($reporterName === '') {
+                    $first = trim((string) ($issue->reporter_first_name ?? ''));
+                    $last = trim((string) ($issue->reporter_last_name ?? ''));
+                    $reporterName = trim("{$first} {$last}");
+                }
+                if ($reporterName === '') {
+                    $reporterName = trim((string) ($issue->reported_by ?? $issue->reporter_username ?? 'Unknown'));
+                }
+
+                $proofUrl = trim((string) ($issue->image_url ?? ''));
+                if ($proofUrl !== '' && !preg_match('#^https?://#i', $proofUrl)) {
+                    $proofUrl = '';
+                }
+
+                $dateValue = $issue->created_at;
+                $reservationId = (int) ($issue->reservation_id ?? 0);
+                $displayId = $reservationId > 0
+                    ? ('NU-' . str_pad((string) $reservationId, 6, '0', STR_PAD_LEFT))
+                    : ('issue_' . (int) $issue->issue_id);
+
+                $rowsByTab['reported'][] = [
+                    'row_type' => 'report',
+                    'unit_id' => 0,
+                    'report_id' => (int) $issue->issue_id,
+                    'reservation_id' => $reservationId,
+                    'id' => $displayId,
+                    'item' => $itemLabel,
+                    'count' => '1',
+                    'date' => $dateValue ? date('d/m/Y', strtotime((string) $dateValue)) : date('d/m/Y'),
+                    'status' => 'Reported',
+                    'statusClass' => 'reported',
+                    'location' => 'Reservation',
+                    'reason' => $description !== '' ? $description : 'Reported reservation issue',
+                    'reporter' => $reporterName,
+                    'description' => $description,
+                    'proof_image_url' => $proofUrl,
+                ];
+            }
+        } elseif (Schema::hasTable('reports')) {
+            // Legacy fallback while older report rows still exist.
             $reportSelect = [
                 'reports.report_id',
                 'reports.report_info',
@@ -466,9 +552,6 @@ class DashboardInventoryController extends Controller
             }
             if (Schema::hasColumn('reports', 'proof_image_url')) {
                 $reportSelect[] = 'reports.proof_image_url';
-            }
-            if (Schema::hasColumn('reports', 'reservation_id')) {
-                $reportSelect[] = 'reports.reservation_id';
             }
 
             $reportRows = DB::table('reports as reports')
@@ -491,49 +574,35 @@ class DashboardInventoryController extends Controller
                 $reporterName = trim((string) ($report->reporter_full_name ?? ''));
                 if ($reporterName === '') {
                     $first = trim((string) ($report->reporter_first_name ?? ''));
-                    $last  = trim((string) ($report->reporter_last_name ?? ''));
-                    $reporterName = trim("$first $last");
+                    $last = trim((string) ($report->reporter_last_name ?? ''));
+                    $reporterName = trim("{$first} {$last}");
                 }
                 if ($reporterName === '') {
                     $reporterName = trim((string) ($report->reporter_username ?? 'Unknown'));
                 }
 
                 $description = trim((string) ($report->description ?? ''));
-                if ($description === '') {
-                    // Fall back to parsing desc= from report_info
-                    if (preg_match('/desc=([^|]+)/', $reportText, $m)) {
-                        $description = trim($m[1]);
-                    }
+                if ($description === '' && preg_match('/desc=([^|]+)/', $reportText, $m)) {
+                    $description = trim($m[1]);
                 }
 
                 $proofUrl = trim((string) ($report->proof_image_url ?? ''));
-                // Only pass the URL if it looks like an actual http URL (Supabase); skip local device paths
                 if ($proofUrl !== '' && !str_starts_with($proofUrl, 'http')) {
                     $proofUrl = '';
                 }
 
-                // Convert Supabase storage URL to local proxy URL so private bucket images load correctly
                 if ($proofUrl !== '') {
-                    $filename = basename(parse_url($proofUrl, PHP_URL_PATH));
+                    $filename = basename(parse_url($proofUrl, PHP_URL_PATH) ?: '');
                     if ($filename !== '') {
                         $proofUrl = route('dashboard.storage.proof', ['filename' => $filename]);
                     }
                 }
 
                 $dateValue = $report->generated_at ?? $report->created_at;
-                $linkedUnitId = 0;
-
-                if (!empty($report->item_id) && Schema::hasTable('item_units')) {
-                    $linkedUnitId = (int) (DB::table('item_units')
-                        ->where('item_id', (int) $report->item_id)
-                        ->whereIn('status', ['damaged', 'maintenance', 'in_use'])
-                        ->orderByRaw("CASE status WHEN 'damaged' THEN 1 WHEN 'maintenance' THEN 2 WHEN 'in_use' THEN 3 ELSE 4 END")
-                        ->value('unit_id') ?? 0);
-                }
 
                 $rowsByTab['reported'][] = [
-                    'row_type' => $linkedUnitId > 0 ? 'unit' : 'report',
-                    'unit_id' => $linkedUnitId,
+                    'row_type' => 'report',
+                    'unit_id' => 0,
                     'report_id' => (int) $report->report_id,
                     'id' => 'report_' . (int) $report->report_id,
                     'item' => $itemLabel,
@@ -770,13 +839,47 @@ class DashboardInventoryController extends Controller
 
     public function dismissMaintenanceReport(Request $request, int $reportId): JsonResponse
     {
-        if (!Schema::hasTable('reports')) {
-            return response()->json(['error' => 'Reports table is not available.'], 422);
-        }
-
         $validated = $request->validate([
             'assessment' => ['required', 'string', 'max:255'],
         ]);
+
+        if (Schema::hasTable('reservation_issues')) {
+            $issue = DB::table('reservation_issues')->where('issue_id', $reportId)->first();
+
+            if (!$issue) {
+                return response()->json(['error' => 'Report not found.'], 404);
+            }
+
+            $update = [
+                'status' => 'Resolved',
+            ];
+
+            // Keep assessment trail when description already exists.
+            $existingDescription = trim((string) ($issue->description ?? ''));
+            $assessment = trim((string) $validated['assessment']);
+            if ($assessment !== '') {
+                $update['description'] = $existingDescription !== ''
+                    ? ($existingDescription . "\n\nResolution: " . $assessment)
+                    : ('Resolution: ' . $assessment);
+            }
+
+            DB::table('reservation_issues')
+                ->where('issue_id', $reportId)
+                ->update($update);
+
+            return response()->json([
+                'success' => true,
+                'report' => [
+                    'row_type' => 'report',
+                    'report_id' => $reportId,
+                    'resolved' => true,
+                ],
+            ]);
+        }
+
+        if (!Schema::hasTable('reports')) {
+            return response()->json(['error' => 'Reports table is not available.'], 422);
+        }
 
         $deleted = DB::table('reports')->where('report_id', $reportId)->delete();
 
@@ -797,8 +900,9 @@ class DashboardInventoryController extends Controller
     public function equipments()
     {
         $equipmentCategories = $this->getEquipmentCategories();
+        $pfOwnerIds = ItemOwnerService::physicalFacilitiesOwnerIds();
 
-        $rows = DB::table('items')
+        $query = DB::table('items')
             ->leftJoin('item_owners', 'item_owners.owner_id', '=', 'items.owner_id')
             ->leftJoin('item_categories as categories', 'categories.category_id', '=', 'items.category_id')
             ->select([
@@ -811,39 +915,42 @@ class DashboardInventoryController extends Controller
                 'items.availability_status',
                 'item_owners.owner_name',
             ])
-            ->orderBy('items.item_id')
-            ->get()
-            ->map(function ($row) {
-                $category = $this->normalizeCategory((string) ($row->category_key ?? ''));
-                $totalCount = max(0, (int) ($row->quantity_total ?? 0));
-                $inUseCount = max(0, min($totalCount, (int) ($row->quantity_in_use ?? 0)));
-                $maintenanceCount = (bool) $row->maintenance_status ? 1 : 0;
-                $unitCodes = ItemUnitService::loadUnitCodesForItem((int) $row->item_id);
+            ->orderBy('items.item_id');
 
-                $statusKey = 'good';
-                $statusLabel = 'Good';
+        // PF admins only manage Physical Facilities stock — never other item owners' gear.
+        if ($pfOwnerIds !== []) {
+            $query->whereIn('items.owner_id', $pfOwnerIds);
+        } elseif (Auth::user()?->isPhysicalFacilitiesAdmin()) {
+            $query->whereRaw('1 = 0');
+        }
 
-                if ($maintenanceCount > 0) {
-                    $statusKey = 'maintenance';
-                    $statusLabel = 'Maintenance';
-                } elseif ($totalCount > 0 && $inUseCount >= $totalCount) {
-                    $statusKey = 'damaged';
-                    $statusLabel = 'Damaged';
-                }
+        $itemRows = $query->get();
+        $itemIds = $itemRows->pluck('item_id')->map(fn ($id) => (int) $id)->all();
+        $unitCodesByItem = ItemUnitService::loadUnitCodesGroupedByItem($itemIds);
+        $issueStatusByItem = $this->loadUnitIssueStatusByItem($itemIds);
 
-                return [
-                    'item_id' => (int) $row->item_id,
-                    'asset_id' => ItemUnitService::listAssetLabel($unitCodes, (int) $row->item_id),
-                    'unit_codes' => $unitCodes,
-                    'category' => $category,
-                    'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
-                    'total_count' => $totalCount,
-                    'in_use' => $inUseCount,
-                    'status_key' => $statusKey,
-                    'status_label' => $statusLabel,
-                    'owner_name' => $row->owner_name,
-                ];
-            });
+        $rows = $itemRows->map(function ($row) use ($unitCodesByItem, $issueStatusByItem) {
+            $itemId = (int) $row->item_id;
+            $category = $this->normalizeCategory((string) ($row->category_key ?? ''));
+            $totalCount = max(0, (int) ($row->quantity_total ?? 0));
+            $inUseCount = max(0, min($totalCount, (int) ($row->quantity_in_use ?? 0)));
+            $unitCodes = $unitCodesByItem[$itemId] ?? [];
+            $statusKey = $issueStatusByItem[$itemId]
+                ?? ((bool) $row->maintenance_status ? 'maintenance' : 'good');
+
+            return [
+                'item_id' => $itemId,
+                'asset_id' => ItemUnitService::listAssetLabel($unitCodes, $itemId),
+                'unit_codes' => $unitCodes,
+                'category' => $category,
+                'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
+                'total_count' => $totalCount,
+                'in_use' => $inUseCount,
+                'status_key' => $statusKey,
+                'status_label' => $this->statusLabel($statusKey),
+                'owner_name' => $row->owner_name,
+            ];
+        });
 
         return view('dashboard-inventory-equipments', [
             'equipmentRows' => $rows,
@@ -1090,6 +1197,7 @@ class DashboardInventoryController extends Controller
         DashboardInventoryCacheService::clearCache();
 
         $normalizedCategory = $this->normalizeCategory($databaseCategory);
+
         return response()->json([
             'success' => true,
             'item' => [
@@ -1132,11 +1240,12 @@ class DashboardInventoryController extends Controller
             ], 422);
         }
 
-        $ownerId = DB::table('item_owners')->orderBy('owner_id')->value('owner_id');
+        $ownerId = ItemOwnerService::physicalFacilitiesOwnerId()
+            ?? DB::table('item_owners')->orderBy('owner_id')->value('owner_id');
 
         if (!$ownerId) {
             return response()->json([
-                'error' => 'No item owner found. Please create an owner first.',
+                'error' => 'No Physical Facilities owner found. Please create a PF item owner first.',
             ], 422);
         }
 
@@ -1250,6 +1359,48 @@ class DashboardInventoryController extends Controller
         };
     }
 
+    /**
+     * Resolve display status from real unit rows.
+     * Damaged/maintenance win; fully borrowed stock is NOT treated as damaged.
+     *
+     * @param  array<int, int>  $itemIds
+     * @return array<int, string> item_id => good|maintenance|damaged
+     */
+    private function loadUnitIssueStatusByItem(array $itemIds): array
+    {
+        if (!Schema::hasTable('item_units') || $itemIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('item_units')
+            ->whereIn('item_id', $itemIds)
+            ->whereIn('status', ['damaged', 'maintenance'])
+            ->select(['item_id', 'status'])
+            ->get();
+
+        $result = [];
+
+        foreach ($rows as $row) {
+            $itemId = (int) $row->item_id;
+            $status = strtolower((string) $row->status);
+
+            if ($status === 'damaged') {
+                $result[$itemId] = 'damaged';
+                continue;
+            }
+
+            if ($status === 'maintenance' && ($result[$itemId] ?? null) !== 'damaged') {
+                $result[$itemId] = 'maintenance';
+            }
+        }
+
+        foreach ($itemIds as $itemId) {
+            $result[(int) $itemId] = $result[(int) $itemId] ?? 'good';
+        }
+
+        return $result;
+    }
+
     private function normalizeCategory(string $rawCategory): string
     {
         $value = $this->normalizeCategoryKey($rawCategory);
@@ -1357,6 +1508,30 @@ class DashboardInventoryController extends Controller
         }
 
         return null;
+    }
+
+    private function itemLabelFromReservationIssue(string $description, string $activityName = ''): string
+    {
+        $description = trim($description);
+        $activityName = trim($activityName);
+
+        if ($description !== '' && preg_match('/reported items?:\s*(.+)$/im', $description, $matches)) {
+            $reportedItems = trim((string) ($matches[1] ?? ''));
+            if ($reportedItems !== '') {
+                return $reportedItems;
+            }
+        }
+
+        if ($activityName !== '') {
+            return $activityName;
+        }
+
+        if ($description !== '') {
+            $firstLine = trim((string) strtok($description, "\n"));
+            return $firstLine !== '' ? $firstLine : 'Reported Issue';
+        }
+
+        return 'Reported Issue';
     }
 
     private function roomTypeFromFacilityCategory(string $category): ?string

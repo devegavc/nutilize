@@ -53,12 +53,12 @@
     <section class="workspace-grid">
       <div id="navbar-container"></div>
 
-      <section class="content-card">
+      <section class="content-card office-users-card">
         <div class="dashboard-page-header-top">
           <h1 class="section-title">Users</h1>
         </div>
         <div class="dashboard-page-header-bottom">
-          <p class="section-subtitle">Create and manage accounts for {{ $programName }}, including your program chair account.</p>
+          <p class="section-subtitle">Manage {{ $programName }} accounts.</p>
           <button class="facilities-add-btn" id="user-add-btn" type="button"><span class="btn-icon">+</span> Add User</button>
         </div>
 
