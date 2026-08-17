@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\DashboardAnnouncementController;
 use App\Http\Controllers\DashboardHomeController;
 use App\Http\Controllers\DashboardHistoryController;
 use App\Http\Controllers\DashboardInventoryController;
@@ -82,6 +83,9 @@ Route::middleware('auth')->group(function () {
             Route::patch('/maintenance/rooms/{roomId}', [DashboardInventoryController::class, 'updateMaintenanceRoom'])->name('dashboard.maintenance.rooms.update');
             Route::patch('/maintenance/reports/{reportId}', [DashboardInventoryController::class, 'dismissMaintenanceReport'])->name('dashboard.maintenance.reports.dismiss');
             Route::view('/messages', 'dashboard-messages')->name('dashboard.messages');
+            Route::get('/announcements', [DashboardAnnouncementController::class, 'index'])->name('dashboard.announcements');
+            Route::post('/announcements', [DashboardAnnouncementController::class, 'store'])->name('dashboard.announcements.store');
+            Route::delete('/announcements/{announcementId}', [DashboardAnnouncementController::class, 'destroy'])->name('dashboard.announcements.destroy');
             Route::get('/schedule', [DashboardScheduleController::class, 'index'])->name('dashboard.schedule');
             Route::get('/users', [DashboardUserController::class, 'index'])->name('dashboard.users');
             Route::post('/users', [DashboardUserController::class, 'store'])->name('dashboard.users.store');

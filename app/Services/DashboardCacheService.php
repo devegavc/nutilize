@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\ItemOwnerService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -10,7 +11,8 @@ use Carbon\Carbon;
 class DashboardCacheService
 {
     /**
-     * Cache TTL in minutes (5 minutes is reasonable for dashboard)
+     * Cache TTL in minutes. Stats are read-only here; in_use sync runs via
+     * `items:sync-in-use` so home does not wait on a full unit reconcile.
      */
     private const CACHE_TTL = 5;
 
@@ -19,13 +21,13 @@ class DashboardCacheService
      */
     public static function getDashboardData(int $userId, int $officeId): array
     {
-        $cacheKey = "dashboard.data.user.{$userId}.office.{$officeId}";
+        $cacheKey = "dashboard.data.v4.user.{$userId}.office.{$officeId}";
 
-        return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($userId, $officeId) {
+        return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
             return [
                 'stats' => self::getStats(),
                 'quickReports' => self::getQuickReports(),
-                'upcomingRequests' => self::getUpcomingRequests(),
+                'upcomingRequests' => self::getUpcomingRequests(8),
                 'tasks' => self::getTasks($officeId),
                 'dailyHighlights' => self::getDailyHighlights(),
             ];
@@ -119,6 +121,7 @@ class DashboardCacheService
                 ->leftJoin('reservations as reservations', 'reservations.reservation_id', '=', 'issues.reservation_id')
                 ->select([
                     'issues.issue_id',
+                    'issues.reservation_id',
                     'issues.description',
                     'issues.reported_by',
                     'issues.image_url',
@@ -141,22 +144,45 @@ class DashboardCacheService
                     $isSolved = in_array($statusRaw, ['solved', 'resolved', 'fixed', 'closed', 'done', 'dismissed'], true);
 
                     $description = trim((string) ($row->description ?? ''));
+                    $activityName = trim((string) ($row->activity_name ?? ''));
                     $itemLabel = 'Reported Issue';
                     if (preg_match('/reported items?:\s*(.+)$/im', $description, $matches)) {
                         $itemLabel = trim((string) $matches[1]);
-                    } elseif (trim((string) ($row->activity_name ?? '')) !== '') {
-                        $itemLabel = trim((string) $row->activity_name);
+                    } elseif ($activityName !== '') {
+                        $itemLabel = $activityName;
                     } elseif ($description !== '') {
                         $itemLabel = strtok($description, "\n") ?: $description;
                     }
 
-                    $hasImage = trim((string) ($row->image_url ?? '')) !== '';
+                    $imageUrl = trim((string) ($row->image_url ?? ''));
+                    if ($imageUrl !== '' && !preg_match('#^https?://#i', $imageUrl)) {
+                        $imageUrl = '';
+                    }
+                    $hasImage = $imageUrl !== '';
+                    $createdAt = $row->created_at ?? null;
+                    $reportedAt = $createdAt
+                        ? \Carbon\Carbon::parse($createdAt)->format('M d, Y g:i A')
+                        : 'N/A';
+                    $reservationId = (int) ($row->reservation_id ?? 0);
+                    $issueId = (int) ($row->issue_id ?? 0);
 
                     return [
+                        'id' => $issueId > 0 ? ('issue_' . $issueId) : ('report_' . uniqid()),
+                        'source' => 'reservation_issue',
+                        'issue_id' => $issueId,
+                        'reservation_id' => $reservationId,
+                        'reservation_code' => $reservationId > 0
+                            ? ('NU-' . str_pad((string) $reservationId, 6, '0', STR_PAD_LEFT))
+                            : null,
                         'item' => $itemLabel,
+                        'activity_name' => $activityName !== '' ? $activityName : null,
                         'reported_by' => \App\Models\User::formatDisplayName($row)
                             ?: trim((string) ($row->reported_by ?? $row->reporter_username ?? 'Unknown')),
                         'attachment_label' => $hasImage ? '1 Attachment' : 'No attachment',
+                        'has_attachment' => $hasImage,
+                        'image_url' => $imageUrl,
+                        'description' => $description !== '' ? $description : 'No additional description provided.',
+                        'reported_at' => $reportedAt,
                         'status_label' => $isSolved ? 'Solved' : 'Pending',
                         'status_class' => $isSolved ? 'solved' : 'pending',
                     ];
@@ -194,9 +220,19 @@ class DashboardCacheService
             $query->addSelect('reports.attachment_count');
         }
 
+        if (self::hasColumn('reports', 'description')) {
+            $query->addSelect('reports.description');
+        }
+
+        if (self::hasColumn('reports', 'proof_image_url')) {
+            $query->addSelect('reports.proof_image_url');
+        }
+
         if (self::hasColumn('reports', 'generated_at')) {
+            $query->addSelect('reports.generated_at');
             $query->orderByDesc('reports.generated_at');
         } else {
+            $query->addSelect('reports.created_at');
             $query->orderByDesc('reports.created_at');
         }
 
@@ -205,22 +241,45 @@ class DashboardCacheService
                 $statusRaw = strtolower(trim((string) ($row->status ?? 'pending')));
                 $isSolved = in_array($statusRaw, ['solved', 'resolved', 'fixed', 'closed', 'done'], true);
 
-                $attachmentLabel = 'No attachment';
-                if (isset($row->attachment_count)) {
-                    $count = max(0, (int) ($row->attachment_count ?? 0));
-                    $attachmentLabel = $count === 0 ? 'No attachment' : ($count === 1 ? '1 Attachment' : "$count Attachments");
+                $attachmentCount = isset($row->attachment_count) ? max(0, (int) $row->attachment_count) : 0;
+                $imageUrl = trim((string) ($row->proof_image_url ?? ''));
+                if ($imageUrl !== '' && !preg_match('#^https?://#i', $imageUrl)) {
+                    $imageUrl = '';
                 }
+                $hasImage = $imageUrl !== '' || $attachmentCount > 0;
+                $attachmentLabel = !$hasImage
+                    ? 'No attachment'
+                    : ($attachmentCount > 1
+                        ? "{$attachmentCount} Attachments"
+                        : '1 Attachment');
 
                 $itemLabel = trim((string) ($row->item_name ?? ''));
+                $roomNumber = trim((string) ($row->room_number ?? ''));
                 if ($itemLabel === '') {
-                    $roomNumber = trim((string) ($row->room_number ?? ''));
                     $itemLabel = $roomNumber !== '' ? ('Room ' . $roomNumber) : 'General Report';
                 }
 
+                $description = trim((string) ($row->description ?? $row->report_info ?? ''));
+                $timestamp = $row->generated_at ?? $row->created_at ?? null;
+                $reportedAt = $timestamp
+                    ? \Carbon\Carbon::parse($timestamp)->format('M d, Y g:i A')
+                    : 'N/A';
+                $reportId = (int) ($row->report_id ?? 0);
+
                 return [
+                    'id' => $reportId > 0 ? ('report_' . $reportId) : ('report_' . uniqid()),
+                    'source' => 'report',
+                    'issue_id' => null,
+                    'reservation_id' => null,
+                    'reservation_code' => null,
                     'item' => $itemLabel,
-                    'reported_by' => \App\Models\User::formatDisplayName($row),
+                    'activity_name' => $roomNumber !== '' ? ('Room ' . $roomNumber) : null,
+                    'reported_by' => \App\Models\User::formatDisplayName($row) ?: 'Unknown',
                     'attachment_label' => $attachmentLabel,
+                    'has_attachment' => $hasImage,
+                    'image_url' => $imageUrl,
+                    'description' => $description !== '' ? $description : 'No additional description provided.',
+                    'reported_at' => $reportedAt,
                     'status_label' => $isSolved ? 'Solved' : 'Pending',
                     'status_class' => $isSolved ? 'solved' : 'pending',
                 ];
@@ -328,36 +387,72 @@ class DashboardCacheService
     }
 
     /**
-     * Get tasks for office
+     * Actionable PF dashboard tasks (live open counts, not this-week totals).
      */
     private static function getTasks(int $officeId): array
     {
         $pendingFinalApprovals = 0;
-        if (self::hasTable('reservation_approvals') && self::hasColumn('reservation_approvals', 'office_id')) {
-            $pendingFinalApprovals = (int) DB::table('reservation_approvals as approvals')
-                ->join('reservations as reservations', 'reservations.reservation_id', '=', 'approvals.reservation_id')
-                ->where('approvals.office_id', $officeId)
-                ->whereNull('approvals.approved_at')
-                ->whereNotIn(DB::raw("LOWER(COALESCE(reservations.overall_status, ''))"), ['approved', 'rejected', 'cancelled', 'canceled', 'expired'])
-                ->whereRaw("LOWER(COALESCE(reservations.overall_status, '')) NOT LIKE ?", ['cancel%'])
+        if (self::hasTable('reservations')) {
+            $pendingFinalApprovals = (int) DB::table('reservations')
+                ->whereRaw("LOWER(TRIM(COALESCE(overall_status, ''))) = ?", ['awaiting_physical_facilities'])
                 ->count();
+
+            // Fallback for rows that still use the older pending-approval label
+            // while PF is the current actionable office.
+            if (
+                $pendingFinalApprovals === 0
+                && $officeId > 0
+                && self::hasTable('reservation_approvals')
+                && self::hasColumn('reservation_approvals', 'office_id')
+            ) {
+                $pendingFinalApprovals = (int) DB::table('reservation_approvals as approvals')
+                    ->join('reservations as reservations', 'reservations.reservation_id', '=', 'approvals.reservation_id')
+                    ->where('approvals.office_id', $officeId)
+                    ->whereNull('approvals.approved_at')
+                    ->whereRaw("LOWER(TRIM(COALESCE(reservations.overall_status, ''))) IN (?, ?)", [
+                        'awaiting_physical_facilities',
+                        'pending approval',
+                    ])
+                    ->selectRaw('COUNT(DISTINCT approvals.reservation_id) as total')
+                    ->value('total');
+            }
+        }
+
+        $pfOwnerIds = [];
+        try {
+            $pfOwnerIds = ItemOwnerService::physicalFacilitiesOwnerIds();
+        } catch (\Throwable $throwable) {
+            report($throwable);
         }
 
         $reviewDamagedItems = 0;
-        if (self::hasTable('item_units') && self::hasColumn('item_units', 'status')) {
-            $reviewDamagedItems = (int) DB::table('item_units')
-                ->whereRaw("LOWER(COALESCE(status, '')) = 'damaged'")
-                ->count();
-        } elseif (self::hasTable('items') && self::hasColumn('items', 'maintenance_status')) {
-            $reviewDamagedItems = (int) DB::table('items')
-                ->whereRaw('maintenance_status IS TRUE')
-                ->count();
-        }
-
         $needRepair = 0;
-        if (self::hasTable('item_units') && self::hasColumn('item_units', 'status')) {
-            $needRepair += (int) DB::table('item_units')
-                ->whereRaw("LOWER(COALESCE(status, '')) = 'maintenance'")
+
+        if (
+            $pfOwnerIds !== []
+            && self::hasTable('item_units')
+            && self::hasColumn('item_units', 'status')
+            && self::hasTable('items')
+        ) {
+            $unitQuery = DB::table('item_units as units')
+                ->join('items as items', 'items.item_id', '=', 'units.item_id')
+                ->whereIn('items.owner_id', $pfOwnerIds);
+
+            $reviewDamagedItems = (int) (clone $unitQuery)
+                ->whereRaw("LOWER(TRIM(COALESCE(units.status, ''))) = ?", ['damaged'])
+                ->count();
+
+            $needRepair = (int) (clone $unitQuery)
+                ->whereRaw("LOWER(TRIM(COALESCE(units.status, ''))) = ?", ['maintenance'])
+                ->count();
+        } elseif (
+            $pfOwnerIds !== []
+            && self::hasTable('items')
+            && self::hasColumn('items', 'maintenance_status')
+        ) {
+            $needRepair = (int) DB::table('items')
+                ->whereIn('owner_id', $pfOwnerIds)
+                ->whereRaw('maintenance_status IS TRUE')
                 ->count();
         }
 
@@ -371,6 +466,9 @@ class DashboardCacheService
             'pending_final_approvals' => $pendingFinalApprovals,
             'review_damaged_items' => $reviewDamagedItems,
             'need_repair' => $needRepair,
+            'pending_final_url' => '/dashboard/request',
+            'review_damaged_url' => '/dashboard/maintenance?tab=damaged',
+            'need_repair_url' => '/dashboard/maintenance?tab=maintenance',
         ];
     }
 
@@ -458,7 +556,7 @@ class DashboardCacheService
      */
     public static function clearCache(int $userId, int $officeId): void
     {
-        $cacheKey = "dashboard.data.user.{$userId}.office.{$officeId}";
+        $cacheKey = "dashboard.data.v4.user.{$userId}.office.{$officeId}";
         Cache::forget($cacheKey);
     }
 

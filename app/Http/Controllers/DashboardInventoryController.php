@@ -6,6 +6,7 @@ use App\Services\DashboardInventoryCacheService;
 use App\Services\ItemOwnerService;
 use App\Services\ItemUnitService;
 use App\Support\ItemAsset;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,9 +24,42 @@ class DashboardInventoryController extends Controller
         return view('dashboard-inventory', DashboardInventoryCacheService::getInventoryData());
     }
 
-    public function analytics()
+    public function analytics(Request $request)
     {
-        return view('dashboard-inventory-analytics', DashboardInventoryCacheService::getAnalyticsData());
+        $selectedMonth = $this->resolveMonth($request->query('month'));
+        $compareMonth = $this->resolveCompareMonth($request->query('compare'), $selectedMonth);
+
+        return view('dashboard-inventory-analytics', DashboardInventoryCacheService::getAnalyticsData($selectedMonth, $compareMonth));
+    }
+
+    private function resolveMonth(?string $monthValue): Carbon
+    {
+        if (is_string($monthValue) && preg_match('/^\d{4}-\d{2}$/', $monthValue) === 1) {
+            try {
+                return Carbon::createFromFormat('Y-m', $monthValue)->startOfMonth();
+            } catch (\Throwable) {
+                // Fall back to the current month when the query string is malformed.
+            }
+        }
+
+        return now()->startOfMonth();
+    }
+
+    private function resolveCompareMonth(?string $compareValue, Carbon $selectedMonth): Carbon
+    {
+        if (is_string($compareValue) && preg_match('/^\d{4}-\d{2}$/', $compareValue) === 1) {
+            try {
+                $compareMonth = Carbon::createFromFormat('Y-m', $compareValue)->startOfMonth();
+
+                if (!$compareMonth->equalTo($selectedMonth)) {
+                    return $compareMonth;
+                }
+            } catch (\Throwable) {
+                // Fall back to the previous month when the query string is malformed.
+            }
+        }
+
+        return $selectedMonth->copy()->subMonth()->startOfMonth();
     }
 
     private function buildInventoryDashboardData(): array
@@ -694,8 +728,8 @@ class DashboardInventoryController extends Controller
         }
 
         $validated = $request->validate([
-            'assessment' => ['required', 'string', 'max:255'],
-            'status' => ['required', 'in:maintenance,damaged,fixed'],
+            'assessment' => ['nullable', 'string', 'max:255'],
+            'status' => ['required', 'in:maintenance,damaged,fixed,good'],
         ]);
 
         $unit = DB::table('item_units')
@@ -716,13 +750,14 @@ class DashboardInventoryController extends Controller
             ], 404);
         }
 
-        $targetStatus = $validated['status'] === 'fixed' ? 'available' : $validated['status'];
+        $assessment = trim((string) ($validated['assessment'] ?? ''));
+        $targetStatus = in_array($validated['status'], ['fixed', 'good'], true) ? 'available' : $validated['status'];
 
         DB::table('item_units')
             ->where('unit_id', $unitId)
             ->update([
                 'status' => $targetStatus,
-                'condition_notes' => $validated['assessment'],
+                'condition_notes' => $assessment !== '' ? $assessment : null,
                 'last_maintenance_at' => in_array($targetStatus, ['maintenance', 'damaged'], true) ? now() : null,
                 'updated_at' => now(),
             ]);
@@ -754,7 +789,7 @@ class DashboardInventoryController extends Controller
                 ->whereNull('date_resolved')
                 ->update([
                     'date_resolved' => now()->toDateString(),
-                    'action_taken' => $validated['assessment'],
+                    'action_taken' => $assessment !== '' ? $assessment : null,
                     'updated_at' => now(),
                 ]);
         }
@@ -774,7 +809,7 @@ class DashboardInventoryController extends Controller
                 'status' => $isDamaged ? 'Damaged' : 'Maintenance',
                 'statusClass' => $isDamaged ? 'damaged' : 'maintenance',
                 'location' => $this->locationFromCategory($normalizedCategory),
-                'reason' => $validated['assessment'],
+                'reason' => $assessment,
                 'resolved' => $targetStatus === 'available',
             ],
         ]);
@@ -787,8 +822,8 @@ class DashboardInventoryController extends Controller
         }
 
         $validated = $request->validate([
-            'assessment' => ['required', 'string', 'max:255'],
-            'status' => ['required', 'in:maintenance,damaged,fixed'],
+            'assessment' => ['nullable', 'string', 'max:255'],
+            'status' => ['required', 'in:maintenance,damaged,fixed,good'],
         ]);
 
         $room = DB::table('rooms')->where('room_id', $roomId)->first();
@@ -797,7 +832,8 @@ class DashboardInventoryController extends Controller
             return response()->json(['error' => 'Room not found.'], 404);
         }
 
-        $isFixed = $validated['status'] === 'fixed';
+        $assessment = trim((string) ($validated['assessment'] ?? ''));
+        $isFixed = in_array($validated['status'], ['fixed', 'good'], true);
 
         DB::table('rooms')
             ->where('room_id', $roomId)
@@ -814,7 +850,7 @@ class DashboardInventoryController extends Controller
                 ->whereNull('date_resolved')
                 ->update([
                     'date_resolved' => $isFixed ? now()->toDateString() : null,
-                    'action_taken' => $validated['assessment'],
+                    'action_taken' => $assessment !== '' ? $assessment : null,
                     'updated_at' => now(),
                 ]);
         }
@@ -828,10 +864,10 @@ class DashboardInventoryController extends Controller
                 'item' => 'Room ' . trim((string) ($room->room_number ?? '')),
                 'count' => '1',
                 'date' => date('d/m/Y'),
-                'status' => $isFixed ? 'Fixed' : ($validated['status'] === 'damaged' ? 'Damaged' : 'Maintenance'),
+                'status' => $isFixed ? 'Good' : ($validated['status'] === 'damaged' ? 'Damaged' : 'Maintenance'),
                 'statusClass' => $isFixed ? 'maintenance' : ($validated['status'] === 'damaged' ? 'damaged' : 'maintenance'),
                 'location' => 'Room',
-                'reason' => $validated['assessment'],
+                'reason' => $assessment,
                 'resolved' => $isFixed,
             ],
         ]);
@@ -840,7 +876,7 @@ class DashboardInventoryController extends Controller
     public function dismissMaintenanceReport(Request $request, int $reportId): JsonResponse
     {
         $validated = $request->validate([
-            'assessment' => ['required', 'string', 'max:255'],
+            'assessment' => ['nullable', 'string', 'max:255'],
         ]);
 
         if (Schema::hasTable('reservation_issues')) {
@@ -856,7 +892,7 @@ class DashboardInventoryController extends Controller
 
             // Keep assessment trail when description already exists.
             $existingDescription = trim((string) ($issue->description ?? ''));
-            $assessment = trim((string) $validated['assessment']);
+            $assessment = trim((string) ($validated['assessment'] ?? ''));
             if ($assessment !== '') {
                 $update['description'] = $existingDescription !== ''
                     ? ($existingDescription . "\n\nResolution: " . $assessment)
@@ -926,14 +962,15 @@ class DashboardInventoryController extends Controller
 
         $itemRows = $query->get();
         $itemIds = $itemRows->pluck('item_id')->map(fn ($id) => (int) $id)->all();
+        $inUseByItem = ItemUnitService::reconcileInUseForItems($itemIds);
         $unitCodesByItem = ItemUnitService::loadUnitCodesGroupedByItem($itemIds);
-        $issueStatusByItem = $this->loadUnitIssueStatusByItem($itemIds);
+        $issueStatusByItem = ItemUnitService::issueStatusByItem($itemIds);
 
-        $rows = $itemRows->map(function ($row) use ($unitCodesByItem, $issueStatusByItem) {
+        $rows = $itemRows->map(function ($row) use ($unitCodesByItem, $issueStatusByItem, $inUseByItem) {
             $itemId = (int) $row->item_id;
             $category = $this->normalizeCategory((string) ($row->category_key ?? ''));
             $totalCount = max(0, (int) ($row->quantity_total ?? 0));
-            $inUseCount = max(0, min($totalCount, (int) ($row->quantity_in_use ?? 0)));
+            $inUseCount = max(0, min($totalCount, (int) ($inUseByItem[$itemId] ?? $row->quantity_in_use ?? 0)));
             $unitCodes = $unitCodesByItem[$itemId] ?? [];
             $statusKey = $issueStatusByItem[$itemId]
                 ?? ((bool) $row->maintenance_status ? 'maintenance' : 'good');
@@ -1207,7 +1244,7 @@ class DashboardInventoryController extends Controller
                 'category' => $normalizedCategory,
                 'item_name' => $validated['item_name'],
                 'total_count' => (int) $validated['total_count'],
-                'in_use' => (int) $validated['in_use'],
+                'in_use' => ItemUnitService::inUseCountForItem((int) $itemId),
                 'status_key' => $validated['status'],
                 'status_label' => $this->statusLabel($validated['status']),
             ],
@@ -1313,7 +1350,7 @@ class DashboardInventoryController extends Controller
                 'category' => $normalizedCategory,
                 'item_name' => $validated['item_name'],
                 'total_count' => (int) $validated['total_count'],
-                'in_use' => (int) $validated['in_use'],
+                'in_use' => ItemUnitService::inUseCountForItem((int) $itemId),
                 'status_key' => $validated['status'],
                 'status_label' => $this->statusLabel($validated['status']),
             ],
@@ -1357,48 +1394,6 @@ class DashboardInventoryController extends Controller
             'damaged' => 'Damaged',
             default => 'Good',
         };
-    }
-
-    /**
-     * Resolve display status from real unit rows.
-     * Damaged/maintenance win; fully borrowed stock is NOT treated as damaged.
-     *
-     * @param  array<int, int>  $itemIds
-     * @return array<int, string> item_id => good|maintenance|damaged
-     */
-    private function loadUnitIssueStatusByItem(array $itemIds): array
-    {
-        if (!Schema::hasTable('item_units') || $itemIds === []) {
-            return [];
-        }
-
-        $rows = DB::table('item_units')
-            ->whereIn('item_id', $itemIds)
-            ->whereIn('status', ['damaged', 'maintenance'])
-            ->select(['item_id', 'status'])
-            ->get();
-
-        $result = [];
-
-        foreach ($rows as $row) {
-            $itemId = (int) $row->item_id;
-            $status = strtolower((string) $row->status);
-
-            if ($status === 'damaged') {
-                $result[$itemId] = 'damaged';
-                continue;
-            }
-
-            if ($status === 'maintenance' && ($result[$itemId] ?? null) !== 'damaged') {
-                $result[$itemId] = 'maintenance';
-            }
-        }
-
-        foreach ($itemIds as $itemId) {
-            $result[(int) $itemId] = $result[(int) $itemId] ?? 'good';
-        }
-
-        return $result;
     }
 
     private function normalizeCategory(string $rawCategory): string

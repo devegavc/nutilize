@@ -487,20 +487,26 @@ let notificationUnreadCount = 0;
 let lastNotificationFetchAt = 0;
 let lastNotificationSyncAt = 0;
 
-async function fetchNotificationUnreadCount() {
+function notificationCsrfHeaders() {
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  const headers = { Accept: 'application/json' };
+  if (csrf) {
+    headers['X-CSRF-TOKEN'] = csrf;
+  }
+  return headers;
+}
+
+async function fetchNotificationUnreadCount({ force = false } = {}) {
   const now = Date.now();
-  // Client-side throttle: unread badge does not need sub-minute accuracy.
-  if (now - lastNotificationFetchAt < 90000 && notificationsLoaded) {
+  if (!force && now - lastNotificationFetchAt < 20000 && notificationsLoaded) {
     return;
   }
 
   try {
     const response = await fetch('/dashboard/notifications/unread-count', {
       method: 'GET',
-      headers: {
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-        'Accept': 'application/json',
-      },
+      credentials: 'same-origin',
+      headers: notificationCsrfHeaders(),
     });
 
     if (!response.ok) {
@@ -518,12 +524,11 @@ async function fetchNotificationUnreadCount() {
 
 async function fetchNotifications({ sync = false, force = false } = {}) {
   const now = Date.now();
-  // Avoid hammering Supabase: reuse recent notification payloads for 2 minutes.
-  if (!force && !sync && notificationsLoaded && now - lastNotificationFetchAt < 120000) {
+  if (!force && !sync && notificationsLoaded && now - lastNotificationFetchAt < 20000) {
     return;
   }
 
-  // Full sync is expensive — at most once every 15 minutes unless forced.
+  // Full workflow rebuild is expensive — at most once every 15 minutes unless forced.
   const shouldSync = Boolean(sync) && (force || now - lastNotificationSyncAt > 900000);
 
   try {
@@ -531,22 +536,21 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
     if (shouldSync) {
       params.set('sync', '1');
     }
-    if (force) {
+    if (force && shouldSync) {
       params.set('force', '1');
     }
     const query = params.toString();
     const url = `/dashboard/notifications${query ? `?${query}` : ''}`;
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-        'Accept': 'application/json',
-      },
+      credentials: 'same-origin',
+      headers: notificationCsrfHeaders(),
     });
 
     if (response.ok) {
       const data = await response.json();
-      notificationItems = data.notifications.map(notification => ({
+      const rows = Array.isArray(data.notifications) ? data.notifications : [];
+      notificationItems = rows.map(notification => ({
         id: notification.id,
         name: notification.title,
         message: notification.message,
@@ -564,6 +568,7 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
         lastNotificationSyncAt = Date.now();
       }
       updateNotificationBadge();
+      refreshNotificationPopover();
     } else {
       console.error('Failed to fetch notifications');
       if (!notificationsLoaded) {
@@ -592,12 +597,12 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
       if (document.visibilityState === 'visible') {
         try {
           lastUnreadPollAt = Date.now();
-          await fetchNotificationUnreadCount();
+          await fetchNotificationUnreadCount({ force: true });
         } catch (error) {
           console.error('Error polling notifications:', error);
         }
       }
-    }, 180000);
+    }, 45000);
   };
 
   const stopNotificationPolling = () => {
@@ -607,21 +612,16 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
     }
   };
 
-  const bootstrapNotifications = () => {
-    // Lightweight bootstrap: no forced workflow sync on every page load.
-    fetchNotifications({ sync: false, force: false }).catch((error) => console.error('Error preloading notifications:', error));
-    startNotificationPolling();
-  };
-
-  setTimeout(bootstrapNotifications, 4000);
+  fetchNotifications({ sync: false, force: true }).catch((error) => console.error('Error preloading notifications:', error));
+  startNotificationPolling();
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible' || Date.now() - lastUnreadPollAt < 180000) {
+    if (document.visibilityState !== 'visible' || Date.now() - lastUnreadPollAt < 20000) {
       return;
     }
 
     lastUnreadPollAt = Date.now();
-    fetchNotificationUnreadCount().catch((error) => console.error('Error refreshing notifications on visibility:', error));
+    fetchNotificationUnreadCount({ force: true }).catch((error) => console.error('Error refreshing notifications on visibility:', error));
   });
 
   window.addEventListener('beforeunload', stopNotificationPolling);
@@ -652,9 +652,9 @@ function getNotificationListMarkup() {
           <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${item.id}" data-notification-index="${index}">
             <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
             <div class="notification-copy">
-              <strong>${item.name}</strong>
-              <span class="notification-sub">${item.message}</span>
-              <small class="notification-time">${item.created_at}</small>
+              <strong>${escapeReservationDetailsHtml(item.name)}</strong>
+              <span class="notification-sub">${escapeReservationDetailsHtml(item.message)}</span>
+              <small class="notification-time">${escapeReservationDetailsHtml(item.created_at)}</small>
             </div>
             <span class="notification-indicator ${item.unread ? 'unread' : 'read'}" aria-label="${item.unread ? 'Unread notification' : 'Read notification'}"></span>
           </article>
@@ -724,6 +724,159 @@ function escapeReservationDetailsHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function closeQuickReportDetailsModal() {
+  document.querySelectorAll('.quick-report-details-modal').forEach((modal) => modal.remove());
+}
+
+function showQuickReportDetailsModal(report) {
+  if (!report || typeof report !== 'object') {
+    showAppNotice('Report details are not available.');
+    return;
+  }
+
+  closeQuickReportDetailsModal();
+
+  const item = escapeReservationDetailsHtml(report.item || 'Reported Issue');
+  const reportedBy = escapeReservationDetailsHtml(report.reported_by || 'Unknown');
+  const statusLabel = escapeReservationDetailsHtml(report.status_label || 'Pending');
+  const statusClass = String(report.status_class || 'pending').toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  const reportedAt = escapeReservationDetailsHtml(report.reported_at || 'N/A');
+  const description = escapeReservationDetailsHtml(report.description || 'No additional description provided.');
+  const activityName = escapeReservationDetailsHtml(report.activity_name || '—');
+  const reservationCode = escapeReservationDetailsHtml(report.reservation_code || '—');
+  const imageUrl = String(report.image_url || '').trim();
+  const safeImageUrl = /^https?:\/\//i.test(imageUrl) ? escapeReservationDetailsHtml(imageUrl) : '';
+  const hasAttachment = Boolean(safeImageUrl);
+
+  const proofPanel = hasAttachment
+    ? `
+      <section class="quick-report-panel quick-report-proof-panel">
+        <div class="quick-report-panel-head">
+          <h3>Attachment</h3>
+          <a class="quick-report-proof-open" href="${safeImageUrl}" target="_blank" rel="noopener noreferrer">Open full image</a>
+        </div>
+        <a class="quick-report-proof-frame" href="${safeImageUrl}" target="_blank" rel="noopener noreferrer">
+          <img src="${safeImageUrl}" alt="Report attachment for ${item}" loading="lazy" />
+        </a>
+      </section>
+    `
+    : `
+      <section class="quick-report-panel quick-report-proof-panel is-empty">
+        <div class="quick-report-panel-head">
+          <h3>Attachment</h3>
+        </div>
+        <div class="quick-report-proof-empty">
+          <i class="bi bi-image" aria-hidden="true"></i>
+          <p>No supporting image was attached to this report.</p>
+        </div>
+      </section>
+    `;
+
+  const modal = document.createElement('div');
+  modal.className = 'quick-report-details-modal';
+  modal.innerHTML = `
+    <div class="quick-report-details-overlay" data-close-quick-report="true">
+      <article class="quick-report-details-card" role="dialog" aria-modal="true" aria-labelledby="quick-report-details-title">
+        <header class="quick-report-details-head">
+          <div class="quick-report-details-heading">
+            <div class="quick-report-details-meta">
+              <span class="quick-report-details-kicker">Report Details</span>
+              <span class="quick-report-status-pill status-${statusClass}">${statusLabel}</span>
+            </div>
+            <h2 id="quick-report-details-title">${item}</h2>
+            <p class="quick-report-details-sub">Reported ${reportedAt}</p>
+          </div>
+          <button type="button" class="quick-report-details-close" data-close-quick-report="true" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </header>
+
+        <div class="quick-report-details-body">
+          <div class="quick-report-details-layout">
+            <section class="quick-report-panel">
+              <div class="quick-report-panel-head">
+                <h3>Report Summary</h3>
+              </div>
+              <dl class="quick-report-info-list">
+                <div>
+                  <dt>Reported By</dt>
+                  <dd>${reportedBy}</dd>
+                </div>
+                <div>
+                  <dt>Activity</dt>
+                  <dd>${activityName}</dd>
+                </div>
+                <div>
+                  <dt>Reservation</dt>
+                  <dd>${reservationCode}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd><span class="quick-report-status-pill status-${statusClass}">${statusLabel}</span></dd>
+                </div>
+              </dl>
+            </section>
+
+            ${proofPanel}
+          </div>
+
+          <section class="quick-report-panel quick-report-description-panel">
+            <div class="quick-report-panel-head">
+              <h3>Description</h3>
+            </div>
+            <p class="quick-report-description">${description}</p>
+          </section>
+        </div>
+
+        <footer class="quick-report-details-footer">
+          <a class="quick-report-footer-link" href="/dashboard/maintenance">Open Item Maintenance</a>
+          <button type="button" class="quick-report-footer-close" data-close-quick-report="true">Close</button>
+        </footer>
+      </article>
+    </div>
+  `;
+
+  modal.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (target.closest('[data-close-quick-report="true"]') && !target.closest('.quick-report-details-card')) {
+      closeQuickReportDetailsModal();
+      return;
+    }
+
+    if (target.closest('.quick-report-details-close') || target.closest('.quick-report-footer-close')) {
+      closeQuickReportDetailsModal();
+    }
+  });
+
+  document.body.appendChild(modal);
+}
+
+function findQuickReportById(reportId) {
+  const reports = Array.isArray(window.quickReportDetails) ? window.quickReportDetails : [];
+  return reports.find((report) => String(report?.id ?? '') === String(reportId ?? '')) || null;
+}
+
+if (reportTableBody instanceof HTMLElement) {
+  reportTableBody.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const button = target.closest('[data-quick-report-details]');
+    if (!(button instanceof HTMLElement)) {
+      return;
+    }
+
+    const report = findQuickReportById(button.dataset.reportId);
+    showQuickReportDetailsModal(report);
+  });
 }
 
 function showReservationDetailsModal(reservation, options = {}) {
@@ -892,6 +1045,30 @@ function showReservationDetailsModal(reservation, options = {}) {
   document.body.appendChild(modal);
 }
 
+function hideReservationDetailsLoadingModal() {
+  document.querySelectorAll('.reservation-details-modal.is-loading').forEach((modal) => modal.remove());
+}
+
+function showReservationDetailsLoadingModal(title = 'Opening request') {
+  hideReservationDetailsLoadingModal();
+
+  const modal = document.createElement('div');
+  modal.className = 'reservation-details-modal is-loading';
+  modal.setAttribute('aria-busy', 'true');
+  modal.innerHTML = `
+    <div class="reservation-details-overlay">
+      <div class="reservation-details-content" role="status" aria-live="polite">
+        <div class="reservation-details-spinner" aria-hidden="true"></div>
+        <p class="reservation-details-loading-title">${escapeReservationDetailsHtml(title)}</p>
+        <p class="reservation-details-loading-copy">Please wait while we load the request details.</p>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  return modal;
+}
+
 const messagePreviewItems = [
   { name: 'Dela Cruz, Jon', unread: true, snippet: 'Sent a photo' },
   { name: 'Santos, Ivan', unread: true, snippet: 'Can we reserve room 502?' },
@@ -1053,6 +1230,46 @@ function formatMaintenanceDescription(raw) {
   return text;
 }
 
+function syncMaintenanceTabCounts() {
+  maintenanceTabs.forEach((tabButton) => {
+    if (!(tabButton instanceof HTMLElement)) {
+      return;
+    }
+
+    const tab = tabButton.dataset.maintenanceTab || '';
+    const countEl = tabButton.querySelector('[data-tab-count]');
+    const count = Array.isArray(maintenanceRowsByTab[tab]) ? maintenanceRowsByTab[tab].length : 0;
+
+    if (!(countEl instanceof HTMLElement)) {
+      return;
+    }
+
+    countEl.textContent = count > 0 ? String(count) : '';
+    countEl.hidden = count <= 0;
+  });
+}
+
+function maintenanceEmptyMessage() {
+  const otherTabs = ['maintenance', 'damaged', 'reported'].filter((tab) => tab !== activeMaintenanceTab);
+  const hints = otherTabs
+    .map((tab) => {
+      const count = Array.isArray(maintenanceRowsByTab[tab]) ? maintenanceRowsByTab[tab].length : 0;
+      if (count <= 0) {
+        return '';
+      }
+
+      const label = tab.charAt(0).toUpperCase() + tab.slice(1);
+      return `${count} on ${label}`;
+    })
+    .filter(Boolean);
+
+  if (hints.length) {
+    return `No records in this tab. ${hints.join(', ')}.`;
+  }
+
+  return 'No maintenance records found.';
+}
+
 function applyMaintenanceFilters() {
   if (!maintenanceTableBody) {
     return;
@@ -1076,9 +1293,10 @@ function applyMaintenanceFilters() {
   if (!filteredRows.length) {
     maintenanceTableBody.innerHTML = `
       <tr class="maintenance-empty-row">
-        <td class="maintenance-empty-cell" colspan="${columnCount}">No maintenance records found.</td>
+        <td class="maintenance-empty-cell" colspan="${columnCount}">${maintenanceEmptyMessage()}</td>
       </tr>
     `;
+    syncMaintenanceTabCounts();
     return;
   }
 
@@ -1107,11 +1325,12 @@ function applyMaintenanceFilters() {
         <td>${row.date}</td>
         <td><span class="maintenance-status ${row.statusClass}">${row.status}</span></td>
         ${locationCell}
-        <td><button class="maintenance-action-btn" type="button">Address</button></td>
+        <td class="maintenance-actions-cell"><button class="maintenance-action-btn" type="button">Address</button></td>
       </tr>
     `;
     })
     .join('');
+  syncMaintenanceTabCounts();
 }
 
 function closeMaintenanceEvalModal() {
@@ -1148,8 +1367,6 @@ function openMaintenanceEvalModal(row) {
   const evalReporter = document.getElementById('maintenance-eval-reporter');
   if (evalReporter) {
     evalReporter.textContent = reporter || '-';
-    evalReporter.closest('.maintenance-eval-grid') && (evalReporter.parentElement.style.display = reporter ? '' : 'none');
-    // show/hide the row via the label span
     const labelSpan = evalReporter.previousElementSibling;
     if (labelSpan) {
       labelSpan.style.display = reporter ? '' : 'none';
@@ -1228,14 +1445,40 @@ function openMaintenanceFormModal() {
 
   if (maintenanceAssessmentInput) {
     maintenanceAssessmentInput.value = '';
+    maintenanceAssessmentInput.disabled = false;
   }
 
   if (maintenanceStatusSelect) {
     maintenanceStatusSelect.value = '';
+    maintenanceStatusSelect.disabled = false;
   }
 
+  setMaintenanceSubmitLoading(false);
   maintenanceFormModal.classList.add('is-open');
   maintenanceFormModal.setAttribute('aria-hidden', 'false');
+}
+
+function setMaintenanceSubmitLoading(isLoading) {
+  if (!maintenanceFormSubmitButton) {
+    return;
+  }
+
+  maintenanceFormSubmitButton.disabled = Boolean(isLoading);
+  maintenanceFormSubmitButton.classList.toggle('is-loading', Boolean(isLoading));
+  maintenanceFormSubmitButton.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+  maintenanceFormSubmitButton.textContent = isLoading ? 'Saving...' : 'Submit';
+
+  if (maintenanceAssessmentInput) {
+    maintenanceAssessmentInput.disabled = Boolean(isLoading);
+  }
+
+  if (maintenanceStatusSelect) {
+    maintenanceStatusSelect.disabled = Boolean(isLoading);
+  }
+
+  if (maintenanceFormModal) {
+    maintenanceFormModal.classList.toggle('is-submitting', Boolean(isLoading));
+  }
 }
 
 function getScheduleDateLabel(day) {
@@ -3157,15 +3400,17 @@ function setActiveNavByPage() {
         ? 'inventory'
         : path.includes('/dashboard/maintenance')
           ? 'maintenance'
-          : path.includes('/dashboard/history')
-            ? 'history'
-            : path.includes('/dashboard/schedule')
-              ? 'schedule'
-              : path.includes('/dashboard/request')
-                ? 'requests'
-                : path.includes('/dashboard/users')
-                  ? 'users'
-                  : 'home';
+          : path.includes('/dashboard/announcements')
+            ? 'announcements'
+            : path.includes('/dashboard/history')
+              ? 'history'
+              : path.includes('/dashboard/schedule')
+                ? 'schedule'
+                : path.includes('/dashboard/request')
+                  ? 'requests'
+                  : path.includes('/dashboard/users')
+                    ? 'users'
+                    : 'home';
   const navItems = document.querySelectorAll('.nav-item[data-nav]');
   const subNavItems = document.querySelectorAll('.nav-subitem[data-subnav]');
   const subTarget = path.includes('/dashboard/inventory/facilities')
@@ -3577,7 +3822,7 @@ function positionNotificationsPopover(button) {
   notificationPopover.style.left = `${left}px`;
 }
 
-async function buildNotificationsPopover() {
+function buildNotificationsPopover() {
   const panel = document.createElement('div');
   panel.className = 'notification-popover';
 
@@ -3587,27 +3832,11 @@ async function buildNotificationsPopover() {
       return;
     }
 
-    list.innerHTML = notificationItems.length > 0
-      ? notificationItems
-          .map((item, index) => `
-            <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${item.id}" data-notification-index="${index}">
-              <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
-              <div class="notification-copy">
-                <strong>${item.name}</strong>
-                <span class="notification-sub">${item.message}</span>
-                <small class="notification-time">${item.created_at}</small>
-              </div>
-              <span class="notification-indicator ${item.unread ? 'unread' : 'read'}" aria-label="${item.unread ? 'Unread notification' : 'Read notification'}"></span>
-            </article>
-          `)
-          .join('')
-      : '<div class="notification-empty">No notifications</div>';
+    list.innerHTML = getNotificationListMarkup();
   };
 
   const notificationListMarkup = notificationsLoaded
-    ? notificationItems.length > 0
-      ? getNotificationListMarkup()
-      : '<div class="notification-empty">No notifications</div>'
+    ? getNotificationListMarkup()
     : '<div class="notification-loading">Loading notifications…</div>';
 
   panel.innerHTML = `
@@ -3620,6 +3849,7 @@ async function buildNotificationsPopover() {
   `;
 
   panel.addEventListener('click', async (event) => {
+    event.stopPropagation();
     const target = event.target;
 
     if (!(target instanceof HTMLElement)) {
@@ -3628,7 +3858,7 @@ async function buildNotificationsPopover() {
 
     const item = target.closest('.notification-item');
 
-    if (!(item instanceof HTMLElement)) {
+    if (!(item instanceof HTMLElement) || item.classList.contains('is-opening')) {
       return;
     }
 
@@ -3644,42 +3874,44 @@ async function buildNotificationsPopover() {
       return;
     }
 
-    // Update UI immediately on click
+    item.classList.add('is-opening');
+    item.setAttribute('aria-busy', 'true');
+    showReservationDetailsLoadingModal('Opening request');
+    closeNotificationsPopover();
+
     if (notification.unread) {
       notification.unread = false;
       notificationUnreadCount = Math.max(0, notificationUnreadCount - 1);
       updateNotificationBadge();
-      renderList();
     }
 
-    // Fetch reservation details and show modal
     try {
       const response = await fetch(`/dashboard/reservation/${notification.related_id}/details`, {
         method: 'GET',
-        headers: {
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-          'Accept': 'application/json',
-        },
+        credentials: 'same-origin',
+        headers: notificationCsrfHeaders(),
       });
+
+      hideReservationDetailsLoadingModal();
 
       if (response.ok) {
         const data = await response.json();
         showReservationDetailsModal(data.reservation);
       } else {
         console.error('Failed to fetch reservation details');
+        showAppNotice('Could not open this request. Please try again.');
       }
     } catch (error) {
+      hideReservationDetailsLoadingModal();
       console.error('Error fetching reservation details:', error);
+      showAppNotice('Could not open this request. Please try again.');
     }
 
-    // Mark as read in database (don't fail if this errors, UI is already updated)
     try {
       const response = await fetch(`/dashboard/notification/${notificationId}/read`, {
         method: 'PATCH',
-        headers: {
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-          'Accept': 'application/json',
-        },
+        credentials: 'same-origin',
+        headers: notificationCsrfHeaders(),
       });
 
       if (response.ok) {
@@ -3691,30 +3923,23 @@ async function buildNotificationsPopover() {
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
-      // Revert UI changes if API call failed
       notification.unread = true;
       notificationUnreadCount += 1;
       updateNotificationBadge();
-      renderList();
     }
   });
 
-  (async function refreshPopoverNotifications() {
-    try {
-      // Prefer a light list fetch; heavy sync runs at most every 15 minutes.
-      await fetchNotifications({ sync: true, force: false });
-      renderList();
-    } catch (_error) {
-      // No-op: errors already logged
-    }
-  })();
+  fetchNotifications({ sync: false, force: true })
+    .then(() => renderList())
+    .catch((error) => console.error('Error refreshing notifications:', error));
 
   return panel;
 }
 
 if (toolbarNotificationButtons.length) {
   toolbarNotificationButtons.forEach((button) => {
-    button.addEventListener('click', async (event) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
       event.stopPropagation();
 
       if (notificationPopover && activeNotificationButton === button) {
@@ -3722,8 +3947,10 @@ if (toolbarNotificationButtons.length) {
         return;
       }
 
+      closeMessagesPopover();
+      closeProfilePopover();
       closeNotificationsPopover();
-      notificationPopover = await buildNotificationsPopover();
+      notificationPopover = buildNotificationsPopover();
       document.body.appendChild(notificationPopover);
       activeNotificationButton = button;
       button.classList.add('notification-open');
@@ -3745,7 +3972,7 @@ if (toolbarNotificationButtons.length) {
     }
   });
 
-  document.addEventListener('click', (event) => {
+  document.addEventListener('pointerdown', (event) => {
     const target = event.target;
 
     if (!(target instanceof Node)) {
@@ -3755,7 +3982,7 @@ if (toolbarNotificationButtons.length) {
     if (notificationPopover && !notificationPopover.contains(target) && !Array.from(toolbarNotificationButtons).some((button) => button.contains(target))) {
       closeNotificationsPopover();
     }
-  });
+  }, true);
 }
 
 if (toolbarProfileButtons.length) {
@@ -4833,6 +5060,21 @@ if (maintenanceTableBody && maintenanceTabs.length) {
     openMaintenanceEvalModal(row);
   });
 
+  const maintenanceCount = Array.isArray(maintenanceRowsByTab.maintenance) ? maintenanceRowsByTab.maintenance.length : 0;
+  const damagedCount = Array.isArray(maintenanceRowsByTab.damaged) ? maintenanceRowsByTab.damaged.length : 0;
+  const requestedTab = new URLSearchParams(window.location.search).get('tab');
+  const allowedTabs = new Set(['maintenance', 'damaged', 'reported']);
+
+  if (requestedTab && allowedTabs.has(requestedTab)) {
+    activeMaintenanceTab = requestedTab;
+  } else if (maintenanceCount === 0 && damagedCount > 0) {
+    activeMaintenanceTab = 'damaged';
+  }
+
+  maintenanceTabs.forEach((button) => {
+    button.classList.toggle('active', (button.dataset.maintenanceTab || '') === activeMaintenanceTab);
+  });
+
   applyMaintenanceFilters();
 }
 
@@ -4866,8 +5108,8 @@ if (maintenanceFormSubmitButton) {
     const reportId = Number.parseInt(activeMaintenanceAddressRow?.dataset.reportId || '', 10);
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
-    if (!assessmentValue || !statusValue) {
-      showAppNotice('Please complete Assessment and Status.');
+    if (!statusValue) {
+      showAppNotice('Please choose a status.');
       return;
     }
 
@@ -4894,7 +5136,11 @@ if (maintenanceFormSubmitButton) {
       return;
     }
 
-    maintenanceFormSubmitButton.disabled = true;
+    if (maintenanceFormSubmitButton.disabled) {
+      return;
+    }
+
+    setMaintenanceSubmitLoading(true);
 
     try {
       const response = await fetch(endpoint, {
@@ -4950,11 +5196,11 @@ if (maintenanceFormSubmitButton) {
       closeMaintenanceEvalModal();
       activeMaintenanceAddressRow = null;
       applyMaintenanceFilters();
-      showAppNotice(resolved ? 'Maintenance record resolved.' : 'Maintenance evaluation submitted.');
+      showAppNotice(resolved ? 'Item marked as Good and removed from maintenance.' : 'Maintenance evaluation submitted.');
     } catch (error) {
       showAppNotice('Unable to submit maintenance update right now.');
     } finally {
-      maintenanceFormSubmitButton.disabled = false;
+      setMaintenanceSubmitLoading(false);
     }
   });
 }
@@ -5878,6 +6124,11 @@ document.addEventListener('keydown', (event) => {
     closeMaintenanceFormModal();
     activeMaintenanceAddressRow = null;
   }
+
+  const announcementsModal = document.getElementById('announcements-modal');
+  if (event.key === 'Escape' && announcementsModal && announcementsModal.classList.contains('is-open')) {
+    closeAnnouncementsModal();
+  }
 });
 
 if (workloadProgress && workloadLabel) {
@@ -5899,7 +6150,63 @@ const initializeDashboard = () => {
   initOfficeQuickSortControl();
   initOfficeReservationModal();
   initApprovalReloadButton();
+  initAnnouncementsModal();
 };
+
+function openAnnouncementsModal() {
+  const modal = document.getElementById('announcements-modal');
+  if (!(modal instanceof HTMLElement)) {
+    return;
+  }
+
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+  const titleInput = document.getElementById('announcement-announcer')
+    || document.getElementById('announcement-title');
+  if (titleInput instanceof HTMLInputElement && !titleInput.disabled) {
+    titleInput.focus();
+  }
+}
+
+function closeAnnouncementsModal() {
+  const modal = document.getElementById('announcements-modal');
+  if (!(modal instanceof HTMLElement)) {
+    return;
+  }
+
+  modal.classList.remove('is-open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function initAnnouncementsModal() {
+  const modal = document.getElementById('announcements-modal');
+  if (!(modal instanceof HTMLElement)) {
+    return;
+  }
+
+  document.querySelectorAll('[data-open-announcements]').forEach((button) => {
+    button.addEventListener('click', openAnnouncementsModal);
+  });
+
+  document.querySelectorAll('[data-close-announcements]').forEach((button) => {
+    button.addEventListener('click', closeAnnouncementsModal);
+  });
+
+  if (modal.classList.contains('is-open')) {
+    openAnnouncementsModal();
+  }
+
+  modal.querySelectorAll('[data-announcement-flash]').forEach((flash) => {
+    if (!(flash instanceof HTMLElement)) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      flash.classList.add('is-hiding');
+      window.setTimeout(() => flash.remove(), 400);
+    }, 3500);
+  });
+}
 
 function initApprovalReloadButton() {
   const button = document.querySelector('#approval-reload-button');

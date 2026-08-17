@@ -16,6 +16,8 @@ class Reservation extends Model
         'start_of_activity' => 'datetime',
         'Date_of_Activity' => 'datetime',
         'Start_of_activity' => 'datetime',
+        'End_of_Activity' => 'datetime',
+        'end_of_activity' => 'datetime',
     ];
 
     public function user()

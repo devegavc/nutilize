@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Support\ItemAsset;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -258,6 +260,471 @@ class ItemUnitService
         return $grouped;
     }
 
+    /**
+     * Resolve display status from real unit rows.
+     * Damaged/maintenance win; fully borrowed stock is NOT treated as damaged.
+     *
+     * @param  array<int, int>  $itemIds
+     * @return array<int, string> item_id => good|maintenance|damaged
+     */
+    public static function issueStatusByItem(array $itemIds): array
+    {
+        if (!Schema::hasTable('item_units') || $itemIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('item_units')
+            ->whereIn('item_id', $itemIds)
+            ->whereIn('status', ['damaged', 'maintenance'])
+            ->select(['item_id', 'status'])
+            ->get();
+
+        $result = [];
+
+        foreach ($rows as $row) {
+            $itemId = (int) $row->item_id;
+            $status = strtolower((string) $row->status);
+
+            if ($status === 'damaged') {
+                $result[$itemId] = 'damaged';
+                continue;
+            }
+
+            if ($status === 'maintenance' && ($result[$itemId] ?? null) !== 'damaged') {
+                $result[$itemId] = 'maintenance';
+            }
+        }
+
+        foreach ($itemIds as $itemId) {
+            $result[(int) $itemId] = $result[(int) $itemId] ?? 'good';
+        }
+
+        return $result;
+    }
+
+    /**
+     * Units currently borrowed — approved reservations whose activity falls on $onDate
+     * (default: today). Future bookings stay available until that day, same as rooms.
+     *
+     * @param  array<int, int>  $itemIds
+     * @return array<int, array<int, int>> item_id => list of unit_ids
+     */
+    public static function borrowedUnitIdsByItem(array $itemIds, ?CarbonInterface $onDate = null): array
+    {
+        $onDate = $onDate ? Carbon::instance($onDate)->startOfDay() : now()->startOfDay();
+
+        return self::reservedUnitIdsForDateWindow($itemIds, $onDate, $onDate);
+    }
+
+    /**
+     * Units already assigned to approved reservations that overlap [$windowStart, $windowEnd].
+     *
+     * @param  array<int, int>  $itemIds
+     * @return array<int, array<int, int>> item_id => list of unit_ids
+     */
+    public static function reservedUnitIdsForDateWindow(
+        array $itemIds,
+        CarbonInterface $windowStart,
+        CarbonInterface $windowEnd,
+        ?int $exceptReservationId = null,
+    ): array {
+        $itemIds = array_values(array_unique(array_filter(array_map('intval', $itemIds), fn (int $id) => $id > 0)));
+        $grouped = array_fill_keys($itemIds, []);
+
+        if (
+            $itemIds === []
+            || !Schema::hasTable('reservation_item_units')
+            || !Schema::hasTable('reservation_items')
+            || !Schema::hasTable('reservation_details')
+            || !Schema::hasTable('reservations')
+        ) {
+            return $grouped;
+        }
+
+        $startExpr = self::reservationStartTimestampSql('reservations');
+        $endExpr = self::reservationEndTimestampSql('reservations');
+
+        if ($startExpr === null) {
+            return $grouped;
+        }
+
+        $query = DB::table('reservation_item_units as riu')
+            ->join('reservation_items as ri', 'ri.reservation_items_id', '=', 'riu.reservation_items_id')
+            ->join('reservation_details as rd', 'rd.reservation_items_id', '=', 'ri.reservation_items_id')
+            ->join('reservations as reservations', 'reservations.reservation_id', '=', 'rd.reservation_id')
+            ->whereIn('ri.item_id', $itemIds)
+            ->whereRaw("LOWER(TRIM(COALESCE(reservations.overall_status, ''))) = 'approved'")
+            ->whereRaw("DATE({$startExpr}) <= ?", [$windowEnd->toDateString()])
+            ->whereRaw("DATE({$endExpr}) >= ?", [$windowStart->toDateString()])
+            ->select(['ri.item_id', 'riu.unit_id']);
+
+        if (!is_null($exceptReservationId) && $exceptReservationId > 0) {
+            $query->where('reservations.reservation_id', '<>', $exceptReservationId);
+        }
+
+        foreach ($query->get() as $row) {
+            $itemId = (int) $row->item_id;
+            $unitId = (int) $row->unit_id;
+
+            if ($itemId <= 0 || $unitId <= 0) {
+                continue;
+            }
+
+            $grouped[$itemId][] = $unitId;
+        }
+
+        foreach ($grouped as $itemId => $unitIds) {
+            $grouped[$itemId] = array_values(array_unique($unitIds));
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * Pick physical units for a reservation without double-booking the same calendar day.
+     *
+     * @return array<int, int>
+     */
+    public static function pickUnitsForReservation(int $itemId, int $quantity, ?object $reservation = null): array
+    {
+        $quantity = max(1, $quantity);
+        $itemId = (int) $itemId;
+
+        if ($itemId <= 0 || !Schema::hasTable('item_units')) {
+            return [];
+        }
+
+        $excludedUnitIds = [];
+
+        if ($reservation) {
+            [$windowStart, $windowEnd] = self::activityDateRange($reservation);
+            $reservationId = (int) ($reservation->reservation_id ?? 0);
+
+            if ($windowStart && $windowEnd) {
+                try {
+                    $excludedUnitIds = self::reservedUnitIdsForDateWindow(
+                        [$itemId],
+                        $windowStart,
+                        $windowEnd,
+                        $reservationId > 0 ? $reservationId : null,
+                    )[$itemId] ?? [];
+                } catch (\Throwable $throwable) {
+                    report($throwable);
+                    $excludedUnitIds = [];
+                }
+            }
+        }
+
+        $query = DB::table('item_units as u')
+            ->where('u.item_id', $itemId)
+            ->whereIn('u.status', ['available', 'in_use']);
+
+        if (Schema::hasTable('reservation_item_units')) {
+            $query->leftJoinSub(
+                DB::table('reservation_item_units')
+                    ->select('unit_id', DB::raw('count(*) as usage_count'))
+                    ->groupBy('unit_id'),
+                'usage',
+                'usage.unit_id',
+                '=',
+                'u.unit_id'
+            )->orderByRaw('COALESCE(usage.usage_count, 0) ASC');
+        }
+
+        if ($excludedUnitIds !== []) {
+            $query->whereNotIn('u.unit_id', $excludedUnitIds);
+        }
+
+        return $query
+            ->orderBy('u.unit_number')
+            ->limit($quantity)
+            ->pluck('u.unit_id')
+            ->map(fn ($unitId) => (int) $unitId)
+            ->all();
+    }
+
+    /**
+     * Flip unit status to in_use only for items that have a live borrow today,
+     * or leftover in_use rows that should be released.
+     *
+     * @return array<int, int> item_id => in_use count
+     */
+    public static function reconcileLiveBorrowedUnits(): array
+    {
+        if (!Schema::hasTable('item_units')) {
+            return [];
+        }
+
+        try {
+            $itemIds = DB::table('item_units')
+                ->where('status', 'in_use')
+                ->pluck('item_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if (
+                Schema::hasTable('reservation_item_units')
+                && Schema::hasTable('reservation_items')
+                && Schema::hasTable('reservation_details')
+                && Schema::hasTable('reservations')
+            ) {
+                $reservedItemIds = DB::table('reservation_item_units as riu')
+                    ->join('reservation_items as ri', 'ri.reservation_items_id', '=', 'riu.reservation_items_id')
+                    ->join('reservation_details as rd', 'rd.reservation_items_id', '=', 'ri.reservation_items_id')
+                    ->join('reservations as reservations', 'reservations.reservation_id', '=', 'rd.reservation_id')
+                    ->whereRaw("LOWER(TRIM(COALESCE(reservations.overall_status, ''))) = 'approved'")
+                    ->pluck('ri.item_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+
+                $itemIds = array_merge($itemIds, $reservedItemIds);
+            }
+
+            return self::reconcileInUseForItems($itemIds);
+        } catch (\Throwable $throwable) {
+            report($throwable);
+
+            return [];
+        }
+    }
+
+    /**
+     * @return array{0: ?Carbon, 1: ?Carbon}
+     */
+    public static function activityDateRange(object $reservation): array
+    {
+        $start = self::firstParseableDate($reservation, [
+            'Start_of_activity',
+            'start_of_activity',
+            'Date_of_Activity',
+            'date_of_activity',
+        ]);
+        $end = self::firstParseableDate($reservation, [
+            'End_of_activity',
+            'end_of_activity',
+            'End_of_Activity',
+        ]);
+
+        if ($start && !$end) {
+            $end = $start->copy();
+        }
+
+        if ($end && $start && $end->lt($start)) {
+            $end = $start->copy();
+        }
+
+        return [$start?->copy()->startOfDay(), $end?->copy()->startOfDay()];
+    }
+
+    private static function firstParseableDate(object $reservation, array $keys): ?Carbon
+    {
+        foreach ($keys as $key) {
+            $value = data_get($reservation, $key);
+
+            if ($value instanceof CarbonInterface) {
+                return Carbon::instance($value);
+            }
+
+            if ($value instanceof \DateTimeInterface) {
+                return Carbon::instance($value);
+            }
+
+            if (is_string($value) && trim($value) !== '') {
+                try {
+                    return Carbon::parse($value);
+                } catch (\Throwable) {
+                    continue;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function reservationStartTimestampSql(string $table = 'reservations'): ?string
+    {
+        return self::coalesceTimestampSql($table, [
+            'Start_of_activity',
+            'start_of_activity',
+            'Date_of_Activity',
+            'date_of_activity',
+        ]);
+    }
+
+    private static function reservationEndTimestampSql(string $table = 'reservations'): ?string
+    {
+        $endExpr = self::coalesceTimestampSql($table, [
+            'End_of_activity',
+            'end_of_activity',
+            'End_of_Activity',
+        ]);
+        $startExpr = self::reservationStartTimestampSql($table);
+
+        if ($endExpr && $startExpr) {
+            return "COALESCE({$endExpr}, {$startExpr})";
+        }
+
+        return $endExpr ?? $startExpr;
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private static function coalesceTimestampSql(string $table, array $columns): ?string
+    {
+        $seen = [];
+        $parts = [];
+
+        foreach ($columns as $column) {
+            $actual = self::resolveReservationColumn($column);
+            if ($actual === null || isset($seen[$actual])) {
+                continue;
+            }
+
+            $seen[$actual] = true;
+            $quoted = '"' . str_replace('"', '""', $actual) . '"';
+            $parts[] = "{$table}.{$quoted}";
+        }
+
+        if ($parts === []) {
+            return null;
+        }
+
+        return count($parts) === 1 ? $parts[0] : ('COALESCE(' . implode(', ', $parts) . ')');
+    }
+
+    private static function resolveReservationColumn(string $wanted): ?string
+    {
+        static $listing = null;
+
+        if ($listing === null) {
+            $listing = Schema::hasTable('reservations')
+                ? Schema::getColumnListing('reservations')
+                : [];
+        }
+
+        foreach ($listing as $actual) {
+            if (strcasecmp((string) $actual, $wanted) === 0) {
+                return (string) $actual;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Release leftover in_use units that are not borrowed today,
+     * and keep units that are actually out today marked in_use.
+     *
+     * @param  array<int, int>  $itemIds
+     * @return array<int, int> item_id => in_use count
+     */
+    public static function reconcileInUseForItems(array $itemIds): array
+    {
+        $itemIds = array_values(array_unique(array_filter(array_map('intval', $itemIds), fn (int $id) => $id > 0)));
+        $counts = array_fill_keys($itemIds, 0);
+
+        if ($itemIds === [] || !Schema::hasTable('item_units') || !Schema::hasTable('items')) {
+            return $counts;
+        }
+
+        try {
+            $borrowedUnitIdsByItem = self::borrowedUnitIdsByItem($itemIds);
+            $borrowedUnitIdSet = [];
+
+            foreach ($borrowedUnitIdsByItem as $unitIds) {
+                foreach ($unitIds as $unitId) {
+                    $borrowedUnitIdSet[(int) $unitId] = true;
+                }
+            }
+
+            $units = DB::table('item_units')
+                ->whereIn('item_id', $itemIds)
+                ->where('status', '<>', 'retired')
+                ->get(['unit_id', 'item_id', 'status']);
+
+            $now = now();
+            $inUseByItem = array_fill_keys($itemIds, 0);
+            $issueByItem = array_fill_keys($itemIds, 0);
+            $releaseIds = [];
+            $borrowIds = [];
+
+            foreach ($units as $unit) {
+                $unitId = (int) $unit->unit_id;
+                $itemId = (int) $unit->item_id;
+                $status = strtolower((string) ($unit->status ?? ''));
+
+                if (in_array($status, ['maintenance', 'damaged'], true)) {
+                    $issueByItem[$itemId] = ($issueByItem[$itemId] ?? 0) + 1;
+                    continue;
+                }
+
+                $isBorrowed = isset($borrowedUnitIdSet[$unitId]);
+
+                if ($isBorrowed) {
+                    $inUseByItem[$itemId] = ($inUseByItem[$itemId] ?? 0) + 1;
+
+                    if ($status !== 'in_use') {
+                        $borrowIds[] = $unitId;
+                    }
+
+                    continue;
+                }
+
+                if ($status === 'in_use') {
+                    $releaseIds[] = $unitId;
+                }
+            }
+
+            if ($releaseIds !== []) {
+                DB::table('item_units')
+                    ->whereIn('unit_id', $releaseIds)
+                    ->update([
+                        'status' => 'available',
+                        'updated_at' => $now,
+                    ]);
+            }
+
+            if ($borrowIds !== []) {
+                DB::table('item_units')
+                    ->whereIn('unit_id', $borrowIds)
+                    ->whereNotIn('status', ['maintenance', 'damaged', 'retired'])
+                    ->update([
+                        'status' => 'in_use',
+                        'updated_at' => $now,
+                    ]);
+            }
+
+            foreach ($itemIds as $itemId) {
+                $inUse = (int) ($inUseByItem[$itemId] ?? 0);
+                $counts[$itemId] = $inUse;
+
+                $issueCount = (int) ($issueByItem[$itemId] ?? 0);
+
+                DB::table('items')
+                    ->where('item_id', $itemId)
+                    ->update([
+                        'quantity_in_use' => $inUse,
+                        'availability_status' => DB::raw(($inUse <= 0 && $issueCount <= 0) ? 'true' : 'false'),
+                        'updated_at' => $now,
+                    ]);
+            }
+
+            return $counts;
+        } catch (\Throwable $throwable) {
+            report($throwable);
+
+            return [];
+        }
+    }
+
+    public static function inUseCountForItem(int $itemId): int
+    {
+        $counts = self::reconcileInUseForItems([$itemId]);
+
+        return (int) ($counts[$itemId] ?? 0);
+    }
+
     public static function defaultBackfillUnitCode(int $itemId, int $unitNumber, int $totalUnits): string
     {
         $base = ItemAsset::fallbackCode($itemId);
@@ -322,6 +789,7 @@ class ItemUnitService
 
         $unitCodes = self::resolveUnitCodes($rawUnitCodes, $total, $itemId, $itemId);
         self::syncForItem($itemId, $total, $inUse, $resolvedStatus, $unitCodes);
+        self::reconcileInUseForItems([$itemId]);
 
         return $unitCodes;
     }
@@ -465,9 +933,10 @@ class ItemUnitService
         }
 
         // Preserve per-unit maintenance/damaged only when the equipment form is not
-        // explicitly setting the item back to Good. Choosing Good means PF cleared it.
+        // explicitly setting the item back to Good. Choosing Good means the issue is cleared.
         $preservedIssueByNumber = [];
-        $clearIssues = strtolower($status) === 'good';
+        $normalizedStatus = strtolower($status);
+        $clearIssues = $normalizedStatus === 'good';
 
         if (!$clearIssues) {
             for ($unitNumber = 1; $unitNumber <= $total; $unitNumber++) {
@@ -478,9 +947,12 @@ class ItemUnitService
                 }
             }
 
-            // Item-level maintenance/damaged from the form tags unit 1 when needed.
-            if ($itemLevelIssue !== null && !isset($preservedIssueByNumber[1])) {
-                $preservedIssueByNumber[1] = $itemLevelIssue;
+            // Item-level Damaged/Maintenance from Manage Items applies to every active unit
+            // so those rows appear on the maintenance dashboard.
+            if ($itemLevelIssue !== null) {
+                for ($unitNumber = 1; $unitNumber <= $total; $unitNumber++) {
+                    $preservedIssueByNumber[$unitNumber] = $itemLevelIssue;
+                }
             }
         } elseif ($itemLevelIssue !== null) {
             $preservedIssueByNumber[1] = $itemLevelIssue;
@@ -515,7 +987,7 @@ class ItemUnitService
 
             if (isset($preservedIssueByNumber[$unitNumber])) {
                 $unitStatus = $preservedIssueByNumber[$unitNumber];
-                if ($unitStatus === 'maintenance' && is_null($maintenanceAt)) {
+                if (in_array($unitStatus, ['maintenance', 'damaged'], true) && is_null($maintenanceAt)) {
                     $maintenanceAt = $now;
                 }
             } elseif (isset($inUseNumberSet[$unitNumber])) {

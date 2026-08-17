@@ -20,6 +20,7 @@
       full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
       role: '{{ auth()->user()->role ?? 'user' }}'
     };
+    window.quickReportDetails = @json($quickReports ?? []);
   </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
@@ -91,6 +92,7 @@
                     <th>Reported by:</th>
                     <th>Attachment</th>
                     <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="report-table-body">
@@ -100,10 +102,21 @@
                       <td>{{ $report['reported_by'] }}</td>
                       <td>{{ $report['attachment_label'] }}</td>
                       <td><span class="badge {{ $report['status_class'] }}">{{ $report['status_label'] }}</span></td>
+                      <td>
+                        <button
+                          type="button"
+                          class="quick-report-details-btn"
+                          data-quick-report-details
+                          data-report-id="{{ $report['id'] ?? '' }}"
+                          aria-label="View details for {{ $report['item'] }}"
+                        >
+                          Details
+                        </button>
+                      </td>
                     </tr>
                   @empty
                     <tr>
-                      <td colspan="4">No reports found.</td>
+                      <td colspan="5">No reports found.</td>
                     </tr>
                   @endforelse
                 </tbody>
@@ -111,15 +124,55 @@
             </div>
           </article>
 
-          <article class="tasks-panel">
-            <h2>Tasks To Acomplish</h2>
-            <p class="tasks-sub">(This week)</p>
-            <ul>
-              <li><i class="bi bi-record-circle"></i> Pending Final Approvals ({{ $tasks['pending_final_approvals'] ?? 0 }})</li>
-              <li><i class="bi bi-file-earmark-lock2-fill"></i> Review Damaged Items ({{ $tasks['review_damaged_items'] ?? 0 }})</li>
-              <li><i class="bi bi-tools"></i> Need of repair ({{ $tasks['need_repair'] ?? 0 }})</li>
-            </ul>
-          </article>
+          <div class="home-right-stack">
+            <article class="tasks-panel">
+              <div class="tasks-panel-head">
+                <h2>Tasks To Accomplish</h2>
+                <p class="tasks-sub">Open items that need action now</p>
+              </div>
+              <ul class="tasks-list">
+                <li>
+                  <a class="task-link" href="{{ $tasks['pending_final_url'] ?? '/dashboard/request' }}">
+                    <span class="task-icon"><i class="bi bi-inboxes-fill"></i></span>
+                    <span class="task-copy">
+                      <strong>Pending Final Approvals</strong>
+                      <small>Requests waiting for PF decision</small>
+                    </span>
+                    <span class="task-count {{ ((int) ($tasks['pending_final_approvals'] ?? 0)) > 0 ? 'is-alert' : '' }}">{{ $tasks['pending_final_approvals'] ?? 0 }}</span>
+                  </a>
+                </li>
+                <li>
+                  <a class="task-link" href="{{ $tasks['review_damaged_url'] ?? '/dashboard/maintenance?tab=damaged' }}">
+                    <span class="task-icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
+                    <span class="task-copy">
+                      <strong>Review Damaged Items</strong>
+                      <small>Units marked damaged</small>
+                    </span>
+                    <span class="task-count {{ ((int) ($tasks['review_damaged_items'] ?? 0)) > 0 ? 'is-alert' : '' }}">{{ $tasks['review_damaged_items'] ?? 0 }}</span>
+                  </a>
+                </li>
+                <li>
+                  <a class="task-link" href="{{ $tasks['need_repair_url'] ?? '/dashboard/maintenance?tab=maintenance' }}">
+                    <span class="task-icon"><i class="bi bi-tools"></i></span>
+                    <span class="task-copy">
+                      <strong>Need Repair</strong>
+                      <small>Units and rooms under maintenance</small>
+                    </span>
+                    <span class="task-count {{ ((int) ($tasks['need_repair'] ?? 0)) > 0 ? 'is-alert' : '' }}">{{ $tasks['need_repair'] ?? 0 }}</span>
+                  </a>
+                </li>
+              </ul>
+            </article>
+
+            <button class="home-announcement-btn" type="button" data-open-announcements aria-haspopup="dialog" aria-controls="announcements-modal">
+              <span class="home-announcement-icon"><i class="bi bi-megaphone-fill"></i></span>
+              <span class="home-announcement-copy">
+                <strong>Announcement</strong>
+                <small>Post updates for offices and borrowers</small>
+              </span>
+              <i class="bi bi-chevron-right home-announcement-chevron"></i>
+            </button>
+          </div>
         </section>
 
         <section class="home-extra-grid">
@@ -167,6 +220,141 @@
       </section>
     </section>
   </main>
+
+  <div
+    id="announcements-modal"
+    class="announcements-modal{{ !empty($openAnnouncementsModal) ? ' is-open' : '' }}"
+    aria-hidden="{{ !empty($openAnnouncementsModal) ? 'false' : 'true' }}"
+  >
+    <div class="announcements-modal-overlay" data-close-announcements></div>
+    <section class="announcements-modal-card" role="dialog" aria-modal="true" aria-labelledby="announcements-modal-title">
+      <header class="announcements-modal-head">
+        <div>
+          <p class="announcements-modal-kicker">Physical Facilities</p>
+          <h2 id="announcements-modal-title">Announcements</h2>
+        </div>
+        <button class="announcements-modal-close" type="button" data-close-announcements aria-label="Close announcements">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </header>
+
+      @if(session('success'))
+        <p class="announcement-flash is-success" data-announcement-flash>{{ session('success') }}</p>
+      @endif
+      @if(session('error'))
+        <p class="announcement-flash is-error" data-announcement-flash>{{ session('error') }}</p>
+      @endif
+
+      <div class="announcement-layout">
+        <article class="announcement-composer">
+          <h3><i class="bi bi-megaphone-fill"></i> New Announcement</h3>
+          <p>Post updates for offices and borrowers. Auto-removes after {{ (int) ($announcementTtlDays ?? 7) }} days.</p>
+
+          <form method="POST" action="{{ route('dashboard.announcements.store') }}" class="announcement-form">
+            @csrf
+            <label for="announcement-announcer">Announced by</label>
+            <input
+              id="announcement-announcer"
+              name="announcer_name"
+              type="text"
+              maxlength="180"
+              value="{{ old('announcer_name', auth()->user()?->displayName() ?: (auth()->user()?->username ?? '')) }}"
+              placeholder="Your name"
+              required
+              @disabled(!($announcementsTableReady ?? false))
+            />
+
+            <label for="announcement-title">Title</label>
+            <input
+              id="announcement-title"
+              name="title"
+              type="text"
+              maxlength="180"
+              value="{{ old('title') }}"
+              placeholder="Example: Facility closure this Friday"
+              required
+              @disabled(!($announcementsTableReady ?? false))
+            />
+
+            <label for="announcement-body">Message</label>
+            <textarea
+              id="announcement-body"
+              name="body"
+              rows="5"
+              maxlength="5000"
+              placeholder="Write the announcement details here..."
+              required
+              @disabled(!($announcementsTableReady ?? false))
+            >{{ old('body') }}</textarea>
+
+            @error('announcer_name')
+              <p class="announcement-error">{{ $message }}</p>
+            @enderror
+            @error('title')
+              <p class="announcement-error">{{ $message }}</p>
+            @enderror
+            @error('body')
+              <p class="announcement-error">{{ $message }}</p>
+            @enderror
+
+            <button class="announcement-submit" type="submit" @disabled(!($announcementsTableReady ?? false))>
+              <i class="bi bi-send-fill"></i> Publish
+            </button>
+          </form>
+        </article>
+
+        <article class="announcement-feed">
+          <div class="announcement-feed-head">
+            <h3>Published</h3>
+            <small>Removes automatically after {{ (int) ($announcementTtlDays ?? 7) }} days</small>
+          </div>
+
+          <div class="announcement-card-list">
+            @forelse(($announcements ?? []) as $announcement)
+              @php
+                $announcedAt = $announcement->published_at ?? $announcement->created_at;
+                $expiresAt = $announcement->expires_at;
+              @endphp
+              <article class="announcement-card">
+                <div class="announcement-card-top">
+                  <strong>{{ $announcement->title }}</strong>
+                  <form method="POST" action="{{ route('dashboard.announcements.destroy', $announcement->announcement_id) }}">
+                    @csrf
+                    @method('DELETE')
+                    <button class="announcement-delete" type="submit" title="Remove announcement">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </form>
+                </div>
+                <p class="announcement-card-body">{{ $announcement->body }}</p>
+                <div class="announcement-card-meta">
+                  <span>
+                    <i class="bi bi-person-fill"></i>
+                    Announced by {{ $announcement->announcerLabel() }}
+                  </span>
+                  <span>
+                    <i class="bi bi-clock-fill"></i>
+                    {{ optional($announcedAt)?->timezone(config('app.timezone'))->format('M j, Y · g:i A') }}
+                  </span>
+                  @if($expiresAt)
+                    <span>
+                      <i class="bi bi-hourglass-split"></i>
+                      Until {{ $expiresAt->timezone(config('app.timezone'))->format('M j, Y') }}
+                    </span>
+                  @endif
+                </div>
+              </article>
+            @empty
+              <div class="announcement-empty">
+                <strong>No announcements yet</strong>
+                <span>Use the form to publish the first one.</span>
+              </div>
+            @endforelse
+          </div>
+        </article>
+      </div>
+    </section>
+  </div>
 
   <script src="/js/dashboard.js"></script>
 </body>
