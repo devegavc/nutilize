@@ -41,7 +41,7 @@ body:has(.home-dashboard-card) .home-dashboard-card {
 
 .home-dashboard-card .stats-grid {
   gap: 22px;
-  padding: 26px 28px 10px;
+  padding: 26px 28px 18px;
 }
 
 .home-dashboard-card .stat-card {
@@ -83,7 +83,7 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.85fr);
   gap: 22px;
-  padding: 18px 28px 8px;
+  padding: 18px 28px 18px;
 }
 
 .quick-view,
@@ -315,8 +315,8 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
   gap: 22px;
-  padding: 18px 28px 28px;
-  margin-top: auto;
+  padding: 18px 28px 18px;
+  margin-top: 0;
 }
 
 .extra-card {

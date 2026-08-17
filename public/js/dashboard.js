@@ -441,6 +441,7 @@ let messagePopover = null;
 let activeMessageButton = null;
 let notificationPopover = null;
 let activeNotificationButton = null;
+let activeNotificationLoadingId = null;
 let profilePopover = null;
 let activeProfileButton = null;
 let pendingProfileAvatarDataUrl = '';
@@ -649,7 +650,7 @@ function getNotificationListMarkup() {
   return notificationItems.length > 0
     ? notificationItems
         .map((item, index) => `
-          <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${item.id}" data-notification-index="${index}">
+          <article class="notification-item${item.unread ? ' unread' : ''}${item.loading ? ' is-loading' : ''}" data-notification-id="${item.id}" data-notification-index="${index}" aria-busy="${item.loading ? 'true' : 'false'}">
             <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
             <div class="notification-copy">
               <strong>${item.name}</strong>
@@ -3263,6 +3264,90 @@ function ensureSidebarToggleButton() {
   sidebarToggleButton = toggle;
 }
 
+function showPageLoadingSkeleton() {
+  const workspaceGrid = document.querySelector('.workspace-grid');
+
+  if (!workspaceGrid) {
+    return;
+  }
+
+  let skeleton = document.getElementById('page-loading-skeleton');
+
+  if (!skeleton) {
+    skeleton = document.createElement('div');
+    skeleton.id = 'page-loading-skeleton';
+    skeleton.className = 'page-loading-skeleton';
+    skeleton.setAttribute('role', 'status');
+    skeleton.setAttribute('aria-live', 'polite');
+    skeleton.setAttribute('aria-label', 'Loading page');
+    skeleton.innerHTML = `
+      <div class="page-loading-skeleton__header"></div>
+      <div class="page-loading-skeleton__stats">
+        <div class="page-loading-skeleton__stat"></div>
+        <div class="page-loading-skeleton__stat"></div>
+        <div class="page-loading-skeleton__stat"></div>
+        <div class="page-loading-skeleton__stat"></div>
+      </div>
+      <div class="page-loading-skeleton__row">
+        <div class="page-loading-skeleton__panel">
+          <span class="page-loading-skeleton__line"></span>
+          <span class="page-loading-skeleton__line-short"></span>
+          <span class="page-loading-skeleton__line"></span>
+          <span class="page-loading-skeleton__line-xs"></span>
+        </div>
+        <div class="page-loading-skeleton__tall"></div>
+      </div>
+      <div class="page-loading-skeleton__row">
+        <div class="page-loading-skeleton__wide"></div>
+        <div class="page-loading-skeleton__tall"></div>
+      </div>
+    `;
+
+    workspaceGrid.appendChild(skeleton);
+  }
+
+  const contentCard = workspaceGrid.querySelector('.content-card, .history-content-card, .maintenance-content-card, .facilities-content-card, .request-content-card, .schedule-content-card, .profile-content-card, .messages-content-card, .analytics-content-card');
+
+  if (contentCard instanceof HTMLElement) {
+    contentCard.style.visibility = 'hidden';
+    contentCard.style.pointerEvents = 'none';
+  }
+
+  skeleton.style.display = 'block';
+}
+
+function attachNavigationLoadingState() {
+  const navLinks = document.querySelectorAll('a.nav-item, a.nav-subitem');
+
+  navLinks.forEach((link) => {
+    if (link.dataset.navLoadingBound === 'true') {
+      return;
+    }
+
+    link.dataset.navLoadingBound = 'true';
+    link.addEventListener('click', (event) => {
+      const href = link.getAttribute('href');
+
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+        return;
+      }
+
+      const currentUrl = new URL(window.location.href);
+      const targetUrl = new URL(href, window.location.href);
+
+      if (currentUrl.pathname === targetUrl.pathname && currentUrl.search === targetUrl.search) {
+        return;
+      }
+
+      event.preventDefault();
+      showPageLoadingSkeleton();
+      setTimeout(() => {
+        window.location.assign(href);
+      }, 0);
+    });
+  });
+}
+
 async function loadNavbar() {
   if (!navbarContainer) {
     return;
@@ -3316,6 +3401,8 @@ async function loadNavbar() {
     navbarContainer.querySelectorAll('a.nav-item, a.nav-subitem').forEach((link) => {
       link.addEventListener('click', closeSidebarDrawer);
     });
+
+    attachNavigationLoadingState();
 
     const logoutButton = navbarContainer.querySelector('[data-nav-action="logout"]');
     if (logoutButton instanceof HTMLButtonElement) {
@@ -3590,7 +3677,7 @@ async function buildNotificationsPopover() {
     list.innerHTML = notificationItems.length > 0
       ? notificationItems
           .map((item, index) => `
-            <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${item.id}" data-notification-index="${index}">
+            <article class="notification-item${item.unread ? ' unread' : ''}${item.loading ? ' is-loading' : ''}" data-notification-id="${item.id}" data-notification-index="${index}" aria-busy="${item.loading ? 'true' : 'false'}">
               <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
               <div class="notification-copy">
                 <strong>${item.name}</strong>
@@ -3639,18 +3726,35 @@ async function buildNotificationsPopover() {
       return;
     }
 
-    const notification = notificationItems[Number.parseInt(notificationIndex, 10)];
+    const notificationIndexNumber = Number.parseInt(notificationIndex, 10);
+    if (!Number.isInteger(notificationIndexNumber)) {
+      return;
+    }
+
+    if (activeNotificationLoadingId && activeNotificationLoadingId !== notificationId) {
+      return;
+    }
+
+    if (activeNotificationLoadingId === notificationId) {
+      return;
+    }
+
+    const notification = notificationItems[notificationIndexNumber];
     if (!notification || !notification.related_id) {
       return;
     }
+
+    activeNotificationLoadingId = notificationId;
+    notification.loading = true;
 
     // Update UI immediately on click
     if (notification.unread) {
       notification.unread = false;
       notificationUnreadCount = Math.max(0, notificationUnreadCount - 1);
       updateNotificationBadge();
-      renderList();
     }
+
+    renderList();
 
     // Fetch reservation details and show modal
     try {
@@ -3672,7 +3776,6 @@ async function buildNotificationsPopover() {
       console.error('Error fetching reservation details:', error);
     }
 
-    // Mark as read in database (don't fail if this errors, UI is already updated)
     try {
       const response = await fetch(`/dashboard/notification/${notificationId}/read`, {
         method: 'PATCH',
@@ -3691,10 +3794,12 @@ async function buildNotificationsPopover() {
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
-      // Revert UI changes if API call failed
       notification.unread = true;
       notificationUnreadCount += 1;
       updateNotificationBadge();
+    } finally {
+      activeNotificationLoadingId = null;
+      notification.loading = false;
       renderList();
     }
   });

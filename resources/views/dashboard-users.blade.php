@@ -83,13 +83,13 @@
     <section class="workspace-grid">
       <div id="navbar-container"></div>
 
-      <section class="content-card">
-        <div class="dashboard-page-header-top">
+      <section class="content-card request-content-card user-management-card">
+        <div class="dashboard-page-header-top request-head">
           <h1 class="section-title">Manage Users</h1>
         </div>
-        <div class="dashboard-page-header-bottom">
+        <div class="dashboard-page-header-bottom request-subhead">
           <p class="section-subtitle">Create, edit, and remove dashboard users, including item owners who manage their own equipment.</p>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <div class="dashboard-page-actions">
             <button class="facilities-add-btn" id="user-add-btn" type="button"><span class="btn-icon">+</span> Add User</button>
             <button class="facilities-add-btn" id="item-owner-add-btn" type="button"><span class="btn-icon">+</span> Add Item Owner</button>
           </div>

@@ -248,19 +248,19 @@
 
 .facilities-add-btn {
   border: 0;
-  background: var(--yellow);
-  color: var(--white);
+  background: linear-gradient(135deg, #f4b70a 0%, #e7a900 100%);
+  color: #1c2b4f;
   border-radius: 999px;
   padding: 10px 18px;
   min-width: 150px;
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 800;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 12px 24px rgba(255, 183, 0, 0.18);
-  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.15s ease;
+  box-shadow: 0 12px 24px rgba(244, 183, 10, 0.22);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.15s ease;
   flex-shrink: 0;
   margin-left: auto;
 }
@@ -268,8 +268,8 @@
 .facilities-add-btn:hover,
 .facilities-add-btn:focus {
   transform: translateY(-1px);
-  box-shadow: 0 18px 30px rgba(255, 183, 0, 0.26);
-  background: #ffc107;
+  box-shadow: 0 18px 30px rgba(244, 183, 10, 0.28);
+  filter: brightness(1.02);
 }
 
 .facilities-add-btn .btn-icon {
@@ -279,8 +279,8 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  color: #1d1d1d;
+  background: rgba(28, 43, 79, 0.12);
+  color: #1c2b4f;
   font-size: 0.95rem;
 }
 
@@ -530,7 +530,7 @@
 .dashboard-page-header-top {
   width: 100%;
   margin: 0;
-  padding: 16px 22px;
+  padding: 22px 24px 18px;
   background: linear-gradient(90deg, #26367b 0%, #38479c 58%, #566bc4 100%);
   border-bottom: 4px solid rgba(255, 255, 255, 0.26);
   border-radius: 0;
@@ -538,8 +538,8 @@
 
 .dashboard-page-header-top .section-title {
   margin: 0;
-  padding: 0 0 0 22px;
-  font-size: 1.5rem;
+  padding: 0 0 0 2px;
+  font-size: clamp(1.5rem, 2vw, 1.9rem);
   font-weight: 800;
   letter-spacing: 0.01em;
   text-transform: uppercase;
@@ -550,12 +550,12 @@
 
 .dashboard-page-header-bottom {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
   flex-wrap: wrap;
-  margin-bottom: 22px;
-  padding: 18px 22px 0;
+  margin: 0;
+  padding: 18px 24px 0;
   border-bottom: none;
 }
 
@@ -563,7 +563,272 @@
   margin: 0;
   color: #586069;
   font-size: 1rem;
+  line-height: 1.6;
   max-width: 48rem;
+}
+
+.dashboard-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.user-management-card {
+  background: transparent;
+  border: 1px solid rgba(136, 153, 214, 0.22);
+  box-shadow: none;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.user-management-card::before {
+  display: none;
+}
+
+.user-management-card .facilities-grid {
+  margin: 14px 22px 22px;
+  background: #f3f5fa;
+  border: 1px solid #dfe4f3;
+  border-radius: 12px;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.user-management-card .table-wrap {
+  background: transparent;
+  border-radius: 16px;
+  overflow: hidden;
+  max-height: 70vh;
+  box-shadow: none;
+  padding: 0;
+}
+
+.user-management-card .inventory-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.user-management-card .inventory-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--blue);
+  color: var(--white);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.user-management-card .inventory-table tbody tr {
+  background: transparent;
+  transition: background 0.18s ease;
+}
+
+.user-management-card .inventory-table tbody tr:hover {
+  background: rgba(56, 71, 156, 0.1);
+}
+
+.user-management-card .inventory-table tbody td {
+  padding: 10px 12px;
+  color: #1e243b;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #c9ccd6;
+  vertical-align: middle;
+}
+
+.user-management-card .category-header-row td {
+  background: transparent;
+  padding: 0;
+}
+
+.user-management-card .category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  margin-top: 0;
+  background: rgba(56, 71, 156, 0.08);
+  border-top: 1px solid rgba(56, 71, 156, 0.2);
+  border-bottom: 1px solid rgba(56, 71, 156, 0.12);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #38479c;
+  border-radius: 0;
+}
+
+.user-management-card .category-header i {
+  font-size: 0.95rem;
+  color: #38479c;
+}
+
+.user-management-card .admin-row {
+  border-left: 0;
+}
+
+.user-management-card .approver-row {
+  border-left: 0;
+}
+
+.user-management-card .role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 104px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  line-height: 1.2;
+}
+
+.user-management-card .role-badge.admin-badge {
+  background: rgba(52, 104, 255, 0.08);
+  color: #2044b7;
+  border-color: rgba(52, 104, 255, 0.12);
+}
+
+.user-management-card .role-badge.approver-badge {
+  background: rgba(244, 183, 10, 0.12);
+  color: #855d00;
+  border-color: rgba(244, 183, 10, 0.18);
+}
+
+.user-management-card .table-actions-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.user-management-card .table-edit-btn {
+  border: 0;
+  background: var(--blue);
+  color: var(--white);
+  border-radius: 7px;
+  padding: 5px 11px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: none;
+  transition: opacity 0.15s ease;
+}
+
+.user-management-card .table-edit-btn:hover,
+.user-management-card .table-edit-btn:focus {
+  transform: none;
+  box-shadow: none;
+  opacity: 0.92;
+}
+
+.user-management-card .table-delete-btn {
+  border: 1px solid rgba(164, 83, 83, 0.14);
+  background: rgba(212, 99, 99, 0.06);
+  color: #9c3535;
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.user-management-card .table-delete-btn:hover,
+.user-management-card .table-delete-btn:focus {
+  background: rgba(212, 99, 99, 0.1);
+  transform: translateY(-1px);
+}
+
+.user-management-card .table-wrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.user-management-card .table-wrap::-webkit-scrollbar-track {
+  background: #edf0f6;
+}
+
+.user-management-card .table-wrap::-webkit-scrollbar-thumb {
+  background: rgba(84, 101, 172, 0.45);
+  border-radius: 999px;
+}
+
+.user-management-card .alert {
+  margin: 0 22px 18px;
+}
+
+.dashboard-page-header-top.request-head {
+  padding: 16px 24px 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 100%);
+  border-bottom: 1px solid #cfd7ee;
+}
+
+.dashboard-page-header-top.request-head .section-title {
+  font-size: clamp(1.6rem, 2vw, 2.1rem);
+  letter-spacing: 0; 
+  text-transform: none;
+  color: #16235a;
+  padding-left: 0;
+}
+
+.dashboard-page-header-bottom.request-subhead {
+  padding: 14px 24px 0;
+  border-bottom: 1px solid rgba(207, 215, 238, 0.7);
+}
+
+.dashboard-page-header-bottom.request-subhead .section-subtitle {
+  color: #54607d;
+}
+
+@media (max-width: 900px) {
+  .dashboard-page-header-bottom.request-subhead {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-page-header-bottom {
+    align-items: flex-start;
+  }
+
+  .dashboard-page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .user-management-card .facilities-grid {
+    margin: 14px 14px 16px;
+  }
+
+  .dashboard-page-header-top {
+    padding: 18px 18px 14px;
+  }
+
+  .dashboard-page-header-bottom {
+    padding: 14px 18px 0;
+  }
+
+  .user-management-card .inventory-table thead th,
+  .user-management-card .inventory-table tbody td {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .user-management-card .table-actions-cell {
+    gap: 6px;
+  }
 }
 
 .dashboard-page-header {
@@ -3185,4 +3450,390 @@
 
 .facilities-grid .inventory-table:not(.users-table):not(.equipment-inventory-table) {
   table-layout: auto;
+}
+
+/* =========================================================
+   USERS PAGE — MATCH INVENTORY DASHBOARD UI
+   UI ONLY — DO NOT MODIFY USER FUNCTIONALITY
+   ========================================================= */
+
+/* ---------- PAGE HEADER ---------- */
+
+.content-card:has(.users-table) .dashboard-page-header-top,
+.user-management-card .dashboard-page-header-top,
+.dashboard-page-header-top.request-head:has(+ .dashboard-page-header-bottom) {
+  width: 100%;
+  margin: 0;
+  padding: 16px 18px 14px;
+  background: linear-gradient(
+    90deg,
+    #26367b 0%,
+    #38479c 58%,
+    #566bc4 100%
+  );
+  border-bottom: 3px solid var(--yellow);
+  border-radius: 0;
+}
+
+.content-card:has(.users-table) .dashboard-page-header-top .section-title,
+.user-management-card .dashboard-page-header-top .section-title,
+.dashboard-page-header-top.request-head .section-title {
+  margin: 0;
+  padding: 0 0 0 2px;
+  color: var(--white);
+  background: transparent;
+  border: none;
+
+  font-size: clamp(1.5rem, 2vw, 1.9rem);
+  font-weight: 800;
+  line-height: 1.2;
+
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+
+/* ---------- DESCRIPTION / ACTION AREA ---------- */
+
+.content-card:has(.users-table) .dashboard-page-header-bottom,
+.user-management-card .dashboard-page-header-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 18px;
+  flex-wrap: wrap;
+
+  margin: 0;
+  padding: 12px 18px 10px;
+
+  border-bottom: 1px solid #d0d4df;
+  background: transparent;
+}
+
+.content-card:has(.users-table) .dashboard-page-header-bottom .section-subtitle,
+.user-management-card .dashboard-page-header-bottom .section-subtitle {
+  margin: 0;
+
+  color: #586069;
+  font-size: 0.92rem;
+  line-height: 1.45;
+
+  max-width: 48rem;
+}
+
+
+/* ---------- ACTION BUTTONS ---------- */
+
+.content-card:has(.users-table) .dashboard-page-actions,
+.user-management-card .dashboard-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.content-card:has(.users-table) .facilities-add-btn,
+.user-management-card .facilities-add-btn {
+  border: 0;
+
+  background: linear-gradient(
+    135deg,
+    #f4b70a 0%,
+    #e7a900 100%
+  );
+
+  color: #1c2b4f;
+
+  border-radius: 999px;
+
+  padding: 8px 16px;
+
+  min-width: auto;
+
+  font-size: 0.9rem;
+  font-weight: 800;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 7px;
+
+  box-shadow: 0 5px 10px rgba(244, 183, 10, 0.18);
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease;
+}
+
+.content-card:has(.users-table) .facilities-add-btn:hover,
+.user-management-card .facilities-add-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 14px rgba(244, 183, 10, 0.24);
+}
+
+
+/* ---------- USERS TABLE CONTAINER ---------- */
+
+.content-card:has(.users-table) .inventory-grid,
+.user-management-card .facilities-grid {
+  margin: 0 18px 18px;
+  background: #f3f5fa;
+  border: 1px solid #dfe4f3;
+  border-radius: 12px;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+
+/* ---------- TABLE WRAPPER ---------- */
+
+.content-card:has(.users-table) .inventory-grid .table-wrap,
+.user-management-card .table-wrap {
+  padding: 0;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  overflow-x: auto;
+  background: transparent;
+}
+
+
+/* ---------- TABLE ---------- */
+
+.content-card:has(.users-table) .users-table,
+.user-management-card .users-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: #f3f5fa;
+}
+
+
+/* ---------- TABLE HEADER ---------- */
+
+.content-card:has(.users-table) .users-table thead th,
+.user-management-card .users-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--blue);
+  color: var(--white);
+  border: none;
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
+  white-space: nowrap;
+}
+
+
+/* ---------- TABLE BODY ---------- */
+
+.content-card:has(.users-table) .users-table tbody td,
+.user-management-card .users-table tbody td {
+  padding: 10px 12px;
+  color: #1e243b;
+  background: #f3f5fa;
+  border-bottom: 1px solid #c9ccd6;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  vertical-align: middle;
+  text-align: left;
+}
+
+
+/* Alternating rows — same subtle feel as Inventory */
+
+.content-card:has(.users-table) .users-table tbody tr:nth-child(even):not(.category-header-row) td,
+.user-management-card .users-table tbody tr:nth-child(even):not(.category-header-row) td {
+  background: rgba(56, 71, 156, 0.04);
+}
+
+
+/* Hover */
+
+.content-card:has(.users-table) .users-table tbody tr:hover:not(.category-header-row) td,
+.user-management-card .users-table tbody tr:hover:not(.category-header-row) td {
+  background: rgba(56, 71, 156, 0.1);
+}
+
+
+/* ---------- CATEGORY / GROUP HEADERS ---------- */
+
+.content-card:has(.users-table) .users-table .category-header-row td,
+.user-management-card .users-table .category-header-row td {
+  padding: 0;
+  background: transparent !important;
+  border-bottom: 0;
+}
+
+.content-card:has(.users-table) .users-table .category-header,
+.user-management-card .users-table .category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  margin-top: 0;
+  background: rgba(56, 71, 156, 0.08);
+  border-top: 1px solid rgba(56, 71, 156, 0.2);
+  border-bottom: 1px solid rgba(56, 71, 156, 0.12);
+  color: #38479c;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: 0;
+}
+
+.content-card:has(.users-table) .users-table .category-header i,
+.user-management-card .users-table .category-header i {
+  color: #38479c;
+  font-size: 0.95rem;
+}
+
+
+/* ---------- ROLE BADGES ---------- */
+
+.content-card:has(.users-table) .users-table .role-badge,
+.user-management-card .users-table .role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.content-card:has(.users-table) .users-table .role-badge.admin-badge,
+.user-management-card .users-table .role-badge.admin-badge {
+  background: rgba(56, 71, 156, 0.08);
+  color: #394ea9;
+  border: 1px solid rgba(56, 71, 156, 0.12);
+}
+
+.content-card:has(.users-table) .users-table .role-badge.approver-badge,
+.user-management-card .users-table .role-badge.approver-badge {
+  background: rgba(56, 71, 156, 0.04);
+  color: #394ea9;
+  border: 1px solid rgba(56, 71, 156, 0.1);
+}
+
+
+/* ---------- ACTION BUTTONS ---------- */
+
+.content-card:has(.users-table) .users-table .table-actions-cell,
+.user-management-card .users-table .table-actions-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  flex-wrap: nowrap;
+}
+
+.content-card:has(.users-table) .users-table .table-edit-btn,
+.user-management-card .users-table .table-edit-btn {
+  border: 0;
+  background: var(--blue);
+  color: var(--white);
+  border-radius: 7px;
+  padding: 5px 11px;
+  min-width: 58px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+  box-shadow: none;
+}
+
+.content-card:has(.users-table) .users-table .table-delete-btn,
+.user-management-card .users-table .table-delete-btn {
+  border: 1px solid #e0caca;
+  background: #f7eeee;
+  color: #a33b3b;
+  border-radius: 7px;
+  padding: 5px 10px;
+  min-width: 58px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+
+/* ---------- COLUMN WIDTHS ---------- */
+
+.content-card:has(.users-table) .users-table th:nth-child(1),
+.content-card:has(.users-table) .users-table td:nth-child(1),
+.user-management-card .users-table th:nth-child(1),
+.user-management-card .users-table td:nth-child(1) {
+  width: 13%;
+}
+
+.content-card:has(.users-table) .users-table th:nth-child(2),
+.content-card:has(.users-table) .users-table td:nth-child(2),
+.user-management-card .users-table th:nth-child(2),
+.user-management-card .users-table td:nth-child(2) {
+  width: 19%;
+}
+
+.content-card:has(.users-table) .users-table th:nth-child(3),
+.content-card:has(.users-table) .users-table td:nth-child(3),
+.user-management-card .users-table th:nth-child(3),
+.user-management-card .users-table td:nth-child(3) {
+  width: 20%;
+}
+
+.content-card:has(.users-table) .users-table th:nth-child(4),
+.content-card:has(.users-table) .users-table td:nth-child(4),
+.user-management-card .users-table th:nth-child(4),
+.user-management-card .users-table td:nth-child(4) {
+  width: 10%;
+}
+
+.content-card:has(.users-table) .users-table th:nth-child(5),
+.content-card:has(.users-table) .users-table td:nth-child(5),
+.user-management-card .users-table th:nth-child(5),
+.user-management-card .users-table td:nth-child(5) {
+  width: 14%;
+}
+
+.content-card:has(.users-table) .users-table th:nth-child(6),
+.content-card:has(.users-table) .users-table td:nth-child(6),
+.user-management-card .users-table th:nth-child(6),
+.user-management-card .users-table td:nth-child(6) {
+  width: 11%;
+}
+
+.content-card:has(.users-table) .users-table th:nth-child(7),
+.content-card:has(.users-table) .users-table td:nth-child(7),
+.user-management-card .users-table th:nth-child(7),
+.user-management-card .users-table td:nth-child(7) {
+  width: 13%;
+}
+
+
+/* ---------- SCROLLBAR ---------- */
+
+.content-card:has(.users-table) .table-wrap::-webkit-scrollbar,
+.user-management-card .table-wrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.content-card:has(.users-table) .table-wrap::-webkit-scrollbar-track,
+.user-management-card .table-wrap::-webkit-scrollbar-track {
+  background: #d0d3dc;
+  border-radius: 999px;
+}
+
+.content-card:has(.users-table) .table-wrap::-webkit-scrollbar-thumb,
+.user-management-card .table-wrap::-webkit-scrollbar-thumb {
+  background: var(--third);
+  border-radius: 999px;
 }
