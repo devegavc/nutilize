@@ -27,7 +27,7 @@ class OfficeItemController extends Controller
 
         $equipmentCategories = $this->getEquipmentCategories();
 
-        $rows = DB::table('items')
+        $itemRows = DB::table('items')
             ->leftJoin('item_owners', 'item_owners.owner_id', '=', 'items.owner_id')
             ->leftJoin('item_categories as categories', 'categories.category_id', '=', 'items.category_id')
             ->select([
@@ -41,39 +41,35 @@ class OfficeItemController extends Controller
             ])
             ->where('items.owner_id', $ownerId)
             ->orderBy('items.item_id')
-            ->get()
-            ->map(function ($row) {
-                $category = $this->normalizeCategory((string) ($row->category_key ?? ''));
-                $totalCount = max(0, (int) ($row->quantity_total ?? 0));
-                $inUseCount = max(0, min($totalCount, (int) ($row->quantity_in_use ?? 0)));
-                $maintenanceCount = (bool) $row->maintenance_status ? 1 : 0;
+            ->get();
 
-                $unitCodes = ItemUnitService::loadUnitCodesForItem((int) $row->item_id);
+        $itemIds = $itemRows->pluck('item_id')->map(fn ($id) => (int) $id)->all();
+        $inUseByItem = ItemUnitService::reconcileInUseForItems($itemIds);
+        $unitCodesByItem = ItemUnitService::loadUnitCodesGroupedByItem($itemIds);
+        $issueStatusByItem = ItemUnitService::issueStatusByItem($itemIds);
 
-                $statusKey = 'good';
-                $statusLabel = 'Good';
+        $rows = $itemRows->map(function ($row) use ($unitCodesByItem, $issueStatusByItem, $inUseByItem) {
+            $itemId = (int) $row->item_id;
+            $category = $this->normalizeCategory((string) ($row->category_key ?? ''));
+            $totalCount = max(0, (int) ($row->quantity_total ?? 0));
+            $inUseCount = max(0, min($totalCount, (int) ($inUseByItem[$itemId] ?? $row->quantity_in_use ?? 0)));
+            $unitCodes = $unitCodesByItem[$itemId] ?? [];
+            $statusKey = $issueStatusByItem[$itemId]
+                ?? ((bool) $row->maintenance_status ? 'maintenance' : 'good');
 
-                if ($maintenanceCount > 0) {
-                    $statusKey = 'maintenance';
-                    $statusLabel = 'Maintenance';
-                } elseif ($totalCount > 0 && $inUseCount >= $totalCount) {
-                    $statusKey = 'damaged';
-                    $statusLabel = 'Damaged';
-                }
-
-                return [
-                    'item_id' => (int) $row->item_id,
-                    'asset_id' => ItemUnitService::listAssetLabel($unitCodes, (int) $row->item_id),
-                    'unit_codes' => $unitCodes,
-                    'category' => $category,
-                    'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
-                    'total_count' => $totalCount,
-                    'in_use' => $inUseCount,
-                    'status_key' => $statusKey,
-                    'status_label' => $statusLabel,
-                    'owner_name' => $row->owner_name,
-                ];
-            });
+            return [
+                'item_id' => $itemId,
+                'asset_id' => ItemUnitService::listAssetLabel($unitCodes, $itemId),
+                'unit_codes' => $unitCodes,
+                'category' => $category,
+                'item_name' => (string) ($row->item_name ?? 'Unnamed Item'),
+                'total_count' => $totalCount,
+                'in_use' => $inUseCount,
+                'status_key' => $statusKey,
+                'status_label' => $this->statusLabel($statusKey),
+                'owner_name' => $row->owner_name,
+            ];
+        });
 
         return view('office-items', [
             'equipmentRows' => $rows,
@@ -177,7 +173,7 @@ class OfficeItemController extends Controller
                 'category' => $this->normalizeCategory($databaseCategory),
                 'item_name' => $validated['item_name'],
                 'total_count' => (int) $validated['total_count'],
-                'in_use' => (int) $validated['in_use'],
+                'in_use' => ItemUnitService::inUseCountForItem((int) $itemId),
                 'status_key' => $validated['status'],
                 'status_label' => $this->statusLabel($validated['status']),
             ],
@@ -284,7 +280,7 @@ class OfficeItemController extends Controller
                 'category' => $this->normalizeCategory($databaseCategory),
                 'item_name' => $validated['item_name'],
                 'total_count' => (int) $validated['total_count'],
-                'in_use' => (int) $validated['in_use'],
+                'in_use' => ItemUnitService::inUseCountForItem((int) $itemId),
                 'status_key' => $validated['status'],
                 'status_label' => $this->statusLabel($validated['status']),
             ],
@@ -346,6 +342,8 @@ class OfficeItemController extends Controller
         ];
 
         if (Schema::hasTable('item_units')) {
+            $this->syncFlaggedItemsOntoUnits($ownerId);
+
             $unitsNeedingAttention = DB::table('item_units')
                 ->join('items', 'items.item_id', '=', 'item_units.item_id')
                 ->leftJoin('item_categories as categories', 'categories.category_id', '=', 'items.category_id')
@@ -385,6 +383,8 @@ class OfficeItemController extends Controller
                     'statusClass' => $isDamaged ? 'damaged' : 'maintenance',
                     'location' => $this->locationFromCategory($category),
                     'reason' => (string) ($unit->condition_notes ?? ''),
+                    'reporter' => '',
+                    'description' => (string) ($unit->condition_notes ?? ''),
                 ];
             }
         }
@@ -409,7 +409,7 @@ class OfficeItemController extends Controller
         }
 
         $validated = $request->validate([
-            'assessment' => ['required', 'string', 'max:255'],
+            'assessment' => ['nullable', 'string', 'max:255'],
         ]);
 
         $ownerId = $this->resolveOwnerIdForUser($user, true);
@@ -428,7 +428,7 @@ class OfficeItemController extends Controller
         ];
 
         $existingDescription = trim((string) ($issue->description ?? ''));
-        $assessment = trim((string) $validated['assessment']);
+        $assessment = trim((string) ($validated['assessment'] ?? ''));
         if ($assessment !== '') {
             $update['description'] = $existingDescription !== ''
                 ? ($existingDescription . "\n\nResolution: " . $assessment)
@@ -464,8 +464,8 @@ class OfficeItemController extends Controller
         }
 
         $validated = $request->validate([
-            'assessment' => ['required', 'string', 'max:255'],
-            'status' => ['required', 'in:maintenance,damaged,fixed'],
+            'assessment' => ['nullable', 'string', 'max:255'],
+            'status' => ['required', 'in:maintenance,damaged,fixed,good'],
         ]);
 
         $ownerId = $this->resolveOwnerIdForUser($user, true);
@@ -490,13 +490,14 @@ class OfficeItemController extends Controller
             ], 404);
         }
 
-        $targetStatus = $validated['status'] === 'fixed' ? 'available' : $validated['status'];
+        $assessment = trim((string) ($validated['assessment'] ?? ''));
+        $targetStatus = in_array($validated['status'], ['fixed', 'good'], true) ? 'available' : $validated['status'];
 
         DB::table('item_units')
             ->where('unit_id', $unitId)
             ->update([
                 'status' => $targetStatus,
-                'condition_notes' => $validated['assessment'],
+                'condition_notes' => $assessment !== '' ? $assessment : null,
                 'last_maintenance_at' => in_array($targetStatus, ['maintenance', 'damaged'], true) ? now() : null,
                 'updated_at' => now(),
             ]);
@@ -537,7 +538,7 @@ class OfficeItemController extends Controller
                 'status' => $isDamaged ? 'Damaged' : 'Maintenance',
                 'statusClass' => $isDamaged ? 'damaged' : 'maintenance',
                 'location' => $this->locationFromCategory($normalizedCategory),
-                'reason' => $validated['assessment'],
+                'reason' => $assessment,
                 'resolved' => $targetStatus === 'available',
             ],
         ]);
@@ -679,6 +680,49 @@ class OfficeItemController extends Controller
         }
 
         return $rows;
+    }
+
+    /**
+     * If Manage Items marked an item Damaged/Maintenance but unit rows were never updated,
+     * push that status onto the units so they appear on Item Maintenance.
+     */
+    private function syncFlaggedItemsOntoUnits(int $ownerId): void
+    {
+        if ($ownerId <= 0 || !Schema::hasTable('items') || !Schema::hasTable('item_units')) {
+            return;
+        }
+
+        $flaggedItems = DB::table('items')
+            ->where('owner_id', $ownerId)
+            ->where('maintenance_status', true)
+            ->get(['item_id', 'quantity_total', 'quantity_in_use']);
+
+        if ($flaggedItems->isEmpty()) {
+            return;
+        }
+
+        $flaggedItemIds = $flaggedItems->pluck('item_id')->map(fn ($id) => (int) $id)->all();
+        $itemsWithIssueUnits = DB::table('item_units')
+            ->whereIn('item_id', $flaggedItemIds)
+            ->whereIn('status', ['maintenance', 'damaged'])
+            ->pluck('item_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+
+        foreach ($flaggedItems as $item) {
+            $itemId = (int) $item->item_id;
+
+            if (in_array($itemId, $itemsWithIssueUnits, true)) {
+                continue;
+            }
+
+            $total = max(0, (int) ($item->quantity_total ?? 0));
+            $inUse = max(0, min($total, (int) ($item->quantity_in_use ?? 0)));
+            $status = ($total > 0 && $inUse >= $total) ? 'damaged' : 'maintenance';
+
+            ItemUnitService::ensureUnitsForItem($itemId, [], $total, $inUse, $status);
+        }
     }
 
     private function reservationInvolvesOwner(int $reservationId, int $ownerId): bool

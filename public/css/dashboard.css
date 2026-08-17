@@ -14,9 +14,11 @@
   --message-popover-bg-start: #2a385b;
   --message-popover-bg-end: #1c2742;
   --top-header-height: 90px;
-  --dashboard-top-gap: 12px;
-  --dashboard-bottom-gap: 12px;
-  --dashboard-page-padding: clamp(12px, 1.4vw, 24px);
+  --dashboard-top-gap: 14px;
+  --dashboard-bottom-gap: 14px;
+  --dashboard-page-padding: clamp(16px, 1.6vw, 28px);
+  --dashboard-sidebar-width: 220px;
+  --dashboard-grid-gap: 22px;
 }
 
 html {
@@ -189,6 +191,7 @@ body {
   color: var(--white);
   font-size: 1.35rem;
   border: 1px solid rgba(255, 255, 255, 0.3);
+  overflow: visible;
   transition: transform 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
 }
 
@@ -228,6 +231,8 @@ body {
   text-align: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   display: none;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .message-popover {
@@ -332,8 +337,8 @@ body {
 
 .notification-popover {
   position: fixed;
-  width: min(330px, 92vw);
-  max-height: 72vh;
+  width: min(360px, 92vw);
+  max-height: min(72vh, 520px);
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, var(--message-popover-bg-start) 0%, var(--message-popover-bg-end) 100%);
@@ -341,11 +346,12 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   box-shadow: 0 18px 34px rgba(7, 9, 16, 0.52);
-  z-index: 2200;
+  z-index: 3200;
   overflow: hidden;
 }
 
 .notification-popover-head {
+  flex-shrink: 0;
   padding: 14px 14px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -357,8 +363,12 @@ body {
 }
 
 .notification-popover-list {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 8px 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .notification-item {
@@ -375,6 +385,22 @@ body {
 
 .notification-item:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+.notification-item.is-opening {
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.notification-item.is-opening .notification-indicator {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-top-color: #f4b70a;
+  background: transparent;
+  box-shadow: none;
+  animation: notification-spinner 0.8s linear infinite;
 }
 
 .notification-item:last-child {
@@ -566,8 +592,8 @@ body {
 .workspace-grid {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: minmax(220px, 220px) minmax(0, 1fr);
-  gap: 22px;
+  grid-template-columns: minmax(var(--dashboard-sidebar-width), var(--dashboard-sidebar-width)) minmax(0, 1fr);
+  gap: var(--dashboard-grid-gap);
   height: calc(100% - 10px);
   min-height: 0;
   align-items: stretch;
@@ -672,6 +698,8 @@ body {
   box-shadow: 0 14px 28px rgba(23, 36, 93, 0.15);
   overflow: hidden;
   height: 100%;
+  min-height: 0;
+  max-height: 100%;
   animation: contentRiseIn 0.45s ease both;
 }
 
@@ -909,11 +937,17 @@ body {
   .workspace-grid > .schedule-content-card,
   .workspace-grid > .profile-content-card,
   .workspace-grid > .messages-content-card,
-  .workspace-grid > .analytics-content-card {
+  .workspace-grid > .analytics-content-card,
+  .workspace-grid > .home-dashboard-card,
+  .workspace-grid > .office-requests-card,
+  .workspace-grid > .inventory-dashboard-card {
     grid-column: 2;
     grid-row: 1;
     min-width: 0;
     max-width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
     position: relative;
     z-index: 1;
   }
@@ -1123,7 +1157,7 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 3000;
+  z-index: 3400;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1153,6 +1187,38 @@ body {
   color: #1f2937;
   display: flex;
   flex-direction: column;
+}
+
+.reservation-details-modal.is-loading .reservation-details-content {
+  max-width: 380px;
+  min-height: 220px;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 28px;
+  text-align: center;
+  overflow: visible;
+}
+
+.reservation-details-spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #d7def2;
+  border-top-color: #32408a;
+  border-radius: 50%;
+  animation: notification-spinner 0.8s linear infinite;
+}
+
+.reservation-details-loading-title {
+  margin: 16px 0 0;
+  font-size: 1.15rem;
+  font-weight: 750;
+  color: #243274;
+}
+
+.reservation-details-loading-copy {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+  color: #5b6790;
 }
 
 .reservation-details-header {

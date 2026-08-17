@@ -57,9 +57,9 @@
 
         <section class="maintenance-filter-row">
           <div class="maintenance-tab-group" role="tablist" aria-label="Maintenance status">
-            <button class="maintenance-tab active" type="button" data-maintenance-tab="maintenance">Maintenance</button>
-            <button class="maintenance-tab" type="button" data-maintenance-tab="damaged">Damaged</button>
-            <button class="maintenance-tab" type="button" data-maintenance-tab="reported">Reported</button>
+            <button class="maintenance-tab active" type="button" data-maintenance-tab="maintenance">Maintenance <span class="maintenance-tab-count" data-tab-count="maintenance" hidden></span></button>
+            <button class="maintenance-tab" type="button" data-maintenance-tab="damaged">Damaged <span class="maintenance-tab-count" data-tab-count="damaged" hidden></span></button>
+            <button class="maintenance-tab" type="button" data-maintenance-tab="reported">Reported <span class="maintenance-tab-count" data-tab-count="reported" hidden></span></button>
           </div>
 
           <div class="maintenance-head-actions">
@@ -156,15 +156,15 @@
         <span>Name of Item:</span>
         <span id="maintenance-form-item-name">-</span>
 
-        <label for="maintenance-assessment-input">Assessment:</label>
-        <textarea id="maintenance-assessment-input" rows="3" placeholder="Input text here..."></textarea>
+        <label for="maintenance-assessment-input">Assessment (optional):</label>
+        <textarea id="maintenance-assessment-input" rows="3" placeholder="Add notes if needed..."></textarea>
 
         <label for="maintenance-status-select">Status</label>
         <select id="maintenance-status-select">
           <option value="">Choose one</option>
           <option value="maintenance">Maintenance</option>
           <option value="damaged">Damaged</option>
-          <option value="fixed">Fixed</option>
+          <option value="good">Good</option>
         </select>
       </div>
 

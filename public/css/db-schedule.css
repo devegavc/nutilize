@@ -8,21 +8,12 @@
   --schedule-panel-shadow: 0 18px 40px rgba(27, 38, 92, 0.14);
 }
 
-.dashboard-shell {
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-bottom: 14px;
-}
-
-.dashboard-shell .workspace-grid {
-  height: auto;
-  min-height: calc(100% - 10px);
-}
-
 .schedule-content-card {
   display: flex;
   flex-direction: column;
-  height: auto;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
 }
 
 .schedule-layout {

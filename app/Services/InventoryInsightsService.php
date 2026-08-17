@@ -23,24 +23,34 @@ class InventoryInsightsService
 
     private static ?array $reservationColumns = null;
 
-    public static function build(int $lookbackDays = self::LOOKBACK_DAYS): array
+    public static function build(?\DateTimeInterface $since = null, ?\DateTimeInterface $until = null): array
     {
-        $empty = self::emptyPayload($lookbackDays);
+        if ($since === null) {
+            $since = now()->subDays(self::LOOKBACK_DAYS);
+            $until = now();
+            $lookbackDays = self::LOOKBACK_DAYS;
+            $periodLabel = 'the last ' . self::LOOKBACK_DAYS . ' days';
+        } else {
+            $until ??= now();
+            $lookbackDays = max(1, (int) $since->diff($until)->days + 1);
+            $periodLabel = $since->format('F Y');
+        }
+
+        $empty = self::emptyPayload($lookbackDays, $periodLabel);
 
         if (!Schema::hasTable('items') || !Schema::hasTable('reservation_details')) {
             return $empty;
         }
 
-        $since = now()->subDays($lookbackDays);
         $items = self::loadItems();
 
         if ($items === []) {
             return $empty;
         }
 
-        $demand = self::loadItemDemand($since);
+        $demand = self::loadItemDemand($since, $until);
         $unavailableUnits = self::loadUnavailableUnitCounts();
-        $maintenanceCounts = self::loadMaintenanceCounts($since);
+        $maintenanceCounts = self::loadMaintenanceCounts($since, $until);
 
         $recommendations = [];
         $idleStock = [];
@@ -75,13 +85,14 @@ class InventoryInsightsService
 
         return [
             'lookbackDays' => $lookbackDays,
+            'periodLabel' => $periodLabel,
             'restockRecommendations' => $recommendations,
             'restockSummary' => self::summarise($recommendations, $idleStock),
             'idleStock' => array_slice($idleStock, 0, 8),
             'categoryDemand' => array_slice($categoryDemand, 0, 8),
-            'peakPeriods' => self::loadPeakPeriods($since),
+            'peakPeriods' => self::loadPeakPeriods($since, $until),
             'maintenanceWatch' => self::buildMaintenanceWatch($items, $unavailableUnits, $maintenanceCounts),
-            'fulfillmentStats' => self::loadFulfillmentStats($since),
+            'fulfillmentStats' => self::loadFulfillmentStats($since, $until),
         ];
     }
 
@@ -136,7 +147,7 @@ class InventoryInsightsService
      *
      * @return array<int, array<string, mixed>>
      */
-    private static function loadItemDemand(\DateTimeInterface $since): array
+    private static function loadItemDemand(\DateTimeInterface $since, ?\DateTimeInterface $until = null): array
     {
         if (!Schema::hasTable('reservation_items') || !Schema::hasTable('reservations')) {
             return [];
@@ -150,16 +161,22 @@ class InventoryInsightsService
             'reservations.created_at',
         ];
 
-        $rows = DB::table('reservation_details as details')
+        $query = DB::table('reservation_details as details')
             ->join('reservations', 'reservations.reservation_id', '=', 'details.reservation_id')
             ->join('reservation_items as bookedItems', 'bookedItems.reservation_items_id', '=', 'details.reservation_items_id')
             ->join('items', 'items.item_id', '=', 'bookedItems.item_id')
             ->whereNotNull('details.reservation_items_id')
-            ->where('reservations.created_at', '>=', $since)
-            ->select($select)
-            ->get();
+            ->where('reservations.created_at', '>=', $since);
 
-        $midpoint = now()->subDays((int) round(self::LOOKBACK_DAYS / 2))->getTimestamp();
+        if ($until !== null) {
+            $query->where('reservations.created_at', '<=', $until);
+        }
+
+        $rows = $query->select($select)->get();
+
+        $sinceTs = $since->getTimestamp();
+        $untilTs = ($until ?? now())->getTimestamp();
+        $midpoint = (int) round(($sinceTs + $untilTs) / 2);
         $demand = [];
 
         foreach ($rows as $row) {
@@ -365,23 +382,61 @@ class InventoryInsightsService
     {
         $critical = 0;
         $high = 0;
+        $medium = 0;
         $unitsToProcure = 0;
         $unmetUnits = 0;
+        $itemsWithGap = 0;
+        $criticalTopItem = null;
+        $criticalTopGap = -1;
+        $idleUnits = 0;
 
         foreach ($recommendations as $recommendation) {
-            $critical += $recommendation['priority'] === 'critical' ? 1 : 0;
-            $high += $recommendation['priority'] === 'high' ? 1 : 0;
-            $unitsToProcure += $recommendation['suggested_qty'];
-            $unmetUnits += $recommendation['gap'];
+            $priority = (string) ($recommendation['priority'] ?? '');
+            $critical += $priority === 'critical' ? 1 : 0;
+            $high += $priority === 'high' ? 1 : 0;
+            $medium += $priority === 'medium' ? 1 : 0;
+            $unitsToProcure += (int) ($recommendation['suggested_qty'] ?? 0);
+            $gap = (int) ($recommendation['gap'] ?? 0);
+            $unmetUnits += $gap;
+            if ($gap > 0) {
+                $itemsWithGap++;
+            }
+
+            if ($priority === 'critical' && $gap > $criticalTopGap) {
+                $criticalTopGap = $gap;
+                $criticalTopItem = (string) ($recommendation['item_name'] ?? '');
+            }
         }
+
+        foreach ($idleStock as $item) {
+            $idleUnits += max(0, (int) ($item['stock'] ?? 0));
+        }
+
+        $flagged = count($recommendations);
 
         return [
             'critical' => $critical,
             'high' => $high,
-            'items_needing_action' => count($recommendations),
+            'medium' => $medium,
+            'items_needing_action' => $flagged,
             'units_to_procure' => $unitsToProcure,
             'unmet_units' => $unmetUnits,
+            'items_with_gap' => $itemsWithGap,
             'idle_items' => count($idleStock),
+            'idle_units' => $idleUnits,
+            'critical_top_item' => $criticalTopItem ?: null,
+            'procure_hint' => $flagged > 0
+                ? sprintf('across %d item%s', $flagged, $flagged === 1 ? '' : 's')
+                : 'no buy action needed',
+            'unmet_hint' => $itemsWithGap > 0
+                ? sprintf('on %d short item%s', $itemsWithGap, $itemsWithGap === 1 ? '' : 's')
+                : 'stock covers demand',
+            'idle_hint' => $idleUnits > 0
+                ? sprintf('%d unit%s sitting unused', $idleUnits, $idleUnits === 1 ? '' : 's')
+                : 'no dead stock',
+            'critical_hint' => $critical > 0
+                ? ($criticalTopItem ? ('worst: ' . $criticalTopItem) : 'buy or repair soon')
+                : 'none right now',
         ];
     }
 
@@ -406,15 +461,21 @@ class InventoryInsightsService
     /**
      * @return array<int, int>
      */
-    private static function loadMaintenanceCounts(\DateTimeInterface $since): array
+    private static function loadMaintenanceCounts(\DateTimeInterface $since, ?\DateTimeInterface $until = null): array
     {
         if (!Schema::hasTable('maintenance')) {
             return [];
         }
 
-        return DB::table('maintenance')
+        $query = DB::table('maintenance')
             ->whereNotNull('item_id')
-            ->where('created_at', '>=', $since)
+            ->where('created_at', '>=', $since);
+
+        if ($until !== null) {
+            $query->where('created_at', '<=', $until);
+        }
+
+        return $query
             ->groupBy('item_id')
             ->selectRaw('item_id, COUNT(*) as incidents')
             ->pluck('incidents', 'item_id')
@@ -469,7 +530,7 @@ class InventoryInsightsService
      *
      * @return array<string, mixed>
      */
-    private static function loadPeakPeriods(\DateTimeInterface $since): array
+    private static function loadPeakPeriods(\DateTimeInterface $since, ?\DateTimeInterface $until = null): array
     {
         $empty = ['weekdays' => [], 'busiest_dates' => []];
 
@@ -484,10 +545,14 @@ class InventoryInsightsService
             $select[] = 'reservations.' . $dateColumn;
         }
 
-        $rows = DB::table('reservations')
-            ->where('created_at', '>=', $since)
-            ->select($select)
-            ->get();
+        $query = DB::table('reservations')
+            ->where('created_at', '>=', $since);
+
+        if ($until !== null) {
+            $query->where('created_at', '<=', $until);
+        }
+
+        $rows = $query->select($select)->get();
 
         $weekdayCounts = array_fill(0, 7, 0);
         $dateCounts = [];
@@ -535,7 +600,7 @@ class InventoryInsightsService
     /**
      * @return array<string, mixed>
      */
-    private static function loadFulfillmentStats(\DateTimeInterface $since): array
+    private static function loadFulfillmentStats(\DateTimeInterface $since, ?\DateTimeInterface $until = null): array
     {
         $stats = ['approved' => 0, 'pending' => 0, 'cancelled' => 0, 'rejected' => 0, 'total' => 0, 'cancellation_rate' => 0.0];
 
@@ -543,8 +608,14 @@ class InventoryInsightsService
             return $stats;
         }
 
-        $rows = DB::table('reservations')
-            ->where('created_at', '>=', $since)
+        $query = DB::table('reservations')
+            ->where('created_at', '>=', $since);
+
+        if ($until !== null) {
+            $query->where('created_at', '<=', $until);
+        }
+
+        $rows = $query
             ->selectRaw("LOWER(TRIM(COALESCE(overall_status, ''))) as status, COUNT(*) as total")
             ->groupBy('status')
             ->get();
@@ -604,10 +675,11 @@ class InventoryInsightsService
     /**
      * @return array<string, mixed>
      */
-    private static function emptyPayload(int $lookbackDays): array
+    private static function emptyPayload(int $lookbackDays, string $periodLabel = ''): array
     {
         return [
             'lookbackDays' => $lookbackDays,
+            'periodLabel' => $periodLabel !== '' ? $periodLabel : ('the last ' . $lookbackDays . ' days'),
             'restockRecommendations' => [],
             'restockSummary' => [
                 'critical' => 0,
@@ -615,7 +687,14 @@ class InventoryInsightsService
                 'items_needing_action' => 0,
                 'units_to_procure' => 0,
                 'unmet_units' => 0,
+                'items_with_gap' => 0,
                 'idle_items' => 0,
+                'idle_units' => 0,
+                'critical_top_item' => null,
+                'procure_hint' => 'no buy action needed',
+                'unmet_hint' => 'stock covers demand',
+                'idle_hint' => 'no dead stock',
+                'critical_hint' => 'none right now',
             ],
             'idleStock' => [],
             'categoryDemand' => [],
