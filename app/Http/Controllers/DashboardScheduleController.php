@@ -97,6 +97,10 @@ class DashboardScheduleController extends Controller
         }
 
         $firstMarkedDay = !empty($scheduleByDay) ? (int) array_key_first($scheduleByDay) : null;
+        $todayDay = (int) now()->day;
+        $defaultDay = $monthStart->isSameMonth(now()) && !empty($scheduleByDay[$todayDay])
+            ? $todayDay
+            : $firstMarkedDay;
 
         return view('dashboard-schedule', [
             'monthLabel' => $monthStart->format('F Y'),
@@ -109,7 +113,7 @@ class DashboardScheduleController extends Controller
                 'monthLabel' => $monthStart->format('F Y'),
                 'markedDays' => $this->normalizeMarkedDays($markedDays),
                 'requestData' => $scheduleByDay,
-                'defaultDay' => $firstMarkedDay,
+                'defaultDay' => $defaultDay,
             ],
         ]);
     }

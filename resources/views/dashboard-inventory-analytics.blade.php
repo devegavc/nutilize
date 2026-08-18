@@ -26,11 +26,6 @@
     <div class="top-header-inner toolbar-card">
       <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
 
-      <div class="search-wrap">
-        <i class="bi bi-search"></i>
-        <input id="dashboard-search" type="text" placeholder="Search" />
-      </div>
-
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
       </button>
@@ -48,50 +43,28 @@
       <div id="navbar-container"></div>
 
       <section class="content-card analytics-content-card">
-        <div class="insights-header">
-          <div>
+        <div class="dashboard-page-header-top insights-header-top">
+          <div class="insights-header-copy">
             <h1 class="section-title">INSIGHTS DASHBOARD</h1>
-            <p class="insights-subtitle">
-              Demand and stock analysis for {{ $periodLabel ?? $monthLabel }}
-              <span class="insights-vs-label">compared with {{ $compareMonthLabel }}</span>
-            </p>
           </div>
 
-          <div class="insights-month-controls">
-            <div class="insights-month-row">
-              <a class="month-nav-btn" href="{{ $previousMonthUrl }}" aria-label="Previous month">
-                <i class="bi bi-chevron-left"></i>
-              </a>
-              <h2 class="insights-month-label">{{ $monthLabel }}</h2>
-              @if ($canGoNext)
-                <a class="month-nav-btn" href="{{ $nextMonthUrl }}" aria-label="Next month">
-                  <i class="bi bi-chevron-right"></i>
-                </a>
-              @else
-                <button class="month-nav-btn" type="button" disabled aria-label="Next month">
-                  <i class="bi bi-chevron-right"></i>
-                </button>
-              @endif
-            </div>
-
-            @php
-              [$selectedYear, $selectedMonthNum] = explode('-', $monthKey);
-              $selectedYear = (int) $selectedYear;
-              $selectedMonthNum = (int) $selectedMonthNum;
-            @endphp
-            <div class="insights-month-jump" aria-label="Jump to month">
-              <label for="analytics-month-select">Jump to</label>
-              <select id="analytics-month-select" aria-label="Select month">
-                @foreach ([1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'] as $monthNumber => $monthName)
-                  <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonthNum === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
-                @endforeach
-              </select>
-              <select id="analytics-year-select" aria-label="Select year">
-                @for ($year = $selectedYear - 3; $year <= $selectedYear + 1; $year++)
-                  <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
-                @endfor
-              </select>
-            </div>
+          @php
+            [$selectedYear, $selectedMonthNum] = explode('-', $monthKey);
+            $selectedYear = (int) $selectedYear;
+            $selectedMonthNum = (int) $selectedMonthNum;
+          @endphp
+          <div class="insights-month-jump" aria-label="Jump to month">
+            <label for="analytics-month-select">Jump to</label>
+            <select id="analytics-month-select" aria-label="Select month">
+              @foreach ([1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'] as $monthNumber => $monthName)
+                <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonthNum === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
+              @endforeach
+            </select>
+            <select id="analytics-year-select" aria-label="Select year">
+              @for ($year = $selectedYear - 3; $year <= $selectedYear + 1; $year++)
+                <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
+              @endfor
+            </select>
           </div>
         </div>
 
@@ -141,7 +114,7 @@
         <section class="insight-kpi-strip" aria-label="Procurement signals">
           <button
             type="button"
-            class="insight-kpi {{ $restockSummary['critical'] > 0 ? 'is-critical' : '' }}"
+            class="insight-kpi insight-kpi-critical {{ $restockSummary['critical'] > 0 ? 'is-critical' : '' }}"
             data-insight-filter="critical"
             aria-pressed="false"
           >
@@ -155,7 +128,7 @@
 
           <button
             type="button"
-            class="insight-kpi {{ $restockSummary['units_to_procure'] > 0 ? 'is-action' : '' }}"
+            class="insight-kpi insight-kpi-procure {{ $restockSummary['units_to_procure'] > 0 ? 'is-action' : '' }}"
             data-insight-filter="procure"
             aria-pressed="false"
           >
@@ -169,7 +142,7 @@
 
           <button
             type="button"
-            class="insight-kpi"
+            class="insight-kpi insight-kpi-gap"
             data-insight-filter="unmet"
             aria-pressed="false"
           >
@@ -183,7 +156,7 @@
 
           <button
             type="button"
-            class="insight-kpi"
+            class="insight-kpi insight-kpi-idle"
             data-insight-filter="idle"
             aria-pressed="false"
           >
@@ -331,28 +304,28 @@
               <span>Approved Bookings</span>
               <strong>{{ number_format($approvedBookings) }}</strong>
               <em class="{{ $bookingsDelta >= 0 ? 'up' : 'down' }}">
-                {{ $bookingsDelta > 0 ? '+' : '' }}{{ number_format($bookingsDelta) }}
+                @if ($bookingsDelta > 0)↑ @elseif ($bookingsDelta < 0)↓ @endif{{ $bookingsDelta > 0 ? '+' : '' }}{{ number_format($bookingsDelta) }}
               </em>
             </p>
             <p>
               <span>Unique Borrowers</span>
               <strong>{{ number_format($totalBorrowers) }}</strong>
               <em class="{{ $borrowersDelta >= 0 ? 'up' : 'down' }}">
-                {{ $borrowersDelta > 0 ? '+' : '' }}{{ number_format($borrowersDelta) }}
+                @if ($borrowersDelta > 0)↑ @elseif ($borrowersDelta < 0)↓ @endif{{ $borrowersDelta > 0 ? '+' : '' }}{{ number_format($borrowersDelta) }}
               </em>
             </p>
             <p>
               <span>Units Borrowed</span>
               <strong>{{ number_format($engagementCount) }}</strong>
               <em class="{{ $engagementDelta >= 0 ? 'up' : 'down' }}">
-                {{ $engagementDelta > 0 ? '+' : '' }}{{ number_format($engagementDelta) }}
+                @if ($engagementDelta > 0)↑ @elseif ($engagementDelta < 0)↓ @endif{{ $engagementDelta > 0 ? '+' : '' }}{{ number_format($engagementDelta) }}
               </em>
             </p>
             <p>
               <span>New Users</span>
               <strong>{{ number_format($newUsers) }}</strong>
               <em class="{{ $newUsersDelta >= 0 ? 'up' : 'down' }}">
-                {{ $newUsersDelta > 0 ? '+' : '' }}{{ number_format($newUsersDelta) }}
+                @if ($newUsersDelta > 0)↑ @elseif ($newUsersDelta < 0)↓ @endif{{ $newUsersDelta > 0 ? '+' : '' }}{{ number_format($newUsersDelta) }}
               </em>
             </p>
           </article>
@@ -410,7 +383,7 @@
             </div>
           </div>
           <div class="table-wrap">
-            <table class="inventory-table analytics-table">
+            <table class="inventory-table analytics-table leading-items-table">
               <thead>
                 <tr>
                   <th>Item Name</th>
@@ -525,7 +498,8 @@
             <h3 class="insight-card-title">Idle Stock</h3>
             <p class="insight-panel-hint">Owned but never requested — avoid buying more of these</p>
             @if (count($idleStock) > 0)
-              <table class="inventory-table analytics-table compact-table">
+              <div class="table-wrap">
+              <table class="inventory-table analytics-table idle-stock-table">
                 <thead>
                   <tr>
                     <th>Item</th>
@@ -543,6 +517,7 @@
                   @endforeach
                 </tbody>
               </table>
+              </div>
             @else
               <p class="insight-empty-inline">Every item has seen activity — no dead stock.</p>
             @endif
@@ -552,7 +527,8 @@
             <h3 class="insight-card-title">Maintenance Watch</h3>
             <p class="insight-panel-hint">Downtime reduces usable stock and drives shortages</p>
             @if (count($maintenanceWatch) > 0)
-              <table class="inventory-table analytics-table compact-table">
+              <div class="table-wrap">
+              <table class="inventory-table analytics-table maintenance-watch-table">
                 <thead>
                   <tr>
                     <th>Item</th>
@@ -573,6 +549,7 @@
                   @endforeach
                 </tbody>
               </table>
+              </div>
             @else
               <p class="insight-empty-inline">No items are currently out of service.</p>
             @endif
@@ -625,7 +602,14 @@
               y: { beginAtZero: true, ticks: { precision: 0 } }
             },
             plugins: {
-              legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 11 } } }
+              legend: {
+                position: 'top',
+                align: 'end',
+                labels: { usePointStyle: true, boxWidth: 8, padding: 14, font: { size: 11 } }
+              }
+            },
+            layout: {
+              padding: { top: 2, right: 6, bottom: 2, left: 2 }
             }
           }
         });
@@ -660,6 +644,9 @@
             },
             plugins: {
               legend: { display: false }
+            },
+            layout: {
+              padding: { top: 6, right: 8, bottom: 4, left: 2 }
             }
           }
         });
@@ -729,11 +716,20 @@
         return `${prevYear}-${prevMonth}`;
       };
 
+      const goToAnalytics = (url) => {
+        if (typeof window.navigateWithInsightsSkeleton === 'function') {
+          window.navigateWithInsightsSkeleton(url);
+          return;
+        }
+
+        window.location.assign(url);
+      };
+
       if (monthSelect && yearSelect) {
         const openSelectedMonth = () => {
           const monthKey = `${yearSelect.value}-${monthSelect.value}`;
           // Always pair the selected month with the month before it.
-          window.location.href = buildAnalyticsUrl(monthKey, previousMonthKey(monthKey));
+          goToAnalytics(buildAnalyticsUrl(monthKey, previousMonthKey(monthKey)));
         };
 
         monthSelect.addEventListener('change', openSelectedMonth);
@@ -743,12 +739,12 @@
       if (compareMonthSelect && compareYearSelect) {
         compareMonthSelect.addEventListener('change', () => {
           const compareKey = `${compareYearSelect.value}-${compareMonthSelect.value}`;
-          window.location.href = buildAnalyticsUrl(window.analyticsMonthKey, compareKey);
+          goToAnalytics(buildAnalyticsUrl(window.analyticsMonthKey, compareKey));
         });
 
         compareYearSelect.addEventListener('change', () => {
           const compareKey = `${compareYearSelect.value}-${compareMonthSelect.value}`;
-          window.location.href = buildAnalyticsUrl(window.analyticsMonthKey, compareKey);
+          goToAnalytics(buildAnalyticsUrl(window.analyticsMonthKey, compareKey));
         });
       }
 

@@ -74,11 +74,21 @@ const scheduleFilterButtons = document.querySelectorAll('[data-schedule-filter]'
 const scheduleDayCells = document.querySelectorAll('.calendar-grid .day[data-day]');
 const scheduleMonthSelect = document.getElementById('schedule-month-select');
 const scheduleYearSelect = document.getElementById('schedule-year-select');
+const scheduleMonthTitle = document.getElementById('schedule-month-title');
+const scheduleMonthPicker = document.getElementById('schedule-month-picker');
+const scheduleTodayButton = document.getElementById('schedule-today-btn');
+const scheduleMonthSummary = document.getElementById('schedule-month-summary');
 const scheduleRequestModal = document.getElementById('schedule-request-modal');
 const scheduleRequestBody = document.getElementById('schedule-request-body');
 const scheduleModalDate = document.getElementById('schedule-modal-date');
+const scheduleInlinePanel = document.getElementById('schedule-inline-panel');
 const scheduleInlineDate = document.getElementById('schedule-inline-date');
+const scheduleInlineDateStats = document.getElementById('schedule-inline-date-stats');
+const scheduleInlineStatReservations = document.getElementById('schedule-inline-stat-reservations');
+const scheduleInlineStatResources = document.getElementById('schedule-inline-stat-resources');
+const scheduleInlineStatApproved = document.getElementById('schedule-inline-stat-approved');
 const scheduleInlineRequestBody = document.getElementById('schedule-inline-request-body');
+const scheduleInlineDetailCard = document.getElementById('schedule-inline-detail-card');
 const scheduleInlineDetailRequester = document.getElementById('schedule-inline-detail-requester');
 const scheduleInlineDetailActivity = document.getElementById('schedule-inline-detail-activity');
 const scheduleInlineDetailRequestedOn = document.getElementById('schedule-inline-detail-requested-on');
@@ -171,8 +181,246 @@ const equipmentCategoryDeleteEndpointBase =
 
 let requestListPollInterval = null;
 let requestListRefreshInFlight = false;
+let navigationProgressBar = null;
 
 let appNoticeResolver = null;
+
+function ensureNavigationProgressBar() {
+  if (navigationProgressBar instanceof HTMLElement) {
+    return navigationProgressBar;
+  }
+
+  navigationProgressBar = document.createElement('div');
+  navigationProgressBar.className = 'nav-progress-bar';
+  navigationProgressBar.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(navigationProgressBar);
+
+  return navigationProgressBar;
+}
+
+function showNavigationProgressBar() {
+  const bar = ensureNavigationProgressBar();
+  bar.classList.add('is-visible');
+}
+
+function hideNavigationProgressBar() {
+  if (!(navigationProgressBar instanceof HTMLElement)) {
+    return;
+  }
+
+  navigationProgressBar.classList.remove('is-visible');
+}
+
+function isInsightsDashboardUrl(href) {
+  try {
+    const url = new URL(href, window.location.href);
+    return url.pathname.toLowerCase().includes('/dashboard/inventory/analytics');
+  } catch (error) {
+    return String(href || '').toLowerCase().includes('/dashboard/inventory/analytics');
+  }
+}
+
+function getDashboardSkeletonType(href) {
+  try {
+    const path = new URL(href, window.location.href).pathname.toLowerCase();
+
+    if (path.includes('/inventory/analytics')) {
+      return 'insights';
+    }
+
+    if (path.includes('/inventory/facilities')) {
+      return 'facilities';
+    }
+
+    if (path.includes('/inventory/equipments') || (path.includes('/office/items') && !path.includes('maintenance'))) {
+      return 'equipment';
+    }
+
+    if (path.includes('/inventory')) {
+      return 'inventory';
+    }
+
+    if (path.includes('/schedule')) {
+      return 'schedule';
+    }
+
+    if (path.includes('/request')) {
+      return 'requests';
+    }
+
+    if (path.includes('/users')) {
+      return 'users';
+    }
+
+    if (path.includes('/history')) {
+      return 'history';
+    }
+
+    if (path.includes('/maintenance')) {
+      return 'maintenance';
+    }
+
+    if (path.includes('/home') || path.includes('/office')) {
+      return 'home';
+    }
+
+    return 'default';
+  } catch (error) {
+    return 'default';
+  }
+}
+
+function getInsightsSkeletonMarkup() {
+  return `
+      <div class="ils-header"></div>
+      <div class="ils-charts">
+        <div class="ils-card ils-chart-card">
+          <span class="ils-line ils-w-40"></span>
+          <span class="ils-line ils-w-28 ils-thin"></span>
+          <div class="ils-chart-body"></div>
+          <div class="ils-legend"><i></i><i></i></div>
+        </div>
+        <div class="ils-card ils-chart-card">
+          <span class="ils-line ils-w-48"></span>
+          <span class="ils-line ils-w-32 ils-thin"></span>
+          <div class="ils-chart-body"></div>
+        </div>
+      </div>
+      <div class="ils-kpis">
+        <div class="ils-card ils-kpi"><i class="ils-icon"></i><div><b></b><span class="ils-line ils-w-56 ils-thin"></span><span class="ils-line ils-w-40 ils-xs"></span></div></div>
+        <div class="ils-card ils-kpi"><i class="ils-icon"></i><div><b></b><span class="ils-line ils-w-56 ils-thin"></span><span class="ils-line ils-w-40 ils-xs"></span></div></div>
+        <div class="ils-card ils-kpi"><i class="ils-icon"></i><div><b></b><span class="ils-line ils-w-56 ils-thin"></span><span class="ils-line ils-w-40 ils-xs"></span></div></div>
+        <div class="ils-card ils-kpi"><i class="ils-icon"></i><div><b></b><span class="ils-line ils-w-56 ils-thin"></span><span class="ils-line ils-w-40 ils-xs"></span></div></div>
+      </div>
+      <div class="ils-card ils-hint">
+        <span class="ils-line ils-w-36"></span>
+        <span class="ils-line ils-w-90 ils-thin"></span>
+        <span class="ils-line ils-w-80 ils-thin"></span>
+        <span class="ils-line ils-w-70 ils-thin"></span>
+      </div>
+      <div class="ils-card ils-table">
+        <div class="ils-table-head"></div>
+        <div class="ils-table-row"></div>
+        <div class="ils-table-row"></div>
+        <div class="ils-table-row"></div>
+        <div class="ils-table-row"></div>
+      </div>
+      <div class="ils-lower">
+        <div class="ils-card ils-share"></div>
+        <div class="ils-card ils-metrics"></div>
+        <div class="ils-card ils-category"></div>
+      </div>
+      <div class="ils-card ils-table ils-table-short">
+        <div class="ils-table-head"></div>
+        <div class="ils-table-row"></div>
+        <div class="ils-table-row"></div>
+        <div class="ils-table-row"></div>
+      </div>
+      <div class="ils-card ils-activity"></div>
+      <div class="ils-health">
+        <div class="ils-card ils-side"></div>
+        <div class="ils-card ils-side"></div>
+      </div>
+    `;
+}
+
+function getPageSkeletonMarkup(type) {
+  const card = '<article class="nps-card"><i class="nps-icon"></i><div><span class="nps-line nps-w-40"></span><span class="nps-line nps-w-70 nps-thin"></span></div></article>';
+  const rows = '<div class="nps-row"></div><div class="nps-row"></div><div class="nps-row"></div><div class="nps-row"></div><div class="nps-row"></div><div class="nps-row"></div>';
+  const table = `<div class="nps-table"><div class="nps-table-head"></div>${rows}</div>`;
+  const tabs = '<div class="nps-tabs"><span class="nps-tab"></span><span class="nps-tab"></span><span class="nps-tab"></span></div>';
+  const toolbar = `<div class="nps-toolbar"><span class="nps-search"></span>${tabs}</div>`;
+  const calendarCells = Array.from({ length: 35 }, () => '<span class="nps-cal-cell"></span>').join('');
+  const weekdays = Array.from({ length: 7 }, () => '<span></span>').join('');
+
+  const layouts = {
+    home: `<div class="nps-cards">${card}${card}${card}${card}</div><div class="nps-split">${table}<div class="nps-chart"></div></div>`,
+    inventory: `<div class="nps-cards">${card}${card}${card}</div>${table}`,
+    facilities: `${tabs}${toolbar}${table}`,
+    equipment: `${tabs}${toolbar}${table}`,
+    schedule: `<div class="nps-cal-toolbar"><span class="nps-line"></span><span class="nps-line"></span></div><div class="nps-cal-weekdays">${weekdays}</div><div class="nps-cal-grid">${calendarCells}</div>`,
+    requests: `${tabs}<div class="nps-list-row"></div><div class="nps-list-row"></div><div class="nps-list-row"></div><div class="nps-list-row"></div><div class="nps-list-row"></div>`,
+    users: `<div class="nps-cards">${card}${card}${card}${card}</div>${toolbar}${table}`,
+    history: `${tabs}${table}`,
+    maintenance: `${tabs}${table}`,
+    default: `<div class="nps-cards">${card}${card}${card}</div>${table}`,
+  };
+
+  return `
+    <div class="nps-header"></div>
+    <div class="nps-body">
+      <p class="nps-msg">Loading data...</p>
+      ${layouts[type] || layouts.default}
+    </div>
+  `;
+}
+
+function showPageLoadingSkeleton(type = 'default') {
+  const workspaceGrid = document.querySelector('.workspace-grid');
+
+  if (!workspaceGrid) {
+    return;
+  }
+
+  const skeletonType = type || 'default';
+  let skeleton = document.getElementById('nutilize-page-skeleton') || document.getElementById('insights-loading-skeleton');
+
+  if (!skeleton) {
+    skeleton = document.createElement('div');
+    skeleton.id = 'nutilize-page-skeleton';
+    skeleton.setAttribute('role', 'status');
+    skeleton.setAttribute('aria-live', 'polite');
+    workspaceGrid.appendChild(skeleton);
+  }
+
+  skeleton.dataset.skeleton = skeletonType;
+  skeleton.setAttribute('aria-busy', 'true');
+  skeleton.setAttribute('aria-label', skeletonType === 'insights' ? 'Loading insights dashboard' : 'Loading page');
+
+  if (skeletonType === 'insights') {
+    skeleton.className = 'nutilize-page-skeleton insights-loading-skeleton';
+    skeleton.innerHTML = getInsightsSkeletonMarkup();
+  } else {
+    skeleton.className = 'nutilize-page-skeleton';
+    skeleton.innerHTML = getPageSkeletonMarkup(skeletonType);
+  }
+
+  const contentCard = workspaceGrid.querySelector(
+    '.content-card, .history-content-card, .maintenance-content-card, .facilities-content-card, .request-content-card, .schedule-content-card, .profile-content-card, .messages-content-card, .analytics-content-card'
+  );
+
+  if (contentCard instanceof HTMLElement) {
+    contentCard.style.visibility = 'hidden';
+    contentCard.style.pointerEvents = 'none';
+    contentCard.setAttribute('aria-busy', 'true');
+  }
+
+  skeleton.hidden = false;
+}
+
+function showInsightsLoadingSkeleton() {
+  showPageLoadingSkeleton('insights');
+}
+
+function navigateWithPageSkeleton(href) {
+  showNavigationProgressBar();
+  showPageLoadingSkeleton(getDashboardSkeletonType(href));
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      window.location.assign(href);
+    });
+  });
+}
+
+function navigateWithInsightsSkeleton(href) {
+  navigateWithPageSkeleton(href);
+}
+
+window.showInsightsLoadingSkeleton = showInsightsLoadingSkeleton;
+window.showPageLoadingSkeleton = showPageLoadingSkeleton;
+window.navigateWithInsightsSkeleton = navigateWithInsightsSkeleton;
+window.navigateWithPageSkeleton = navigateWithPageSkeleton;
 
 function showAppNotice(message, options = {}) {
   const {
@@ -441,7 +689,6 @@ let messagePopover = null;
 let activeMessageButton = null;
 let notificationPopover = null;
 let activeNotificationButton = null;
-let activeNotificationLoadingId = null;
 let profilePopover = null;
 let activeProfileButton = null;
 let pendingProfileAvatarDataUrl = '';
@@ -488,26 +735,20 @@ let notificationUnreadCount = 0;
 let lastNotificationFetchAt = 0;
 let lastNotificationSyncAt = 0;
 
-function notificationCsrfHeaders() {
-  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-  const headers = { Accept: 'application/json' };
-  if (csrf) {
-    headers['X-CSRF-TOKEN'] = csrf;
-  }
-  return headers;
-}
-
-async function fetchNotificationUnreadCount({ force = false } = {}) {
+async function fetchNotificationUnreadCount() {
   const now = Date.now();
-  if (!force && now - lastNotificationFetchAt < 20000 && notificationsLoaded) {
+  // Client-side throttle: unread badge does not need sub-minute accuracy.
+  if (now - lastNotificationFetchAt < 90000 && notificationsLoaded) {
     return;
   }
 
   try {
     const response = await fetch('/dashboard/notifications/unread-count', {
       method: 'GET',
-      credentials: 'same-origin',
-      headers: notificationCsrfHeaders(),
+      headers: {
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+        'Accept': 'application/json',
+      },
     });
 
     if (!response.ok) {
@@ -525,11 +766,12 @@ async function fetchNotificationUnreadCount({ force = false } = {}) {
 
 async function fetchNotifications({ sync = false, force = false } = {}) {
   const now = Date.now();
-  if (!force && !sync && notificationsLoaded && now - lastNotificationFetchAt < 20000) {
+  // Avoid hammering Supabase: reuse recent notification payloads for 2 minutes.
+  if (!force && !sync && notificationsLoaded && now - lastNotificationFetchAt < 120000) {
     return;
   }
 
-  // Full workflow rebuild is expensive — at most once every 15 minutes unless forced.
+  // Full sync is expensive — at most once every 15 minutes unless forced.
   const shouldSync = Boolean(sync) && (force || now - lastNotificationSyncAt > 900000);
 
   try {
@@ -537,21 +779,22 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
     if (shouldSync) {
       params.set('sync', '1');
     }
-    if (force && shouldSync) {
+    if (force) {
       params.set('force', '1');
     }
     const query = params.toString();
     const url = `/dashboard/notifications${query ? `?${query}` : ''}`;
     const response = await fetch(url, {
       method: 'GET',
-      credentials: 'same-origin',
-      headers: notificationCsrfHeaders(),
+      headers: {
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+        'Accept': 'application/json',
+      },
     });
 
     if (response.ok) {
       const data = await response.json();
-      const rows = Array.isArray(data.notifications) ? data.notifications : [];
-      notificationItems = rows.map(notification => ({
+      notificationItems = data.notifications.map(notification => ({
         id: notification.id,
         name: notification.title,
         message: notification.message,
@@ -569,7 +812,6 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
         lastNotificationSyncAt = Date.now();
       }
       updateNotificationBadge();
-      refreshNotificationPopover();
     } else {
       console.error('Failed to fetch notifications');
       if (!notificationsLoaded) {
@@ -598,12 +840,12 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
       if (document.visibilityState === 'visible') {
         try {
           lastUnreadPollAt = Date.now();
-          await fetchNotificationUnreadCount({ force: true });
+          await fetchNotificationUnreadCount();
         } catch (error) {
           console.error('Error polling notifications:', error);
         }
       }
-    }, 45000);
+    }, 180000);
   };
 
   const stopNotificationPolling = () => {
@@ -613,16 +855,21 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
     }
   };
 
-  fetchNotifications({ sync: false, force: true }).catch((error) => console.error('Error preloading notifications:', error));
-  startNotificationPolling();
+  const bootstrapNotifications = () => {
+    // Lightweight bootstrap: no forced workflow sync on every page load.
+    fetchNotifications({ sync: false, force: false }).catch((error) => console.error('Error preloading notifications:', error));
+    startNotificationPolling();
+  };
+
+  setTimeout(bootstrapNotifications, 4000);
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible' || Date.now() - lastUnreadPollAt < 20000) {
+    if (document.visibilityState !== 'visible' || Date.now() - lastUnreadPollAt < 180000) {
       return;
     }
 
     lastUnreadPollAt = Date.now();
-    fetchNotificationUnreadCount({ force: true }).catch((error) => console.error('Error refreshing notifications on visibility:', error));
+    fetchNotificationUnreadCount().catch((error) => console.error('Error refreshing notifications on visibility:', error));
   });
 
   window.addEventListener('beforeunload', stopNotificationPolling);
@@ -650,12 +897,12 @@ function getNotificationListMarkup() {
   return notificationItems.length > 0
     ? notificationItems
         .map((item, index) => `
-          <article class="notification-item${item.unread ? ' unread' : ''}${item.loading ? ' is-loading' : ''}" data-notification-id="${item.id}" data-notification-index="${index}" aria-busy="${item.loading ? 'true' : 'false'}">
+          <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${item.id}" data-notification-index="${index}">
             <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
             <div class="notification-copy">
-              <strong>${escapeReservationDetailsHtml(item.name)}</strong>
-              <span class="notification-sub">${escapeReservationDetailsHtml(item.message)}</span>
-              <small class="notification-time">${escapeReservationDetailsHtml(item.created_at)}</small>
+              <strong>${item.name}</strong>
+              <span class="notification-sub">${item.message}</span>
+              <small class="notification-time">${item.created_at}</small>
             </div>
             <span class="notification-indicator ${item.unread ? 'unread' : 'read'}" aria-label="${item.unread ? 'Unread notification' : 'Read notification'}"></span>
           </article>
@@ -725,159 +972,6 @@ function escapeReservationDetailsHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function closeQuickReportDetailsModal() {
-  document.querySelectorAll('.quick-report-details-modal').forEach((modal) => modal.remove());
-}
-
-function showQuickReportDetailsModal(report) {
-  if (!report || typeof report !== 'object') {
-    showAppNotice('Report details are not available.');
-    return;
-  }
-
-  closeQuickReportDetailsModal();
-
-  const item = escapeReservationDetailsHtml(report.item || 'Reported Issue');
-  const reportedBy = escapeReservationDetailsHtml(report.reported_by || 'Unknown');
-  const statusLabel = escapeReservationDetailsHtml(report.status_label || 'Pending');
-  const statusClass = String(report.status_class || 'pending').toLowerCase().replace(/[^a-z0-9_-]/g, '-');
-  const reportedAt = escapeReservationDetailsHtml(report.reported_at || 'N/A');
-  const description = escapeReservationDetailsHtml(report.description || 'No additional description provided.');
-  const activityName = escapeReservationDetailsHtml(report.activity_name || '—');
-  const reservationCode = escapeReservationDetailsHtml(report.reservation_code || '—');
-  const imageUrl = String(report.image_url || '').trim();
-  const safeImageUrl = /^https?:\/\//i.test(imageUrl) ? escapeReservationDetailsHtml(imageUrl) : '';
-  const hasAttachment = Boolean(safeImageUrl);
-
-  const proofPanel = hasAttachment
-    ? `
-      <section class="quick-report-panel quick-report-proof-panel">
-        <div class="quick-report-panel-head">
-          <h3>Attachment</h3>
-          <a class="quick-report-proof-open" href="${safeImageUrl}" target="_blank" rel="noopener noreferrer">Open full image</a>
-        </div>
-        <a class="quick-report-proof-frame" href="${safeImageUrl}" target="_blank" rel="noopener noreferrer">
-          <img src="${safeImageUrl}" alt="Report attachment for ${item}" loading="lazy" />
-        </a>
-      </section>
-    `
-    : `
-      <section class="quick-report-panel quick-report-proof-panel is-empty">
-        <div class="quick-report-panel-head">
-          <h3>Attachment</h3>
-        </div>
-        <div class="quick-report-proof-empty">
-          <i class="bi bi-image" aria-hidden="true"></i>
-          <p>No supporting image was attached to this report.</p>
-        </div>
-      </section>
-    `;
-
-  const modal = document.createElement('div');
-  modal.className = 'quick-report-details-modal';
-  modal.innerHTML = `
-    <div class="quick-report-details-overlay" data-close-quick-report="true">
-      <article class="quick-report-details-card" role="dialog" aria-modal="true" aria-labelledby="quick-report-details-title">
-        <header class="quick-report-details-head">
-          <div class="quick-report-details-heading">
-            <div class="quick-report-details-meta">
-              <span class="quick-report-details-kicker">Report Details</span>
-              <span class="quick-report-status-pill status-${statusClass}">${statusLabel}</span>
-            </div>
-            <h2 id="quick-report-details-title">${item}</h2>
-            <p class="quick-report-details-sub">Reported ${reportedAt}</p>
-          </div>
-          <button type="button" class="quick-report-details-close" data-close-quick-report="true" aria-label="Close">
-            <i class="bi bi-x-lg"></i>
-          </button>
-        </header>
-
-        <div class="quick-report-details-body">
-          <div class="quick-report-details-layout">
-            <section class="quick-report-panel">
-              <div class="quick-report-panel-head">
-                <h3>Report Summary</h3>
-              </div>
-              <dl class="quick-report-info-list">
-                <div>
-                  <dt>Reported By</dt>
-                  <dd>${reportedBy}</dd>
-                </div>
-                <div>
-                  <dt>Activity</dt>
-                  <dd>${activityName}</dd>
-                </div>
-                <div>
-                  <dt>Reservation</dt>
-                  <dd>${reservationCode}</dd>
-                </div>
-                <div>
-                  <dt>Status</dt>
-                  <dd><span class="quick-report-status-pill status-${statusClass}">${statusLabel}</span></dd>
-                </div>
-              </dl>
-            </section>
-
-            ${proofPanel}
-          </div>
-
-          <section class="quick-report-panel quick-report-description-panel">
-            <div class="quick-report-panel-head">
-              <h3>Description</h3>
-            </div>
-            <p class="quick-report-description">${description}</p>
-          </section>
-        </div>
-
-        <footer class="quick-report-details-footer">
-          <a class="quick-report-footer-link" href="/dashboard/maintenance">Open Item Maintenance</a>
-          <button type="button" class="quick-report-footer-close" data-close-quick-report="true">Close</button>
-        </footer>
-      </article>
-    </div>
-  `;
-
-  modal.addEventListener('click', (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-
-    if (target.closest('[data-close-quick-report="true"]') && !target.closest('.quick-report-details-card')) {
-      closeQuickReportDetailsModal();
-      return;
-    }
-
-    if (target.closest('.quick-report-details-close') || target.closest('.quick-report-footer-close')) {
-      closeQuickReportDetailsModal();
-    }
-  });
-
-  document.body.appendChild(modal);
-}
-
-function findQuickReportById(reportId) {
-  const reports = Array.isArray(window.quickReportDetails) ? window.quickReportDetails : [];
-  return reports.find((report) => String(report?.id ?? '') === String(reportId ?? '')) || null;
-}
-
-if (reportTableBody instanceof HTMLElement) {
-  reportTableBody.addEventListener('click', (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-
-    const button = target.closest('[data-quick-report-details]');
-    if (!(button instanceof HTMLElement)) {
-      return;
-    }
-
-    const report = findQuickReportById(button.dataset.reportId);
-    showQuickReportDetailsModal(report);
-  });
 }
 
 function showReservationDetailsModal(reservation, options = {}) {
@@ -1046,30 +1140,6 @@ function showReservationDetailsModal(reservation, options = {}) {
   document.body.appendChild(modal);
 }
 
-function hideReservationDetailsLoadingModal() {
-  document.querySelectorAll('.reservation-details-modal.is-loading').forEach((modal) => modal.remove());
-}
-
-function showReservationDetailsLoadingModal(title = 'Opening request') {
-  hideReservationDetailsLoadingModal();
-
-  const modal = document.createElement('div');
-  modal.className = 'reservation-details-modal is-loading';
-  modal.setAttribute('aria-busy', 'true');
-  modal.innerHTML = `
-    <div class="reservation-details-overlay">
-      <div class="reservation-details-content" role="status" aria-live="polite">
-        <div class="reservation-details-spinner" aria-hidden="true"></div>
-        <p class="reservation-details-loading-title">${escapeReservationDetailsHtml(title)}</p>
-        <p class="reservation-details-loading-copy">Please wait while we load the request details.</p>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-  return modal;
-}
-
 const messagePreviewItems = [
   { name: 'Dela Cruz, Jon', unread: true, snippet: 'Sent a photo' },
   { name: 'Santos, Ivan', unread: true, snippet: 'Can we reserve room 502?' },
@@ -1145,6 +1215,7 @@ function applyHistoryFilters() {
     : rows;
 
   if (!filteredRows.length) {
+    historyTableBody.removeAttribute('aria-busy');
     historyTableBody.innerHTML = `
       <tr>
         <td colspan="5">No history records found.</td>
@@ -1153,6 +1224,7 @@ function applyHistoryFilters() {
     return;
   }
 
+  historyTableBody.removeAttribute('aria-busy');
   historyTableBody.innerHTML = filteredRows
     .map((row) => {
       const statusClass = String(row.raw_status || row.status || '').toLowerCase();
@@ -1231,46 +1303,6 @@ function formatMaintenanceDescription(raw) {
   return text;
 }
 
-function syncMaintenanceTabCounts() {
-  maintenanceTabs.forEach((tabButton) => {
-    if (!(tabButton instanceof HTMLElement)) {
-      return;
-    }
-
-    const tab = tabButton.dataset.maintenanceTab || '';
-    const countEl = tabButton.querySelector('[data-tab-count]');
-    const count = Array.isArray(maintenanceRowsByTab[tab]) ? maintenanceRowsByTab[tab].length : 0;
-
-    if (!(countEl instanceof HTMLElement)) {
-      return;
-    }
-
-    countEl.textContent = count > 0 ? String(count) : '';
-    countEl.hidden = count <= 0;
-  });
-}
-
-function maintenanceEmptyMessage() {
-  const otherTabs = ['maintenance', 'damaged', 'reported'].filter((tab) => tab !== activeMaintenanceTab);
-  const hints = otherTabs
-    .map((tab) => {
-      const count = Array.isArray(maintenanceRowsByTab[tab]) ? maintenanceRowsByTab[tab].length : 0;
-      if (count <= 0) {
-        return '';
-      }
-
-      const label = tab.charAt(0).toUpperCase() + tab.slice(1);
-      return `${count} on ${label}`;
-    })
-    .filter(Boolean);
-
-  if (hints.length) {
-    return `No records in this tab. ${hints.join(', ')}.`;
-  }
-
-  return 'No maintenance records found.';
-}
-
 function applyMaintenanceFilters() {
   if (!maintenanceTableBody) {
     return;
@@ -1292,15 +1324,16 @@ function applyMaintenanceFilters() {
   });
 
   if (!filteredRows.length) {
+    maintenanceTableBody.removeAttribute('aria-busy');
     maintenanceTableBody.innerHTML = `
       <tr class="maintenance-empty-row">
-        <td class="maintenance-empty-cell" colspan="${columnCount}">${maintenanceEmptyMessage()}</td>
+        <td class="maintenance-empty-cell" colspan="${columnCount}">No maintenance records found.</td>
       </tr>
     `;
-    syncMaintenanceTabCounts();
     return;
   }
 
+  maintenanceTableBody.removeAttribute('aria-busy');
   maintenanceTableBody.innerHTML = filteredRows
     .map((row) => {
       const reporterCell = showReporter
@@ -1326,12 +1359,11 @@ function applyMaintenanceFilters() {
         <td>${row.date}</td>
         <td><span class="maintenance-status ${row.statusClass}">${row.status}</span></td>
         ${locationCell}
-        <td class="maintenance-actions-cell"><button class="maintenance-action-btn" type="button">Address</button></td>
+        <td><button class="maintenance-action-btn" type="button">Address</button></td>
       </tr>
     `;
     })
     .join('');
-  syncMaintenanceTabCounts();
 }
 
 function closeMaintenanceEvalModal() {
@@ -1368,6 +1400,8 @@ function openMaintenanceEvalModal(row) {
   const evalReporter = document.getElementById('maintenance-eval-reporter');
   if (evalReporter) {
     evalReporter.textContent = reporter || '-';
+    evalReporter.closest('.maintenance-eval-grid') && (evalReporter.parentElement.style.display = reporter ? '' : 'none');
+    // show/hide the row via the label span
     const labelSpan = evalReporter.previousElementSibling;
     if (labelSpan) {
       labelSpan.style.display = reporter ? '' : 'none';
@@ -1446,40 +1480,14 @@ function openMaintenanceFormModal() {
 
   if (maintenanceAssessmentInput) {
     maintenanceAssessmentInput.value = '';
-    maintenanceAssessmentInput.disabled = false;
   }
 
   if (maintenanceStatusSelect) {
     maintenanceStatusSelect.value = '';
-    maintenanceStatusSelect.disabled = false;
   }
 
-  setMaintenanceSubmitLoading(false);
   maintenanceFormModal.classList.add('is-open');
   maintenanceFormModal.setAttribute('aria-hidden', 'false');
-}
-
-function setMaintenanceSubmitLoading(isLoading) {
-  if (!maintenanceFormSubmitButton) {
-    return;
-  }
-
-  maintenanceFormSubmitButton.disabled = Boolean(isLoading);
-  maintenanceFormSubmitButton.classList.toggle('is-loading', Boolean(isLoading));
-  maintenanceFormSubmitButton.setAttribute('aria-busy', isLoading ? 'true' : 'false');
-  maintenanceFormSubmitButton.textContent = isLoading ? 'Saving...' : 'Submit';
-
-  if (maintenanceAssessmentInput) {
-    maintenanceAssessmentInput.disabled = Boolean(isLoading);
-  }
-
-  if (maintenanceStatusSelect) {
-    maintenanceStatusSelect.disabled = Boolean(isLoading);
-  }
-
-  if (maintenanceFormModal) {
-    maintenanceFormModal.classList.toggle('is-submitting', Boolean(isLoading));
-  }
 }
 
 function getScheduleDateLabel(day) {
@@ -1495,6 +1503,97 @@ function getScheduleDateLabel(day) {
   }
 
   return `Month ${String(day).padStart(2, '0')}, 2026`;
+}
+
+function getScheduleMonthBaseUrl() {
+  return (typeof window.scheduleMonthBaseUrl === 'string' && window.scheduleMonthBaseUrl)
+    ? window.scheduleMonthBaseUrl
+    : '/dashboard/schedule';
+}
+
+function getFilteredScheduleRequestsForDay(day) {
+  const dayRequests = scheduleRequestData[day] || [];
+
+  if (activeScheduleCategory === 'all') {
+    return dayRequests;
+  }
+
+  return dayRequests.filter((request) => Array.isArray(request.categories) && request.categories.includes(activeScheduleCategory));
+}
+
+function renderScheduleDayIndicators(cell, count) {
+  if (!(cell instanceof HTMLElement)) {
+    return;
+  }
+
+  const safeCount = Number.isInteger(count) ? Math.max(count, 0) : 0;
+  let indicators = cell.querySelector('.day-indicators');
+
+  if (!indicators) {
+    indicators = document.createElement('span');
+    indicators.className = 'day-indicators';
+    indicators.setAttribute('aria-hidden', 'true');
+    cell.appendChild(indicators);
+  }
+
+  const visibleCount = Math.min(safeCount, 3);
+  indicators.replaceChildren();
+
+  for (let index = 0; index < visibleCount; index += 1) {
+    const dot = document.createElement('span');
+    dot.className = 'day-indicator';
+    indicators.appendChild(dot);
+  }
+
+  cell.dataset.requestCount = String(safeCount);
+  cell.title = safeCount > 0
+    ? `${safeCount} approved request${safeCount === 1 ? '' : 's'}`
+    : 'No approved requests';
+}
+
+function updateScheduleMonthSummary() {
+  if (!scheduleMonthSummary) {
+    return;
+  }
+
+  let total = 0;
+  Object.keys(scheduleRequestData).forEach((dayKey) => {
+    const day = Number.parseInt(dayKey, 10);
+
+    if (Number.isInteger(day)) {
+      total += getFilteredScheduleRequestsForDay(day).length;
+    }
+  });
+
+  scheduleMonthSummary.textContent = `${total} ${total === 1 ? 'reservation' : 'reservations'} scheduled`;
+}
+
+function goToScheduleToday() {
+  const now = new Date();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const currentYear = String(now.getFullYear());
+  const monthKey = `${currentYear}-${currentMonth}`;
+
+  if (scheduleMonthSelect) {
+    scheduleMonthSelect.value = currentMonth;
+  }
+
+  if (scheduleYearSelect) {
+    scheduleYearSelect.value = currentYear;
+  }
+
+  if (scheduleMonthKey === monthKey) {
+    const todayDay = now.getDate();
+    const todayCell = Array.from(scheduleDayCells).find((cell) => (
+      Number.parseInt(cell.dataset.day || '', 10) === todayDay
+    ));
+
+    openScheduleInlineDetails(todayDay);
+    todayCell?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return;
+  }
+
+  window.location.href = `${getScheduleMonthBaseUrl()}?month=${encodeURIComponent(monthKey)}`;
 }
 
 function closeScheduleRequestModal() {
@@ -1548,6 +1647,39 @@ function renderScheduleInlineDetail(request, dateLabel) {
   });
 }
 
+function formatScheduleStatLabel(count, singularLabel, pluralLabel) {
+  const safeCount = Number.isFinite(count) ? count : 0;
+  return `${safeCount} ${safeCount === 1 ? singularLabel : pluralLabel}`;
+}
+
+function updateScheduleInlineDateSummaryStats(requests) {
+  if (!scheduleInlineDateStats || !scheduleInlineStatReservations || !scheduleInlineStatResources || !scheduleInlineStatApproved) {
+    return;
+  }
+
+  const safeRequests = Array.isArray(requests) ? requests : [];
+  const reservationCount = safeRequests.length;
+  const resourcesCount = safeRequests.reduce((requestTotal, request) => {
+    const resources = Array.isArray(request?.resources) ? request.resources : [];
+
+    return requestTotal + resources.reduce((resourceTotal, resource) => {
+      const quantity = Number.parseInt(String(resource?.quantity ?? 1), 10);
+      return resourceTotal + (Number.isInteger(quantity) && quantity > 0 ? quantity : 1);
+    }, 0);
+  }, 0);
+  const approvedCount = safeRequests.reduce((total, request) => {
+    const statusLabel = String(request?.status_label || '').toLowerCase();
+    const statusClass = String(request?.status_class || '').toLowerCase();
+    const isApproved = statusLabel.includes('approved') || statusClass.includes('approved');
+    return total + (isApproved ? 1 : 0);
+  }, 0);
+
+  scheduleInlineStatReservations.textContent = formatScheduleStatLabel(reservationCount, 'Reservation', 'Reservations');
+  scheduleInlineStatResources.textContent = formatScheduleStatLabel(resourcesCount, 'Resource', 'Resources');
+  scheduleInlineStatApproved.textContent = formatScheduleStatLabel(approvedCount, 'Fully Approved', 'Fully Approved');
+  scheduleInlineDateStats.hidden = false;
+}
+
 function renderScheduleDetailContent(request, dateLabel, targets) {
   const resources = Array.isArray(request.resources) ? request.resources : [];
   const approvals = Array.isArray(request.approval_steps) ? request.approval_steps : [];
@@ -1574,8 +1706,10 @@ function renderScheduleDetailContent(request, dateLabel, targets) {
   }
 
   if (targets.status) {
-    targets.status.textContent = request.status_label || 'Fully Approved';
-    targets.status.className = `schedule-status-pill ${request.status_class || 'is-approved'}`;
+    const statusLabel = request.status_label || '-';
+    const statusClass = request.status_class || (statusLabel.toLowerCase().includes('approved') ? 'is-approved' : '');
+    targets.status.textContent = statusLabel;
+    targets.status.className = statusClass ? `schedule-status-pill ${statusClass}` : 'schedule-status-pill';
   }
 
   if (targets.resources) {
@@ -1600,15 +1734,8 @@ function renderScheduleDetailContent(request, dateLabel, targets) {
 }
 
 function openScheduleInlineDetails(day) {
-  if (!scheduleInlineDate || !scheduleInlineRequestBody) {
-    return;
-  }
-
   const dateLabel = getScheduleDateLabel(day);
-  const dayRequests = scheduleRequestData[day] || [];
-  const filteredRequests = activeScheduleCategory === 'all'
-    ? dayRequests
-    : dayRequests.filter((request) => Array.isArray(request.categories) && request.categories.includes(activeScheduleCategory));
+  const filteredRequests = getFilteredScheduleRequestsForDay(day);
 
   selectedScheduleDay = day;
   visibleScheduleInlineRequests = filteredRequests;
@@ -1618,26 +1745,41 @@ function openScheduleInlineDetails(day) {
     cell.classList.toggle('selected', dayValue === day);
   });
 
-  scheduleInlineDate.textContent = `Date Used: ${dateLabel}`;
+  if (scheduleInlinePanel) {
+    scheduleInlinePanel.hidden = false;
+  }
+
+  const scheduleContentCard = document.querySelector('.schedule-content-card');
+  if (scheduleContentCard) {
+    scheduleContentCard.classList.toggle('has-schedule-details', filteredRequests.length > 0);
+  }
+
+  if (!scheduleInlineDate || !scheduleInlineRequestBody) {
+    return;
+  }
+
+  scheduleInlineDate.textContent = dateLabel;
 
   if (!filteredRequests.length) {
     scheduleInlineRequestBody.innerHTML = `
       <tr>
-        <td colspan="4">No approved requests for the selected category on this date.</td>
+        <td colspan="3">No reservations scheduled for this date.</td>
       </tr>
     `;
 
-    renderScheduleInlineDetail({
-      requester_name: '-',
-      activity_name: '-',
-      requested_time: '-',
-      reservation_code: '-',
-      status_label: '-',
-      resources: [],
-      approval_steps: [],
-    }, '-');
+    if (scheduleInlineDateStats) {
+      scheduleInlineDateStats.hidden = true;
+    }
+
+    if (scheduleInlineDetailCard) {
+      scheduleInlineDetailCard.hidden = true;
+    }
 
     return;
+  }
+
+  if (scheduleInlineDetailCard) {
+    scheduleInlineDetailCard.hidden = false;
   }
 
   scheduleInlineRequestBody.innerHTML = filteredRequests
@@ -1650,6 +1792,7 @@ function openScheduleInlineDetails(day) {
     `)
     .join('');
 
+  updateScheduleInlineDateSummaryStats(filteredRequests);
   renderScheduleInlineDetail(filteredRequests[0], dateLabel);
 }
 
@@ -1721,7 +1864,6 @@ function applyScheduleCategory(category) {
 
   const selectedCategory = scheduleMarkedDays[category] ? category : 'all';
   activeScheduleCategory = selectedCategory;
-  const markedSet = new Set(scheduleMarkedDays[selectedCategory]);
 
   scheduleFilterButtons.forEach((button) => {
     button.classList.toggle('active', button.dataset.scheduleFilter === selectedCategory);
@@ -1729,12 +1871,16 @@ function applyScheduleCategory(category) {
 
   scheduleDayCells.forEach((cell) => {
     const dayValue = Number.parseInt(cell.dataset.day || '', 10);
-    cell.classList.toggle('marked', markedSet.has(dayValue));
+    const filteredCount = getFilteredScheduleRequestsForDay(dayValue).length;
+    cell.classList.toggle('marked', filteredCount > 0);
+    renderScheduleDayIndicators(cell, filteredCount);
 
-    if (!markedSet.has(dayValue)) {
+    if (filteredCount === 0) {
       cell.classList.remove('selected');
     }
   });
+
+  updateScheduleMonthSummary();
 
   if (selectedScheduleDay !== null) {
     openScheduleInlineDetails(selectedScheduleDay);
@@ -3401,17 +3547,15 @@ function setActiveNavByPage() {
         ? 'inventory'
         : path.includes('/dashboard/maintenance')
           ? 'maintenance'
-          : path.includes('/dashboard/announcements')
-            ? 'announcements'
-            : path.includes('/dashboard/history')
-              ? 'history'
-              : path.includes('/dashboard/schedule')
-                ? 'schedule'
-                : path.includes('/dashboard/request')
-                  ? 'requests'
-                  : path.includes('/dashboard/users')
-                    ? 'users'
-                    : 'home';
+          : path.includes('/dashboard/history')
+            ? 'history'
+            : path.includes('/dashboard/schedule')
+              ? 'schedule'
+              : path.includes('/dashboard/request')
+                ? 'requests'
+                : path.includes('/dashboard/users')
+                  ? 'users'
+                  : 'home';
   const navItems = document.querySelectorAll('.nav-item[data-nav]');
   const subNavItems = document.querySelectorAll('.nav-subitem[data-subnav]');
   const subTarget = path.includes('/dashboard/inventory/facilities')
@@ -3509,90 +3653,6 @@ function ensureSidebarToggleButton() {
   sidebarToggleButton = toggle;
 }
 
-function showPageLoadingSkeleton() {
-  const workspaceGrid = document.querySelector('.workspace-grid');
-
-  if (!workspaceGrid) {
-    return;
-  }
-
-  let skeleton = document.getElementById('page-loading-skeleton');
-
-  if (!skeleton) {
-    skeleton = document.createElement('div');
-    skeleton.id = 'page-loading-skeleton';
-    skeleton.className = 'page-loading-skeleton';
-    skeleton.setAttribute('role', 'status');
-    skeleton.setAttribute('aria-live', 'polite');
-    skeleton.setAttribute('aria-label', 'Loading page');
-    skeleton.innerHTML = `
-      <div class="page-loading-skeleton__header"></div>
-      <div class="page-loading-skeleton__stats">
-        <div class="page-loading-skeleton__stat"></div>
-        <div class="page-loading-skeleton__stat"></div>
-        <div class="page-loading-skeleton__stat"></div>
-        <div class="page-loading-skeleton__stat"></div>
-      </div>
-      <div class="page-loading-skeleton__row">
-        <div class="page-loading-skeleton__panel">
-          <span class="page-loading-skeleton__line"></span>
-          <span class="page-loading-skeleton__line-short"></span>
-          <span class="page-loading-skeleton__line"></span>
-          <span class="page-loading-skeleton__line-xs"></span>
-        </div>
-        <div class="page-loading-skeleton__tall"></div>
-      </div>
-      <div class="page-loading-skeleton__row">
-        <div class="page-loading-skeleton__wide"></div>
-        <div class="page-loading-skeleton__tall"></div>
-      </div>
-    `;
-
-    workspaceGrid.appendChild(skeleton);
-  }
-
-  const contentCard = workspaceGrid.querySelector('.content-card, .history-content-card, .maintenance-content-card, .facilities-content-card, .request-content-card, .schedule-content-card, .profile-content-card, .messages-content-card, .analytics-content-card');
-
-  if (contentCard instanceof HTMLElement) {
-    contentCard.style.visibility = 'hidden';
-    contentCard.style.pointerEvents = 'none';
-  }
-
-  skeleton.style.display = 'block';
-}
-
-function attachNavigationLoadingState() {
-  const navLinks = document.querySelectorAll('a.nav-item, a.nav-subitem');
-
-  navLinks.forEach((link) => {
-    if (link.dataset.navLoadingBound === 'true') {
-      return;
-    }
-
-    link.dataset.navLoadingBound = 'true';
-    link.addEventListener('click', (event) => {
-      const href = link.getAttribute('href');
-
-      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
-        return;
-      }
-
-      const currentUrl = new URL(window.location.href);
-      const targetUrl = new URL(href, window.location.href);
-
-      if (currentUrl.pathname === targetUrl.pathname && currentUrl.search === targetUrl.search) {
-        return;
-      }
-
-      event.preventDefault();
-      showPageLoadingSkeleton();
-      setTimeout(() => {
-        window.location.assign(href);
-      }, 0);
-    });
-  });
-}
-
 async function loadNavbar() {
   if (!navbarContainer) {
     return;
@@ -3644,17 +3704,47 @@ async function loadNavbar() {
     ensureSidebarBackdrop();
 
     navbarContainer.querySelectorAll('a.nav-item, a.nav-subitem').forEach((link) => {
-      link.addEventListener('click', closeSidebarDrawer);
-    });
+      link.addEventListener('click', (event) => {
+        closeSidebarDrawer();
 
-    attachNavigationLoadingState();
+        if (link.target === '_blank') {
+          return;
+        }
+
+        const href = link.getAttribute('href') || '';
+        if (!href || href.startsWith('#')) {
+          return;
+        }
+
+        if (event.defaultPrevented) {
+          return;
+        }
+
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+          return;
+        }
+
+        const currentUrl = new URL(window.location.href);
+        const targetUrl = new URL(href, window.location.href);
+
+        if (currentUrl.pathname === targetUrl.pathname && currentUrl.search === targetUrl.search) {
+          return;
+        }
+
+        event.preventDefault();
+        navigateWithPageSkeleton(href);
+      });
+    });
 
     const logoutButton = navbarContainer.querySelector('[data-nav-action="logout"]');
     if (logoutButton instanceof HTMLButtonElement) {
       logoutButton.addEventListener('click', () => {
+        showNavigationProgressBar();
+
         const token = document.querySelector('meta[name="csrf-token"]');
 
         if (!token || !token.content) {
+          hideNavigationProgressBar();
           showAppNotice('Unable to logout. Missing CSRF token.');
           return;
         }
@@ -3909,7 +3999,7 @@ function positionNotificationsPopover(button) {
   notificationPopover.style.left = `${left}px`;
 }
 
-function buildNotificationsPopover() {
+async function buildNotificationsPopover() {
   const panel = document.createElement('div');
   panel.className = 'notification-popover';
 
@@ -3919,11 +4009,10 @@ function buildNotificationsPopover() {
       return;
     }
 
-<<<<<<< HEAD
     list.innerHTML = notificationItems.length > 0
       ? notificationItems
           .map((item, index) => `
-            <article class="notification-item${item.unread ? ' unread' : ''}${item.loading ? ' is-loading' : ''}" data-notification-id="${item.id}" data-notification-index="${index}" aria-busy="${item.loading ? 'true' : 'false'}">
+            <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${item.id}" data-notification-index="${index}">
               <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
               <div class="notification-copy">
                 <strong>${item.name}</strong>
@@ -3935,13 +4024,12 @@ function buildNotificationsPopover() {
           `)
           .join('')
       : '<div class="notification-empty">No notifications</div>';
-=======
-    list.innerHTML = getNotificationListMarkup();
->>>>>>> 3f3e22e758b8f1eba48053be3c6c511d587119a0
   };
 
   const notificationListMarkup = notificationsLoaded
-    ? getNotificationListMarkup()
+    ? notificationItems.length > 0
+      ? getNotificationListMarkup()
+      : '<div class="notification-empty">No notifications</div>'
     : '<div class="notification-loading">Loading notifications…</div>';
 
   panel.innerHTML = `
@@ -3954,7 +4042,6 @@ function buildNotificationsPopover() {
   `;
 
   panel.addEventListener('click', async (event) => {
-    event.stopPropagation();
     const target = event.target;
 
     if (!(target instanceof HTMLElement)) {
@@ -3963,7 +4050,7 @@ function buildNotificationsPopover() {
 
     const item = target.closest('.notification-item');
 
-    if (!(item instanceof HTMLElement) || item.classList.contains('is-opening')) {
+    if (!(item instanceof HTMLElement)) {
       return;
     }
 
@@ -3974,75 +4061,47 @@ function buildNotificationsPopover() {
       return;
     }
 
-    const notificationIndexNumber = Number.parseInt(notificationIndex, 10);
-    if (!Number.isInteger(notificationIndexNumber)) {
-      return;
-    }
-
-    if (activeNotificationLoadingId && activeNotificationLoadingId !== notificationId) {
-      return;
-    }
-
-    if (activeNotificationLoadingId === notificationId) {
-      return;
-    }
-
-    const notification = notificationItems[notificationIndexNumber];
+    const notification = notificationItems[Number.parseInt(notificationIndex, 10)];
     if (!notification || !notification.related_id) {
       return;
     }
 
-<<<<<<< HEAD
-    activeNotificationLoadingId = notificationId;
-    notification.loading = true;
-
     // Update UI immediately on click
-=======
-    item.classList.add('is-opening');
-    item.setAttribute('aria-busy', 'true');
-    showReservationDetailsLoadingModal('Opening request');
-    closeNotificationsPopover();
-
->>>>>>> 3f3e22e758b8f1eba48053be3c6c511d587119a0
     if (notification.unread) {
       notification.unread = false;
       notificationUnreadCount = Math.max(0, notificationUnreadCount - 1);
       updateNotificationBadge();
+      renderList();
     }
 
-<<<<<<< HEAD
-    renderList();
-
     // Fetch reservation details and show modal
-=======
->>>>>>> 3f3e22e758b8f1eba48053be3c6c511d587119a0
     try {
       const response = await fetch(`/dashboard/reservation/${notification.related_id}/details`, {
         method: 'GET',
-        credentials: 'same-origin',
-        headers: notificationCsrfHeaders(),
+        headers: {
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+          'Accept': 'application/json',
+        },
       });
-
-      hideReservationDetailsLoadingModal();
 
       if (response.ok) {
         const data = await response.json();
         showReservationDetailsModal(data.reservation);
       } else {
         console.error('Failed to fetch reservation details');
-        showAppNotice('Could not open this request. Please try again.');
       }
     } catch (error) {
-      hideReservationDetailsLoadingModal();
       console.error('Error fetching reservation details:', error);
-      showAppNotice('Could not open this request. Please try again.');
     }
 
+    // Mark as read in database (don't fail if this errors, UI is already updated)
     try {
       const response = await fetch(`/dashboard/notification/${notificationId}/read`, {
         method: 'PATCH',
-        credentials: 'same-origin',
-        headers: notificationCsrfHeaders(),
+        headers: {
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+          'Accept': 'application/json',
+        },
       });
 
       if (response.ok) {
@@ -4054,30 +4113,30 @@ function buildNotificationsPopover() {
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
+      // Revert UI changes if API call failed
       notification.unread = true;
       notificationUnreadCount += 1;
       updateNotificationBadge();
-<<<<<<< HEAD
-    } finally {
-      activeNotificationLoadingId = null;
-      notification.loading = false;
       renderList();
-=======
->>>>>>> 3f3e22e758b8f1eba48053be3c6c511d587119a0
     }
   });
 
-  fetchNotifications({ sync: false, force: true })
-    .then(() => renderList())
-    .catch((error) => console.error('Error refreshing notifications:', error));
+  (async function refreshPopoverNotifications() {
+    try {
+      // Prefer a light list fetch; heavy sync runs at most every 15 minutes.
+      await fetchNotifications({ sync: true, force: false });
+      renderList();
+    } catch (_error) {
+      // No-op: errors already logged
+    }
+  })();
 
   return panel;
 }
 
 if (toolbarNotificationButtons.length) {
   toolbarNotificationButtons.forEach((button) => {
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
+    button.addEventListener('click', async (event) => {
       event.stopPropagation();
 
       if (notificationPopover && activeNotificationButton === button) {
@@ -4085,10 +4144,8 @@ if (toolbarNotificationButtons.length) {
         return;
       }
 
-      closeMessagesPopover();
-      closeProfilePopover();
       closeNotificationsPopover();
-      notificationPopover = buildNotificationsPopover();
+      notificationPopover = await buildNotificationsPopover();
       document.body.appendChild(notificationPopover);
       activeNotificationButton = button;
       button.classList.add('notification-open');
@@ -4110,7 +4167,7 @@ if (toolbarNotificationButtons.length) {
     }
   });
 
-  document.addEventListener('pointerdown', (event) => {
+  document.addEventListener('click', (event) => {
     const target = event.target;
 
     if (!(target instanceof Node)) {
@@ -4120,7 +4177,7 @@ if (toolbarNotificationButtons.length) {
     if (notificationPopover && !notificationPopover.contains(target) && !Array.from(toolbarNotificationButtons).some((button) => button.contains(target))) {
       closeNotificationsPopover();
     }
-  }, true);
+  });
 }
 
 if (toolbarProfileButtons.length) {
@@ -5198,21 +5255,6 @@ if (maintenanceTableBody && maintenanceTabs.length) {
     openMaintenanceEvalModal(row);
   });
 
-  const maintenanceCount = Array.isArray(maintenanceRowsByTab.maintenance) ? maintenanceRowsByTab.maintenance.length : 0;
-  const damagedCount = Array.isArray(maintenanceRowsByTab.damaged) ? maintenanceRowsByTab.damaged.length : 0;
-  const requestedTab = new URLSearchParams(window.location.search).get('tab');
-  const allowedTabs = new Set(['maintenance', 'damaged', 'reported']);
-
-  if (requestedTab && allowedTabs.has(requestedTab)) {
-    activeMaintenanceTab = requestedTab;
-  } else if (maintenanceCount === 0 && damagedCount > 0) {
-    activeMaintenanceTab = 'damaged';
-  }
-
-  maintenanceTabs.forEach((button) => {
-    button.classList.toggle('active', (button.dataset.maintenanceTab || '') === activeMaintenanceTab);
-  });
-
   applyMaintenanceFilters();
 }
 
@@ -5246,8 +5288,8 @@ if (maintenanceFormSubmitButton) {
     const reportId = Number.parseInt(activeMaintenanceAddressRow?.dataset.reportId || '', 10);
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
-    if (!statusValue) {
-      showAppNotice('Please choose a status.');
+    if (!assessmentValue || !statusValue) {
+      showAppNotice('Please complete Assessment and Status.');
       return;
     }
 
@@ -5274,11 +5316,7 @@ if (maintenanceFormSubmitButton) {
       return;
     }
 
-    if (maintenanceFormSubmitButton.disabled) {
-      return;
-    }
-
-    setMaintenanceSubmitLoading(true);
+    maintenanceFormSubmitButton.disabled = true;
 
     try {
       const response = await fetch(endpoint, {
@@ -5334,14 +5372,50 @@ if (maintenanceFormSubmitButton) {
       closeMaintenanceEvalModal();
       activeMaintenanceAddressRow = null;
       applyMaintenanceFilters();
-      showAppNotice(resolved ? 'Item marked as Good and removed from maintenance.' : 'Maintenance evaluation submitted.');
+      showAppNotice(resolved ? 'Maintenance record resolved.' : 'Maintenance evaluation submitted.');
     } catch (error) {
       showAppNotice('Unable to submit maintenance update right now.');
     } finally {
-      setMaintenanceSubmitLoading(false);
+      maintenanceFormSubmitButton.disabled = false;
     }
   });
 }
+
+document.querySelectorAll('.facilities-inline-search, .maintenance-inline-search').forEach((searchWrap) => {
+  const input = searchWrap.querySelector('input');
+
+  if (!(input instanceof HTMLInputElement)) {
+    return;
+  }
+
+  const expandSearch = () => {
+    searchWrap.classList.add('is-expanded');
+    input.focus();
+  };
+
+  const collapseSearch = () => {
+    if (!input.value.trim()) {
+      searchWrap.classList.remove('is-expanded');
+    }
+  };
+
+  searchWrap.addEventListener('click', (event) => {
+    if (event.target === searchWrap || searchWrap.contains(event.target)) {
+      expandSearch();
+    }
+  });
+
+  input.addEventListener('focus', () => searchWrap.classList.add('is-expanded'));
+  input.addEventListener('blur', collapseSearch);
+  input.addEventListener('input', () => {
+    if (input.value.trim()) {
+      searchWrap.classList.add('is-expanded');
+      return;
+    }
+
+    searchWrap.classList.remove('is-expanded');
+  });
+});
 
 if (facilitiesTableBody && facilitiesTabs.length) {
   facilitiesTableBody.addEventListener('click', (event) => {
@@ -5582,6 +5656,50 @@ if (scheduleMonthSelect && scheduleYearSelect) {
   scheduleYearSelect.addEventListener('change', openSelectedScheduleMonth);
 }
 
+function setScheduleMonthPickerOpen(isOpen) {
+  if (!scheduleMonthPicker || !scheduleMonthTitle) {
+    return;
+  }
+
+  scheduleMonthPicker.hidden = !isOpen;
+  scheduleMonthTitle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  scheduleMonthTitle.classList.toggle('is-open', isOpen);
+}
+
+if (scheduleMonthTitle && scheduleMonthPicker) {
+  scheduleMonthTitle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setScheduleMonthPickerOpen(Boolean(scheduleMonthPicker.hidden));
+  });
+
+  document.addEventListener('click', (event) => {
+    if (scheduleMonthPicker.hidden) {
+      return;
+    }
+
+    const clickTarget = event.target;
+
+    if (
+      clickTarget instanceof Node
+      && (scheduleMonthPicker.contains(clickTarget) || scheduleMonthTitle.contains(clickTarget))
+    ) {
+      return;
+    }
+
+    setScheduleMonthPickerOpen(false);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      setScheduleMonthPickerOpen(false);
+    }
+  });
+}
+
+if (scheduleTodayButton) {
+  scheduleTodayButton.addEventListener('click', goToScheduleToday);
+}
+
 if (scheduleFilterButtons.length && scheduleDayCells.length) {
   scheduleFilterButtons.forEach((button) => {
     button.addEventListener('click', () => {
@@ -5591,25 +5709,18 @@ if (scheduleFilterButtons.length && scheduleDayCells.length) {
 
   scheduleDayCells.forEach((dayCell) => {
     dayCell.addEventListener('click', () => {
-      if (!dayCell.classList.contains('marked')) {
+      const day = Number.parseInt(dayCell.dataset.day || '', 10);
+
+      if (Number.isNaN(day)) {
         return;
       }
 
-      const day = Number.parseInt(dayCell.dataset.day || '', 10);
-
-      if (!Number.isNaN(day)) {
-        openScheduleInlineDetails(day);
-        openScheduleRequestModal(day);
-      }
+      openScheduleInlineDetails(day);
+      scheduleInlinePanel?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     });
   });
 
   applyScheduleCategory('all');
-
-  const defaultScheduleDay = Number.parseInt(String(scheduleCalendarData?.defaultDay ?? ''), 10);
-  if (Number.isInteger(defaultScheduleDay) && defaultScheduleDay > 0) {
-    openScheduleInlineDetails(defaultScheduleDay);
-  }
 }
 
 if (scheduleInlineRequestBody) {
@@ -6262,11 +6373,6 @@ document.addEventListener('keydown', (event) => {
     closeMaintenanceFormModal();
     activeMaintenanceAddressRow = null;
   }
-
-  const announcementsModal = document.getElementById('announcements-modal');
-  if (event.key === 'Escape' && announcementsModal && announcementsModal.classList.contains('is-open')) {
-    closeAnnouncementsModal();
-  }
 });
 
 if (workloadProgress && workloadLabel) {
@@ -6281,6 +6387,16 @@ window.addEventListener('resize', () => {
   }
 });
 
+window.addEventListener('pagehide', hideNavigationProgressBar);
+window.addEventListener('beforeunload', hideNavigationProgressBar);
+window.addEventListener('load', hideNavigationProgressBar);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    hideNavigationProgressBar();
+  }
+});
+
 const initializeDashboard = () => {
   // Load navbar without blocking other dashboard initialization.
   loadNavbar().catch((error) => console.error('Unable to initialize navbar:', error));
@@ -6288,61 +6404,19 @@ const initializeDashboard = () => {
   initOfficeQuickSortControl();
   initOfficeReservationModal();
   initApprovalReloadButton();
-  initAnnouncementsModal();
+  initInsightsShortcutButton();
 };
 
-function openAnnouncementsModal() {
-  const modal = document.getElementById('announcements-modal');
-  if (!(modal instanceof HTMLElement)) {
+function initInsightsShortcutButton() {
+  const button = document.querySelector('button[onclick*="inventory/analytics"]');
+
+  if (!(button instanceof HTMLButtonElement)) {
     return;
   }
 
-  modal.classList.add('is-open');
-  modal.setAttribute('aria-hidden', 'false');
-  const titleInput = document.getElementById('announcement-announcer')
-    || document.getElementById('announcement-title');
-  if (titleInput instanceof HTMLInputElement && !titleInput.disabled) {
-    titleInput.focus();
-  }
-}
-
-function closeAnnouncementsModal() {
-  const modal = document.getElementById('announcements-modal');
-  if (!(modal instanceof HTMLElement)) {
-    return;
-  }
-
-  modal.classList.remove('is-open');
-  modal.setAttribute('aria-hidden', 'true');
-}
-
-function initAnnouncementsModal() {
-  const modal = document.getElementById('announcements-modal');
-  if (!(modal instanceof HTMLElement)) {
-    return;
-  }
-
-  document.querySelectorAll('[data-open-announcements]').forEach((button) => {
-    button.addEventListener('click', openAnnouncementsModal);
-  });
-
-  document.querySelectorAll('[data-close-announcements]').forEach((button) => {
-    button.addEventListener('click', closeAnnouncementsModal);
-  });
-
-  if (modal.classList.contains('is-open')) {
-    openAnnouncementsModal();
-  }
-
-  modal.querySelectorAll('[data-announcement-flash]').forEach((flash) => {
-    if (!(flash instanceof HTMLElement)) {
-      return;
-    }
-
-    window.setTimeout(() => {
-      flash.classList.add('is-hiding');
-      window.setTimeout(() => flash.remove(), 400);
-    }, 3500);
+  button.removeAttribute('onclick');
+  button.addEventListener('click', () => {
+    navigateWithInsightsSkeleton('/dashboard/inventory/analytics');
   });
 }
 

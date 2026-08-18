@@ -28,11 +28,6 @@
     <div class="top-header-inner toolbar-card">
       <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
 
-      <div class="search-wrap">
-        <i class="bi bi-search"></i>
-        <input id="dashboard-search" type="text" placeholder="Search" />
-      </div>
-
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
       </button>

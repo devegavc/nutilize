@@ -2394,3 +2394,60 @@ select.office-history-filter-control option {
 .office-table-header {
 	padding: 12px 18px;
 }
+
+/* Program Chair Users — reuse Admin Manage Users components; page-specific only */
+.office-users-card.user-management-card {
+	min-width: 0;
+	overflow-x: hidden;
+}
+
+.office-users-card .dashboard-page-header-bottom {
+	padding: 12px 18px 0;
+}
+
+.office-users-card .dashboard-page-header-bottom .section-subtitle {
+	margin: 0;
+	max-width: none;
+}
+
+.office-users-card .users-summary-icon .bi-circle-fill {
+	font-size: 0.7rem;
+}
+
+.office-users-card .users-summary-label {
+	white-space: normal;
+}
+
+.office-users-card .users-table td:nth-child(4) {
+	text-align: left;
+}
+
+.office-users-card .users-table th:nth-child(7),
+.office-users-card .users-table td:nth-child(7) {
+	width: 12%;
+	min-width: 148px;
+	text-align: left;
+	white-space: nowrap;
+	overflow: visible;
+	vertical-align: middle;
+}
+
+.office-users-card .users-table td.table-actions-cell {
+	display: table-cell;
+	text-align: left;
+	white-space: nowrap;
+	overflow: visible;
+	vertical-align: middle;
+}
+
+.office-users-card .users-table .table-actions-cell .table-edit-btn,
+.office-users-card .users-table .table-actions-cell .table-delete-btn,
+.office-users-card .users-table .table-actions-cell .inline-action-form {
+	display: inline-flex;
+	align-items: center;
+	vertical-align: middle;
+}
+
+.office-users-card .users-table .table-actions-cell .inline-action-form {
+	margin: 0 0 0 6px;
+}

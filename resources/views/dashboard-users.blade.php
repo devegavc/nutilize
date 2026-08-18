@@ -62,11 +62,6 @@
     <div class="top-header-inner toolbar-card">
       <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
 
-      <div class="search-wrap">
-        <i class="bi bi-search"></i>
-        <input id="dashboard-search" type="text" placeholder="Search" />
-      </div>
-
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
       </button>
@@ -87,13 +82,6 @@
         <div class="dashboard-page-header-top request-head">
           <h1 class="section-title">Manage Users</h1>
         </div>
-        <div class="dashboard-page-header-bottom request-subhead">
-          <p class="section-subtitle">Create, edit, and remove dashboard users, including item owners who manage their own equipment.</p>
-          <div class="dashboard-page-actions">
-            <button class="facilities-add-btn" id="user-add-btn" type="button"><span class="btn-icon">+</span> Add User</button>
-            <button class="facilities-add-btn" id="item-owner-add-btn" type="button"><span class="btn-icon">+</span> Add Item Owner</button>
-          </div>
-        </div>
 
         @if(session('success'))
           <div class="alert alert-success">{{ session('success') }}</div>
@@ -111,6 +99,116 @@
           </div>
         @endif
 
+        @php
+          use App\Services\ItemOwnerService;
+
+          $adminRoles = ['admin', 'pf_admin', 'pc_admin'];
+          $itemOwners = $users->filter(fn ($user) => ItemOwnerService::isItemOwnerUser($user));
+          $admins = $users->filter(function ($user) use ($adminRoles) {
+              return in_array(strtolower((string) $user->role), $adminRoles, true)
+                  && !ItemOwnerService::isItemOwnerUser($user);
+          });
+          $approvers = $users->filter(function ($user) use ($adminRoles) {
+              return !in_array(strtolower((string) $user->role), $adminRoles, true)
+                  && !ItemOwnerService::isItemOwnerUser($user);
+          });
+          $displayRole = function ($user) {
+              return ItemOwnerService::isItemOwnerUser($user) ? 'item_owner' : strtolower((string) $user->role);
+          };
+          $resolveUserStatus = function ($user): string {
+              $rawStatus = strtolower(trim((string) ($user->status ?? $user->account_status ?? '')));
+
+              if ($rawStatus !== '') {
+                  return in_array($rawStatus, ['inactive', 'disabled', 'suspended', 'blocked'], true) ? 'inactive' : 'active';
+              }
+
+              if (isset($user->is_active)) {
+                  return (bool) $user->is_active ? 'active' : 'inactive';
+              }
+
+              if (isset($user->active)) {
+                  return (bool) $user->active ? 'active' : 'inactive';
+              }
+
+              return 'active';
+          };
+          $formatUserCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'user' : 'users');
+          $activeUsersCount = $users->filter(fn ($user) => $resolveUserStatus($user) === 'active')->count();
+          $resolveUserName = fn ($user) => $user->displayName();
+        @endphp
+
+        <section class="users-summary-grid" aria-label="User summary">
+          <article class="users-summary-card">
+            <span class="users-summary-icon"><i class="bi bi-people-fill"></i></span>
+            <div class="users-summary-copy">
+              <p class="users-summary-value">{{ $users->count() }}</p>
+              <p class="users-summary-label">Total Users</p>
+            </div>
+          </article>
+          <article class="users-summary-card">
+            <span class="users-summary-icon"><i class="bi bi-shield-lock-fill"></i></span>
+            <div class="users-summary-copy">
+              <p class="users-summary-value">{{ $admins->count() }}</p>
+              <p class="users-summary-label">Admins</p>
+            </div>
+          </article>
+          <article class="users-summary-card">
+            <span class="users-summary-icon"><i class="bi bi-box-seam"></i></span>
+            <div class="users-summary-copy">
+              <p class="users-summary-value">{{ $itemOwners->count() }}</p>
+              <p class="users-summary-label">Item Owners</p>
+            </div>
+          </article>
+          <article class="users-summary-card">
+            <span class="users-summary-icon"><i class="bi bi-person-check-fill"></i></span>
+            <div class="users-summary-copy">
+              <p class="users-summary-value">{{ $activeUsersCount }}</p>
+              <p class="users-summary-label">Active Users</p>
+            </div>
+          </article>
+        </section>
+
+        <section class="users-tools-bar" aria-label="User table filters">
+          <div class="users-search-wrap">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input id="users-search-input" type="search" placeholder="Search username, name, email, or office" autocomplete="off" />
+          </div>
+
+          <div class="users-filter-group">
+            <div class="users-filter-wrap">
+              <label for="users-role-filter">Role</label>
+              <select id="users-role-filter">
+                <option value="all">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="item_owner">Item Owner</option>
+              </select>
+            </div>
+
+            <div class="users-filter-wrap">
+              <label for="users-status-filter">Status</label>
+              <select id="users-status-filter">
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+
+            <div class="users-filter-wrap">
+              <label for="users-sort-select">Sort</label>
+              <select id="users-sort-select">
+                <option value="name-asc">Name A-Z</option>
+                <option value="name-desc">Name Z-A</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </div>
+
+            <button class="users-reset-btn" id="users-reset-filters" type="button">Reset</button>
+          </div>
+
+          <button class="facilities-add-btn" id="user-add-btn" type="button"><span class="btn-icon">+</span> Add User</button>
+        </section>
+
         <section class="inventory-grid facilities-grid">
           <div class="table-wrap">
             <table class="inventory-table users-table">
@@ -126,50 +224,41 @@
                 </tr>
               </thead>
               <tbody id="users-table-body">
-                <!-- Admins Section -->
-                @php
-                  use App\Services\ItemOwnerService;
-
-                  $adminRoles = ['admin', 'pf_admin', 'pc_admin'];
-                  $itemOwners = $users->filter(fn ($user) => ItemOwnerService::isItemOwnerUser($user));
-                  $admins = $users->filter(function ($user) use ($adminRoles) {
-                      return in_array(strtolower((string) $user->role), $adminRoles, true)
-                          && !ItemOwnerService::isItemOwnerUser($user);
-                  });
-                  $approvers = $users->filter(function ($user) use ($adminRoles) {
-                      return !in_array(strtolower((string) $user->role), $adminRoles, true)
-                          && !ItemOwnerService::isItemOwnerUser($user);
-                  });
-                  $displayRole = function ($user) {
-                      return ItemOwnerService::isItemOwnerUser($user) ? 'item_owner' : strtolower((string) $user->role);
-                  };
-                @endphp
-
                 @if($admins->count() > 0)
                   <tr class="category-header-row">
                     <td colspan="7">
                       <div class="category-header">
                         <i class="bi bi-shield-lock"></i>
                         <span>Admins</span>
+                        <span class="category-count" data-group-count>{{ $formatUserCount($admins->count()) }}</span>
                       </div>
                     </td>
                   </tr>
                   @foreach($admins as $user)
+                    @php
+                      $userStatus = $resolveUserStatus($user);
+                      $userOffice = $user->office?->department_name ?? 'No Office';
+                      $userName = $resolveUserName($user);
+                    @endphp
                     <tr
                       class="admin-row"
                       data-user-id="{{ $user->user_id }}"
                       data-user-username="{{ $user->username }}"
-                      data-user-full_name="{{ $user->full_name }}"
+                      data-user-full-name="{{ $user->full_name }}"
+                      data-user-name="{{ $userName }}"
                       data-user-email="{{ $user->email }}"
+                      data-user-office-name="{{ strtolower((string) $userOffice) }}"
                       data-user-role="{{ $displayRole($user) }}"
+                      data-user-status="{{ $userStatus }}"
+                      data-user-created-at="{{ $user->created_at ? $user->created_at->timestamp : 0 }}"
                       data-user-office-id="{{ $user->office_id }}"
                     >
-                      <td>{{ $user->username }}</td>
-                      <td>{{ $user->full_name ?? '—' }}</td>
-                      <td>{{ $user->email }}</td>
+                      <td><span class="user-cell-text" title="{{ $user->username }}">{{ $user->username }}</span></td>
+                      <td><span class="user-cell-text" title="{{ $userName }}">{{ $userName }}</span></td>
+                      <td><span class="user-cell-text" title="{{ $user->email }}">{{ $user->email }}</span></td>
                       <td><span class="role-badge admin-badge">{{ strtoupper($user->role) }}</span></td>
-                      <td>{{ $user->office?->department_name ?? 'No Office' }}</td>
-                      <td>{{ $user->created_at ? $user->created_at->format('M d, Y') : 'N/A' }}</td>
+                      <td><span class="user-cell-text" title="{{ $userOffice }}">{{ $userOffice }}</span></td>
+                      <td><span class="status-badge {{ $userStatus === 'active' ? 'is-active' : 'is-inactive' }}">{{ ucfirst($userStatus) }}</span></td>
                       <td class="table-actions-cell">
                         <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
                         @if(auth()->user()->user_id !== $user->user_id)
@@ -190,25 +279,35 @@
                       <div class="category-header">
                         <i class="bi bi-box-seam"></i>
                         <span>Item Owners</span>
+                        <span class="category-count" data-group-count>{{ $formatUserCount($itemOwners->count()) }}</span>
                       </div>
                     </td>
                   </tr>
                   @foreach($itemOwners as $user)
+                    @php
+                      $userStatus = $resolveUserStatus($user);
+                      $userOffice = $user->office?->department_name ?? 'Item Owner';
+                      $userName = $resolveUserName($user);
+                    @endphp
                     <tr
                       class="admin-row"
                       data-user-id="{{ $user->user_id }}"
                       data-user-username="{{ $user->username }}"
-                      data-user-full_name="{{ $user->full_name }}"
+                      data-user-full-name="{{ $user->full_name }}"
+                      data-user-name="{{ $userName }}"
                       data-user-email="{{ $user->email }}"
+                      data-user-office-name="{{ strtolower((string) $userOffice) }}"
                       data-user-role="{{ $displayRole($user) }}"
+                      data-user-status="{{ $userStatus }}"
+                      data-user-created-at="{{ $user->created_at ? $user->created_at->timestamp : 0 }}"
                       data-user-office-id="{{ $user->office_id }}"
                     >
-                      <td>{{ $user->username }}</td>
-                      <td>{{ $user->full_name ?? '—' }}</td>
-                      <td>{{ $user->email }}</td>
-                      <td><span class="role-badge approver-badge">ITEM OWNER</span></td>
-                      <td>{{ $user->office?->department_name ?? 'Item Owner' }}</td>
-                      <td>{{ $user->created_at ? $user->created_at->format('M d, Y') : 'N/A' }}</td>
+                      <td><span class="user-cell-text" title="{{ $user->username }}">{{ $user->username }}</span></td>
+                      <td><span class="user-cell-text" title="{{ $userName }}">{{ $userName }}</span></td>
+                      <td><span class="user-cell-text" title="{{ $user->email }}">{{ $user->email }}</span></td>
+                      <td><span class="role-badge item-owner-badge">ITEM OWNER</span></td>
+                      <td><span class="user-cell-text" title="{{ $userOffice }}">{{ $userOffice }}</span></td>
+                      <td><span class="status-badge {{ $userStatus === 'active' ? 'is-active' : 'is-inactive' }}">{{ ucfirst($userStatus) }}</span></td>
                       <td class="table-actions-cell">
                         <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
                         @if(auth()->user()->user_id !== $user->user_id)
@@ -230,25 +329,35 @@
                       <div class="category-header">
                         <i class="bi bi-person-check"></i>
                         <span>Users</span>
+                        <span class="category-count" data-group-count>{{ $formatUserCount($approvers->count()) }}</span>
                       </div>
                     </td>
                   </tr>
                   @foreach($approvers as $user)
+                    @php
+                      $userStatus = $resolveUserStatus($user);
+                      $userOffice = $user->office?->department_name ?? 'No Office';
+                      $userName = $resolveUserName($user);
+                    @endphp
                     <tr
                       class="approver-row"
                       data-user-id="{{ $user->user_id }}"
                       data-user-username="{{ $user->username }}"
-                      data-user-full_name="{{ $user->full_name }}"
+                      data-user-full-name="{{ $user->full_name }}"
+                      data-user-name="{{ $userName }}"
                       data-user-email="{{ $user->email }}"
+                      data-user-office-name="{{ strtolower((string) $userOffice) }}"
                       data-user-role="{{ $displayRole($user) }}"
+                      data-user-status="{{ $userStatus }}"
+                      data-user-created-at="{{ $user->created_at ? $user->created_at->timestamp : 0 }}"
                       data-user-office-id="{{ $user->office_id }}"
                     >
-                      <td>{{ $user->username }}</td>
-                      <td>{{ $user->full_name ?? '—' }}</td>
-                      <td>{{ $user->email }}</td>
+                      <td><span class="user-cell-text" title="{{ $user->username }}">{{ $user->username }}</span></td>
+                      <td><span class="user-cell-text" title="{{ $userName }}">{{ $userName }}</span></td>
+                      <td><span class="user-cell-text" title="{{ $user->email }}">{{ $user->email }}</span></td>
                       <td><span class="role-badge approver-badge">{{ strtoupper($user->role) }}</span></td>
-                      <td>{{ $user->office?->department_name ?? 'No Office' }}</td>
-                      <td>{{ $user->created_at ? $user->created_at->format('M d, Y') : 'N/A' }}</td>
+                      <td><span class="user-cell-text" title="{{ $userOffice }}">{{ $userOffice }}</span></td>
+                      <td><span class="status-badge {{ $userStatus === 'active' ? 'is-active' : 'is-inactive' }}">{{ ucfirst($userStatus) }}</span></td>
                       <td class="table-actions-cell">
                         <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
                         @if(auth()->user()->user_id !== $user->user_id)
@@ -264,10 +373,26 @@
                 @endif
 
                 @if($users->isEmpty())
-                  <tr>
-                    <td colspan="7">No users available.</td>
+                  <tr class="users-empty-state-row" data-empty-fallback>
+                    <td colspan="7">
+                      <div class="users-empty-state-content">
+                        <i class="bi bi-people" aria-hidden="true"></i>
+                        <strong>No users found</strong>
+                        <span>Try adjusting your search or filters.</span>
+                      </div>
+                    </td>
                   </tr>
                 @endif
+
+                <tr id="users-empty-state-row" class="users-empty-state-row" hidden>
+                  <td colspan="7">
+                    <div class="users-empty-state-content">
+                      <i class="bi bi-search" aria-hidden="true"></i>
+                      <strong>No users found</strong>
+                      <span>Try adjusting your search or filters.</span>
+                    </div>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -360,6 +485,14 @@
     const userPasswordNote = document.getElementById('user-password-note');
     const itemOwnerOfficeNote = document.getElementById('item-owner-office-note');
     const itemOwnerOfficeId = window.itemOwnerOfficeId ? String(window.itemOwnerOfficeId) : '';
+    const usersTableBody = document.getElementById('users-table-body');
+    const usersSearchInput = document.getElementById('users-search-input');
+    const usersRoleFilter = document.getElementById('users-role-filter');
+    const usersStatusFilter = document.getElementById('users-status-filter');
+    const usersSortSelect = document.getElementById('users-sort-select');
+    const usersResetFiltersBtn = document.getElementById('users-reset-filters');
+    const usersResultsCount = document.getElementById('users-results-count');
+    const usersEmptyStateRow = document.getElementById('users-empty-state-row');
 
     const editButtons = document.querySelectorAll('.user-edit-btn');
     const modalOverlay = userModal.querySelector('[data-close-modal]');
@@ -421,7 +554,7 @@
     const populateModal = (row) => {
       const userId = row.dataset.userId;
       const username = row.dataset.userUsername;
-      const fullName = row.dataset.userFullName;
+      const fullName = row.dataset.userFullName || row.dataset.userName;
       const email = row.dataset.userEmail;
       const role = row.dataset.userRole;
       const officeId = row.dataset.userOfficeId;
@@ -525,6 +658,169 @@
         populateModal(row);
       });
     });
+
+    if (usersTableBody) {
+      const userRows = Array.from(usersTableBody.querySelectorAll('tr[data-user-id]'));
+      const categoryRows = Array.from(usersTableBody.querySelectorAll('tr.category-header-row'));
+
+      if (userRows.length > 0 && categoryRows.length > 0) {
+        const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+        const groupedSections = categoryRows.map((headerRow) => {
+          const rows = [];
+          let pointer = headerRow.nextElementSibling;
+
+          while (pointer && !pointer.classList.contains('category-header-row')) {
+            if (pointer instanceof HTMLTableRowElement && pointer.dataset.userId) {
+              rows.push(pointer);
+            }
+
+            pointer = pointer.nextElementSibling;
+          }
+
+          return {
+            headerRow,
+            rows,
+            countLabel: headerRow.querySelector('[data-group-count]'),
+            totalCount: rows.length,
+          };
+        });
+
+        const normalizeText = (value) => String(value || '').toLowerCase().trim();
+        const formatCount = (value) => `${value} ${value === 1 ? 'user' : 'users'}`;
+
+        const roleFilterMatch = (rowRole, selectedRole) => {
+          if (selectedRole === 'all') {
+            return true;
+          }
+
+          if (selectedRole === 'item_owner') {
+            return rowRole === 'item_owner';
+          }
+
+          return ['admin', 'pf_admin', 'pc_admin'].includes(rowRole);
+        };
+
+        const compareRows = (left, right, sortMode) => {
+          const leftName = normalizeText(left.dataset.userName)
+            || normalizeText(left.dataset.userFullName)
+            || normalizeText(left.dataset.userUsername);
+          const rightName = normalizeText(right.dataset.userName)
+            || normalizeText(right.dataset.userFullName)
+            || normalizeText(right.dataset.userUsername);
+          const leftCreatedAt = Number.parseInt(left.dataset.userCreatedAt || '0', 10) || 0;
+          const rightCreatedAt = Number.parseInt(right.dataset.userCreatedAt || '0', 10) || 0;
+
+          if (sortMode === 'name-desc') {
+            return collator.compare(rightName, leftName);
+          }
+
+          if (sortMode === 'newest') {
+            return rightCreatedAt - leftCreatedAt;
+          }
+
+          if (sortMode === 'oldest') {
+            return leftCreatedAt - rightCreatedAt;
+          }
+
+          return collator.compare(leftName, rightName);
+        };
+
+        const applyUsersFilters = () => {
+          const searchTerm = normalizeText(usersSearchInput?.value);
+          const selectedRole = normalizeText(usersRoleFilter?.value) || 'all';
+          const selectedStatus = normalizeText(usersStatusFilter?.value) || 'all';
+          const sortMode = normalizeText(usersSortSelect?.value) || 'name-asc';
+          let visibleUserCount = 0;
+
+          groupedSections.forEach((section) => {
+            section.rows.forEach((row) => {
+              const rowRole = normalizeText(row.dataset.userRole);
+              const rowStatus = normalizeText(row.dataset.userStatus) || 'active';
+              const rowOffice = normalizeText(row.dataset.userOfficeName);
+              const haystack = [
+                normalizeText(row.dataset.userUsername),
+                normalizeText(row.dataset.userName),
+                normalizeText(row.dataset.userFullName),
+                normalizeText(row.dataset.userEmail),
+                rowOffice,
+              ].join(' ');
+
+              const matchesSearch = searchTerm === '' || haystack.includes(searchTerm);
+              const matchesRole = roleFilterMatch(rowRole, selectedRole);
+              const matchesStatus = selectedStatus === 'all' || rowStatus === selectedStatus;
+              const isVisible = matchesSearch && matchesRole && matchesStatus;
+
+              row.hidden = !isVisible;
+
+              if (isVisible) {
+                visibleUserCount += 1;
+              }
+            });
+
+            const visibleInSection = section.rows.filter((row) => !row.hidden).length;
+            section.headerRow.hidden = visibleInSection === 0;
+
+            if (section.countLabel) {
+              section.countLabel.textContent = formatCount(visibleInSection);
+            }
+
+            section.rows.sort((left, right) => compareRows(left, right, sortMode));
+          });
+
+          if (usersResultsCount) {
+            usersResultsCount.textContent = `${visibleUserCount} ${visibleUserCount === 1 ? 'user' : 'users'} shown`;
+          }
+
+          if (usersEmptyStateRow) {
+            usersEmptyStateRow.hidden = visibleUserCount !== 0;
+          }
+
+          const fallbackRow = usersTableBody.querySelector('[data-empty-fallback]');
+          if (fallbackRow instanceof HTMLTableRowElement) {
+            fallbackRow.hidden = true;
+          }
+
+          const fragment = document.createDocumentFragment();
+          groupedSections.forEach((section) => {
+            fragment.appendChild(section.headerRow);
+            section.rows.forEach((row) => fragment.appendChild(row));
+          });
+
+          if (usersEmptyStateRow) {
+            fragment.appendChild(usersEmptyStateRow);
+          }
+
+          usersTableBody.appendChild(fragment);
+        };
+
+        usersSearchInput?.addEventListener('input', applyUsersFilters);
+        usersRoleFilter?.addEventListener('change', applyUsersFilters);
+        usersStatusFilter?.addEventListener('change', applyUsersFilters);
+        usersSortSelect?.addEventListener('change', applyUsersFilters);
+
+        usersResetFiltersBtn?.addEventListener('click', () => {
+          if (usersSearchInput) {
+            usersSearchInput.value = '';
+          }
+
+          if (usersRoleFilter) {
+            usersRoleFilter.value = 'all';
+          }
+
+          if (usersStatusFilter) {
+            usersStatusFilter.value = 'all';
+          }
+
+          if (usersSortSelect) {
+            usersSortSelect.value = 'name-asc';
+          }
+
+          applyUsersFilters();
+        });
+
+        applyUsersFilters();
+      }
+    }
   </script>
 
   <script src="/js/dashboard.js"></script>

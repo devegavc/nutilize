@@ -27,11 +27,6 @@
     <div class="top-header-inner toolbar-card">
       <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
 
-      <div class="search-wrap">
-        <i class="bi bi-search"></i>
-        <input id="dashboard-search" type="text" placeholder="Search" />
-      </div>
-
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
       </button>
@@ -61,61 +56,96 @@
           </article>
 
           <article class="schedule-calendar-card">
+            @php
+              [$selectedYear, $selectedMonth] = explode('-', $monthKey);
+              $selectedYear = (int) $selectedYear;
+              $selectedMonth = (int) $selectedMonth;
+              $monthReservationCount = collect($calendarCells)->sum(fn ($cell) => (int) ($cell['request_count'] ?? 0));
+              $isCurrentMonth = $monthKey === now()->format('Y-m');
+              $todayDay = (int) now()->day;
+            @endphp
             <header class="schedule-month-row">
               <button class="month-nav-btn" type="button" aria-label="Previous month" onclick="window.location.href='{{ $previousMonthUrl }}'">
                 <i class="bi bi-chevron-left"></i>
               </button>
-              <h1>{{ $monthLabel }}</h1>
+              <div class="schedule-month-heading">
+                <h1>
+                  <button
+                    class="calendar-month-title"
+                    id="schedule-month-title"
+                    type="button"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    aria-controls="schedule-month-picker"
+                  >
+                    <span class="calendar-month-title-text">{{ $monthLabel }}</span>
+                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                  </button>
+                </h1>
+                <div class="schedule-month-picker" id="schedule-month-picker" hidden>
+                  <select id="schedule-month-select" aria-label="Select month">
+                    @foreach ([1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'] as $monthNumber => $monthName)
+                      <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonth === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
+                    @endforeach
+                  </select>
+                  <select id="schedule-year-select" aria-label="Select year">
+                    @for ($year = $selectedYear - 3; $year <= $selectedYear + 3; $year++)
+                      <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
+                    @endfor
+                  </select>
+                </div>
+                <p class="schedule-month-summary" id="schedule-month-summary">{{ $monthReservationCount }} {{ $monthReservationCount === 1 ? 'reservation' : 'reservations' }} scheduled</p>
+              </div>
               <button class="month-nav-btn" type="button" aria-label="Next month" onclick="window.location.href='{{ $nextMonthUrl }}'">
                 <i class="bi bi-chevron-right"></i>
               </button>
             </header>
 
-            @php
-              [$selectedYear, $selectedMonth] = explode('-', $monthKey);
-              $selectedYear = (int) $selectedYear;
-              $selectedMonth = (int) $selectedMonth;
-            @endphp
-            <div class="schedule-month-jump" aria-label="Jump to month">
-              <label for="schedule-month-select">Jump to Month</label>
-              <select id="schedule-month-select" aria-label="Select month">
-                @foreach ([1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'] as $monthNumber => $monthName)
-                  <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonth === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
-                @endforeach
-              </select>
-              <select id="schedule-year-select" aria-label="Select year">
-                @for ($year = $selectedYear - 3; $year <= $selectedYear + 3; $year++)
-                  <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
-                @endfor
-              </select>
-            </div>
+            <div class="schedule-calendar-toolbar">
+              <button class="schedule-today-btn" id="schedule-today-btn" type="button">Today</button>
 
-            <div class="schedule-legend">
-              <span class="schedule-legend-dot"></span>
-              Fully approved requests are highlighted in yellow.
+              <div class="schedule-legend" aria-label="Calendar legend">
+                <span class="schedule-legend-item">
+                  <span class="schedule-legend-dot is-reservation" aria-hidden="true"></span>
+                  Has Reservations
+                </span>
+                <span class="schedule-legend-item">
+                  <span class="schedule-legend-dot is-approved" aria-hidden="true"></span>
+                  Fully Approved
+                </span>
+                <span class="schedule-legend-item">
+                  <span class="schedule-legend-dot is-empty" aria-hidden="true"></span>
+                  No Reservations
+                </span>
+              </div>
             </div>
 
             <section class="calendar-grid-wrap">
               <div class="calendar-grid">
-                <span class="day-label">Sunday</span>
-                <span class="day-label">Monday</span>
-                <span class="day-label">Tuesday</span>
-                <span class="day-label">Wednesday</span>
-                <span class="day-label">Thursday</span>
-                <span class="day-label">Friday</span>
-                <span class="day-label">Saturday</span>
+                <span class="day-label">Sun</span>
+                <span class="day-label">Mon</span>
+                <span class="day-label">Tue</span>
+                <span class="day-label">Wed</span>
+                <span class="day-label">Thu</span>
+                <span class="day-label">Fri</span>
+                <span class="day-label">Sat</span>
 
                 @foreach ($calendarCells as $cell)
                   @if (!empty($cell['blank']))
                     <span class="day day-empty" aria-hidden="true"></span>
                   @else
                     <span
-                      class="day{{ !empty($cell['marked']) ? ' marked' : '' }}"
+                      class="day{{ !empty($cell['marked']) ? ' marked' : '' }}{{ $isCurrentMonth && (int) $cell['day'] === $todayDay ? ' today' : '' }}"
                       data-day="{{ $cell['day'] }}"
                       data-request-count="{{ $cell['request_count'] }}"
                       title="{{ $cell['request_count'] > 0 ? $cell['request_count'] . ' approved request(s)' : 'No approved requests' }}"
                     >
-                      {{ $cell['day'] }}
+                      <span class="day-number">{{ $cell['day'] }}</span>
+                      <span class="day-indicators" aria-hidden="true">
+                        @for ($dotIndex = 0; $dotIndex < min(3, (int) $cell['request_count']); $dotIndex++)
+                          <span class="day-indicator"></span>
+                        @endfor
+                      </span>
                     </span>
                   @endif
                 @endforeach
@@ -124,11 +154,18 @@
           </article>
         </section>
 
-        <section class="schedule-inline-panel" id="schedule-inline-panel" aria-live="polite">
+        <section class="schedule-inline-panel" id="schedule-inline-panel" hidden aria-live="polite">
           <div class="schedule-inline-content">
             <div class="schedule-inline-table-wrap">
               <div class="schedule-inline-table-title">Selected Date Details</div>
-              <div class="schedule-inline-table-meta" id="schedule-inline-date">Select a highlighted date to see approved requests and details below.</div>
+              <div class="schedule-inline-date-summary">
+                <div class="schedule-inline-date-heading" id="schedule-inline-date">Select a highlighted date to see approved requests and details below.</div>
+                <div class="schedule-inline-date-stats" id="schedule-inline-date-stats" hidden>
+                  <span class="schedule-inline-date-stat" id="schedule-inline-stat-reservations">0 Reservations</span>
+                  <span class="schedule-inline-date-stat" id="schedule-inline-stat-resources">0 Resources</span>
+                  <span class="schedule-inline-date-stat" id="schedule-inline-stat-approved">0 Fully Approved</span>
+                </div>
+              </div>
               <table class="schedule-inline-table">
                 <thead>
                   <tr>
@@ -148,34 +185,48 @@
             <article class="schedule-inline-detail-card" id="schedule-inline-detail-card">
               <h3>Request Information</h3>
 
-              <div class="schedule-inline-detail-grid">
-                <span>Requester:</span>
-                <span id="schedule-inline-detail-requester">-</span>
+              <div class="schedule-inline-detail-groups">
+                <div class="schedule-inline-detail-group">
+                  <span class="schedule-inline-detail-group-label">Requester</span>
+                  <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-requester">-</span>
+                </div>
 
-                <span>Activity:</span>
-                <span id="schedule-inline-detail-activity">-</span>
+                <div class="schedule-inline-detail-group">
+                  <span class="schedule-inline-detail-group-label">Activity</span>
+                  <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-activity">-</span>
+                </div>
 
-                <span>Date of Activity:</span>
-                <span id="schedule-inline-detail-requested-on">-</span>
+                <div class="schedule-inline-detail-group">
+                  <span class="schedule-inline-detail-group-label">Date &amp; Time</span>
+                  <div class="schedule-inline-detail-group-stack">
+                    <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-requested-on">-</span>
+                    <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-requested-time">-</span>
+                  </div>
+                </div>
 
-                <span>Requested Time:</span>
-                <span id="schedule-inline-detail-requested-time">-</span>
+                <div class="schedule-inline-detail-group">
+                  <span class="schedule-inline-detail-group-label">Reservation</span>
+                  <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-reservation-code">-</span>
+                </div>
 
-                <span>Reservation ID:</span>
-                <span id="schedule-inline-detail-reservation-code">-</span>
+                <div class="schedule-inline-detail-group">
+                  <span class="schedule-inline-detail-group-label">Status</span>
+                  <span id="schedule-inline-detail-status">-</span>
+                </div>
 
-                <span>Status:</span>
-                <span id="schedule-inline-detail-status">-</span>
-              </div>
+                <div class="schedule-inline-detail-group">
+                  <span class="schedule-inline-detail-group-label">Resources</span>
+                  <div class="schedule-inline-extra-list" id="schedule-inline-detail-resources">
+                    <div>No resource details available.</div>
+                  </div>
+                </div>
 
-              <div class="schedule-inline-extra-title">Resources Requested:</div>
-              <div class="schedule-inline-extra-list" id="schedule-inline-detail-resources">
-                <div>No resource details available.</div>
-              </div>
-
-              <div class="schedule-inline-extra-title">Approval Trail:</div>
-              <div class="schedule-inline-extra-list" id="schedule-inline-detail-approvals">
-                <div>No approval trail available.</div>
+                <div class="schedule-inline-detail-group">
+                  <span class="schedule-inline-detail-group-label">Approval Trail</span>
+                  <div class="schedule-inline-extra-list" id="schedule-inline-detail-approvals">
+                    <div>No approval trail available.</div>
+                  </div>
+                </div>
               </div>
             </article>
           </div>
