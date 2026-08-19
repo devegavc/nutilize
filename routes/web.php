@@ -85,6 +85,7 @@ Route::middleware('auth')->group(function () {
             Route::view('/messages', 'dashboard-messages')->name('dashboard.messages');
             Route::get('/announcements', [DashboardAnnouncementController::class, 'index'])->name('dashboard.announcements');
             Route::post('/announcements', [DashboardAnnouncementController::class, 'store'])->name('dashboard.announcements.store');
+            Route::patch('/announcements/{announcementId}', [DashboardAnnouncementController::class, 'update'])->name('dashboard.announcements.update');
             Route::delete('/announcements/{announcementId}', [DashboardAnnouncementController::class, 'destroy'])->name('dashboard.announcements.destroy');
             Route::get('/schedule', [DashboardScheduleController::class, 'index'])->name('dashboard.schedule');
             Route::get('/users', [DashboardUserController::class, 'index'])->name('dashboard.users');

@@ -242,10 +242,18 @@
 
       <div class="announcement-layout">
         <article class="announcement-composer">
-          <h3><i class="bi bi-megaphone-fill"></i> New Announcement</h3>
-          <p>Post updates for offices and borrowers. Auto-removes after {{ (int) ($announcementTtlDays ?? 7) }} days.</p>
+          <h3 data-announcement-composer-title><i class="bi bi-megaphone-fill"></i> <span>New Announcement</span></h3>
+          <p data-announcement-composer-hint>Post updates for offices and borrowers.</p>
 
-          <form method="POST" action="{{ route('dashboard.announcements.store') }}" class="announcement-form">
+          <form
+            method="POST"
+            action="{{ route('dashboard.announcements.store') }}"
+            class="announcement-form"
+            data-announcement-form
+            data-store-action="{{ route('dashboard.announcements.store') }}"
+            data-update-action="{{ route('dashboard.announcements.update', ['announcementId' => '__ID__']) }}"
+            data-default-announcer="{{ old('announcer_name', auth()->user()?->displayName() ?: (auth()->user()?->username ?? '')) }}"
+          >
             @csrf
             <label for="announcement-announcer">Announced by</label>
             <input
@@ -292,34 +300,51 @@
               <p class="announcement-error">{{ $message }}</p>
             @enderror
 
-            <button class="announcement-submit" type="submit" @disabled(!($announcementsTableReady ?? false))>
-              <i class="bi bi-send-fill"></i> Publish
-            </button>
+            <div class="announcement-form-actions">
+              <button class="announcement-submit" type="submit" data-announcement-submit @disabled(!($announcementsTableReady ?? false))>
+                <i class="bi bi-send-fill"></i> <span>Publish</span>
+              </button>
+              <button class="announcement-cancel" type="button" data-announcement-cancel hidden>
+                Cancel
+              </button>
+            </div>
           </form>
         </article>
 
         <article class="announcement-feed">
           <div class="announcement-feed-head">
             <h3>Published</h3>
-            <small>Removes automatically after {{ (int) ($announcementTtlDays ?? 7) }} days</small>
           </div>
 
           <div class="announcement-card-list">
             @forelse(($announcements ?? []) as $announcement)
               @php
                 $announcedAt = $announcement->published_at ?? $announcement->created_at;
-                $expiresAt = $announcement->expires_at;
               @endphp
               <article class="announcement-card">
                 <div class="announcement-card-top">
                   <strong>{{ $announcement->title }}</strong>
-                  <form method="POST" action="{{ route('dashboard.announcements.destroy', $announcement->announcement_id) }}">
-                    @csrf
-                    @method('DELETE')
-                    <button class="announcement-delete" type="submit" title="Remove announcement">
-                      <i class="bi bi-trash3"></i>
+                  <div class="announcement-card-actions">
+                    <button
+                      class="announcement-edit"
+                      type="button"
+                      title="Edit announcement"
+                      data-edit-announcement
+                      data-id="{{ $announcement->announcement_id }}"
+                      data-title="{{ $announcement->title }}"
+                      data-body="{{ $announcement->body }}"
+                      data-announcer="{{ $announcement->announcerLabel() }}"
+                    >
+                      <i class="bi bi-pencil-square"></i>
                     </button>
-                  </form>
+                    <form method="POST" action="{{ route('dashboard.announcements.destroy', $announcement->announcement_id) }}">
+                      @csrf
+                      @method('DELETE')
+                      <button class="announcement-delete" type="submit" title="Remove announcement">
+                        <i class="bi bi-trash3"></i>
+                      </button>
+                    </form>
+                  </div>
                 </div>
                 <p class="announcement-card-body">{{ $announcement->body }}</p>
                 <div class="announcement-card-meta">
@@ -329,14 +354,8 @@
                   </span>
                   <span>
                     <i class="bi bi-clock-fill"></i>
-                    {{ optional($announcedAt)?->timezone(config('app.timezone'))->format('M j, Y · g:i A') }}
+                    {{ optional($announcedAt)?->timezone('Asia/Manila')->format('M j, Y · g:i A') }}
                   </span>
-                  @if($expiresAt)
-                    <span>
-                      <i class="bi bi-hourglass-split"></i>
-                      Until {{ $expiresAt->timezone(config('app.timezone'))->format('M j, Y') }}
-                    </span>
-                  @endif
                 </div>
               </article>
             @empty
@@ -351,6 +370,123 @@
     </section>
   </div>
 
+  <script>
+    (function initAnnouncementsModal() {
+      const modal = document.getElementById('announcements-modal');
+      if (!(modal instanceof HTMLElement)) {
+        return;
+      }
+
+      const setOpen = (isOpen) => {
+        modal.classList.toggle('is-open', isOpen);
+        modal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+      };
+
+      document.querySelectorAll('[data-open-announcements]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.preventDefault();
+          setOpen(true);
+        });
+      });
+
+      document.querySelectorAll('[data-close-announcements]').forEach((node) => {
+        node.addEventListener('click', (event) => {
+          event.preventDefault();
+          setOpen(false);
+        });
+      });
+
+      const form = modal.querySelector('[data-announcement-form]');
+      const announcerInput = document.getElementById('announcement-announcer');
+      const titleInput = document.getElementById('announcement-title');
+      const bodyInput = document.getElementById('announcement-body');
+      const cancelButton = modal.querySelector('[data-announcement-cancel]');
+      const submitButton = modal.querySelector('[data-announcement-submit]');
+      const composerTitle = modal.querySelector('[data-announcement-composer-title] span');
+      const composerHint = modal.querySelector('[data-announcement-composer-hint]');
+      let methodInput = null;
+
+      const setEditing = (announcement) => {
+        if (!(form instanceof HTMLFormElement)) {
+          return;
+        }
+
+        if (announcement) {
+          if (!(methodInput instanceof HTMLInputElement)) {
+            methodInput = document.createElement('input');
+            methodInput.type = 'hidden';
+            methodInput.name = '_method';
+            form.appendChild(methodInput);
+          }
+
+          methodInput.value = 'PATCH';
+          form.action = String(form.dataset.updateAction || '').replace('__ID__', encodeURIComponent(announcement.id));
+          if (announcerInput) announcerInput.value = announcement.announcer;
+          if (titleInput) titleInput.value = announcement.title;
+          if (bodyInput) bodyInput.value = announcement.body;
+          if (composerTitle) composerTitle.textContent = 'Edit Announcement';
+          if (composerHint) composerHint.textContent = 'Update this published announcement.';
+          if (submitButton) {
+            submitButton.innerHTML = '<i class="bi bi-check2-circle"></i> <span>Save changes</span>';
+          }
+          if (cancelButton) cancelButton.hidden = false;
+          titleInput?.focus();
+          return;
+        }
+
+        if (methodInput instanceof HTMLInputElement) {
+          methodInput.remove();
+          methodInput = null;
+        }
+
+        form.action = form.dataset.storeAction || form.action;
+        if (announcerInput) announcerInput.value = form.dataset.defaultAnnouncer || '';
+        if (titleInput) titleInput.value = '';
+        if (bodyInput) bodyInput.value = '';
+        if (composerTitle) composerTitle.textContent = 'New Announcement';
+        if (composerHint) composerHint.textContent = 'Post updates for offices and borrowers.';
+        if (submitButton) {
+          submitButton.innerHTML = '<i class="bi bi-send-fill"></i> <span>Publish</span>';
+        }
+        if (cancelButton) cancelButton.hidden = true;
+      };
+
+      modal.querySelectorAll('[data-edit-announcement]').forEach((button) => {
+        button.addEventListener('click', () => {
+          setEditing({
+            id: button.getAttribute('data-id') || '',
+            title: button.getAttribute('data-title') || '',
+            body: button.getAttribute('data-body') || '',
+            announcer: button.getAttribute('data-announcer') || '',
+          });
+        });
+      });
+
+      cancelButton?.addEventListener('click', () => setEditing(null));
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || !modal.classList.contains('is-open')) {
+          return;
+        }
+
+        if (cancelButton && !cancelButton.hidden) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          setEditing(null);
+          return;
+        }
+
+        setOpen(false);
+      }, true);
+
+      modal.querySelectorAll('[data-announcement-flash]').forEach((flash) => {
+        window.setTimeout(() => {
+          flash.classList.add('is-hiding');
+          window.setTimeout(() => flash.remove(), 400);
+        }, 2800);
+      });
+    })();
+  </script>
   <script src="/js/dashboard.js"></script>
 </body>
 </html>

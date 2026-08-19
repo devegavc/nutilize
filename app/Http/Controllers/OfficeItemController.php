@@ -113,7 +113,7 @@ class OfficeItemController extends Controller
         $ownerId = $this->resolveOwnerIdForUser($user, true);
 
         $maintenanceStatus = in_array($validated['status'], ['maintenance', 'damaged'], true);
-        $availabilityStatus = ((int) $validated['in_use'] <= 0) && !$maintenanceStatus;
+        $availabilityStatus = !$maintenanceStatus;
         $categoryRecord = $this->resolveEquipmentCategoryByKey((string) $validated['category']);
 
         if (is_null($categoryRecord)) {
@@ -226,7 +226,7 @@ class OfficeItemController extends Controller
         }
 
         $maintenanceStatus = in_array($validated['status'], ['maintenance', 'damaged'], true);
-        $availabilityStatus = ((int) $validated['in_use'] <= 0) && !$maintenanceStatus;
+        $availabilityStatus = !$maintenanceStatus;
         $categoryRecord = $this->resolveEquipmentCategoryByKey((string) $validated['category']);
 
         if (is_null($categoryRecord)) {
@@ -520,7 +520,7 @@ class OfficeItemController extends Controller
                 'quantity_total' => $totalActive,
                 'quantity_in_use' => $inUseCount,
                 'maintenance_status' => DB::raw($issueCount > 0 ? 'true' : 'false'),
-                'availability_status' => DB::raw(($inUseCount <= 0 && $issueCount <= 0) ? 'true' : 'false'),
+                'availability_status' => DB::raw($issueCount <= 0 ? 'true' : 'false'),
                 'updated_at' => now(),
             ]);
 

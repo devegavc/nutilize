@@ -747,6 +747,32 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   gap: 8px;
 }
 
+.announcement-form-actions {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.announcement-form-actions .announcement-submit {
+  margin-top: 0;
+}
+
+.announcement-cancel {
+  border: 1px solid #c9d2ea;
+  background: #fff;
+  color: #425087;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.announcement-cancel:hover {
+  background: #eef1f9;
+}
+
 .announcement-submit:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -773,13 +799,35 @@ body:has(.home-dashboard-card) .home-dashboard-card {
 
 .announcement-card-list {
   margin-top: 12px;
-  max-height: min(48vh, 420px);
+  max-height: min(52vh, 460px);
   overflow-x: hidden;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-right: 2px;
+  padding: 2px 10px 18px 2px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #8f9cc8 #e7ebf6;
+}
+
+.announcement-card-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.announcement-card-list::-webkit-scrollbar-track {
+  background: #e7ebf6;
+  border-radius: 999px;
+}
+
+.announcement-card-list::-webkit-scrollbar-thumb {
+  background: #8f9cc8;
+  border-radius: 999px;
+  border: 2px solid #e7ebf6;
+}
+
+.announcement-card-list::-webkit-scrollbar-thumb:hover {
+  background: #7382b8;
 }
 
 .announcement-card {
@@ -835,14 +883,34 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   font-weight: 600;
 }
 
+.announcement-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.announcement-edit,
 .announcement-delete {
   border: 0;
   background: transparent;
-  color: #8f1b1b;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 4px 6px;
   border-radius: 8px;
   flex-shrink: 0;
+  line-height: 1;
+}
+
+.announcement-edit {
+  color: #32408a;
+}
+
+.announcement-edit:hover {
+  background: #e8edff;
+}
+
+.announcement-delete {
+  color: #8f1b1b;
 }
 
 .announcement-delete:hover {

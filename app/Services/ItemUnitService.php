@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\ItemAsset;
+use App\Support\OpenReservationScope;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -304,20 +305,24 @@ class ItemUnitService
 
     /**
      * Units currently borrowed — approved reservations whose activity falls on $onDate
-     * (default: today). Future bookings stay available until that day, same as rooms.
+     * (default: today in Asia/Manila). Future bookings stay available until that day.
      *
      * @param  array<int, int>  $itemIds
      * @return array<int, array<int, int>> item_id => list of unit_ids
      */
     public static function borrowedUnitIdsByItem(array $itemIds, ?CarbonInterface $onDate = null): array
     {
-        $onDate = $onDate ? Carbon::instance($onDate)->startOfDay() : now()->startOfDay();
+        $onDate = $onDate
+            ? Carbon::instance($onDate)->timezone('Asia/Manila')->startOfDay()
+            : self::todayInManila();
 
         return self::reservedUnitIdsForDateWindow($itemIds, $onDate, $onDate);
     }
 
     /**
-     * Units already assigned to approved reservations that overlap [$windowStart, $windowEnd].
+     * Units already assigned to reservations that overlap [$windowStart, $windowEnd].
+     * Default: approved only (physical out / in_use). Pass $includeOpenRequests to also
+     * block pending requests on that calendar day without marking the unit in_use.
      *
      * @param  array<int, int>  $itemIds
      * @return array<int, array<int, int>> item_id => list of unit_ids
@@ -327,6 +332,7 @@ class ItemUnitService
         CarbonInterface $windowStart,
         CarbonInterface $windowEnd,
         ?int $exceptReservationId = null,
+        bool $includeOpenRequests = false,
     ): array {
         $itemIds = array_values(array_unique(array_filter(array_map('intval', $itemIds), fn (int $id) => $id > 0)));
         $grouped = array_fill_keys($itemIds, []);
@@ -353,10 +359,15 @@ class ItemUnitService
             ->join('reservation_details as rd', 'rd.reservation_items_id', '=', 'ri.reservation_items_id')
             ->join('reservations as reservations', 'reservations.reservation_id', '=', 'rd.reservation_id')
             ->whereIn('ri.item_id', $itemIds)
-            ->whereRaw("LOWER(TRIM(COALESCE(reservations.overall_status, ''))) = 'approved'")
             ->whereRaw("DATE({$startExpr}) <= ?", [$windowEnd->toDateString()])
             ->whereRaw("DATE({$endExpr}) >= ?", [$windowStart->toDateString()])
             ->select(['ri.item_id', 'riu.unit_id']);
+
+        if ($includeOpenRequests) {
+            OpenReservationScope::apply($query, 'reservations.overall_status');
+        } else {
+            $query->whereRaw("LOWER(TRIM(COALESCE(reservations.overall_status, ''))) = 'approved'");
+        }
 
         if (!is_null($exceptReservationId) && $exceptReservationId > 0) {
             $query->where('reservations.reservation_id', '<>', $exceptReservationId);
@@ -407,6 +418,7 @@ class ItemUnitService
                         $windowStart,
                         $windowEnd,
                         $reservationId > 0 ? $reservationId : null,
+                        true,
                     )[$itemId] ?? [];
                 } catch (\Throwable $throwable) {
                     report($throwable);
@@ -494,10 +506,10 @@ class ItemUnitService
     public static function activityDateRange(object $reservation): array
     {
         $start = self::firstParseableDate($reservation, [
-            'Start_of_activity',
-            'start_of_activity',
             'Date_of_Activity',
             'date_of_activity',
+            'Start_of_activity',
+            'start_of_activity',
         ]);
         $end = self::firstParseableDate($reservation, [
             'End_of_activity',
@@ -541,13 +553,18 @@ class ItemUnitService
         return null;
     }
 
+    public static function todayInManila(): Carbon
+    {
+        return Carbon::now('Asia/Manila')->startOfDay();
+    }
+
     private static function reservationStartTimestampSql(string $table = 'reservations'): ?string
     {
         return self::coalesceTimestampSql($table, [
-            'Start_of_activity',
-            'start_of_activity',
             'Date_of_Activity',
             'date_of_activity',
+            'Start_of_activity',
+            'start_of_activity',
         ]);
     }
 
@@ -613,11 +630,56 @@ class ItemUnitService
     }
 
     /**
-     * Release leftover in_use units that are not borrowed today,
-     * and keep units that are actually out today marked in_use.
+     * Count distinct units with an approved activity on $onDate (default: today, Manila).
+     * Used for dashboard "Borrowed" so occupancy is by calendar day, not a global lock.
+     */
+    public static function borrowedUnitCountForDate(?CarbonInterface $onDate = null): int
+    {
+        $onDate = $onDate
+            ? Carbon::instance($onDate)->timezone('Asia/Manila')->startOfDay()
+            : self::todayInManila();
+
+        if (
+            !Schema::hasTable('reservation_item_units')
+            || !Schema::hasTable('reservation_items')
+            || !Schema::hasTable('reservation_details')
+            || !Schema::hasTable('reservations')
+        ) {
+            return 0;
+        }
+
+        $startExpr = self::reservationStartTimestampSql('reservations');
+        $endExpr = self::reservationEndTimestampSql('reservations');
+
+        if ($startExpr === null) {
+            return 0;
+        }
+
+        $query = DB::table('reservation_item_units as riu')
+            ->join('reservation_items as ri', 'ri.reservation_items_id', '=', 'riu.reservation_items_id')
+            ->join('reservation_details as rd', 'rd.reservation_items_id', '=', 'ri.reservation_items_id')
+            ->join('reservations as reservations', 'reservations.reservation_id', '=', 'rd.reservation_id')
+            ->whereRaw("LOWER(TRIM(COALESCE(reservations.overall_status, ''))) = 'approved'")
+            ->whereRaw("DATE({$startExpr}) <= ?", [$onDate->toDateString()])
+            ->whereRaw("DATE({$endExpr}) >= ?", [$onDate->toDateString()])
+            ->selectRaw('COUNT(DISTINCT riu.unit_id) as total');
+
+        if (Schema::hasTable('item_units')) {
+            $query->join('item_units as u', 'u.unit_id', '=', 'riu.unit_id')
+                ->whereNotIn('u.status', ['maintenance', 'damaged', 'retired']);
+        }
+
+        return (int) $query->value('total');
+    }
+
+    /**
+     * Release leftover in_use units. Do not stamp units in_use for today's
+     * activity — that global flag blocks requests for other days (e.g. Friday)
+     * while the unit is only occupied today. Occupancy is stored on
+     * items.quantity_in_use and enforced by reservation dates.
      *
      * @param  array<int, int>  $itemIds
-     * @return array<int, int> item_id => in_use count
+     * @return array<int, int> item_id => in_use count for today
      */
     public static function reconcileInUseForItems(array $itemIds): array
     {
@@ -647,7 +709,6 @@ class ItemUnitService
             $inUseByItem = array_fill_keys($itemIds, 0);
             $issueByItem = array_fill_keys($itemIds, 0);
             $releaseIds = [];
-            $borrowIds = [];
 
             foreach ($units as $unit) {
                 $unitId = (int) $unit->unit_id;
@@ -659,16 +720,8 @@ class ItemUnitService
                     continue;
                 }
 
-                $isBorrowed = isset($borrowedUnitIdSet[$unitId]);
-
-                if ($isBorrowed) {
+                if (isset($borrowedUnitIdSet[$unitId])) {
                     $inUseByItem[$itemId] = ($inUseByItem[$itemId] ?? 0) + 1;
-
-                    if ($status !== 'in_use') {
-                        $borrowIds[] = $unitId;
-                    }
-
-                    continue;
                 }
 
                 if ($status === 'in_use') {
@@ -685,16 +738,6 @@ class ItemUnitService
                     ]);
             }
 
-            if ($borrowIds !== []) {
-                DB::table('item_units')
-                    ->whereIn('unit_id', $borrowIds)
-                    ->whereNotIn('status', ['maintenance', 'damaged', 'retired'])
-                    ->update([
-                        'status' => 'in_use',
-                        'updated_at' => $now,
-                    ]);
-            }
-
             foreach ($itemIds as $itemId) {
                 $inUse = (int) ($inUseByItem[$itemId] ?? 0);
                 $counts[$itemId] = $inUse;
@@ -705,7 +748,7 @@ class ItemUnitService
                     ->where('item_id', $itemId)
                     ->update([
                         'quantity_in_use' => $inUse,
-                        'availability_status' => DB::raw(($inUse <= 0 && $issueCount <= 0) ? 'true' : 'false'),
+                        'availability_status' => DB::raw($issueCount <= 0 ? 'true' : 'false'),
                         'updated_at' => $now,
                     ]);
             }
@@ -898,7 +941,8 @@ class ItemUnitService
      * Rules for units inside the active quantity (1..total):
      * - New or previously retired units become `available` (borrowable again).
      * - Units a PF admin marked `maintenance` / `damaged` keep that status.
-     * - `in_use` is assigned only to units that are not under repair/damage.
+     * - Borrowable units stay `available` here. `in_use` is applied afterwards
+     *   by reconcileInUseForItems() only for approved activity happening today.
      *
      * Units beyond the active quantity stay/become `retired` (not borrowable).
      *
@@ -911,9 +955,8 @@ class ItemUnitService
         }
 
         $total = max(0, $totalCount);
-        $inUseTarget = max(0, min($total, $inUseCount));
-        $itemLevelIssue = $status === 'maintenance' ? 'maintenance' : ($status === 'damaged' ? 'damaged' : null);
         $now = now();
+        $itemLevelIssue = $status === 'maintenance' ? 'maintenance' : ($status === 'damaged' ? 'damaged' : null);
 
         if ($total === 0) {
             // No active stock — remove physical unit rows rather than leaving a pile of
@@ -958,16 +1001,6 @@ class ItemUnitService
             $preservedIssueByNumber[1] = $itemLevelIssue;
         }
 
-        $borrowableNumbers = [];
-        for ($unitNumber = 1; $unitNumber <= $total; $unitNumber++) {
-            if (!isset($preservedIssueByNumber[$unitNumber])) {
-                $borrowableNumbers[] = $unitNumber;
-            }
-        }
-
-        $inUseNumbers = array_slice($borrowableNumbers, 0, $inUseTarget);
-        $inUseNumberSet = array_fill_keys($inUseNumbers, true);
-
         $upsertRows = [];
 
         for ($unitNumber = 1; $unitNumber <= $total; $unitNumber++) {
@@ -990,11 +1023,8 @@ class ItemUnitService
                 if (in_array($unitStatus, ['maintenance', 'damaged'], true) && is_null($maintenanceAt)) {
                     $maintenanceAt = $now;
                 }
-            } elseif (isset($inUseNumberSet[$unitNumber])) {
-                $unitStatus = 'in_use';
-                $maintenanceAt = null;
             } else {
-                // New units, reactivated retired units, and freed stock are borrowable.
+                // Occupancy is date-based. Do not stamp in_use from a quantity count.
                 $unitStatus = 'available';
                 $maintenanceAt = null;
             }

@@ -101,6 +101,43 @@ class ReservationApprovalNotifier
     }
 
     /**
+     * Remove approval alerts for every approver in $officeId on this reservation.
+     * Used when the request has moved on to another office.
+     */
+    public static function dismissOfficeApprovalNotifications(int $officeId, int $reservationId): void
+    {
+        $officeId = (int) $officeId;
+        $reservationId = (int) $reservationId;
+
+        if ($officeId <= 0 || $reservationId <= 0) {
+            return;
+        }
+
+        $userIds = User::query()
+            ->where('office_id', $officeId)
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->values()
+            ->all();
+
+        if ($userIds === []) {
+            return;
+        }
+
+        Notification::query()
+            ->whereIn('user_id', $userIds)
+            ->where('related_id', $reservationId)
+            ->whereIn('type', ['reservation_approval_request', 'reservation_approval_handoff'])
+            ->delete();
+
+        foreach ($userIds as $userId) {
+            Cache::forget('notification_unread_count.user.' . $userId);
+            Cache::forget('approval_notification_sync.user.' . $userId);
+        }
+    }
+
+    /**
      * Notify admins in $officeId when that office should be alerted:
      * - it is the current actionable approver, or
      * - it is the Physical Facilities office (PF visibility across requests).

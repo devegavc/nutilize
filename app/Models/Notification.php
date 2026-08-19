@@ -57,4 +57,23 @@ class Notification extends Model
                 'updated_at' => now(),
             ]);
     }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function insertUnread(array $attributes): void
+    {
+        $now = now();
+
+        DB::table('notifications')->insert([
+            'user_id' => (int) ($attributes['user_id'] ?? 0),
+            'type' => (string) ($attributes['type'] ?? 'reservation_approval_request'),
+            'title' => (string) ($attributes['title'] ?? 'Notification'),
+            'message' => (string) ($attributes['message'] ?? ''),
+            'related_id' => isset($attributes['related_id']) ? (int) $attributes['related_id'] : null,
+            'read' => DB::raw('false'),
+            'created_at' => $attributes['created_at'] ?? $now,
+            'updated_at' => $attributes['updated_at'] ?? $now,
+        ]);
+    }
 }

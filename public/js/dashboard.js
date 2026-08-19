@@ -794,7 +794,12 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
 
     if (response.ok) {
       const data = await response.json();
-      notificationItems = data.notifications.map(notification => ({
+      const rows = Array.isArray(data.notifications)
+        ? data.notifications
+        : (data.notifications && typeof data.notifications === 'object'
+          ? Object.values(data.notifications)
+          : []);
+      notificationItems = rows.map(notification => ({
         id: notification.id,
         name: notification.title,
         message: notification.message,
@@ -861,7 +866,7 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
     startNotificationPolling();
   };
 
-  setTimeout(bootstrapNotifications, 4000);
+  bootstrapNotifications();
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible' || Date.now() - lastUnreadPollAt < 180000) {
@@ -897,12 +902,12 @@ function getNotificationListMarkup() {
   return notificationItems.length > 0
     ? notificationItems
         .map((item, index) => `
-          <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${item.id}" data-notification-index="${index}">
+          <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${escapeReservationDetailsHtml(item.id)}" data-notification-index="${index}">
             <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
             <div class="notification-copy">
-              <strong>${item.name}</strong>
-              <span class="notification-sub">${item.message}</span>
-              <small class="notification-time">${item.created_at}</small>
+              <strong>${escapeReservationDetailsHtml(item.name)}</strong>
+              <span class="notification-sub">${escapeReservationDetailsHtml(item.message)}</span>
+              <small class="notification-time">${escapeReservationDetailsHtml(item.created_at)}</small>
             </div>
             <span class="notification-indicator ${item.unread ? 'unread' : 'read'}" aria-label="${item.unread ? 'Unread notification' : 'Read notification'}"></span>
           </article>
@@ -972,6 +977,160 @@ function escapeReservationDetailsHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function closeQuickReportDetailsModal() {
+  document.querySelectorAll('.quick-report-details-modal').forEach((modal) => modal.remove());
+}
+
+function findQuickReportById(reportId) {
+  const reports = Array.isArray(window.quickReportDetails) ? window.quickReportDetails : [];
+  return reports.find((report) => String(report?.id ?? '') === String(reportId ?? '')) || null;
+}
+
+function showQuickReportDetailsModal(report) {
+  if (!report || typeof report !== 'object') {
+    showAppNotice('Report details are not available.');
+    return;
+  }
+
+  closeQuickReportDetailsModal();
+
+  const item = escapeReservationDetailsHtml(report.item || 'Reported Issue');
+  const reportedBy = escapeReservationDetailsHtml(report.reported_by || 'Unknown');
+  const statusLabel = escapeReservationDetailsHtml(report.status_label || 'Pending');
+  const statusClass = String(report.status_class || 'pending').toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  const reportedAt = escapeReservationDetailsHtml(report.reported_at || 'N/A');
+  const description = escapeReservationDetailsHtml(report.description || 'No additional description provided.');
+  const activityName = escapeReservationDetailsHtml(report.activity_name || '—');
+  const reservationCode = escapeReservationDetailsHtml(report.reservation_code || '—');
+  const imageUrl = String(report.image_url || '').trim();
+  const safeImageUrl = /^https?:\/\//i.test(imageUrl) ? escapeReservationDetailsHtml(imageUrl) : '';
+  const hasAttachment = Boolean(safeImageUrl);
+
+  const proofPanel = hasAttachment
+    ? `
+      <section class="quick-report-panel quick-report-proof-panel">
+        <div class="quick-report-panel-head">
+          <h3>Attachment</h3>
+          <a class="quick-report-proof-open" href="${safeImageUrl}" target="_blank" rel="noopener noreferrer">Open full image</a>
+        </div>
+        <a class="quick-report-proof-frame" href="${safeImageUrl}" target="_blank" rel="noopener noreferrer">
+          <img src="${safeImageUrl}" alt="Report attachment for ${item}" loading="lazy" />
+        </a>
+      </section>
+    `
+    : `
+      <section class="quick-report-panel quick-report-proof-panel is-empty">
+        <div class="quick-report-panel-head">
+          <h3>Attachment</h3>
+        </div>
+        <div class="quick-report-proof-empty">
+          <i class="bi bi-image" aria-hidden="true"></i>
+          <p>No supporting image was attached to this report.</p>
+        </div>
+      </section>
+    `;
+
+  const modal = document.createElement('div');
+  modal.className = 'quick-report-details-modal';
+  modal.innerHTML = `
+    <div class="quick-report-details-overlay" data-close-quick-report="true">
+      <article class="quick-report-details-card" role="dialog" aria-modal="true" aria-labelledby="quick-report-details-title">
+        <header class="quick-report-details-head">
+          <div class="quick-report-details-heading">
+            <div class="quick-report-details-meta">
+              <span class="quick-report-details-kicker">Report Details</span>
+              <span class="quick-report-status-pill status-${statusClass}">${statusLabel}</span>
+            </div>
+            <h2 id="quick-report-details-title">${item}</h2>
+            <p class="quick-report-details-sub">Reported ${reportedAt}</p>
+          </div>
+          <button type="button" class="quick-report-details-close" data-close-quick-report="true" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </header>
+
+        <div class="quick-report-details-body">
+          <div class="quick-report-details-layout">
+            <section class="quick-report-panel">
+              <div class="quick-report-panel-head">
+                <h3>Report Summary</h3>
+              </div>
+              <dl class="quick-report-info-list">
+                <div>
+                  <dt>Reported By</dt>
+                  <dd>${reportedBy}</dd>
+                </div>
+                <div>
+                  <dt>Activity</dt>
+                  <dd>${activityName}</dd>
+                </div>
+                <div>
+                  <dt>Reservation</dt>
+                  <dd>${reservationCode}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd><span class="quick-report-status-pill status-${statusClass}">${statusLabel}</span></dd>
+                </div>
+              </dl>
+            </section>
+
+            ${proofPanel}
+          </div>
+
+          <section class="quick-report-panel quick-report-description-panel">
+            <div class="quick-report-panel-head">
+              <h3>Description</h3>
+            </div>
+            <p class="quick-report-description">${description}</p>
+          </section>
+        </div>
+
+        <footer class="quick-report-details-footer">
+          <a class="quick-report-footer-link" href="/dashboard/maintenance">Open Item Maintenance</a>
+          <button type="button" class="quick-report-footer-close" data-close-quick-report="true">Close</button>
+        </footer>
+      </article>
+    </div>
+  `;
+
+  modal.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (target.closest('[data-close-quick-report="true"]') && !target.closest('.quick-report-details-card')) {
+      closeQuickReportDetailsModal();
+      return;
+    }
+
+    if (target.closest('.quick-report-details-close') || target.closest('.quick-report-footer-close')) {
+      closeQuickReportDetailsModal();
+    }
+  });
+
+  document.body.appendChild(modal);
+}
+
+if (reportTableBody instanceof HTMLElement) {
+  reportTableBody.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const button = target.closest('[data-quick-report-details]');
+    if (!(button instanceof HTMLElement)) {
+      return;
+    }
+
+    event.preventDefault();
+    const report = findQuickReportById(button.dataset.reportId);
+    showQuickReportDetailsModal(report);
+  });
 }
 
 function showReservationDetailsModal(reservation, options = {}) {
@@ -1136,6 +1295,29 @@ function showReservationDetailsModal(reservation, options = {}) {
       });
     });
   }
+
+  document.body.appendChild(modal);
+}
+
+function hideReservationDetailsLoadingModal() {
+  document.querySelectorAll('.reservation-details-modal.is-loading').forEach((modal) => modal.remove());
+}
+
+function showReservationDetailsLoadingModal(title = 'Opening request') {
+  hideReservationDetailsLoadingModal();
+
+  const modal = document.createElement('div');
+  modal.className = 'reservation-details-modal is-loading';
+  modal.setAttribute('aria-busy', 'true');
+  modal.innerHTML = `
+    <div class="reservation-details-overlay">
+      <div class="reservation-details-content" role="status" aria-live="polite">
+        <div class="reservation-details-spinner" aria-hidden="true"></div>
+        <p class="reservation-details-loading-title">${escapeReservationDetailsHtml(title)}</p>
+        <p class="reservation-details-loading-copy">Please wait…</p>
+      </div>
+    </div>
+  `;
 
   document.body.appendChild(modal);
 }
@@ -4009,27 +4191,11 @@ async function buildNotificationsPopover() {
       return;
     }
 
-    list.innerHTML = notificationItems.length > 0
-      ? notificationItems
-          .map((item, index) => `
-            <article class="notification-item${item.unread ? ' unread' : ''}" data-notification-id="${item.id}" data-notification-index="${index}">
-              <span class="notification-avatar"><i class="bi bi-person-fill"></i></span>
-              <div class="notification-copy">
-                <strong>${item.name}</strong>
-                <span class="notification-sub">${item.message}</span>
-                <small class="notification-time">${item.created_at}</small>
-              </div>
-              <span class="notification-indicator ${item.unread ? 'unread' : 'read'}" aria-label="${item.unread ? 'Unread notification' : 'Read notification'}"></span>
-            </article>
-          `)
-          .join('')
-      : '<div class="notification-empty">No notifications</div>';
+    list.innerHTML = getNotificationListMarkup();
   };
 
   const notificationListMarkup = notificationsLoaded
-    ? notificationItems.length > 0
-      ? getNotificationListMarkup()
-      : '<div class="notification-empty">No notifications</div>'
+    ? getNotificationListMarkup()
     : '<div class="notification-loading">Loading notifications…</div>';
 
   panel.innerHTML = `
@@ -4062,11 +4228,12 @@ async function buildNotificationsPopover() {
     }
 
     const notification = notificationItems[Number.parseInt(notificationIndex, 10)];
-    if (!notification || !notification.related_id) {
+    if (!notification) {
       return;
     }
 
-    // Update UI immediately on click
+    const relatedId = Number.parseInt(String(notification.related_id ?? ''), 10);
+
     if (notification.unread) {
       notification.unread = false;
       notificationUnreadCount = Math.max(0, notificationUnreadCount - 1);
@@ -4074,9 +4241,17 @@ async function buildNotificationsPopover() {
       renderList();
     }
 
-    // Fetch reservation details and show modal
+    closeNotificationsPopover();
+
+    if (!Number.isInteger(relatedId) || relatedId <= 0) {
+      showAppNotice('This notification has no request attached.');
+      return;
+    }
+
+    showReservationDetailsLoadingModal(notification.name || 'Opening request');
+
     try {
-      const response = await fetch(`/dashboard/reservation/${notification.related_id}/details`, {
+      const response = await fetch(`/dashboard/reservation/${relatedId}/details`, {
         method: 'GET',
         headers: {
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
@@ -4084,17 +4259,24 @@ async function buildNotificationsPopover() {
         },
       });
 
+      hideReservationDetailsLoadingModal();
+
       if (response.ok) {
         const data = await response.json();
-        showReservationDetailsModal(data.reservation);
+        if (data.reservation) {
+          showReservationDetailsModal(data.reservation);
+        } else {
+          showAppNotice('Request details are not available.');
+        }
       } else {
-        console.error('Failed to fetch reservation details');
+        showAppNotice('Could not open that request. Please try again.');
       }
     } catch (error) {
+      hideReservationDetailsLoadingModal();
       console.error('Error fetching reservation details:', error);
+      showAppNotice('Could not open that request. Please try again.');
     }
 
-    // Mark as read in database (don't fail if this errors, UI is already updated)
     try {
       const response = await fetch(`/dashboard/notification/${notificationId}/read`, {
         method: 'PATCH',
@@ -4113,18 +4295,13 @@ async function buildNotificationsPopover() {
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
-      // Revert UI changes if API call failed
-      notification.unread = true;
-      notificationUnreadCount += 1;
-      updateNotificationBadge();
-      renderList();
     }
   });
 
   (async function refreshPopoverNotifications() {
     try {
-      // Prefer a light list fetch; heavy sync runs at most every 15 minutes.
-      await fetchNotifications({ sync: true, force: false });
+      // Fresh list on open. Heavy sync is separate so it cannot empty the bell.
+      await fetchNotifications({ sync: false, force: true });
       renderList();
     } catch (_error) {
       // No-op: errors already logged
@@ -6372,6 +6549,16 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && maintenanceFormModal && maintenanceFormModal.classList.contains('is-open')) {
     closeMaintenanceFormModal();
     activeMaintenanceAddressRow = null;
+  }
+
+  const announcementsModal = document.getElementById('announcements-modal');
+  if (event.key === 'Escape' && announcementsModal && announcementsModal.classList.contains('is-open')) {
+    announcementsModal.classList.remove('is-open');
+    announcementsModal.setAttribute('aria-hidden', 'true');
+  }
+
+  if (event.key === 'Escape' && document.querySelector('.quick-report-details-modal')) {
+    closeQuickReportDetailsModal();
   }
 });
 

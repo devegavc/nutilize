@@ -11,8 +11,8 @@ use Carbon\Carbon;
 class DashboardCacheService
 {
     /**
-     * Cache TTL in minutes. Stats are read-only here; in_use sync runs via
-     * `items:sync-in-use` so home does not wait on a full unit reconcile.
+     * Cache TTL in minutes. Borrowed/available are reconciled to "in use today"
+     * before counting so future reservations do not look borrowed.
      */
     private const CACHE_TTL = 5;
 
@@ -21,7 +21,7 @@ class DashboardCacheService
      */
     public static function getDashboardData(int $userId, int $officeId): array
     {
-        $cacheKey = "dashboard.data.v4.user.{$userId}.office.{$officeId}";
+        $cacheKey = "dashboard.data.v6.user.{$userId}.office.{$officeId}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
             return [
@@ -78,14 +78,18 @@ class DashboardCacheService
         }
 
         if (self::hasTable('item_units')) {
+            ItemUnitService::reconcileLiveBorrowedUnits();
+
             $unitStats = DB::table('item_units')
-                ->selectRaw("SUM(CASE WHEN status = 'in_use' THEN 1 ELSE 0 END) as borrowed")
-                ->selectRaw("SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available")
+                ->selectRaw("SUM(CASE WHEN status IN ('available', 'in_use') THEN 1 ELSE 0 END) as serviceable")
                 ->selectRaw("SUM(CASE WHEN status IN ('maintenance', 'damaged') THEN 1 ELSE 0 END) as maintenance")
                 ->first();
 
-            $stats['borrowed'] = (int) ($unitStats->borrowed ?? 0);
-            $stats['available'] = (int) ($unitStats->available ?? 0);
+            $borrowed = ItemUnitService::borrowedUnitCountForDate();
+            $serviceable = (int) ($unitStats->serviceable ?? 0);
+
+            $stats['borrowed'] = $borrowed;
+            $stats['available'] = max(0, $serviceable - $borrowed);
             $stats['maintenance'] = (int) ($unitStats->maintenance ?? 0);
         } elseif (self::hasTable('items')) {
             $itemStats = DB::table('items')
@@ -556,7 +560,7 @@ class DashboardCacheService
      */
     public static function clearCache(int $userId, int $officeId): void
     {
-        $cacheKey = "dashboard.data.v4.user.{$userId}.office.{$officeId}";
+        $cacheKey = "dashboard.data.v6.user.{$userId}.office.{$officeId}";
         Cache::forget($cacheKey);
     }
 

@@ -29,7 +29,7 @@ class DashboardHomeController extends Controller
             Announcement::purgeExpired();
 
             $query = Announcement::query()
-                ->with('author:user_id,full_name,username')
+                ->with('author:user_id,first_name,middle_initial,last_name,suffix,full_name,username')
                 ->orderByDesc('published_at')
                 ->orderByDesc('created_at')
                 ->limit(30);
