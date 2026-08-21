@@ -9,7 +9,7 @@
   <title>NUtilize | Schedule</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-schedule.css" />
+  <link rel="stylesheet" href="/css/db-schedule.css?v={{ filemtime(public_path('css/db-schedule.css')) }}" />
 </head>
 <body>
   <script>
@@ -41,7 +41,7 @@
 
   <main class="dashboard-shell">
     <section class="workspace-grid">
-      <div id="navbar-container"></div>
+      @include('partials.dashboard-navbar')
 
       <section class="content-card schedule-content-card">
         <h1 class="section-title">SCHEDULE DASHBOARD</h1>
@@ -82,19 +82,28 @@
                     <i class="bi bi-chevron-down" aria-hidden="true"></i>
                   </button>
                 </h1>
-                <div class="schedule-month-picker" id="schedule-month-picker" hidden>
-                  <select id="schedule-month-select" aria-label="Select month">
-                    @foreach ([1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'] as $monthNumber => $monthName)
-                      <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonth === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
-                    @endforeach
-                  </select>
-                  <select id="schedule-year-select" aria-label="Select year">
-                    @for ($year = $selectedYear - 3; $year <= $selectedYear + 3; $year++)
-                      <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
-                    @endfor
-                  </select>
-                </div>
                 <p class="schedule-month-summary" id="schedule-month-summary">{{ $monthReservationCount }} {{ $monthReservationCount === 1 ? 'reservation' : 'reservations' }} scheduled</p>
+                <div class="schedule-month-picker" id="schedule-month-picker" hidden>
+                  <p class="schedule-month-picker-label">Jump to month</p>
+                  <div class="schedule-month-picker-fields">
+                    <label class="schedule-month-field" for="schedule-month-select">
+                      <span>Month</span>
+                      <select id="schedule-month-select" aria-label="Select month">
+                        @foreach ([1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'] as $monthNumber => $monthName)
+                          <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonth === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
+                        @endforeach
+                      </select>
+                    </label>
+                    <label class="schedule-month-field" for="schedule-year-select">
+                      <span>Year</span>
+                      <select id="schedule-year-select" aria-label="Select year">
+                        @for ($year = $selectedYear - 3; $year <= $selectedYear + 3; $year++)
+                          <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
+                        @endfor
+                      </select>
+                    </label>
+                  </div>
+                </div>
               </div>
               <button class="month-nav-btn" type="button" aria-label="Next month" onclick="window.location.href='{{ $nextMonthUrl }}'">
                 <i class="bi bi-chevron-right"></i>

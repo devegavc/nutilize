@@ -40,7 +40,7 @@
 
   <main class="dashboard-shell">
     <section class="workspace-grid">
-      <div id="navbar-container"></div>
+      @include('partials.dashboard-navbar')
 
       <section class="content-card analytics-content-card">
         <div class="dashboard-page-header-top insights-header-top">

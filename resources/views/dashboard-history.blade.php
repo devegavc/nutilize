@@ -40,7 +40,7 @@
 
   <main class="dashboard-shell">
     <section class="workspace-grid">
-      <div id="navbar-container"></div>
+      @include('partials.dashboard-navbar')
 
       <section class="content-card history-content-card">
         <h1 class="section-title">LENDING HISTORY</h1>

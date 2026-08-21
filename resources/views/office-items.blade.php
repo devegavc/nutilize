@@ -56,7 +56,7 @@
 
   <main class="dashboard-shell">
     <section class="workspace-grid">
-      <div id="navbar-container"></div>
+      @include('partials.dashboard-navbar')
 
       <section class="content-card facilities-content-card">
         <h1 class="section-title">MANAGE OFFICE ITEMS</h1>

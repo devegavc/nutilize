@@ -7,25 +7,22 @@ use Illuminate\Support\Facades\Schema;
 
 class ProgramChairOfficeResolver
 {
+    /** @var array<int, int|null> */
+    private static array $resolvedPcOfficeByReservation = [];
+
     /**
      * Program-chair office for this reservation (from the requester's program).
      * Returns null when the user has no program — callers should keep the legacy Program Chair office.
      */
     public static function resolveForReservation(int $reservationId): ?int
     {
-        if (!Schema::hasTable('academic_programs') || !Schema::hasColumn('users', 'program_id')) {
-            return null;
+        if (array_key_exists($reservationId, self::$resolvedPcOfficeByReservation)) {
+            return self::$resolvedPcOfficeByReservation[$reservationId];
         }
 
-        $officeId = DB::table('reservations')
-            ->join('users', 'users.user_id', '=', 'reservations.user_id')
-            ->join('academic_programs', 'academic_programs.program_id', '=', 'users.program_id')
-            ->where('reservations.reservation_id', $reservationId)
-            ->whereNotNull('users.program_id')
-            ->whereNotNull('academic_programs.office_id')
-            ->value('academic_programs.office_id');
+        $resolved = self::batchResolveForReservations([$reservationId]);
 
-        return $officeId ? (int) $officeId : null;
+        return $resolved[$reservationId] ?? null;
     }
 
     /**
@@ -35,24 +32,49 @@ class ProgramChairOfficeResolver
     public static function batchResolveForReservations(array $reservationIds): array
     {
         $reservationIds = array_values(array_unique(array_filter(array_map('intval', $reservationIds))));
-        if (
-            $reservationIds === []
-            || !Schema::hasTable('academic_programs')
-            || !Schema::hasColumn('users', 'program_id')
-        ) {
+        if ($reservationIds === []) {
             return [];
         }
 
-        return DB::table('reservations')
-            ->join('users', 'users.user_id', '=', 'reservations.user_id')
-            ->join('academic_programs', 'academic_programs.program_id', '=', 'users.program_id')
-            ->whereIn('reservations.reservation_id', $reservationIds)
-            ->whereNotNull('users.program_id')
-            ->whereNotNull('academic_programs.office_id')
-            ->select(['reservations.reservation_id', 'academic_programs.office_id'])
-            ->get()
-            ->mapWithKeys(fn ($row) => [(int) $row->reservation_id => (int) $row->office_id])
-            ->all();
+        $missingIds = array_values(array_filter(
+            $reservationIds,
+            static fn (int $reservationId): bool => !array_key_exists($reservationId, self::$resolvedPcOfficeByReservation)
+        ));
+
+        if (
+            $missingIds !== []
+            && Schema::hasTable('academic_programs')
+            && Schema::hasColumn('users', 'program_id')
+        ) {
+            $fetched = DB::table('reservations')
+                ->join('users', 'users.user_id', '=', 'reservations.user_id')
+                ->join('academic_programs', 'academic_programs.program_id', '=', 'users.program_id')
+                ->whereIn('reservations.reservation_id', $missingIds)
+                ->whereNotNull('users.program_id')
+                ->whereNotNull('academic_programs.office_id')
+                ->select(['reservations.reservation_id', 'academic_programs.office_id'])
+                ->get()
+                ->mapWithKeys(fn ($row) => [(int) $row->reservation_id => (int) $row->office_id])
+                ->all();
+
+            foreach ($missingIds as $reservationId) {
+                self::$resolvedPcOfficeByReservation[$reservationId] = $fetched[$reservationId] ?? null;
+            }
+        } elseif ($missingIds !== []) {
+            foreach ($missingIds as $reservationId) {
+                self::$resolvedPcOfficeByReservation[$reservationId] = null;
+            }
+        }
+
+        $map = [];
+        foreach ($reservationIds as $reservationId) {
+            $officeId = self::$resolvedPcOfficeByReservation[$reservationId] ?? null;
+            if (!is_null($officeId)) {
+                $map[$reservationId] = $officeId;
+            }
+        }
+
+        return $map;
     }
 
     /**

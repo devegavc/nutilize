@@ -42,7 +42,7 @@
 
   <main class="dashboard-shell">
     <section class="workspace-grid">
-      <div id="navbar-container"></div>
+      @include('partials.dashboard-navbar')
 
       <section class="content-card request-content-card">
         <h1 class="section-title">TEACHER REQUEST</h1>
@@ -87,7 +87,7 @@
     </article>
   </div>
 
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
 </html>
 

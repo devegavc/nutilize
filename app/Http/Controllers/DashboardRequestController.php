@@ -12,6 +12,7 @@ use App\Services\ReservationApprovalNotifier;
 use App\Support\HeavySyncGate;
 use App\Support\OpenReservationScope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -28,6 +29,12 @@ class DashboardRequestController extends Controller
     /** @var array<int, true>|null */
     private ?array $batchGymWithItemsLookup = null;
 
+    /** @var array<int, int|null> */
+    private array $batchPcOfficeLookup = [];
+
+    /** @var array<int, int> */
+    private array $warmedReservationIds = [];
+
     /** @var array<string, array<int, int>> */
     private array $workflowOfficeIdsCache = [];
 
@@ -39,7 +46,7 @@ class DashboardRequestController extends Controller
             return redirect('/dashboard/home')->with('error', 'Unauthorized access.');
         }
 
-        return view('dashboard-request', $this->buildRequestPageViewData($user));
+        return view('dashboard-request', $this->buildRequestPageViewData($user, true));
     }
 
     public function requestList()
@@ -53,7 +60,7 @@ class DashboardRequestController extends Controller
             ], 403);
         }
 
-        $viewData = $this->buildRequestPageViewData($user);
+        $viewData = $this->buildRequestPageViewData($user, false);
 
         return response()->json([
             'success' => true,
@@ -61,15 +68,18 @@ class DashboardRequestController extends Controller
         ]);
     }
 
-    private function buildRequestPageViewData($user): array
+    private function buildRequestPageViewData($user, bool $allowWorkflowSync = true): array
     {
-        // Full-table sync on every load is too slow; Approvals/Office still align rows for what they show.
-        // Sync only the current page (max 20) so workflow tabs and steps match the same logic as other dashboards.
+        // Display the current page without a full-table walk. Occasional gated sync
+        // keeps workflow steps aligned; polls and pagination skip that write path.
 
         $isPfAdmin = $user->isPhysicalFacilitiesAdmin();
 
         $reservationsQuery = Reservation::query()
-            ->with(['user', 'approvals'])
+            ->with([
+                'user:user_id,full_name,username,email,phone_number,contact_number',
+                'approvals:approval_id,reservation_id,office_id,owner_id,status,approved_at',
+            ])
             ->orderByDesc('created_at');
 
         if ($isPfAdmin) {
@@ -88,34 +98,41 @@ class DashboardRequestController extends Controller
         }
 
         $reservations = $reservationsQuery
-            ->paginate(20)
+            ->simplePaginate(20)
             ->withQueryString();
 
-        $syncReservationIds = $reservations->getCollection()
-            ->filter(function (Reservation $reservation) {
-                $status = strtolower((string) $reservation->overall_status);
+        $reservationIds = $reservations->getCollection()->pluck('reservation_id')->map(fn ($id) => (int) $id)->all();
 
-                return !in_array($status, ['returned', 'damaged', 'rejected', 'cancelled', 'canceled', 'expired', 'approved'], true);
-            })
-            ->pluck('reservation_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        $didSync = false;
+        if ($allowWorkflowSync) {
+            $syncReservationIds = $reservations->getCollection()
+                ->filter(function (Reservation $reservation) {
+                    $status = strtolower((string) $reservation->overall_status);
 
-        if ($syncReservationIds !== []) {
-            ProgramChairOfficeResolver::reconcileOpenReservationPcApprovals($syncReservationIds);
-            ReservationApprovalDeduper::deduplicatePendingForReservations($syncReservationIds);
-            $this->syncReservationApprovalsForReservationIds($syncReservationIds);
+                    return !in_array($status, ['returned', 'damaged', 'rejected', 'cancelled', 'canceled', 'expired', 'approved'], true);
+                })
+                ->pluck('reservation_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if ($syncReservationIds !== [] && $this->shouldSyncRequestWorkflow($user)) {
+                $this->syncReservationApprovalsForReservationIds($syncReservationIds);
+                $didSync = true;
+            }
         }
 
-        $reservations->getCollection()->load('approvals');
+        if ($didSync) {
+            $reservations->getCollection()->load([
+                'approvals:approval_id,reservation_id,office_id,owner_id,status,approved_at',
+            ]);
+        }
 
-        $reservationIds = $reservations->getCollection()->pluck('reservation_id')->map(fn($id) => (int) $id)->all();
-
+        $this->warmBatchWorkflowLookups($reservationIds);
         $resourceMap = $this->buildResourceMap($reservationIds);
         $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($reservationIds);
         $pfOfficeId = $this->getOfficeIdsByShortCode()['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
 
-        if ($isPfAdmin && !is_null($pfOfficeId)) {
+        if ($allowWorkflowSync && $isPfAdmin && !is_null($pfOfficeId)) {
             $pfActionableIds = [];
             foreach ($actionableOfficeIds as $reservationId => $actionableOfficeId) {
                 if ((int) $actionableOfficeId === (int) $pfOfficeId) {
@@ -354,8 +371,10 @@ class DashboardRequestController extends Controller
             $this->warmBatchWorkflowLookups($reservationIds);
             $now = now();
 
+            ProgramChairOfficeResolver::reconcileOpenReservationPcApprovals($reservationIds);
+            ReservationApprovalDeduper::deduplicatePendingForReservations($reservationIds);
+
             foreach ($reservationIds as $reservationId) {
-                ProgramChairOfficeResolver::reconcilePendingLegacyPcApproval((int) $reservationId);
                 $workflowOfficeIds = $this->resolveWorkflowOfficeIdsCached($reservationId, true);
                 ReservationApprovalWorkflowService::ensureApprovalRows((int) $reservationId, $workflowOfficeIds);
             }
@@ -367,6 +386,10 @@ class DashboardRequestController extends Controller
                     'status' => 'pending',
                     'updated_at' => $now,
                 ]);
+
+            if ($userId = (int) (Auth::user()->user_id ?? 0)) {
+                Cache::put($this->workflowSyncCacheKey($userId), true, now()->addMinutes(2));
+            }
         });
     }
 
@@ -637,7 +660,10 @@ class DashboardRequestController extends Controller
         $pfOfficeId = $ids['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
         $ownerOfficeId = $this->resolveOwnerOfficeId($reservationId, $ids, $pfOfficeId);
         $templatePcOfficeId = $ids['PC'] ?? null;
-        $pcOfficeId = ProgramChairOfficeResolver::resolveForReservation($reservationId) ?? $templatePcOfficeId;
+        $pcOfficeId = (array_key_exists($reservationId, $this->batchPcOfficeLookup)
+            ? $this->batchPcOfficeLookup[$reservationId]
+            : ProgramChairOfficeResolver::resolveForReservation($reservationId))
+            ?? $templatePcOfficeId;
         if (!is_null($templatePcOfficeId) && !is_null($pcOfficeId)) {
             $actionSequence = ProgramChairOfficeResolver::replaceTemplatePcInSequence(
                 $actionSequence,
@@ -742,55 +768,88 @@ class DashboardRequestController extends Controller
         $reservationIds = array_values(array_unique(array_map('intval', $reservationIds)));
         $this->warmBatchWorkflowLookups($reservationIds);
 
-        try {
-            $approvalsByReservation = ReservationApproval::query()
-                ->whereIn('reservation_id', $reservationIds)
-                ->get(['reservation_id', 'office_id', 'owner_id', 'status', 'approved_at'])
-                ->groupBy('reservation_id');
+        $approvalsByReservation = ReservationApproval::query()
+            ->whereIn('reservation_id', $reservationIds)
+            ->get(['reservation_id', 'office_id', 'owner_id', 'status', 'approved_at'])
+            ->groupBy('reservation_id');
 
-            $actionableOfficeIds = [];
+        $actionableOfficeIds = [];
 
-            foreach ($reservationIds as $reservationId) {
-                $reservationId = (int) $reservationId;
-                $actionSequence = $this->resolveWorkflowOfficeIdsCached($reservationId, true);
+        foreach ($reservationIds as $reservationId) {
+            $reservationId = (int) $reservationId;
+            $actionSequence = $this->resolveWorkflowOfficeIdsCached($reservationId, true);
 
-                if (empty($actionSequence)) {
-                    continue;
-                }
-
-                $approvals = ReservationApprovalDeduper::collapseByOfficeId(
-                    $approvalsByReservation->get($reservationId) ?? collect()
-                );
-
-                foreach ($actionSequence as $officeId) {
-                    $officeId = (int) $officeId;
-                    $approval = $approvals->get($officeId);
-                    $status = strtolower((string) ($approval?->status ?? 'pending'));
-
-                    if ($status === 'rejected' && !is_null($approval?->approved_at)) {
-                        continue 2;
-                    }
-
-                    if ($status !== 'approved' || is_null($approval?->approved_at)) {
-                        $actionableOfficeIds[$reservationId] = (int) $officeId;
-                        continue 2;
-                    }
-                }
+            if (empty($actionSequence)) {
+                continue;
             }
 
-            return $actionableOfficeIds;
-        } finally {
-            $this->batchGymLookup = null;
-            $this->batchGymWithItemsLookup = null;
+            $approvals = ReservationApprovalDeduper::collapseByOfficeId(
+                $approvalsByReservation->get($reservationId) ?? collect()
+            );
+
+            foreach ($actionSequence as $officeId) {
+                $officeId = (int) $officeId;
+                $approval = $approvals->get($officeId);
+                $status = strtolower((string) ($approval?->status ?? 'pending'));
+
+                if ($status === 'rejected' && !is_null($approval?->approved_at)) {
+                    continue 2;
+                }
+
+                if ($status !== 'approved' || is_null($approval?->approved_at)) {
+                    $actionableOfficeIds[$reservationId] = (int) $officeId;
+                    continue 2;
+                }
+            }
         }
+
+        return $actionableOfficeIds;
+    }
+
+    private function shouldSyncRequestWorkflow($user): bool
+    {
+        $userId = (int) ($user->user_id ?? 0);
+        if ($userId <= 0) {
+            return false;
+        }
+
+        $key = $this->workflowSyncCacheKey($userId);
+
+        if (Cache::has($key)) {
+            return false;
+        }
+
+        Cache::put($key, true, now()->addMinutes(2));
+
+        return true;
+    }
+
+    private function workflowSyncCacheKey(int $userId): string
+    {
+        return 'dashboard_request_workflow_sync.user.' . $userId;
     }
 
     private function warmBatchWorkflowLookups(array $reservationIds): void
     {
+        $reservationIds = array_values(array_unique(array_map('intval', $reservationIds)));
+        sort($reservationIds);
+
+        if ($reservationIds !== [] && $this->warmedReservationIds === $reservationIds) {
+            return;
+        }
+
         $this->batchGymLookup = [];
         $this->batchGymWithItemsLookup = [];
+        $resolvedPcOffices = ProgramChairOfficeResolver::batchResolveForReservations($reservationIds);
+        foreach ($reservationIds as $reservationId) {
+            if (!array_key_exists($reservationId, $resolvedPcOffices)) {
+                $resolvedPcOffices[$reservationId] = null;
+            }
+        }
+        $this->batchPcOfficeLookup = $resolvedPcOffices;
+        $this->warmedReservationIds = $reservationIds;
 
-        if (!Schema::hasTable('reservation_details')) {
+        if ($reservationIds === [] || !Schema::hasTable('reservation_details')) {
             return;
         }
 

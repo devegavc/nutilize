@@ -40,7 +40,7 @@
 
   <main class="dashboard-shell">
     <section class="workspace-grid">
-      <div id="navbar-container"></div>
+      @include('partials.dashboard-navbar')
 
       <section class="content-card home-dashboard-card">
         <h1 class="section-title">PHYSICAL FACILITIES DASHBOARD</h1>

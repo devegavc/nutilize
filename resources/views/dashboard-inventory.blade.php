@@ -39,7 +39,7 @@
 
   <main class="dashboard-shell">
     <section class="workspace-grid">
-      <div id="navbar-container"></div>
+      @include('partials.dashboard-navbar')
 
       <section class="content-card inventory-dashboard-card">
         <h1 class="section-title">INVENTORY DASHBOARD</h1>

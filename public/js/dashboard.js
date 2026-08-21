@@ -2282,10 +2282,19 @@ async function refreshRequestListSafely(explicitUrl) {
     return;
   }
 
-  const poll = async () => {
+  let lastRequestListPollAt = Date.now();
+
+  const poll = async ({ force = false } = {}) => {
     if (document.visibilityState !== 'visible') {
       return;
     }
+
+    const now = Date.now();
+    if (!force && now - lastRequestListPollAt < 120000) {
+      return;
+    }
+
+    lastRequestListPollAt = now;
 
     try {
       await refreshRequestListSafely();
@@ -2298,9 +2307,10 @@ async function refreshRequestListSafely(explicitUrl) {
     clearInterval(requestListPollInterval);
   }
 
-  // PF request list: poll infrequently to reduce Supabase Disk IO.
-  poll();
-  requestListPollInterval = setInterval(poll, 120000);
+  // List is already rendered server-side. Poll in the background only.
+  requestListPollInterval = setInterval(() => {
+    poll({ force: true });
+  }, 120000);
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
@@ -3845,41 +3855,46 @@ async function loadNavbar() {
       ? window.dashboardNavComponent.trim()
       : '/components/navbar.html';
 
+  const serverRendered = navbarContainer.dataset.navServerRendered === '1'
+    && Boolean(navbarContainer.querySelector('.side-nav'));
+
   try {
-    const response = await fetch(navComponentPath);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    if (!serverRendered) {
+      const response = await fetch(navComponentPath);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      navbarContainer.innerHTML = await response.text();
+
+      const currentUsername = String(window.authUser?.username || '').toLowerCase();
+      const currentOfficeCode = String(window.authUser?.office_short_code || '').toLowerCase();
+      const currentRole = String(window.authUser?.role || '').toLowerCase();
+      const isIoAdmin = window.authUser?.is_item_owner === true
+        || currentUsername === 'io_admin'
+        || currentOfficeCode === 'io'
+        || (currentRole === 'admin' && currentOfficeCode === 'io');
+      const isPfAdmin = ['admin', 'pf_admin'].includes(currentRole);
+      const isPcAdmin = currentRole === 'pc_admin';
+
+      navbarContainer.querySelectorAll('[data-visible-for="io-admin"]').forEach((item) => {
+        if (!isIoAdmin) {
+          item.remove();
+        }
+      });
+
+      navbarContainer.querySelectorAll('[data-visible-for="pc-admin"]').forEach((item) => {
+        if (!isPcAdmin) {
+          item.remove();
+        }
+      });
+
+      navbarContainer.querySelectorAll('[data-visible-for="pf-admin"]').forEach((item) => {
+        if (!isPfAdmin) {
+          item.remove();
+        }
+      });
     }
-
-    navbarContainer.innerHTML = await response.text();
-
-    const currentUsername = String(window.authUser?.username || '').toLowerCase();
-    const currentOfficeCode = String(window.authUser?.office_short_code || '').toLowerCase();
-    const currentRole = String(window.authUser?.role || '').toLowerCase();
-    const isIoAdmin = window.authUser?.is_item_owner === true
-      || currentUsername === 'io_admin'
-      || currentOfficeCode === 'io'
-      || (currentRole === 'admin' && currentOfficeCode === 'io');
-    const isPfAdmin = ['admin', 'pf_admin'].includes(currentRole);
-    const isPcAdmin = currentRole === 'pc_admin';
-
-    navbarContainer.querySelectorAll('[data-visible-for="io-admin"]').forEach((item) => {
-      if (!isIoAdmin) {
-        item.remove();
-      }
-    });
-
-    navbarContainer.querySelectorAll('[data-visible-for="pc-admin"]').forEach((item) => {
-      if (!isPcAdmin) {
-        item.remove();
-      }
-    });
-
-    navbarContainer.querySelectorAll('[data-visible-for="pf-admin"]').forEach((item) => {
-      if (!isPfAdmin) {
-        item.remove();
-      }
-    });
 
     setActiveNavByPage();
     ensureSidebarToggleButton();
