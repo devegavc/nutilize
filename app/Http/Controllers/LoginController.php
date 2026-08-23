@@ -15,8 +15,43 @@ class LoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (Auth::attempt($credentials)) {
-            $request->session()->regenerate();
+        // #region agent log
+        \App\Support\AgentDebugLog::write(
+            'LoginController.php:authenticate',
+            'login attempt start',
+            \App\Support\AgentDebugLog::snapshot(null, $request),
+            'C'
+        );
+        // #endregion
+
+        try {
+            $authenticated = Auth::attempt($credentials);
+        } catch (\Throwable $throwable) {
+            // #region agent log
+            \App\Support\AgentDebugLog::write(
+                'LoginController.php:authenticate',
+                'login attempt threw',
+                \App\Support\AgentDebugLog::snapshot($throwable, $request),
+                'C'
+            );
+            // #endregion
+            throw $throwable;
+        }
+
+        if ($authenticated) {
+            try {
+                $request->session()->regenerate();
+            } catch (\Throwable $throwable) {
+                // #region agent log
+                \App\Support\AgentDebugLog::write(
+                    'LoginController.php:authenticate',
+                    'session regenerate threw',
+                    \App\Support\AgentDebugLog::snapshot($throwable, $request),
+                    'C'
+                );
+                // #endregion
+                throw $throwable;
+            }
             $user = $request->user();
 
             if ($user && (int) $user->user_id === 8) {

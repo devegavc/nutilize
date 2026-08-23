@@ -32,15 +32,44 @@ Route::get('/health/db', function () {
     try {
         DB::connection()->getPdo();
 
+        // #region agent log
+        $debugPayload = \App\Support\AgentDebugLog::snapshot();
+        \App\Support\AgentDebugLog::write('web.php:health.db', 'health snapshot connected', $debugPayload, 'A');
+        // #endregion
+
         return response()->json([
             'ok' => true,
             'database' => 'connected',
+            'debug' => [
+                'driver' => $debugPayload['driver'],
+                'connection' => $debugPayload['connection'],
+                'cache_store' => $debugPayload['cache_store'],
+                'session_driver' => $debugPayload['session_driver'],
+                'pdo_mysql' => $debugPayload['pdo_mysql'],
+                'pdo_pgsql' => $debugPayload['pdo_pgsql'],
+                'pdo_sqlite' => $debugPayload['pdo_sqlite'],
+                'tables' => $debugPayload['tables'],
+            ],
         ]);
     } catch (\Throwable $throwable) {
+        // #region agent log
+        $debugPayload = \App\Support\AgentDebugLog::snapshot($throwable);
+        \App\Support\AgentDebugLog::write('web.php:health.db', 'health snapshot failed', $debugPayload, 'D');
+        // #endregion
+
         return response()->json([
             'ok' => false,
             'database' => 'unreachable',
             'message' => 'Database connection failed on this network.',
+            'debug' => [
+                'driver' => $debugPayload['driver'],
+                'connection' => $debugPayload['connection'],
+                'cache_store' => $debugPayload['cache_store'],
+                'session_driver' => $debugPayload['session_driver'],
+                'pdo_mysql' => $debugPayload['pdo_mysql'],
+                'pdo_pgsql' => $debugPayload['pdo_pgsql'],
+                'sqlstate' => $debugPayload['sqlstate'],
+            ],
         ], 503);
     }
 })->name('health.db');

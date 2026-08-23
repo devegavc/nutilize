@@ -26,6 +26,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (QueryException|\PDOException $e, Request $request) {
             $message = $e->getMessage();
 
+            // #region agent log
+            $debugPayload = \App\Support\AgentDebugLog::snapshot($e, $request);
+            \App\Support\AgentDebugLog::write('bootstrap/app.php:exceptions', 'query/pdo exception rendered', $debugPayload, 'E');
+            // #endregion
+
             $networkErrors = [
                 'could not translate host name',
                 'Unknown host',
@@ -39,12 +44,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 if (stripos($message, $error) !== false) {
                     return response()->view('errors.database-offline', [
                         'message' => 'Database is temporarily unreachable on this network. Please switch DNS/network or try again.',
+                        'debugPayload' => $debugPayload,
                     ], 503);
                 }
             }
 
             return response()->view('errors.database-error', [
                 'message' => 'A database error occurred. Please try again later.',
+                'debugPayload' => $debugPayload,
             ], 500);
         });
     })->create();

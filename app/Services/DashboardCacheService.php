@@ -23,15 +23,37 @@ class DashboardCacheService
     {
         $cacheKey = "dashboard.data.v6.user.{$userId}.office.{$officeId}";
 
-        return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
-            return [
-                'stats' => self::getStats(),
-                'quickReports' => self::getQuickReports(),
-                'upcomingRequests' => self::getUpcomingRequests(8),
-                'tasks' => self::getTasks($officeId),
-                'dailyHighlights' => self::getDailyHighlights(),
-            ];
-        });
+        // #region agent log
+        \App\Support\AgentDebugLog::write(
+            'DashboardCacheService.php:getDashboardData',
+            'before cache remember',
+            array_merge(\App\Support\AgentDebugLog::snapshot(), ['cacheKeyPresent' => $cacheKey !== '']),
+            'A'
+        );
+        // #endregion
+
+        try {
+            return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
+                return [
+                    'stats' => self::getStats(),
+                    'quickReports' => self::getQuickReports(),
+                    'upcomingRequests' => self::getUpcomingRequests(8),
+                    'tasks' => self::getTasks($officeId),
+                    'dailyHighlights' => self::getDailyHighlights(),
+                ];
+            });
+        } catch (\Throwable $throwable) {
+            // #region agent log
+            \App\Support\AgentDebugLog::write(
+                'DashboardCacheService.php:getDashboardData',
+                'cache remember failed',
+                \App\Support\AgentDebugLog::snapshot($throwable),
+                'A'
+            );
+            // #endregion
+
+            throw $throwable;
+        }
     }
 
     /**

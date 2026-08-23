@@ -20,6 +20,11 @@ class HandleDatabaseErrors
         try {
             return $next($request);
         } catch (QueryException|PDOException $e) {
+            // #region agent log
+            $debugPayload = \App\Support\AgentDebugLog::snapshot($e, $request);
+            \App\Support\AgentDebugLog::write('HandleDatabaseErrors.php:handle', 'middleware caught db exception', $debugPayload, 'E');
+            // #endregion
+
             // Log the error
             \Log::error('Database Connection Error', [
                 'error' => $e->getMessage(),
@@ -30,12 +35,14 @@ class HandleDatabaseErrors
             if ($this->isNetworkError($e)) {
                 return response()->view('errors.database-offline', [
                     'message' => 'Database connection unavailable. Please check your network connection.',
+                    'debugPayload' => $debugPayload,
                 ], 503);
             }
 
             // Other database errors
             return response()->view('errors.database-error', [
                 'message' => 'Database error occurred.',
+                'debugPayload' => $debugPayload,
             ], 500);
         }
     }
