@@ -71,12 +71,5 @@
 
         <button class="retry-button" onclick="location.reload()">Try Again</button>
     </div>
-    @if (!empty($debugPayload))
-    <script>
-      // #region agent log
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',location:'database-error.blade.php',message:'db error page shown',data:@json($debugPayload),timestamp:Date.now(),hypothesisId:'E',runId:'pre-fix'})}).catch(function(){});
-      // #endregion
-    </script>
-    @endif
 </body>
 </html>

@@ -48,15 +48,12 @@ class AppServiceProvider extends ServiceProvider
         }
 
         try {
-            $created = false;
-
             if (! Schema::hasTable('cache')) {
                 Schema::create('cache', function (Blueprint $table) {
                     $table->string('key')->primary();
                     $table->mediumText('value');
                     $table->integer('expiration')->index();
                 });
-                $created = true;
             }
 
             if (! Schema::hasTable('cache_locks')) {
@@ -65,32 +62,11 @@ class AppServiceProvider extends ServiceProvider
                     $table->string('owner');
                     $table->integer('expiration')->index();
                 });
-                $created = true;
             }
-
-            // #region agent log
-            \App\Support\AgentDebugLog::write(
-                'AppServiceProvider.php:ensureDatabaseCacheTables',
-                $created ? 'created missing cache tables' : 'cache tables already present',
-                array_merge(\App\Support\AgentDebugLog::snapshot(), ['created' => $created]),
-                'A',
-                'post-fix'
-            );
-            // #endregion
-        } catch (Throwable $throwable) {
+        } catch (Throwable) {
             config(['cache.default' => 'file']);
             $this->app->forgetInstance('cache');
             $this->app->forgetInstance('cache.store');
-
-            // #region agent log
-            \App\Support\AgentDebugLog::write(
-                'AppServiceProvider.php:ensureDatabaseCacheTables',
-                'cache table ensure failed; fell back to file cache',
-                \App\Support\AgentDebugLog::snapshot($throwable),
-                'A',
-                'post-fix'
-            );
-            // #endregion
         }
     }
 }
