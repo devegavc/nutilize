@@ -33,7 +33,7 @@ class DashboardCacheService
         // #endregion
 
         try {
-            return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
+            $payload = Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
                 return [
                     'stats' => self::getStats(),
                     'quickReports' => self::getQuickReports(),
@@ -42,6 +42,18 @@ class DashboardCacheService
                     'dailyHighlights' => self::getDailyHighlights(),
                 ];
             });
+
+            // #region agent log
+            \App\Support\AgentDebugLog::write(
+                'DashboardCacheService.php:getDashboardData',
+                'cache remember succeeded',
+                ['cache_store' => config('cache.default'), 'has_stats' => isset($payload['stats'])],
+                'A',
+                'post-fix'
+            );
+            // #endregion
+
+            return $payload;
         } catch (\Throwable $throwable) {
             // #region agent log
             \App\Support\AgentDebugLog::write(
