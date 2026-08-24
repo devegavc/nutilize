@@ -1681,6 +1681,7 @@ class ApprovalController extends Controller
 
         $notificationRows = Notification::where('user_id', $userId)
             ->orderByDesc('created_at')
+            ->orderByDesc('notification_id')
             ->limit($limit)
             ->get([
                 'notification_id',
@@ -1763,7 +1764,7 @@ class ApprovalController extends Controller
                 'message' => 'notification list order',
                 'data' => $debugPayload,
                 'hypothesisId' => 'A',
-                'runId' => 'pre-fix',
+                'runId' => 'post-fix',
             ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND | LOCK_EX);
         } catch (Throwable) {
         }
@@ -2140,12 +2141,17 @@ class ApprovalController extends Controller
                 continue;
             }
 
-            // Insert new notification as unread.
+            // Insert new notification as unread, stamped with the request time
+            // so a late backfill of an old pending request cannot jump to the top.
+            if ($reservation->isPastActivity()) {
+                continue;
+            }
+
             DB::table('notifications')->insert($key + [
                 'title' => 'Reservation approval needed',
                 'message' => "Request '{$activityName}' by {$requesterName} is waiting for your approval.",
                 'read' => DB::raw('false'),
-                'created_at' => now(),
+                'created_at' => $reservation->created_at ?? now(),
                 'updated_at' => now(),
             ]);
         }
@@ -2185,7 +2191,7 @@ class ApprovalController extends Controller
 
         $reservations = Reservation::query()
             ->whereIn('reservation_id', $relatedIds)
-            ->get(['reservation_id', 'overall_status'])
+            ->get()
             ->keyBy('reservation_id');
 
         $closedStatuses = array_map('strval', \App\Support\OpenReservationScope::CLOSED_STATUSES);
@@ -2200,7 +2206,7 @@ class ApprovalController extends Controller
             }
 
             $status = strtolower(trim((string) $reservation->overall_status));
-            if (in_array($status, $closedStatuses, true) || str_starts_with($status, 'cancel')) {
+            if (in_array($status, $closedStatuses, true) || str_starts_with($status, 'cancel') || $reservation->isPastActivity()) {
                 $staleIds[] = $reservationId;
                 continue;
             }
@@ -2209,6 +2215,21 @@ class ApprovalController extends Controller
         }
 
         if ($openIds !== []) {
+            foreach ($openIds as $reservationId) {
+                $reservation = $reservations->get($reservationId);
+                if (!$reservation || !$reservation->created_at) {
+                    continue;
+                }
+
+                // Backfilled seeds used now(), which pinned old requests to the top.
+                Notification::query()
+                    ->where('user_id', $userId)
+                    ->where('related_id', $reservationId)
+                    ->where('type', 'reservation_approval_request')
+                    ->where('created_at', '>', $reservation->created_at)
+                    ->update(['created_at' => $reservation->created_at]);
+            }
+
             $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($openIds);
             $isPfAdmin = $user->isPhysicalFacilitiesAdmin();
             $pfOfficeId = $isPfAdmin
@@ -2307,6 +2328,10 @@ class ApprovalController extends Controller
 
         foreach ($reservations as $reservation) {
             try {
+                if ($reservation->isPastActivity()) {
+                    continue;
+                }
+
                 $requesterName = $reservation->user->full_name ?? $reservation->user->username ?? 'Unknown';
                 $activityName = trim((string) $reservation->activity_name) ?: 'Reservation request';
 
@@ -2316,6 +2341,7 @@ class ApprovalController extends Controller
                     'title' => 'Reservation approval needed',
                     'message' => "Request '{$activityName}' by {$requesterName} is waiting for your approval.",
                     'related_id' => $reservation->reservation_id,
+                    'created_at' => $reservation->created_at ?? now(),
                 ]);
             } catch (\Throwable $throwable) {
                 report($throwable);
@@ -2403,6 +2429,10 @@ class ApprovalController extends Controller
 
         foreach ($reservations as $reservation) {
             try {
+                if ($reservation->isPastActivity()) {
+                    continue;
+                }
+
                 $requesterName = $reservation->user->full_name ?? $reservation->user->username ?? 'Unknown';
                 $activityName = trim((string) $reservation->activity_name) ?: 'Reservation request';
 
@@ -2412,6 +2442,7 @@ class ApprovalController extends Controller
                     'title' => 'Reservation approval needed',
                     'message' => "Request '{$activityName}' by {$requesterName} is waiting for your approval.",
                     'related_id' => $reservation->reservation_id,
+                    'created_at' => $reservation->created_at ?? now(),
                 ]);
             } catch (\Throwable $throwable) {
                 report($throwable);

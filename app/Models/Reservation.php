@@ -50,6 +50,29 @@ class Reservation extends Model
     }
 
     /**
+     * True when the activity window has already passed, even if overall_status
+     * was never flipped to expired (Hostinger cron for reservations:expire may not run).
+     */
+    public function isPastActivity(): bool
+    {
+        if ($this->isExpired()) {
+            return true;
+        }
+
+        $endTime = $this->End_of_Activity ?? $this->end_of_activity;
+        if (!is_null($endTime) && $endTime < now()) {
+            return true;
+        }
+
+        $activityDate = $this->Date_of_Activity ?? $this->date_of_activity;
+        if (is_null($activityDate)) {
+            return false;
+        }
+
+        return \Carbon\Carbon::parse($activityDate)->endOfDay()->lt(now());
+    }
+
+    /**
      * Check if this reservation can be cancelled (not yet finalized)
      */
     public function canBeCancelled(): bool

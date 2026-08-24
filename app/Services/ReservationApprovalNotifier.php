@@ -60,7 +60,7 @@ class ReservationApprovalNotifier
 
         foreach ($missingIds as $reservationId) {
             $reservation = $reservations->get($reservationId);
-            if (!$reservation) {
+            if (!$reservation || $reservation->isPastActivity()) {
                 continue;
             }
 
@@ -69,6 +69,7 @@ class ReservationApprovalNotifier
                 ? (method_exists($requester, 'displayName') ? $requester->displayName() : ($requester->full_name ?? $requester->username ?? 'Unknown'))
                 : 'Unknown';
             $activityName = trim((string) $reservation->activity_name) ?: 'Reservation request';
+            $createdAt = self::timestampForReservation($reservation, $now);
 
             try {
                 DB::table('notifications')->insert([
@@ -78,7 +79,7 @@ class ReservationApprovalNotifier
                     'message' => "Request '{$activityName}' by {$requesterName} is waiting for your approval.",
                     'related_id' => (int) $reservationId,
                     'read' => DB::raw('false'),
-                    'created_at' => $now,
+                    'created_at' => $createdAt,
                     'updated_at' => $now,
                 ]);
                 $inserted++;
@@ -363,5 +364,17 @@ class ReservationApprovalNotifier
         $name = trim((string) ($office->department_name ?? ''));
 
         return $name !== '' ? $name : 'Previous office';
+    }
+
+    private static function timestampForReservation(Reservation $reservation, $fallback)
+    {
+        $createdAt = $reservation->created_at;
+        if (!$createdAt) {
+            return $fallback;
+        }
+
+        $parsed = \Carbon\Carbon::parse($createdAt);
+
+        return $parsed->gt($fallback) ? $fallback : $parsed;
     }
 }
