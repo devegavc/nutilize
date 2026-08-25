@@ -3969,31 +3969,7 @@ async function loadNavbar() {
     const logoutButton = navbarContainer.querySelector('[data-nav-action="logout"]');
     if (logoutButton instanceof HTMLButtonElement) {
       logoutButton.addEventListener('click', () => {
-        // #region agent log
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'pre-fix',hypothesisId:'B,D',location:'dashboard.js:navbarLogout',message:'navbar logout clicked',data:{hasConfirmGate:false,action:'/logout'},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        showNavigationProgressBar();
-
-        const token = document.querySelector('meta[name="csrf-token"]');
-
-        if (!token || !token.content) {
-          hideNavigationProgressBar();
-          showAppNotice('Unable to logout. Missing CSRF token.');
-          return;
-        }
-
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/logout';
-
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = '_token';
-        input.value = token.content;
-
-        form.appendChild(input);
-        document.body.appendChild(form);
-        form.submit();
+        requestLogout('navbar');
       });
     }
   } catch (error) {
@@ -4005,6 +3981,60 @@ if (inventoryShortcut) {
   inventoryShortcut.addEventListener('click', () => {
     window.location.href = '/dashboard/inventory';
   });
+}
+
+function submitLogoutForm() {
+  const token = document.querySelector('meta[name="csrf-token"]');
+
+  if (!token || !token.content) {
+    showAppNotice('Unable to logout. Missing CSRF token.');
+    return;
+  }
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/logout';
+
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = '_token';
+  input.value = token.content;
+
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function requestLogout(source = 'unknown') {
+  // #region agent log
+  try {
+    const payload = JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,B',location:'dashboard.js:requestLogout',message:'logout confirm prompt',data:{source,hasConfirmGate:true},timestamp:Date.now()});
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', new Blob([payload], { type: 'application/json' }));
+    } else {
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:payload}).catch(()=>{});
+    }
+  } catch (_) {}
+  // #endregion
+
+  const confirmed = window.confirm('Are you sure you want to log out?');
+
+  // #region agent log
+  try {
+    const payload = JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,B',location:'dashboard.js:requestLogout:result',message:'logout confirm result',data:{source,confirmed},timestamp:Date.now()});
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', new Blob([payload], { type: 'application/json' }));
+    } else {
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:payload}).catch(()=>{});
+    }
+  } catch (_) {}
+  // #endregion
+
+  if (!confirmed) {
+    return;
+  }
+
+  submitLogoutForm();
 }
 
 function closeMessagesPopover() {
@@ -4199,29 +4229,7 @@ function buildProfilePopover() {
     }
 
     if (action === 'logout') {
-      // #region agent log
-      try {
-        const payload = JSON.stringify({sessionId:'e19b10',runId:'pre-fix',hypothesisId:'A,D',location:'dashboard.js:profileLogout',message:'profile logout clicked',data:{hasConfirmGate:false,action:'/logout',hasCsrf:!!document.querySelector('meta[name="csrf-token"]')?.content},timestamp:Date.now()});
-        if (navigator.sendBeacon) {
-          navigator.sendBeacon('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', new Blob([payload], { type: 'application/json' }));
-        } else {
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:payload}).catch(()=>{});
-        }
-      } catch (_) {}
-      // #endregion
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = '/logout';
-      const token = document.querySelector('meta[name="csrf-token"]');
-      if (token) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = '_token';
-        input.value = token.content;
-        form.appendChild(input);
-      }
-      document.body.appendChild(form);
-      form.submit();
+      requestLogout('profile');
     }
   });
 

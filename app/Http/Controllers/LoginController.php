@@ -43,17 +43,16 @@ class LoginController extends Controller
         $request->session()->regenerateToken();
 
         // #region agent log
-        $redirectRoute = 'login';
+        $redirectRoute = 'index';
         @file_put_contents(base_path('.cursor/debug-e19b10.log'), json_encode([
             'sessionId' => 'e19b10',
-            'runId' => 'pre-fix',
+            'runId' => 'post-fix',
             'hypothesisId' => 'C,E',
             'location' => 'LoginController.php:logout',
             'message' => 'logout redirect target',
             'data' => [
                 'redirectRoute' => $redirectRoute,
                 'indexRouteExists' => \Illuminate\Support\Facades\Route::has('index'),
-                'loginRouteExists' => \Illuminate\Support\Facades\Route::has('login'),
             ],
             'timestamp' => (int) round(microtime(true) * 1000),
         ]) . PHP_EOL, FILE_APPEND);
