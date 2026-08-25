@@ -25,7 +25,7 @@ class DashboardScheduleController extends Controller
 
         $reservations = Reservation::query()
             ->with(['user', 'approvals.office', 'approvals.approver'])
-            ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['approved'])
+            ->whereRaw("LOWER(TRIM(COALESCE(overall_status, ''))) IN ('approved', 'returned', 'damaged')")
             ->get();
 
         $scheduleRows = $reservations

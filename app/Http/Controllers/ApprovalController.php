@@ -410,6 +410,8 @@ class ApprovalController extends Controller
                 $this->clearAllApprovalNotificationsForReservation((int) $reservation->reservation_id);
             }
 
+            \App\Services\DashboardInventoryCacheService::clearCache();
+
             return response()->json([
                 'success' => true,
                 'message' => match ($status) {

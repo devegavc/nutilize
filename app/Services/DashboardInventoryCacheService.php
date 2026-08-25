@@ -16,14 +16,14 @@ class DashboardInventoryCacheService
      */
     public static function getInventoryData(): array
     {
-        $cacheKey = 'dashboard.inventory.data';
+        $cacheKey = 'dashboard.inventory.data.v2';
 
         $data = Cache::remember($cacheKey, self::CACHE_TTL * 60, function () {
             return [
                 'facilityCount' => self::getFacilityCount(),
                 'equipmentCount' => self::getEquipmentCount(),
                 'maintenanceAndReportCount' => self::getMaintenanceAndReportCount(),
-                'mostRequestedItems' => self::getTopRequestedItems(10, true),
+                'mostRequestedItems' => self::getTopRequestedItems(10, false),
             ];
         });
 
@@ -47,7 +47,7 @@ class DashboardInventoryCacheService
         $monthEnd = $selectedMonth->copy()->endOfMonth();
         $compareStart = $compareMonth->copy()->startOfMonth();
         $compareEnd = $compareMonth->copy()->endOfMonth();
-        $cacheKey = 'dashboard.inventory.analytics.v4.'
+        $cacheKey = 'dashboard.inventory.analytics.v5.'
             . $monthStart->format('Y-m') . '.'
             . $compareStart->format('Y-m');
 
@@ -184,6 +184,25 @@ class DashboardInventoryCacheService
     }
 
     /**
+     * Statuses that mean the booking completed the approval chain (or finished usage).
+     * Insights used to count only exact "approved", which hid all "returned" history.
+     *
+     * @return array<int, string>
+     */
+    private static function completedBookingStatuses(): array
+    {
+        return ['approved', 'returned', 'damaged'];
+    }
+
+    private static function whereCompletedBookingStatus($query, string $column = 'overall_status')
+    {
+        $statuses = self::completedBookingStatuses();
+        $placeholders = implode(', ', array_fill(0, count($statuses), '?'));
+
+        return $query->whereRaw("LOWER(TRIM(COALESCE({$column}, ''))) IN ({$placeholders})", $statuses);
+    }
+
+    /**
      * @return array{0: array<int, string>, 1: array<int, int>}
      */
     private static function getMonthlyTrend(Carbon $endMonth): array
@@ -195,8 +214,7 @@ class DashboardInventoryCacheService
         $countsByMonth = [];
 
         if (Schema::hasTable('reservations')) {
-            $rows = DB::table('reservations')
-                ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['approved'])
+            $rows = self::whereCompletedBookingStatus(DB::table('reservations'))
                 ->whereBetween('created_at', [$start->copy()->startOfMonth(), $end->copy()->endOfMonth()])
                 ->select('created_at')
                 ->get();
@@ -224,8 +242,7 @@ class DashboardInventoryCacheService
             return 0;
         }
 
-        return (int) DB::table('reservations')
-            ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['approved'])
+        return (int) self::whereCompletedBookingStatus(DB::table('reservations'))
             ->whereBetween('created_at', [$start, $end])
             ->count();
     }
@@ -236,8 +253,7 @@ class DashboardInventoryCacheService
             return 0;
         }
 
-        return (int) DB::table('reservations')
-            ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['approved'])
+        return (int) self::whereCompletedBookingStatus(DB::table('reservations'))
             ->whereBetween('created_at', [$start, $end])
             ->distinct('user_id')
             ->count('user_id');
@@ -249,9 +265,11 @@ class DashboardInventoryCacheService
             return 0;
         }
 
-        return (int) (DB::table('reservation_details as details')
-            ->join('reservations as reservations', 'reservations.reservation_id', '=', 'details.reservation_id')
-            ->whereRaw("LOWER(COALESCE(reservations.overall_status, '')) = ?", ['approved'])
+        return (int) (self::whereCompletedBookingStatus(
+            DB::table('reservation_details as details')
+                ->join('reservations as reservations', 'reservations.reservation_id', '=', 'details.reservation_id'),
+            'reservations.overall_status'
+        )
             ->whereBetween('reservations.created_at', [$start, $end])
             ->sum('details.quantity') ?? 0);
     }
@@ -509,7 +527,12 @@ class DashboardInventoryCacheService
             ->groupBy(['items.item_id', 'items.item_name', 'owners.owner_name']);
 
         if ($approvedOnly) {
-            $query->whereRaw("LOWER(COALESCE(reservations.overall_status, '')) = ?", ['approved']);
+            self::whereCompletedBookingStatus($query, 'reservations.overall_status');
+        } else {
+            $query->whereNotIn(
+                DB::raw("LOWER(TRIM(COALESCE(reservations.overall_status, '')))"),
+                ['cancelled', 'canceled', 'rejected']
+            );
         }
 
         $rows = $query
@@ -565,6 +588,7 @@ class DashboardInventoryCacheService
     public static function clearCache(): void
     {
         Cache::forget('dashboard.inventory.data');
+        Cache::forget('dashboard.inventory.data.v2');
 
         $cursor = now()->startOfMonth();
         for ($i = 0; $i < 24; $i++) {
@@ -576,6 +600,7 @@ class DashboardInventoryCacheService
                 Cache::forget('dashboard.inventory.analytics.v2.' . $monthKey . '.' . $compareKey);
                 Cache::forget('dashboard.inventory.analytics.v3.' . $monthKey . '.' . $compareKey);
                 Cache::forget('dashboard.inventory.analytics.v4.' . $monthKey . '.' . $compareKey);
+                Cache::forget('dashboard.inventory.analytics.v5.' . $monthKey . '.' . $compareKey);
             }
 
             $cursor->subMonth();
@@ -609,37 +634,43 @@ class DashboardInventoryCacheService
             if (Schema::hasTable('reservations')) {
                 $snapshot['reservationTotal'] = (int) DB::table('reservations')->count();
                 $snapshot['approvedTotal'] = (int) DB::table('reservations')
-                    ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['approved'])
-                    ->count();
-                $snapshot['approvedCreatedThisMonth'] = (int) DB::table('reservations')
-                    ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['approved'])
-                    ->whereBetween('created_at', [$monthStart, $monthEnd])
-                    ->count();
-                $snapshot['openTotal'] = (int) DB::table('reservations')
-                    ->whereRaw(\App\Support\OpenReservationScope::rawPredicate('overall_status'))
-                    ->count();
-                $statusRows = DB::table('reservations')
-                    ->selectRaw("LOWER(TRIM(COALESCE(overall_status, ''))) as status, COUNT(*) as total")
-                    ->groupByRaw("LOWER(TRIM(COALESCE(overall_status, '')))")
-                    ->orderByDesc('total')
-                    ->limit(12)
-                    ->get();
-                foreach ($statusRows as $row) {
-                    $snapshot['statusCounts'][(string) ($row->status ?: '(empty)')] = (int) $row->total;
-                }
+                ->whereRaw("LOWER(TRIM(COALESCE(overall_status, ''))) IN ('approved', 'returned', 'damaged')")
+                ->count();
+            $snapshot['approvedCreatedThisMonth'] = (int) DB::table('reservations')
+                ->whereRaw("LOWER(TRIM(COALESCE(overall_status, ''))) IN ('approved', 'returned', 'damaged')")
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->count();
+            $snapshot['approvedExactTotal'] = (int) DB::table('reservations')
+                ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['approved'])
+                ->count();
+            $snapshot['returnedTotal'] = (int) DB::table('reservations')
+                ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['returned'])
+                ->count();
+            $snapshot['openTotal'] = (int) DB::table('reservations')
+                ->whereRaw(\App\Support\OpenReservationScope::rawPredicate('overall_status'))
+                ->count();
+            $statusRows = DB::table('reservations')
+                ->selectRaw("LOWER(TRIM(COALESCE(overall_status, ''))) as status, COUNT(*) as total")
+                ->groupByRaw("LOWER(TRIM(COALESCE(overall_status, '')))")
+                ->orderByDesc('total')
+                ->limit(12)
+                ->get();
+            foreach ($statusRows as $row) {
+                $snapshot['statusCounts'][(string) ($row->status ?: '(empty)')] = (int) $row->total;
             }
+        }
 
-            if (Schema::hasTable('reservation_details')) {
-                $snapshot['mostRequestedLive'] = count(self::getTopRequestedItems(10, true));
-                $anyStatus = DB::table('reservation_details as details')
-                    ->join('reservations as reservations', 'reservations.reservation_id', '=', 'details.reservation_id')
-                    ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
-                    ->whereBetween('reservations.created_at', [$monthStart, $monthEnd])
-                    ->whereNotNull('details.reservation_items_id')
-                    ->selectRaw('COUNT(DISTINCT reservationItems.item_id) as total')
-                    ->value('total');
-                $snapshot['mostRequestedAnyStatusThisMonth'] = (int) $anyStatus;
-            }
+        if (Schema::hasTable('reservation_details')) {
+            $snapshot['mostRequestedLive'] = count(self::getTopRequestedItems(10, true));
+            $anyStatus = DB::table('reservation_details as details')
+                ->join('reservations as reservations', 'reservations.reservation_id', '=', 'details.reservation_id')
+                ->join('reservation_items as ri', 'ri.reservation_items_id', '=', 'details.reservation_items_id')
+                ->whereBetween('reservations.created_at', [$monthStart, $monthEnd])
+                ->whereNotNull('details.reservation_items_id')
+                ->selectRaw('COUNT(DISTINCT ri.item_id) as total')
+                ->value('total');
+            $snapshot['mostRequestedAnyStatusThisMonth'] = (int) $anyStatus;
+        }
         } catch (\Throwable $throwable) {
             $snapshot['error'] = substr($throwable->getMessage(), 0, 240);
         }
@@ -652,7 +683,7 @@ class DashboardInventoryCacheService
                 'message' => 'inventory/insights fetch snapshot',
                 'data' => $snapshot,
                 'hypothesisId' => 'B',
-                'runId' => 'pre-fix',
+                'runId' => 'post-fix',
             ], JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND | LOCK_EX);
         } catch (\Throwable) {
         }
