@@ -674,6 +674,178 @@ function showAppNotice(message, options = {}) {
   });
 }
 
+function showAppConfirm(message, options = {}) {
+  const {
+    title = 'Confirm',
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    variant = 'danger',
+  } = options;
+
+  let modal = document.getElementById('app-confirm-modal');
+
+  if (!(modal instanceof HTMLElement)) {
+    if (!document.getElementById('app-confirm-style')) {
+      const style = document.createElement('style');
+      style.id = 'app-confirm-style';
+      style.textContent = `
+        .app-confirm-modal {
+          position: fixed;
+          inset: 0;
+          z-index: 3300;
+          display: none;
+        }
+        .app-confirm-modal.is-open {
+          display: grid;
+          place-items: center;
+          padding: 18px;
+        }
+        .app-confirm-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(18, 22, 34, 0.5);
+          backdrop-filter: blur(1px);
+        }
+        .app-confirm-card {
+          position: relative;
+          width: min(440px, 92vw);
+          background: #ffffff;
+          border: 1px solid #d7ddea;
+          border-radius: 14px;
+          box-shadow: 0 16px 34px rgba(20, 26, 48, 0.24);
+          overflow: hidden;
+        }
+        .app-confirm-card::before {
+          content: "";
+          position: absolute;
+          inset: 0 auto auto 0;
+          width: 100%;
+          height: 4px;
+          background: linear-gradient(90deg, #d44545 0%, #ea6a6a 100%);
+        }
+        .app-confirm-head {
+          padding: 14px 16px 10px;
+          border-bottom: 1px solid #e6eaf2;
+          background: #fbfcff;
+        }
+        .app-confirm-head h2 {
+          margin: 0;
+          font-size: 1.25rem;
+          font-weight: 750;
+          color: #c53030;
+        }
+        .app-confirm-body {
+          padding: 16px;
+          color: #2f3545;
+          font-size: 1rem;
+          line-height: 1.45;
+        }
+        .app-confirm-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          padding: 12px 16px;
+          background: #fbfcff;
+          border-top: 1px solid #e6eaf2;
+        }
+        .app-confirm-btn {
+          min-width: 104px;
+          height: 38px;
+          border-radius: 9px;
+          border: 1px solid #c7cfde;
+          background: #f1f4fa;
+          color: #3b4458;
+          font-size: 0.92rem;
+          font-weight: 650;
+          cursor: pointer;
+        }
+        .app-confirm-btn.cancel:hover {
+          background: #e7ebf4;
+        }
+        .app-confirm-btn.confirm {
+          border-color: #cf3b3b;
+          background: #cf3b3b;
+          color: #fff;
+        }
+        .app-confirm-btn.confirm:hover {
+          background: #b83232;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    modal = document.createElement('div');
+    modal.id = 'app-confirm-modal';
+    modal.className = 'app-confirm-modal';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+      <div class="app-confirm-overlay" data-close-app-confirm="true"></div>
+      <article class="app-confirm-card" role="dialog" aria-modal="true" aria-labelledby="app-confirm-title">
+        <header class="app-confirm-head">
+          <h2 id="app-confirm-title">Confirm</h2>
+        </header>
+        <div class="app-confirm-body">
+          <p id="app-confirm-message"></p>
+        </div>
+        <div class="app-confirm-actions">
+          <button type="button" class="app-confirm-btn cancel" id="app-confirm-cancel">Cancel</button>
+          <button type="button" class="app-confirm-btn confirm" id="app-confirm-ok">Confirm</button>
+        </div>
+      </article>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const titleNode = modal.querySelector('#app-confirm-title');
+  const messageNode = modal.querySelector('#app-confirm-message');
+  const cancelButton = modal.querySelector('#app-confirm-cancel');
+  const confirmButton = modal.querySelector('#app-confirm-ok');
+
+  if (!(titleNode instanceof HTMLElement)
+    || !(messageNode instanceof HTMLElement)
+    || !(cancelButton instanceof HTMLButtonElement)
+    || !(confirmButton instanceof HTMLButtonElement)) {
+    return Promise.resolve(window.confirm(String(message || 'Are you sure?')));
+  }
+
+  titleNode.textContent = title;
+  messageNode.textContent = String(message || '');
+  cancelButton.textContent = cancelText;
+  confirmButton.textContent = confirmText;
+  void variant;
+
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+
+  return new Promise((resolve) => {
+    const finish = (result) => {
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+      resolve(result);
+    };
+
+    const onCancel = () => finish(false);
+    const onConfirm = () => finish(true);
+    const onBackdrop = (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.dataset.closeAppConfirm === 'true') {
+        finish(false);
+      }
+    };
+    const onKeydown = (event) => {
+      if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+        finish(false);
+      }
+    };
+
+    cancelButton.addEventListener('click', onCancel, { once: true });
+    confirmButton.addEventListener('click', onConfirm, { once: true });
+    modal.addEventListener('click', onBackdrop, { once: true });
+    document.addEventListener('keydown', onKeydown, { once: true });
+    confirmButton.focus();
+  });
+}
+
 let activeFacilitiesTab = 'rooms';
 let activeEquipmentTab = 'all';
 let activeHistoryTab = 'latest';
@@ -4008,7 +4180,7 @@ function submitLogoutForm() {
 function requestLogout(source = 'unknown') {
   // #region agent log
   try {
-    const payload = JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,B',location:'dashboard.js:requestLogout',message:'logout confirm prompt',data:{source,hasConfirmGate:true},timestamp:Date.now()});
+    const payload = JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'F,G',location:'dashboard.js:requestLogout',message:'logout confirm modal opening',data:{source,confirmType:'app-modal'},timestamp:Date.now()});
     if (navigator.sendBeacon) {
       navigator.sendBeacon('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', new Blob([payload], { type: 'application/json' }));
     } else {
@@ -4017,24 +4189,29 @@ function requestLogout(source = 'unknown') {
   } catch (_) {}
   // #endregion
 
-  const confirmed = window.confirm('Are you sure you want to log out?');
+  showAppConfirm('Are you sure you want to log out?', {
+    title: 'Log out?',
+    confirmText: 'Log out',
+    cancelText: 'Cancel',
+    variant: 'danger',
+  }).then((confirmed) => {
+    // #region agent log
+    try {
+      const payload = JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'F,G',location:'dashboard.js:requestLogout:result',message:'logout confirm result',data:{source,confirmed,confirmType:'app-modal'},timestamp:Date.now()});
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', new Blob([payload], { type: 'application/json' }));
+      } else {
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:payload}).catch(()=>{});
+      }
+    } catch (_) {}
+    // #endregion
 
-  // #region agent log
-  try {
-    const payload = JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,B',location:'dashboard.js:requestLogout:result',message:'logout confirm result',data:{source,confirmed},timestamp:Date.now()});
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', new Blob([payload], { type: 'application/json' }));
-    } else {
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:payload}).catch(()=>{});
+    if (!confirmed) {
+      return;
     }
-  } catch (_) {}
-  // #endregion
 
-  if (!confirmed) {
-    return;
-  }
-
-  submitLogoutForm();
+    submitLogoutForm();
+  });
 }
 
 function closeMessagesPopover() {
@@ -4221,14 +4398,14 @@ function buildProfilePopover() {
 
     const action = actionButton.dataset.profileAction;
 
-    closeProfilePopover();
-
     if (action === 'account') {
+      closeProfilePopover();
       window.location.href = '/dashboard/profile';
       return;
     }
 
     if (action === 'logout') {
+      closeProfilePopover();
       requestLogout('profile');
     }
   });
