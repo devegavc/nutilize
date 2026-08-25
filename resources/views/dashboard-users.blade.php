@@ -135,6 +135,24 @@
           $formatUserCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'user' : 'users');
           $activeUsersCount = $users->filter(fn ($user) => $resolveUserStatus($user) === 'active')->count();
           $resolveUserName = fn ($user) => $user->displayName();
+          $resolveUserOffice = function ($user): string {
+              $officeName = trim((string) ($user->office?->department_name ?? ''));
+              if ($officeName !== '') {
+                  return $officeName;
+              }
+
+              $programOfficeName = trim((string) ($user->academicProgram?->office?->department_name ?? ''));
+              if ($programOfficeName !== '') {
+                  return $programOfficeName;
+              }
+
+              $programName = trim((string) ($user->academicProgram?->name ?? ''));
+              if ($programName !== '') {
+                  return $programName;
+              }
+
+              return 'No Office';
+          };
         @endphp
 
         <section class="users-summary-grid" aria-label="User summary">
@@ -237,7 +255,7 @@
                   @foreach($admins as $user)
                     @php
                       $userStatus = $resolveUserStatus($user);
-                      $userOffice = $user->office?->department_name ?? 'No Office';
+                      $userOffice = $resolveUserOffice($user);
                       $userName = $resolveUserName($user);
                     @endphp
                     <tr
@@ -286,7 +304,7 @@
                   @foreach($itemOwners as $user)
                     @php
                       $userStatus = $resolveUserStatus($user);
-                      $userOffice = $user->office?->department_name ?? 'Item Owner';
+                      $userOffice = $resolveUserOffice($user);
                       $userName = $resolveUserName($user);
                     @endphp
                     <tr
@@ -336,7 +354,7 @@
                   @foreach($approvers as $user)
                     @php
                       $userStatus = $resolveUserStatus($user);
-                      $userOffice = $user->office?->department_name ?? 'No Office';
+                      $userOffice = $resolveUserOffice($user);
                       $userName = $resolveUserName($user);
                     @endphp
                     <tr
@@ -824,15 +842,27 @@
 
     // #region agent log
     (() => {
-      const rows = Array.from(document.querySelectorAll('#users-table-body tr[data-user-id]')).slice(0, 8);
-      const sample = rows.map((row) => ({
-        id: row.dataset.userId,
-        role: row.dataset.userRole,
-        officeId: row.dataset.userOfficeId || null,
-        officeName: row.dataset.userOfficeName || null,
-        officeCell: row.querySelector('td:nth-child(5) .user-cell-text')?.textContent?.trim() || null,
-      }));
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'pre-fix',hypothesisId:'A,E',location:'dashboard-users.blade.php:dom',message:'rendered office cells',data:{rowCount:document.querySelectorAll('#users-table-body tr[data-user-id]').length,sample},timestamp:Date.now()})}).catch(()=>{});
+      const rows = Array.from(document.querySelectorAll('#users-table-body tr[data-user-id]'));
+      const noOffice = rows
+        .filter((row) => (row.querySelector('td:nth-child(5) .user-cell-text')?.textContent?.trim() || '') === 'No Office')
+        .slice(0, 10)
+        .map((row) => ({
+          id: row.dataset.userId,
+          role: row.dataset.userRole,
+          officeId: row.dataset.userOfficeId || null,
+          officeName: row.dataset.userOfficeName || null,
+          officeCell: row.querySelector('td:nth-child(5) .user-cell-text')?.textContent?.trim() || null,
+        }));
+      const withOffice = rows
+        .filter((row) => (row.querySelector('td:nth-child(5) .user-cell-text')?.textContent?.trim() || '') !== 'No Office')
+        .slice(0, 5)
+        .map((row) => ({
+          id: row.dataset.userId,
+          role: row.dataset.userRole,
+          officeId: row.dataset.userOfficeId || null,
+          officeCell: row.querySelector('td:nth-child(5) .user-cell-text')?.textContent?.trim() || null,
+        }));
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,C',location:'dashboard-users.blade.php:dom',message:'office vs no-office row split',data:{rowCount:rows.length,noOfficeCount:rows.filter((r)=> (r.querySelector('td:nth-child(5) .user-cell-text')?.textContent?.trim()||'')==='No Office').length,noOffice,withOffice},timestamp:Date.now()})}).catch(()=>{});
     })();
     // #endregion
   </script>

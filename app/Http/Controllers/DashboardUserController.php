@@ -16,7 +16,7 @@ class DashboardUserController extends Controller
 {
     public function index()
     {
-        $users = User::with(['office', 'academicProgram'])
+        $users = User::with(['office', 'academicProgram.office'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -59,6 +59,7 @@ class DashboardUserController extends Controller
             'timestamp' => (int) round(microtime(true) * 1000),
         ];
         @file_put_contents(base_path('.cursor/debug-e19b10.log'), json_encode($payload) . PHP_EOL, FILE_APPEND);
+        @file_put_contents(storage_path('logs/debug-e19b10.log'), json_encode($payload) . PHP_EOL, FILE_APPEND);
         // #endregion
 
         return view('dashboard-users', [
