@@ -821,6 +821,20 @@
         applyUsersFilters();
       }
     }
+
+    // #region agent log
+    (() => {
+      const rows = Array.from(document.querySelectorAll('#users-table-body tr[data-user-id]')).slice(0, 8);
+      const sample = rows.map((row) => ({
+        id: row.dataset.userId,
+        role: row.dataset.userRole,
+        officeId: row.dataset.userOfficeId || null,
+        officeName: row.dataset.userOfficeName || null,
+        officeCell: row.querySelector('td:nth-child(5) .user-cell-text')?.textContent?.trim() || null,
+      }));
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'pre-fix',hypothesisId:'A,E',location:'dashboard-users.blade.php:dom',message:'rendered office cells',data:{rowCount:document.querySelectorAll('#users-table-body tr[data-user-id]').length,sample},timestamp:Date.now()})}).catch(()=>{});
+    })();
+    // #endregion
   </script>
 
   <script src="/js/dashboard.js"></script>
