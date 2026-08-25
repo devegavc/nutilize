@@ -102,6 +102,15 @@ class DashboardScheduleController extends Controller
             ? $todayDay
             : $firstMarkedDay;
 
+        // #region agent log
+        $agentDebug = \App\Services\DashboardInventoryCacheService::agentFetchDebugSnapshot('schedule', [
+            'monthKey' => $monthStart->format('Y-m'),
+            'approvedLoaded' => $reservations->count(),
+            'scheduledInMonth' => count($reservationIds),
+            'markedDays' => count($markedDays['all'] ?? []),
+        ]);
+        // #endregion
+
         return view('dashboard-schedule', [
             'monthLabel' => $monthStart->format('F Y'),
             'monthKey' => $monthStart->format('Y-m'),
@@ -115,6 +124,7 @@ class DashboardScheduleController extends Controller
                 'requestData' => $scheduleByDay,
                 'defaultDay' => $defaultDay,
             ],
+            '_agentDebug' => $agentDebug,
         ]);
     }
 
