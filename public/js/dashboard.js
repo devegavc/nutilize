@@ -1727,6 +1727,15 @@ function renderScheduleDayIndicators(cell, count) {
     indicators.appendChild(badge);
   }
 
+  cell.classList.remove('density-low', 'density-mid', 'density-high');
+  if (safeCount >= 5) {
+    cell.classList.add('density-high');
+  } else if (safeCount >= 3) {
+    cell.classList.add('density-mid');
+  } else if (safeCount > 0) {
+    cell.classList.add('density-low');
+  }
+
   cell.dataset.requestCount = String(safeCount);
   cell.title = safeCount > 0
     ? `${safeCount} reservation${safeCount === 1 ? '' : 's'}`

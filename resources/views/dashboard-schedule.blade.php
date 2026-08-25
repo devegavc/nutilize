@@ -64,11 +64,14 @@
               $isCurrentMonth = $monthKey === now()->format('Y-m');
               $todayDay = (int) now()->day;
             @endphp
+            <div class="schedule-calendar-accent" aria-hidden="true"></div>
+
             <header class="schedule-month-row">
               <button class="month-nav-btn" type="button" aria-label="Previous month" onclick="window.location.href='{{ $previousMonthUrl }}'">
                 <i class="bi bi-chevron-left"></i>
               </button>
               <div class="schedule-month-heading">
+                <p class="schedule-calendar-kicker">Monthly schedule</p>
                 <h1>
                   <button
                     class="calendar-month-title"
@@ -113,13 +116,13 @@
             <div class="schedule-calendar-toolbar">
               <button class="schedule-today-btn" id="schedule-today-btn" type="button">
                 <i class="bi bi-calendar-event" aria-hidden="true"></i>
-                Today
+                Jump to today
               </button>
 
               <div class="schedule-legend" aria-label="Calendar legend">
                 <span class="schedule-legend-item">
-                  <span class="schedule-legend-chip is-reservation" aria-hidden="true">2</span>
-                  Has bookings
+                  <span class="schedule-legend-chip is-reservation" aria-hidden="true">3</span>
+                  Bookings
                 </span>
                 <span class="schedule-legend-item">
                   <span class="schedule-legend-chip is-today" aria-hidden="true"></span>
@@ -133,7 +136,7 @@
             </div>
 
             <section class="calendar-grid-wrap">
-              <div class="calendar-grid">
+              <div class="calendar-weekdays" aria-hidden="true">
                 <span class="day-label">Sun</span>
                 <span class="day-label">Mon</span>
                 <span class="day-label">Tue</span>
@@ -141,7 +144,8 @@
                 <span class="day-label">Thu</span>
                 <span class="day-label">Fri</span>
                 <span class="day-label">Sat</span>
-
+              </div>
+              <div class="calendar-grid">
                 @foreach ($calendarCells as $cell)
                   @if (!empty($cell['blank']))
                     <span class="day day-empty" aria-hidden="true"></span>
@@ -149,10 +153,11 @@
                     @php
                       $requestCount = (int) ($cell['request_count'] ?? 0);
                       $isToday = $isCurrentMonth && (int) $cell['day'] === $todayDay;
+                      $densityClass = $requestCount >= 5 ? ' density-high' : ($requestCount >= 3 ? ' density-mid' : ($requestCount > 0 ? ' density-low' : ''));
                     @endphp
                     <button
                       type="button"
-                      class="day{{ $requestCount > 0 ? ' marked' : '' }}{{ $isToday ? ' today' : '' }}"
+                      class="day{{ $requestCount > 0 ? ' marked' : '' }}{{ $isToday ? ' today' : '' }}{{ $densityClass }}"
                       data-day="{{ $cell['day'] }}"
                       data-request-count="{{ $requestCount }}"
                       aria-label="{{ $isToday ? 'Today, ' : '' }}{{ $monthLabel }} {{ $cell['day'] }}{{ $requestCount > 0 ? ', ' . $requestCount . ' reservation' . ($requestCount === 1 ? '' : 's') : '' }}"
@@ -327,7 +332,7 @@
     </article>
   </section>
 
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
 </html>
 
