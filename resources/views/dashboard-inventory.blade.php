@@ -112,11 +112,6 @@
   </main>
 
   <script src="/js/dashboard.js"></script>
-  <script>
-    // #region agent log
-    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',location:'dashboard-inventory.blade.php',message:'inventory page rendered',data:@json($_agentDebug ?? ['page'=>'inventory','missing'=>true]),timestamp:Date.now(),hypothesisId:'B',runId:'post-fix'})}).catch(function(){});
-    // #endregion
-  </script>
 </body>
 </html>
 

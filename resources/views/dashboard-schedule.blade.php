@@ -111,20 +111,23 @@
             </header>
 
             <div class="schedule-calendar-toolbar">
-              <button class="schedule-today-btn" id="schedule-today-btn" type="button">Today</button>
+              <button class="schedule-today-btn" id="schedule-today-btn" type="button">
+                <i class="bi bi-calendar-event" aria-hidden="true"></i>
+                Today
+              </button>
 
               <div class="schedule-legend" aria-label="Calendar legend">
                 <span class="schedule-legend-item">
-                  <span class="schedule-legend-dot is-reservation" aria-hidden="true"></span>
-                  Has Reservations
+                  <span class="schedule-legend-chip is-reservation" aria-hidden="true">2</span>
+                  Has bookings
                 </span>
                 <span class="schedule-legend-item">
-                  <span class="schedule-legend-dot is-approved" aria-hidden="true"></span>
-                  Fully Approved
+                  <span class="schedule-legend-chip is-today" aria-hidden="true"></span>
+                  Today
                 </span>
                 <span class="schedule-legend-item">
-                  <span class="schedule-legend-dot is-empty" aria-hidden="true"></span>
-                  No Reservations
+                  <span class="schedule-legend-chip is-selected" aria-hidden="true"></span>
+                  Selected
                 </span>
               </div>
             </div>
@@ -143,19 +146,25 @@
                   @if (!empty($cell['blank']))
                     <span class="day day-empty" aria-hidden="true"></span>
                   @else
-                    <span
-                      class="day{{ !empty($cell['marked']) ? ' marked' : '' }}{{ $isCurrentMonth && (int) $cell['day'] === $todayDay ? ' today' : '' }}"
+                    @php
+                      $requestCount = (int) ($cell['request_count'] ?? 0);
+                      $isToday = $isCurrentMonth && (int) $cell['day'] === $todayDay;
+                    @endphp
+                    <button
+                      type="button"
+                      class="day{{ $requestCount > 0 ? ' marked' : '' }}{{ $isToday ? ' today' : '' }}"
                       data-day="{{ $cell['day'] }}"
-                      data-request-count="{{ $cell['request_count'] }}"
-                      title="{{ $cell['request_count'] > 0 ? $cell['request_count'] . ' approved request(s)' : 'No approved requests' }}"
+                      data-request-count="{{ $requestCount }}"
+                      aria-label="{{ $isToday ? 'Today, ' : '' }}{{ $monthLabel }} {{ $cell['day'] }}{{ $requestCount > 0 ? ', ' . $requestCount . ' reservation' . ($requestCount === 1 ? '' : 's') : '' }}"
+                      title="{{ $requestCount > 0 ? $requestCount . ' reservation' . ($requestCount === 1 ? '' : 's') : 'No reservations' }}"
                     >
                       <span class="day-number">{{ $cell['day'] }}</span>
                       <span class="day-indicators" aria-hidden="true">
-                        @for ($dotIndex = 0; $dotIndex < min(3, (int) $cell['request_count']); $dotIndex++)
-                          <span class="day-indicator"></span>
-                        @endfor
+                        @if ($requestCount > 0)
+                          <span class="day-count">{{ $requestCount > 9 ? '9+' : $requestCount }}</span>
+                        @endif
                       </span>
-                    </span>
+                    </button>
                   @endif
                 @endforeach
               </div>
@@ -319,11 +328,6 @@
   </section>
 
   <script src="/js/dashboard.js"></script>
-  <script>
-    // #region agent log
-    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',location:'dashboard-schedule.blade.php',message:'schedule page rendered',data:@json($_agentDebug ?? ['page'=>'schedule','missing'=>true]),timestamp:Date.now(),hypothesisId:'E',runId:'post-fix'})}).catch(function(){});
-    // #endregion
-  </script>
 </body>
 </html>
 

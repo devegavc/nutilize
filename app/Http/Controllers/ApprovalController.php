@@ -1681,7 +1681,7 @@ class ApprovalController extends Controller
         $limit = min(max((int) $request->query('limit', 20), 1), 50);
         $userId = (int) $user->user_id;
 
-        $notificationRows = Notification::where('user_id', $userId)
+        $notifications = Notification::where('user_id', $userId)
             ->orderByDesc('created_at')
             ->orderByDesc('notification_id')
             ->limit($limit)
@@ -1693,24 +1693,7 @@ class ApprovalController extends Controller
                 'related_id',
                 'read',
                 'created_at',
-            ]);
-
-        $relatedIds = $notificationRows
-            ->pluck('related_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
-
-        $reservationMeta = $relatedIds === []
-            ? collect()
-            : Reservation::query()
-                ->whereIn('reservation_id', $relatedIds)
-                ->get()
-                ->keyBy('reservation_id');
-
-        $notifications = $notificationRows
+            ])
             ->map(function ($notification) {
                 return [
                     'id' => $notification->notification_id,
@@ -1720,57 +1703,10 @@ class ApprovalController extends Controller
                     'related_id' => $notification->related_id,
                     'read' => (bool) $notification->read,
                     'created_at' => $this->formatNotificationTime($notification->created_at),
-                    'created_at_iso' => optional($notification->created_at)?->toIso8601String(),
                 ];
             })
             ->values()
             ->all();
-
-        // #region agent log
-        $orderDebug = $notificationRows->take(8)->values()->map(function ($notification) use ($reservationMeta) {
-            $createdAt = $notification->created_at;
-            $relatedId = (int) ($notification->related_id ?? 0);
-            $reservation = $relatedId > 0 ? $reservationMeta->get($relatedId) : null;
-            $activityAt = $reservation
-                ? ($reservation->Start_of_activity ?? $reservation->start_of_activity ?? $reservation->Date_of_Activity ?? $reservation->date_of_activity)
-                : null;
-
-            return [
-                'id' => (int) $notification->notification_id,
-                'type' => (string) $notification->type,
-                'read' => (bool) $notification->read,
-                'related_id' => $relatedId ?: null,
-                'created_at' => optional($createdAt)?->toIso8601String(),
-                'age_days' => $createdAt ? (int) now()->diffInDays($createdAt) : null,
-                'status' => $reservation ? (string) $reservation->overall_status : null,
-                'reservation_age_days' => ($reservation && $reservation->created_at)
-                    ? (int) now()->diffInDays($reservation->created_at)
-                    : null,
-                'activity_past' => $activityAt ? \Carbon\Carbon::parse($activityAt)->lt(now()) : null,
-            ];
-        })->all();
-
-        $debugPayload = [
-            'count' => count($notifications),
-            'first_age_days' => $orderDebug[0]['age_days'] ?? null,
-            'first_activity_past' => $orderDebug[0]['activity_past'] ?? null,
-            'oldest_in_page_days' => collect($orderDebug)->max('age_days'),
-            'order' => $orderDebug,
-        ];
-
-        try {
-            file_put_contents(base_path('debug-e19b10.log'), json_encode([
-                'sessionId' => 'e19b10',
-                'timestamp' => (int) round(microtime(true) * 1000),
-                'location' => 'ApprovalController.php:getNotifications',
-                'message' => 'notification list order',
-                'data' => $debugPayload,
-                'hypothesisId' => 'A',
-                'runId' => 'post-fix',
-            ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND | LOCK_EX);
-        } catch (Throwable) {
-        }
-        // #endregion
 
         $unreadCount = $this->cachedUnreadNotificationCount($userId);
 
@@ -1778,7 +1714,6 @@ class ApprovalController extends Controller
             'success' => true,
             'notifications' => $notifications,
             'unread_count' => $unreadCount,
-            '_debug' => $debugPayload,
         ]);
     }
 

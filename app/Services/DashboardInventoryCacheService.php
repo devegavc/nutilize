@@ -16,9 +16,7 @@ class DashboardInventoryCacheService
      */
     public static function getInventoryData(): array
     {
-        $cacheKey = 'dashboard.inventory.data.v2';
-
-        $data = Cache::remember($cacheKey, self::CACHE_TTL * 60, function () {
+        return Cache::remember('dashboard.inventory.data.v2', self::CACHE_TTL * 60, function () {
             return [
                 'facilityCount' => self::getFacilityCount(),
                 'equipmentCount' => self::getEquipmentCount(),
@@ -26,16 +24,6 @@ class DashboardInventoryCacheService
                 'mostRequestedItems' => self::getTopRequestedItems(10, false),
             ];
         });
-
-        // #region agent log
-        $data['_agentDebug'] = self::agentFetchDebugSnapshot('inventory', [
-            'facilityCount' => (int) ($data['facilityCount'] ?? 0),
-            'equipmentCount' => (int) ($data['equipmentCount'] ?? 0),
-            'mostRequestedCount' => count($data['mostRequestedItems'] ?? []),
-        ]);
-        // #endregion
-
-        return $data;
     }
 
     /**
@@ -127,19 +115,6 @@ class DashboardInventoryCacheService
                 'topBorrowers' => self::getTopBorrowers(8, $monthStart, $monthEnd),
             ], InventoryInsightsService::build($monthStart, $monthEnd));
         });
-
-        // #region agent log
-        $data['_agentDebug'] = self::agentFetchDebugSnapshot('insights', [
-            'monthKey' => $monthStart->format('Y-m'),
-            'compareMonthKey' => $compareStart->format('Y-m'),
-            'approvedBookings' => (int) ($data['approvedBookings'] ?? 0),
-            'totalBorrowers' => (int) ($data['totalBorrowers'] ?? 0),
-            'engagementCount' => (int) ($data['engagementCount'] ?? 0),
-            'newUsers' => (int) ($data['newUsers'] ?? 0),
-            'trendSum' => array_sum(array_map('intval', $data['trendCounts'] ?? [])),
-            'topItemsCount' => count($data['topItems'] ?? []),
-        ]);
-        // #endregion
 
         $canGoNext = $monthStart->lt(now()->startOfMonth());
         $previousSelected = $monthStart->copy()->subMonth();
@@ -606,89 +581,4 @@ class DashboardInventoryCacheService
             $cursor->subMonth();
         }
     }
-
-    // #region agent log
-    /**
-     * @param  array<string, mixed>  $pageMetrics
-     * @return array<string, mixed>
-     */
-    public static function agentFetchDebugSnapshot(string $page, array $pageMetrics = []): array
-    {
-        $monthStart = now()->startOfMonth();
-        $monthEnd = now()->endOfMonth();
-        $snapshot = [
-            'page' => $page,
-            'pageMetrics' => $pageMetrics,
-            'month' => $monthStart->format('Y-m'),
-            'reservationTotal' => 0,
-            'statusCounts' => [],
-            'approvedTotal' => 0,
-            'approvedCreatedThisMonth' => 0,
-            'openTotal' => 0,
-            'mostRequestedLive' => 0,
-            'mostRequestedAnyStatusThisMonth' => 0,
-            'error' => null,
-        ];
-
-        try {
-            if (Schema::hasTable('reservations')) {
-                $snapshot['reservationTotal'] = (int) DB::table('reservations')->count();
-                $snapshot['approvedTotal'] = (int) DB::table('reservations')
-                ->whereRaw("LOWER(TRIM(COALESCE(overall_status, ''))) IN ('approved', 'returned', 'damaged')")
-                ->count();
-            $snapshot['approvedCreatedThisMonth'] = (int) DB::table('reservations')
-                ->whereRaw("LOWER(TRIM(COALESCE(overall_status, ''))) IN ('approved', 'returned', 'damaged')")
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->count();
-            $snapshot['approvedExactTotal'] = (int) DB::table('reservations')
-                ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['approved'])
-                ->count();
-            $snapshot['returnedTotal'] = (int) DB::table('reservations')
-                ->whereRaw("LOWER(COALESCE(overall_status, '')) = ?", ['returned'])
-                ->count();
-            $snapshot['openTotal'] = (int) DB::table('reservations')
-                ->whereRaw(\App\Support\OpenReservationScope::rawPredicate('overall_status'))
-                ->count();
-            $statusRows = DB::table('reservations')
-                ->selectRaw("LOWER(TRIM(COALESCE(overall_status, ''))) as status, COUNT(*) as total")
-                ->groupByRaw("LOWER(TRIM(COALESCE(overall_status, '')))")
-                ->orderByDesc('total')
-                ->limit(12)
-                ->get();
-            foreach ($statusRows as $row) {
-                $snapshot['statusCounts'][(string) ($row->status ?: '(empty)')] = (int) $row->total;
-            }
-        }
-
-        if (Schema::hasTable('reservation_details')) {
-            $snapshot['mostRequestedLive'] = count(self::getTopRequestedItems(10, true));
-            $anyStatus = DB::table('reservation_details as details')
-                ->join('reservations as reservations', 'reservations.reservation_id', '=', 'details.reservation_id')
-                ->join('reservation_items as ri', 'ri.reservation_items_id', '=', 'details.reservation_items_id')
-                ->whereBetween('reservations.created_at', [$monthStart, $monthEnd])
-                ->whereNotNull('details.reservation_items_id')
-                ->selectRaw('COUNT(DISTINCT ri.item_id) as total')
-                ->value('total');
-            $snapshot['mostRequestedAnyStatusThisMonth'] = (int) $anyStatus;
-        }
-        } catch (\Throwable $throwable) {
-            $snapshot['error'] = substr($throwable->getMessage(), 0, 240);
-        }
-
-        try {
-            file_put_contents(base_path('debug-e19b10.log'), json_encode([
-                'sessionId' => 'e19b10',
-                'timestamp' => (int) round(microtime(true) * 1000),
-                'location' => 'DashboardInventoryCacheService.php:agentFetchDebugSnapshot',
-                'message' => 'inventory/insights fetch snapshot',
-                'data' => $snapshot,
-                'hypothesisId' => 'B',
-                'runId' => 'post-fix',
-            ], JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND | LOCK_EX);
-        } catch (\Throwable) {
-        }
-
-        return $snapshot;
-    }
-    // #endregion
 }

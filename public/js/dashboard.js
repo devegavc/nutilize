@@ -805,19 +805,8 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
         message: notification.message,
         unread: !notification.read,
         created_at: notification.created_at,
-        created_at_iso: notification.created_at_iso || '',
         related_id: notification.related_id,
-      })).sort((left, right) => {
-        const leftTime = Date.parse(left.created_at_iso || '') || 0;
-        const rightTime = Date.parse(right.created_at_iso || '') || 0;
-        if (rightTime !== leftTime) {
-          return rightTime - leftTime;
-        }
-        return Number(right.id || 0) - Number(left.id || 0);
-      });
-      // #region agent log
-            fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',location:'dashboard.js:fetchNotifications',message:'client notification order',data:{isArray:Array.isArray(data.notifications),count:notificationItems.length,firstCreated:notificationItems[0]?.created_at||null,firstIso:notificationItems[0]?.created_at_iso||null,firstUnread:notificationItems[0]?.unread??null,firstActivityPast:data._debug?.order?.[0]?.activity_past??null,serverDebug:data._debug||null,preview:notificationItems.slice(0,8).map((item)=>({id:item.id,created_at:item.created_at,created_at_iso:item.created_at_iso,unread:item.unread,related_id:item.related_id}))},timestamp:Date.now(),hypothesisId:'C',runId:'post-fix'})}).catch(()=>{});
-      // #endregion
+      }));
       const parsedUnread = Number.parseInt(String(data.unread_count ?? 0), 10);
       notificationUnreadCount = Number.isFinite(parsedUnread)
         ? parsedUnread
@@ -1729,19 +1718,26 @@ function renderScheduleDayIndicators(cell, count) {
     cell.appendChild(indicators);
   }
 
-  const visibleCount = Math.min(safeCount, 3);
   indicators.replaceChildren();
 
-  for (let index = 0; index < visibleCount; index += 1) {
-    const dot = document.createElement('span');
-    dot.className = 'day-indicator';
-    indicators.appendChild(dot);
+  if (safeCount > 0) {
+    const badge = document.createElement('span');
+    badge.className = 'day-count';
+    badge.textContent = safeCount > 9 ? '9+' : String(safeCount);
+    indicators.appendChild(badge);
   }
 
   cell.dataset.requestCount = String(safeCount);
   cell.title = safeCount > 0
-    ? `${safeCount} approved request${safeCount === 1 ? '' : 's'}`
-    : 'No approved requests';
+    ? `${safeCount} reservation${safeCount === 1 ? '' : 's'}`
+    : 'No reservations';
+
+  const dayLabel = cell.querySelector('.day-number')?.textContent?.trim() || cell.dataset.day || '';
+  const isToday = cell.classList.contains('today');
+  cell.setAttribute(
+    'aria-label',
+    `${isToday ? 'Today, ' : ''}${dayLabel}${safeCount > 0 ? `, ${safeCount} reservation${safeCount === 1 ? '' : 's'}` : ''}`
+  );
 }
 
 function updateScheduleMonthSummary() {
