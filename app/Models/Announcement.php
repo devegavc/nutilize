@@ -48,6 +48,18 @@ class Announcement extends Model
         return 'Physical Facilities staff';
     }
 
+    public function isEdited(): bool
+    {
+        $publishedAt = $this->published_at ?? $this->created_at;
+        $updatedAt = $this->updated_at;
+
+        if (!$publishedAt || !$updatedAt) {
+            return false;
+        }
+
+        return $updatedAt->gt($publishedAt);
+    }
+
     public static function purgeExpired(): int
     {
         if (!Schema::hasTable('announcements') || !Schema::hasColumn('announcements', 'expires_at')) {

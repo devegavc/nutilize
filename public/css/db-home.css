@@ -845,11 +845,35 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   gap: 10px;
 }
 
+.announcement-card-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .announcement-card-top strong {
   color: #243274;
   font-size: 0.98rem;
   line-height: 1.3;
   word-break: break-word;
+}
+
+.announcement-edited-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(244, 183, 10, 0.18);
+  border: 1px solid rgba(244, 183, 10, 0.35);
+  color: #8a6500;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .announcement-card-body {
@@ -881,6 +905,11 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   font-style: normal;
   color: #5a6794;
   font-weight: 600;
+}
+
+.announcement-edited-meta {
+  color: #8a6500;
+  font-weight: 650;
 }
 
 .announcement-card-actions {

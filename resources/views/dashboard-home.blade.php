@@ -320,10 +320,17 @@
             @forelse(($announcements ?? []) as $announcement)
               @php
                 $announcedAt = $announcement->published_at ?? $announcement->created_at;
+                $isEdited = $announcement->isEdited();
+                $editedAt = $isEdited ? $announcement->updated_at : null;
               @endphp
-              <article class="announcement-card">
+              <article class="announcement-card{{ $isEdited ? ' is-edited' : '' }}">
                 <div class="announcement-card-top">
-                  <strong>{{ $announcement->title }}</strong>
+                  <div class="announcement-card-heading">
+                    <strong>{{ $announcement->title }}</strong>
+                    @if ($isEdited)
+                      <span class="announcement-edited-badge" title="This announcement was modified after publishing">Edited</span>
+                    @endif
+                  </div>
                   <div class="announcement-card-actions">
                     <button
                       class="announcement-edit"
@@ -356,6 +363,12 @@
                     <i class="bi bi-clock-fill"></i>
                     {{ optional($announcedAt)?->timezone('Asia/Manila')->format('M j, Y · g:i A') }}
                   </span>
+                  @if ($isEdited && $editedAt)
+                    <span class="announcement-edited-meta">
+                      <i class="bi bi-pencil-fill"></i>
+                      Edited {{ $editedAt->timezone('Asia/Manila')->format('M j, Y · g:i A') }}
+                    </span>
+                  @endif
                 </div>
               </article>
             @empty
