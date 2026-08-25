@@ -180,7 +180,9 @@
         <section class="schedule-inline-panel" id="schedule-inline-panel" hidden aria-live="polite">
           <div class="schedule-inline-content">
             <div class="schedule-inline-table-wrap">
-              <div class="schedule-inline-table-title">Selected Date Details</div>
+              <div class="schedule-inline-table-title">
+                <span>Selected Date Details</span>
+              </div>
               <div class="schedule-inline-date-summary">
                 <div class="schedule-inline-date-heading" id="schedule-inline-date">Select a highlighted date to see approved requests and details below.</div>
                 <div class="schedule-inline-date-stats" id="schedule-inline-date-stats" hidden>
@@ -189,23 +191,12 @@
                   <span class="schedule-inline-date-stat" id="schedule-inline-stat-approved">0 Fully Approved</span>
                 </div>
               </div>
-              <table class="schedule-inline-table">
-                <thead>
-                  <tr>
-                    <th>Reservation ID</th>
-                    <th>Requester</th>
-                    <th>Resources</th>
-                  </tr>
-                </thead>
-                <tbody id="schedule-inline-request-body">
-                  <tr>
-                    <td colspan="3">No date selected yet.</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div class="schedule-inline-request-list" id="schedule-inline-request-body">
+                <div class="schedule-inline-empty">No date selected yet.</div>
+              </div>
             </div>
 
-            <article class="schedule-inline-detail-card" id="schedule-inline-detail-card">
+            <article class="schedule-inline-detail-card" id="schedule-inline-detail-card" hidden>
               <h3>Request Information</h3>
 
               <div class="schedule-inline-detail-groups">

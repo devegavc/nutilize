@@ -40,7 +40,7 @@ body {
 
 .schedule-content-card.has-schedule-details {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 1.15fr);
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   align-content: stretch;
@@ -66,13 +66,16 @@ body {
 .schedule-content-card.has-schedule-details .schedule-inline-panel {
   grid-column: 2;
   grid-row: 2;
-  margin: 12px 14px 14px 0;
+  margin: 12px 14px 14px 8px;
+  padding: 10px;
   min-height: 0;
   height: auto;
   max-height: none;
   align-self: stretch;
-  overflow: auto;
+  overflow: hidden;
   flex-shrink: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .schedule-layout {
@@ -174,7 +177,7 @@ body {
 .schedule-content-card.has-schedule-details .calendar-grid {
   flex: 1 1 auto;
   min-height: 0;
-  grid-auto-rows: minmax(0, 1fr);
+  grid-auto-rows: minmax(44px, 1fr);
 }
 
 .schedule-month-row {
@@ -896,8 +899,13 @@ body {
   font-size: clamp(1.15rem, 1.8vw, 1.4rem);
 }
 
+.schedule-content-card.has-schedule-details .schedule-legend {
+  display: none;
+}
+
 .schedule-content-card.has-schedule-details .schedule-calendar-toolbar {
   padding: 8px 12px 0;
+  justify-content: flex-start;
 }
 
 .schedule-content-card.has-schedule-details .calendar-grid-wrap {
@@ -923,17 +931,28 @@ body {
 }
 
 .schedule-content-card.has-schedule-details .schedule-inline-content {
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   height: 100%;
   min-height: 0;
+  margin-top: 0;
 }
 
 .schedule-content-card.has-schedule-details .schedule-inline-table-wrap {
   min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .schedule-content-card.has-schedule-details .schedule-inline-detail-card {
-  display: none;
+  display: block;
+  flex: 0 1 auto;
+  max-height: 42%;
+  overflow: auto;
+  margin: 0;
 }
 
 .schedule-inline-panel[hidden] {
@@ -965,9 +984,10 @@ body {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(76, 96, 188, 0.12);
   border-radius: 14px;
-  overflow: auto;
-  align-self: start;
+  overflow: hidden;
+  align-self: stretch;
   min-width: 0;
+  min-height: 0;
   box-shadow: 0 10px 18px rgba(33, 49, 109, 0.08);
 }
 
@@ -979,6 +999,8 @@ body {
   font-size: 0.86rem;
   font-weight: 700;
   text-align: left;
+  flex-shrink: 0;
+  background: #fff;
 }
 
 .schedule-inline-date-heading {
@@ -1010,18 +1032,142 @@ body {
 }
 
 .schedule-inline-table-title {
-  padding: 10px 12px;
+  padding: 10px 14px;
   background: var(--schedule-blue-grad);
   color: var(--white);
   font-size: 0.9rem;
   font-weight: 800;
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   text-align: left;
+  flex-shrink: 0;
+}
+
+.schedule-inline-request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  background: #f3f5fb;
+}
+
+.schedule-inline-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 140px;
+  padding: 24px 16px;
+  text-align: center;
+  color: #5c6890;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(76, 96, 188, 0.08) 0%, transparent 65%),
+    #f8f9fd;
+  border: 1px dashed rgba(76, 96, 188, 0.18);
+  border-radius: 12px;
+}
+
+.schedule-inline-empty .bi {
+  font-size: 1.4rem;
+  color: #7a849e;
+}
+
+.schedule-inline-empty strong {
+  color: #1a2558;
+  font-size: 0.92rem;
+}
+
+.schedule-inline-empty span {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.schedule-inline-request-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(76, 96, 188, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(27, 38, 92, 0.05);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+}
+
+.schedule-inline-request-card:hover {
+  border-color: rgba(76, 96, 188, 0.3);
+  box-shadow: 0 6px 14px rgba(27, 38, 92, 0.1);
+  transform: translateY(-1px);
+}
+
+.schedule-inline-request-card.is-active {
+  border-color: rgba(49, 64, 138, 0.45);
+  box-shadow: 0 0 0 2px rgba(76, 96, 188, 0.18), 0 8px 16px rgba(49, 64, 138, 0.12);
+  background: linear-gradient(160deg, #ffffff 0%, #eef1fa 100%);
+}
+
+.schedule-inline-request-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.schedule-inline-request-code {
+  color: #31408a;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.schedule-inline-request-status {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(46, 160, 90, 0.12);
+  color: #1f7a45;
+  font-size: 0.68rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.schedule-inline-request-requester {
+  color: #1a2558;
+  font-size: 0.8rem;
+  font-weight: 650;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.schedule-inline-request-activity {
+  color: #5c6890;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.schedule-inline-request-resources {
+  color: #31408a;
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1.35;
+  padding-top: 4px;
+  border-top: 1px solid rgba(76, 96, 188, 0.1);
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .schedule-inline-table {
   width: 100%;
-  min-width: 560px;
+  min-width: 0;
   border-collapse: collapse;
 }
 
@@ -1120,6 +1266,7 @@ body {
   font-size: 0.78rem;
   color: #1c244c;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .schedule-inline-detail-group-stack {
@@ -1570,12 +1717,18 @@ body {
     overflow: visible;
   }
 
-  .schedule-content-card.has-schedule-details .schedule-inline-detail-card {
-    display: block;
+  .schedule-content-card.has-schedule-details .schedule-inline-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    height: auto;
   }
 
-  .schedule-content-card.has-schedule-details .schedule-inline-content {
-    grid-template-columns: minmax(0, 1.75fr) minmax(280px, 360px);
+  .schedule-content-card.has-schedule-details .schedule-inline-detail-card {
+    max-height: none;
+  }
+
+  .schedule-content-card.has-schedule-details .schedule-inline-table-wrap {
+    overflow: visible;
   }
 
   .schedule-filter-card {

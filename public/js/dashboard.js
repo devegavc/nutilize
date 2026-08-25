@@ -1979,9 +1979,11 @@ function openScheduleInlineDetails(day) {
 
   if (!filteredRequests.length) {
     scheduleInlineRequestBody.innerHTML = `
-      <tr>
-        <td colspan="3">No reservations scheduled for this date.</td>
-      </tr>
+      <div class="schedule-inline-empty">
+        <i class="bi bi-calendar-x" aria-hidden="true"></i>
+        <strong>No reservations</strong>
+        <span>Nothing fully approved for this date.</span>
+      </div>
     `;
 
     if (scheduleInlineDateStats) {
@@ -2000,13 +2002,26 @@ function openScheduleInlineDetails(day) {
   }
 
   scheduleInlineRequestBody.innerHTML = filteredRequests
-    .map((request, index) => `
-      <tr data-inline-request-index="${index}">
-        <td>${request.reservation_code || '-'}</td>
-        <td>${request.requester_name || '-'}</td>
-        <td>${request.resource_summary || '-'}</td>
-      </tr>
-    `)
+    .map((request, index) => {
+      const code = escapeReservationDetailsHtml(request.reservation_code || '-');
+      const requester = escapeReservationDetailsHtml(request.requester_name || 'Unknown requester');
+      const activity = escapeReservationDetailsHtml(request.activity_name || 'Activity');
+      const resources = escapeReservationDetailsHtml(request.resource_summary || 'No resources');
+      const status = escapeReservationDetailsHtml(request.status_label || 'Approved');
+      const activeClass = index === 0 ? ' is-active' : '';
+
+      return `
+        <button type="button" class="schedule-inline-request-card${activeClass}" data-inline-request-index="${index}">
+          <div class="schedule-inline-request-card-top">
+            <span class="schedule-inline-request-code">${code}</span>
+            <span class="schedule-inline-request-status">${status}</span>
+          </div>
+          <div class="schedule-inline-request-requester" title="${requester}">${requester}</div>
+          <div class="schedule-inline-request-activity">${activity}</div>
+          <div class="schedule-inline-request-resources">${resources}</div>
+        </button>
+      `;
+    })
     .join('');
 
   updateScheduleInlineDateSummaryStats(filteredRequests);
@@ -5975,19 +5990,25 @@ if (scheduleInlineRequestBody) {
       return;
     }
 
-    const requestRow = target.closest('tr[data-inline-request-index]');
+    const requestCard = target.closest('[data-inline-request-index]');
 
-    if (!(requestRow instanceof HTMLTableRowElement)) {
+    if (!(requestCard instanceof HTMLElement)) {
       return;
     }
 
-    const requestIndex = Number.parseInt(requestRow.dataset.inlineRequestIndex || '', 10);
+    const requestIndex = Number.parseInt(requestCard.dataset.inlineRequestIndex || '', 10);
     const requestDate = selectedScheduleDay ? getScheduleDateLabel(selectedScheduleDay) : '--';
     const request = visibleScheduleInlineRequests[requestIndex];
 
-    if (request) {
-      renderScheduleInlineDetail(request, requestDate);
+    if (!request) {
+      return;
     }
+
+    scheduleInlineRequestBody
+      .querySelectorAll('[data-inline-request-index]')
+      .forEach((node) => node.classList.toggle('is-active', node === requestCard));
+
+    renderScheduleInlineDetail(request, requestDate);
   });
 }
 
