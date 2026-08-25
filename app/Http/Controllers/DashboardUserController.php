@@ -23,45 +23,6 @@ class DashboardUserController extends Controller
         $offices = Office::orderBy('department_name', 'asc')->get();
         $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
 
-        // #region agent log
-        $sample = $users->take(8)->map(function ($user) {
-            return [
-                'user_id' => (int) $user->user_id,
-                'role' => (string) $user->role,
-                'office_id' => $user->office_id,
-                'has_office_relation' => $user->relationLoaded('office') && $user->office !== null,
-                'office_name' => $user->office?->department_name,
-                'program_id' => $user->program_id,
-                'has_program_relation' => $user->relationLoaded('academicProgram') && $user->academicProgram !== null,
-                'program_name' => $user->academicProgram?->program_name
-                    ?? $user->academicProgram?->name
-                    ?? $user->academicProgram?->short_code
-                    ?? null,
-            ];
-        })->values()->all();
-
-        $payload = [
-            'sessionId' => 'e19b10',
-            'runId' => 'pre-fix',
-            'hypothesisId' => 'A,B,C,D',
-            'location' => 'DashboardUserController.php:index',
-            'message' => 'users office/program snapshot',
-            'data' => [
-                'totalUsers' => $users->count(),
-                'withOfficeId' => $users->whereNotNull('office_id')->count(),
-                'withLoadedOffice' => $users->filter(fn ($u) => $u->office !== null)->count(),
-                'withEmptyOfficeName' => $users->filter(fn ($u) => $u->office && trim((string) $u->office->department_name) === '')->count(),
-                'withProgramId' => $users->whereNotNull('program_id')->count(),
-                'withLoadedProgram' => $users->filter(fn ($u) => $u->academicProgram !== null)->count(),
-                'officeTableCount' => $offices->count(),
-                'sample' => $sample,
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ];
-        @file_put_contents(base_path('.cursor/debug-e19b10.log'), json_encode($payload) . PHP_EOL, FILE_APPEND);
-        @file_put_contents(storage_path('logs/debug-e19b10.log'), json_encode($payload) . PHP_EOL, FILE_APPEND);
-        // #endregion
-
         return view('dashboard-users', [
             'users' => $users,
             'offices' => $offices,
