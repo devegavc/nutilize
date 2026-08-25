@@ -3969,6 +3969,9 @@ async function loadNavbar() {
     const logoutButton = navbarContainer.querySelector('[data-nav-action="logout"]');
     if (logoutButton instanceof HTMLButtonElement) {
       logoutButton.addEventListener('click', () => {
+        // #region agent log
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'pre-fix',hypothesisId:'B,D',location:'dashboard.js:navbarLogout',message:'navbar logout clicked',data:{hasConfirmGate:false,action:'/logout'},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         showNavigationProgressBar();
 
         const token = document.querySelector('meta[name="csrf-token"]');
@@ -4196,6 +4199,16 @@ function buildProfilePopover() {
     }
 
     if (action === 'logout') {
+      // #region agent log
+      try {
+        const payload = JSON.stringify({sessionId:'e19b10',runId:'pre-fix',hypothesisId:'A,D',location:'dashboard.js:profileLogout',message:'profile logout clicked',data:{hasConfirmGate:false,action:'/logout',hasCsrf:!!document.querySelector('meta[name="csrf-token"]')?.content},timestamp:Date.now()});
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', new Blob([payload], { type: 'application/json' }));
+        } else {
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:payload}).catch(()=>{});
+        }
+      } catch (_) {}
+      // #endregion
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = '/logout';
