@@ -1949,7 +1949,9 @@ function openScheduleInlineDetails(day) {
 
   const scheduleContentCard = document.querySelector('.schedule-content-card');
   if (scheduleContentCard) {
-    scheduleContentCard.classList.toggle('has-schedule-details', filteredRequests.length > 0);
+    // Keep details layout mode whenever the panel is open (including empty days),
+    // otherwise flex collapse clips the calendar grid.
+    scheduleContentCard.classList.toggle('has-schedule-details', !scheduleInlinePanel?.hidden);
   }
 
   // #region agent log
@@ -1965,7 +1967,7 @@ function openScheduleInlineDetails(day) {
         const r = el.getBoundingClientRect();
         return { day: el.dataset.day, w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), visible: r.height > 0 && r.width > 0 };
       });
-    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'pre-fix',hypothesisId:'A,D',location:'dashboard.js:openScheduleInlineDetails',message:'layout after day select',data:{day,requestCount:filteredRequests.length,hasScheduleDetails:!!card?.classList.contains('has-schedule-details'),panelHidden:!!scheduleInlinePanel?.hidden,cardOverflowY:card?getComputedStyle(card).overflowY:null,cardH:card?Math.round(card.getBoundingClientRect().height):null,calCardH:calCard?Math.round(calCard.getBoundingClientRect().height):null,wrapH:wrap?Math.round(wrap.getBoundingClientRect().height):null,gridH:grid?Math.round(grid.getBoundingClientRect().height):null,gridAutoRows:grid?getComputedStyle(grid).gridAutoRows:null,sampleDayH:sampleDay?Math.round(sampleDay.getBoundingClientRect().height):null,dayCellCount:document.querySelectorAll('.calendar-grid .day[data-day]').length,dayRects,scrollY:window.scrollY},timestamp:Date.now()})}).catch(()=>{});
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,D',location:'dashboard.js:openScheduleInlineDetails',message:'layout after day select',data:{day,requestCount:filteredRequests.length,hasScheduleDetails:!!card?.classList.contains('has-schedule-details'),panelHidden:!!scheduleInlinePanel?.hidden,cardOverflowY:card?getComputedStyle(card).overflowY:null,cardH:card?Math.round(card.getBoundingClientRect().height):null,calCardH:calCard?Math.round(calCard.getBoundingClientRect().height):null,wrapH:wrap?Math.round(wrap.getBoundingClientRect().height):null,gridH:grid?Math.round(grid.getBoundingClientRect().height):null,gridAutoRows:grid?getComputedStyle(grid).gridAutoRows:null,sampleDayH:sampleDay?Math.round(sampleDay.getBoundingClientRect().height):null,dayCellCount:document.querySelectorAll('.calendar-grid .day[data-day]').length,dayRects,scrollY:window.scrollY},timestamp:Date.now()})}).catch(()=>{});
   });
   // #endregion
 
@@ -5943,11 +5945,11 @@ if (scheduleFilterButtons.length && scheduleDayCells.length) {
       // #region agent log
       const beforeGrid = document.querySelector('.calendar-grid');
       const beforeSample = dayCell.getBoundingClientRect();
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'pre-fix',hypothesisId:'B,C,E',location:'dashboard.js:dayClick',message:'day click before open',data:{day,requestCount:Number.parseInt(dayCell.dataset.requestCount||'0',10),marked:dayCell.classList.contains('marked'),gridHBefore:beforeGrid?Math.round(beforeGrid.getBoundingClientRect().height):null,cellHBefore:Math.round(beforeSample.height),cellCountBefore:document.querySelectorAll('.calendar-grid .day[data-day]').length},timestamp:Date.now()})}).catch(()=>{});
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'B,C,E',location:'dashboard.js:dayClick',message:'day click before open',data:{day,requestCount:Number.parseInt(dayCell.dataset.requestCount||'0',10),marked:dayCell.classList.contains('marked'),gridHBefore:beforeGrid?Math.round(beforeGrid.getBoundingClientRect().height):null,cellHBefore:Math.round(beforeSample.height),cellCountBefore:document.querySelectorAll('.calendar-grid .day[data-day]').length},timestamp:Date.now()})}).catch(()=>{});
       // #endregion
 
       openScheduleInlineDetails(day);
-      scheduleInlinePanel?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      // Keep the calendar in view; details sit beside it on desktop.
 
       // #region agent log
       requestAnimationFrame(() => {
@@ -5955,7 +5957,7 @@ if (scheduleFilterButtons.length && scheduleDayCells.length) {
           const afterGrid = document.querySelector('.calendar-grid');
           const afterSample = dayCell.getBoundingClientRect();
           const card = document.querySelector('.schedule-content-card');
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'pre-fix',hypothesisId:'B,C',location:'dashboard.js:dayClick:afterScroll',message:'layout after scrollIntoView',data:{day,gridHAfter:afterGrid?Math.round(afterGrid.getBoundingClientRect().height):null,cellHAfter:Math.round(afterSample.height),cellTopAfter:Math.round(afterSample.top),cellCountAfter:document.querySelectorAll('.calendar-grid .day[data-day]').length,cardScrollTop:card?card.scrollTop:null,hasDetails:!!card?.classList.contains('has-schedule-details')},timestamp:Date.now()})}).catch(()=>{});
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'B,C',location:'dashboard.js:dayClick:afterScroll',message:'layout after open',data:{day,gridHAfter:afterGrid?Math.round(afterGrid.getBoundingClientRect().height):null,cellHAfter:Math.round(afterSample.height),cellTopAfter:Math.round(afterSample.top),cellCountAfter:document.querySelectorAll('.calendar-grid .day[data-day]').length,cardScrollTop:card?card.scrollTop:null,hasDetails:!!card?.classList.contains('has-schedule-details'),wrapH:document.querySelector('.calendar-grid-wrap')?Math.round(document.querySelector('.calendar-grid-wrap').getBoundingClientRect().height):null,calCardH:document.querySelector('.schedule-calendar-card')?Math.round(document.querySelector('.schedule-calendar-card').getBoundingClientRect().height):null},timestamp:Date.now()})}).catch(()=>{});
         }, 250);
       });
       // #endregion
