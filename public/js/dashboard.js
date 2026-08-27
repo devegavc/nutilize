@@ -680,6 +680,7 @@ function showAppConfirm(message, options = {}) {
     confirmText = 'Confirm',
     cancelText = 'Cancel',
     variant = 'danger',
+    dangerNote = '',
   } = options;
 
   let modal = document.getElementById('app-confirm-modal');
@@ -690,13 +691,13 @@ function showAppConfirm(message, options = {}) {
       style.id = 'app-confirm-style';
       style.textContent = `
         .app-confirm-modal {
-          position: fixed;
-          inset: 0;
-          z-index: 3300;
+          position: fixed !important;
+          inset: 0 !important;
+          z-index: 3600 !important;
           display: none;
         }
         .app-confirm-modal.is-open {
-          display: grid;
+          display: grid !important;
           place-items: center;
           padding: 18px;
         }
@@ -714,6 +715,7 @@ function showAppConfirm(message, options = {}) {
           border-radius: 14px;
           box-shadow: 0 16px 34px rgba(20, 26, 48, 0.24);
           overflow: hidden;
+          z-index: 1;
         }
         .app-confirm-card::before {
           content: "";
@@ -740,6 +742,11 @@ function showAppConfirm(message, options = {}) {
           font-size: 1rem;
           line-height: 1.45;
         }
+        .app-confirm-body .app-confirm-danger-note {
+          margin: 10px 0 0;
+          color: #c53030;
+          font-weight: 700;
+        }
         .app-confirm-actions {
           display: flex;
           justify-content: flex-end;
@@ -759,17 +766,13 @@ function showAppConfirm(message, options = {}) {
           font-weight: 650;
           cursor: pointer;
         }
-        .app-confirm-btn.cancel:hover {
-          background: #e7ebf4;
-        }
+        .app-confirm-btn.cancel:hover { background: #e7ebf4; }
         .app-confirm-btn.confirm {
           border-color: #cf3b3b;
           background: #cf3b3b;
           color: #fff;
         }
-        .app-confirm-btn.confirm:hover {
-          background: #b83232;
-        }
+        .app-confirm-btn.confirm:hover { background: #b83232; }
       `;
       document.head.appendChild(style);
     }
@@ -786,6 +789,7 @@ function showAppConfirm(message, options = {}) {
         </header>
         <div class="app-confirm-body">
           <p id="app-confirm-message"></p>
+          <p id="app-confirm-danger-note" class="app-confirm-danger-note" hidden></p>
         </div>
         <div class="app-confirm-actions">
           <button type="button" class="app-confirm-btn cancel" id="app-confirm-cancel">Cancel</button>
@@ -798,6 +802,7 @@ function showAppConfirm(message, options = {}) {
 
   const titleNode = modal.querySelector('#app-confirm-title');
   const messageNode = modal.querySelector('#app-confirm-message');
+  const dangerNoteNode = modal.querySelector('#app-confirm-danger-note');
   const cancelButton = modal.querySelector('#app-confirm-cancel');
   const confirmButton = modal.querySelector('#app-confirm-ok');
 
@@ -810,12 +815,26 @@ function showAppConfirm(message, options = {}) {
 
   titleNode.textContent = title;
   messageNode.textContent = String(message || '');
+  if (dangerNoteNode instanceof HTMLElement) {
+    const note = String(dangerNote || '').trim();
+    dangerNoteNode.textContent = note;
+    dangerNoteNode.hidden = note === '';
+  }
   cancelButton.textContent = cancelText;
   confirmButton.textContent = confirmText;
   void variant;
 
   modal.classList.add('is-open');
   modal.setAttribute('aria-hidden', 'false');
+
+  // #region agent log
+  requestAnimationFrame(() => {
+    const cs = getComputedStyle(modal);
+    const announcements = document.getElementById('announcements-modal');
+    const annCs = announcements ? getComputedStyle(announcements) : null;
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,B,E',location:'dashboard.js:showAppConfirm',message:'confirm modal computed style',data:{title,hasInlineStyle:!!document.getElementById('app-confirm-style'),hasStylesheetRule:!!Array.from(document.styleSheets).some((s)=>{try{return Array.from(s.cssRules||[]).some((r)=>String(r.selectorText||'').includes('app-confirm-modal'));}catch{return false;}}),display:cs.display,position:cs.position,zIndex:cs.zIndex,rect:(()=>{const r=modal.getBoundingClientRect();return{top:Math.round(r.top),left:Math.round(r.left),w:Math.round(r.width),h:Math.round(r.height)};})(),announcementsZ:annCs?.zIndex||null,announcementsOpen:!!announcements?.classList.contains('is-open')},timestamp:Date.now()})}).catch(()=>{});
+  });
+  // #endregion
 
   return new Promise((resolve) => {
     const finish = (result) => {
@@ -845,6 +864,8 @@ function showAppConfirm(message, options = {}) {
     confirmButton.focus();
   });
 }
+
+window.showAppConfirm = showAppConfirm;
 
 let activeFacilitiesTab = 'rooms';
 let activeEquipmentTab = 'all';
@@ -4178,34 +4199,12 @@ function submitLogoutForm() {
 }
 
 function requestLogout(source = 'unknown') {
-  // #region agent log
-  try {
-    const payload = JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'F,G',location:'dashboard.js:requestLogout',message:'logout confirm modal opening',data:{source,confirmType:'app-modal'},timestamp:Date.now()});
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', new Blob([payload], { type: 'application/json' }));
-    } else {
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:payload}).catch(()=>{});
-    }
-  } catch (_) {}
-  // #endregion
-
   showAppConfirm('Are you sure you want to log out?', {
     title: 'Log out?',
     confirmText: 'Log out',
     cancelText: 'Cancel',
     variant: 'danger',
   }).then((confirmed) => {
-    // #region agent log
-    try {
-      const payload = JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'F,G',location:'dashboard.js:requestLogout:result',message:'logout confirm result',data:{source,confirmed,confirmType:'app-modal'},timestamp:Date.now()});
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', new Blob([payload], { type: 'application/json' }));
-      } else {
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:payload}).catch(()=>{});
-      }
-    } catch (_) {}
-    // #endregion
-
     if (!confirmed) {
       return;
     }

@@ -42,22 +42,6 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        // #region agent log
-        $redirectRoute = 'index';
-        @file_put_contents(base_path('.cursor/debug-e19b10.log'), json_encode([
-            'sessionId' => 'e19b10',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'C,E',
-            'location' => 'LoginController.php:logout',
-            'message' => 'logout redirect target',
-            'data' => [
-                'redirectRoute' => $redirectRoute,
-                'indexRouteExists' => \Illuminate\Support\Facades\Route::has('index'),
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ]) . PHP_EOL, FILE_APPEND);
-        // #endregion
-
-        return redirect()->route($redirectRoute);
+        return redirect()->route('index');
     }
 }

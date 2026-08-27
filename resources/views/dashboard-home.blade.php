@@ -9,7 +9,7 @@
   <title>NUtilize | Home</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-home.css" />
+  <link rel="stylesheet" href="/css/db-home.css?v={{ filemtime(public_path('css/db-home.css')) }}" />
 </head>
 <body>
   <script>
@@ -344,7 +344,7 @@
                     >
                       <i class="bi bi-pencil-square"></i>
                     </button>
-                    <form method="POST" action="{{ route('dashboard.announcements.destroy', $announcement->announcement_id) }}">
+                    <form method="POST" action="{{ route('dashboard.announcements.destroy', $announcement->announcement_id) }}" data-announcement-delete-form>
                       @csrf
                       @method('DELETE')
                       <button class="announcement-delete" type="submit" title="Remove announcement">
@@ -471,6 +471,47 @@
             title: button.getAttribute('data-title') || '',
             body: button.getAttribute('data-body') || '',
             announcer: button.getAttribute('data-announcer') || '',
+          });
+        });
+      });
+
+      modal.querySelectorAll('[data-announcement-delete-form]').forEach((deleteForm) => {
+        if (!(deleteForm instanceof HTMLFormElement)) {
+          return;
+        }
+
+        deleteForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+
+          // #region agent log
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'C',location:'dashboard-home.blade.php:deleteSubmit',message:'announcement delete intercepted',data:{hasShowAppConfirm:typeof window.showAppConfirm==='function'||typeof showAppConfirm==='function',action:deleteForm.action},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+
+          const confirmFn = (typeof showAppConfirm === 'function')
+            ? showAppConfirm
+            : (typeof window.showAppConfirm === 'function' ? window.showAppConfirm : null);
+
+          if (!confirmFn) {
+            if (window.confirm('Are you sure you want to delete this announcement? This action cannot be undone.')) {
+              deleteForm.submit();
+            }
+            return;
+          }
+
+          confirmFn('Are you sure you want to delete this announcement?', {
+            title: 'Delete announcement',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            variant: 'danger',
+            dangerNote: 'This action cannot be undone.',
+          }).then((confirmed) => {
+            // #region agent log
+            fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,B',location:'dashboard-home.blade.php:deleteConfirmResult',message:'announcement delete confirm result',data:{confirmed},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+
+            if (confirmed) {
+              deleteForm.submit();
+            }
           });
         });
       });
