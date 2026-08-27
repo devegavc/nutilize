@@ -73,9 +73,10 @@
         @endif
 
         @php
-          $programChairUsers = $users->filter(fn ($user) => strtolower((string) $user->role) === 'pc_admin');
-          $programChair = $programChairUsers->first();
-          $students = $users->filter(fn ($user) => strtolower((string) $user->role) !== 'pc_admin');
+          $normalizeUserRole = fn ($user) => strtolower(trim((string) ($user->role ?? '')));
+          $programChairUsers = $users->filter(fn ($user) => $normalizeUserRole($user) === 'pc_admin')->values();
+          $facultyUsers = $users->filter(fn ($user) => $normalizeUserRole($user) === 'faculty')->values();
+          $students = $users->filter(fn ($user) => !in_array($normalizeUserRole($user), ['pc_admin', 'faculty'], true))->values();
           $resolveUserStatus = function ($user): string {
               $rawStatus = strtolower(trim((string) ($user->status ?? $user->account_status ?? '')));
 
@@ -95,6 +96,19 @@
           };
           $formatUserCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'user' : 'users');
           $activeUsersCount = $users->filter(fn ($user) => $resolveUserStatus($user) === 'active')->count();
+          $rowRoleValue = function ($user) use ($normalizeUserRole): string {
+              $role = $normalizeUserRole($user);
+
+              if ($role === 'pc_admin') {
+                  return 'pc_admin';
+              }
+
+              if ($role === 'faculty') {
+                  return 'faculty';
+              }
+
+              return 'student';
+          };
         @endphp
 
         <section class="users-summary-grid" aria-label="User summary">
@@ -140,16 +154,8 @@
               <select id="users-role-filter">
                 <option value="all">All Roles</option>
                 <option value="pc_admin">Program Chair</option>
+                <option value="faculty">Faculty</option>
                 <option value="student">Student</option>
-              </select>
-            </div>
-
-            <div class="users-filter-wrap">
-              <label for="users-status-filter">Status</label>
-              <select id="users-status-filter">
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
               </select>
             </div>
 
@@ -167,8 +173,6 @@
 
             <button class="users-reset-btn" id="users-reset-filters" type="button">Reset</button>
           </div>
-
-          <p class="users-results-count" id="users-results-count">{{ $formatUserCount($users->count()) }} shown</p>
 
           <button class="facilities-add-btn" id="user-add-btn" type="button"><span class="btn-icon">+</span> Add User</button>
         </section>
@@ -188,44 +192,94 @@
                 </tr>
               </thead>
               <tbody id="users-table-body">
-                @if($programChair)
+                @if($programChairUsers->count() > 0)
                   <tr class="category-header-row">
                     <td colspan="7">
                       <div class="category-header">
                         <i class="bi bi-shield-lock"></i>
                         <span>Program Chair</span>
-                        <span class="category-count" data-group-count>{{ $formatUserCount(1) }}</span>
+                        <span class="category-count" data-group-count>{{ $formatUserCount($programChairUsers->count()) }}</span>
                       </div>
                     </td>
                   </tr>
-                  @php
-                    $programChairStatus = $resolveUserStatus($programChair);
-                    $programChairName = $programChair->full_name ?? '—';
-                  @endphp
-                  <tr
-                    class="admin-row {{ (int) $programChair->user_id === $currentUserId ? 'is-current-user' : '' }}"
-                    data-user-id="{{ $programChair->user_id }}"
-                    data-user-username="{{ $programChair->username }}"
-                    data-user-full-name="{{ $programChair->full_name }}"
-                    data-user-name="{{ $programChairName }}"
-                    data-user-email="{{ $programChair->email }}"
-                    data-user-role="pc_admin"
-                    data-user-status="{{ $programChairStatus }}"
-                    data-user-program="{{ $programName }}"
-                    data-user-created-at="{{ $programChair->created_at ? $programChair->created_at->timestamp : 0 }}"
-                  >
-                    <td class="user-username-cell">
-                      <span class="user-cell-text" title="{{ $programChair->username }}">{{ $programChair->username }}</span>
-                    </td>
-                    <td><span class="user-cell-text" title="{{ $programChairName }}">{{ $programChairName }}</span></td>
-                    <td><span class="user-cell-text" title="{{ $programChair->email }}">{{ $programChair->email }}</span></td>
-                    <td><span class="role-badge admin-badge">PROGRAM CHAIR</span></td>
-                    <td><span class="user-cell-text" title="{{ $programName }}">{{ $programName }}</span></td>
-                    <td><span class="user-cell-text">{{ $programChair->created_at ? $programChair->created_at->format('M d, Y') : 'N/A' }}</span></td>
-                    <td class="table-actions-cell">
-                      <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
+                  @foreach($programChairUsers as $programChair)
+                    @php
+                      $programChairStatus = $resolveUserStatus($programChair);
+                      $programChairName = $programChair->full_name ?? '—';
+                    @endphp
+                    <tr
+                      class="admin-row {{ (int) $programChair->user_id === $currentUserId ? 'is-current-user' : '' }}"
+                      data-user-id="{{ $programChair->user_id }}"
+                      data-user-username="{{ $programChair->username }}"
+                      data-user-full-name="{{ $programChair->full_name }}"
+                      data-user-name="{{ $programChairName }}"
+                      data-user-email="{{ $programChair->email }}"
+                      data-user-role="{{ $rowRoleValue($programChair) }}"
+                      data-user-status="{{ $programChairStatus }}"
+                      data-user-program="{{ $programName }}"
+                      data-user-created-at="{{ $programChair->created_at ? $programChair->created_at->timestamp : 0 }}"
+                    >
+                      <td class="user-username-cell">
+                        <span class="user-cell-text" title="{{ $programChair->username }}">{{ $programChair->username }}</span>
+                      </td>
+                      <td><span class="user-cell-text" title="{{ $programChairName }}">{{ $programChairName }}</span></td>
+                      <td><span class="user-cell-text" title="{{ $programChair->email }}">{{ $programChair->email }}</span></td>
+                      <td class="user-role-cell"><span class="role-badge admin-badge">PROGRAM CHAIR</span></td>
+                      <td><span class="user-cell-text" title="{{ $programName }}">{{ $programName }}</span></td>
+                      <td><span class="user-cell-text">{{ $programChair->created_at ? $programChair->created_at->format('M d, Y') : 'N/A' }}</span></td>
+                      <td class="table-actions-cell">
+                        <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
+                      </td>
+                    </tr>
+                  @endforeach
+                @endif
+
+                @if($facultyUsers->count() > 0)
+                  <tr class="category-header-row">
+                    <td colspan="7">
+                      <div class="category-header">
+                        <i class="bi bi-people"></i>
+                        <span>Faculty</span>
+                        <span class="category-count" data-group-count>{{ $formatUserCount($facultyUsers->count()) }}</span>
+                      </div>
                     </td>
                   </tr>
+                  @foreach($facultyUsers as $user)
+                    @php
+                      $userStatus = $resolveUserStatus($user);
+                      $userName = $user->full_name ?? '—';
+                    @endphp
+                    <tr
+                      data-user-id="{{ $user->user_id }}"
+                      data-user-username="{{ $user->username }}"
+                      data-user-full-name="{{ $user->full_name }}"
+                      data-user-name="{{ $userName }}"
+                      data-user-email="{{ $user->email }}"
+                      data-user-role="{{ $rowRoleValue($user) }}"
+                      data-user-status="{{ $userStatus }}"
+                      data-user-program="{{ $programName }}"
+                      data-user-created-at="{{ $user->created_at ? $user->created_at->timestamp : 0 }}"
+                    >
+                      <td class="user-username-cell">
+                        <span class="user-cell-text" title="{{ $user->username }}">{{ $user->username }}</span>
+                      </td>
+                      <td><span class="user-cell-text" title="{{ $userName }}">{{ $userName }}</span></td>
+                      <td><span class="user-cell-text" title="{{ $user->email }}">{{ $user->email }}</span></td>
+                      <td class="user-role-cell"><span class="role-badge approver-badge">FACULTY</span></td>
+                      <td><span class="user-cell-text" title="{{ $programName }}">{{ $programName }}</span></td>
+                      <td><span class="user-cell-text">{{ $user->created_at ? $user->created_at->format('M d, Y') : 'N/A' }}</span></td>
+                      <td class="table-actions-cell">
+                        <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
+                        @if($currentUserId !== $user->user_id)
+                          <form method="POST" action="{{ route('office.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" onsubmit="return confirm('Delete this faculty account?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="table-delete-btn">Delete</button>
+                          </form>
+                        @endif
+                      </td>
+                    </tr>
+                  @endforeach
                 @endif
 
                 @if($students->count() > 0)
@@ -233,7 +287,7 @@
                     <td colspan="7">
                       <div class="category-header">
                         <i class="bi bi-person-check"></i>
-                        <span>Students</span>
+                        <span>Mobile Users</span>
                         <span class="category-count" data-group-count>{{ $formatUserCount($students->count()) }}</span>
                       </div>
                     </td>
@@ -249,7 +303,7 @@
                       data-user-full-name="{{ $user->full_name }}"
                       data-user-name="{{ $userName }}"
                       data-user-email="{{ $user->email }}"
-                      data-user-role="student"
+                      data-user-role="{{ $rowRoleValue($user) }}"
                       data-user-status="{{ $userStatus }}"
                       data-user-program="{{ $programName }}"
                       data-user-created-at="{{ $user->created_at ? $user->created_at->timestamp : 0 }}"
@@ -259,7 +313,7 @@
                       </td>
                       <td><span class="user-cell-text" title="{{ $userName }}">{{ $userName }}</span></td>
                       <td><span class="user-cell-text" title="{{ $user->email }}">{{ $user->email }}</span></td>
-                      <td><span class="role-badge approver-badge">STUDENT</span></td>
+                      <td class="user-role-cell"><span class="role-badge approver-badge">STUDENT</span></td>
                       <td><span class="user-cell-text" title="{{ $programName }}">{{ $programName }}</span></td>
                       <td><span class="user-cell-text">{{ $user->created_at ? $user->created_at->format('M d, Y') : 'N/A' }}</span></td>
                       <td class="table-actions-cell">
@@ -307,37 +361,44 @@
 
   <section class="facilities-modal" id="user-modal" aria-hidden="true">
     <div class="facilities-modal-overlay" data-close-modal="true"></div>
-    <article class="facilities-modal-card" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
-      <div class="facilities-modal-top"></div>
-      <div class="facilities-modal-body">
-        <h2 id="user-modal-title">Add User</h2>
-        <p class="section-subtitle" style="margin-top:0;">New accounts are added to {{ $programName }}.</p>
+    <article class="facilities-modal-card equipment-form-modal-card is-compact" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+      <header class="equipment-form-modal-head">
+        <div>
+          <h2 id="user-modal-title">Add User</h2>
+          <p class="equipment-form-modal-subtitle">New accounts are added to {{ $programName }}.</p>
+        </div>
+      </header>
 
-        <form id="user-form" method="POST" action="{{ route('office.users.store') }}">
-          @csrf
-          <input type="hidden" name="_method" id="user-form-method" value="POST" />
-          <input type="hidden" name="user_id" id="user-id" />
-          <input type="hidden" name="program_id" value="{{ $programId }}" />
+      <form id="user-form" class="equipment-form-modal-form" method="POST" action="{{ route('office.users.store') }}">
+        @csrf
+        <input type="hidden" name="_method" id="user-form-method" value="POST" />
+        <input type="hidden" name="user_id" id="user-id" />
+        <input type="hidden" name="program_id" value="{{ $programId }}" />
 
-          <label class="facilities-field-label" for="user-username">Username</label>
-          <input id="user-username" class="facilities-input" name="username" type="text" placeholder="Username" required />
+        <div class="facilities-modal-body equipment-form-modal-body">
+          <section class="equipment-form-section">
+            <label class="facilities-field-label" for="user-username">Username</label>
+            <input id="user-username" class="facilities-input" name="username" type="text" placeholder="Username" required />
 
-          <label class="facilities-field-label" for="user-full-name">Full Name</label>
-          <input id="user-full-name" class="facilities-input" name="full_name" type="text" placeholder="Full Name" />
+            <label class="facilities-field-label" for="user-full-name">Full Name</label>
+            <input id="user-full-name" class="facilities-input" name="full_name" type="text" placeholder="Full Name" />
 
-          <label class="facilities-field-label" for="user-email">Email</label>
-          <input id="user-email" class="facilities-input" name="email" type="email" placeholder="Email address" required />
+            <label class="facilities-field-label" for="user-email">Email</label>
+            <input id="user-email" class="facilities-input" name="email" type="email" placeholder="Email address" required />
+          </section>
 
-          <label class="facilities-field-label" for="user-password">Password</label>
-          <input id="user-password" class="facilities-input" name="password" type="password" placeholder="Password" />
-          <small class="facilities-input-note">Leave blank when editing to keep the current password.</small>
+          <section class="equipment-form-section">
+            <label class="facilities-field-label" for="user-password">Password</label>
+            <input id="user-password" class="facilities-input" name="password" type="password" placeholder="Password" />
+            <small class="facilities-input-note">Leave blank when editing to keep the current password.</small>
+          </section>
+        </div>
 
-          <div class="facilities-modal-actions">
-            <button type="button" class="facilities-action-btn cancel" id="user-cancel-btn">Cancel</button>
-            <button type="submit" class="facilities-action-btn submit" id="user-save-btn">Save User</button>
-          </div>
-        </form>
-      </div>
+        <footer class="equipment-form-modal-footer">
+          <button type="button" class="facilities-action-btn cancel" id="user-cancel-btn">Cancel</button>
+          <button type="submit" class="facilities-action-btn submit" id="user-save-btn">Save User</button>
+        </footer>
+      </form>
     </article>
   </section>
 
@@ -359,7 +420,6 @@
     const usersStatusFilter = document.getElementById('users-status-filter');
     const usersSortSelect = document.getElementById('users-sort-select');
     const usersResetFiltersBtn = document.getElementById('users-reset-filters');
-    const usersResultsCount = document.getElementById('users-results-count');
     const usersEmptyStateRow = document.getElementById('users-empty-state-row');
     const editButtons = document.querySelectorAll('.user-edit-btn');
     const modalOverlay = userModal.querySelector('[data-close-modal]');
@@ -455,6 +515,10 @@
             return rowRole === 'pc_admin';
           }
 
+          if (selectedRole === 'faculty') {
+            return rowRole === 'faculty';
+          }
+
           if (selectedRole === 'student') {
             return rowRole === 'student' || rowRole === 'user';
           }
@@ -537,10 +601,6 @@
 
             section.rows.sort((left, right) => compareRows(left, right, sortMode));
           });
-
-          if (usersResultsCount) {
-            usersResultsCount.textContent = `${visibleUserCount} ${visibleUserCount === 1 ? 'user' : 'users'} shown`;
-          }
 
           if (usersEmptyStateRow) {
             usersEmptyStateRow.hidden = visibleUserCount !== 0;

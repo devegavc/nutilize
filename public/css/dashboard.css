@@ -2030,3 +2030,33 @@ body {
   background: #fff3cd;
   color: #856404;
 }
+
+.action-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  animation: action-btn-spin 0.7s linear infinite;
+}
+
+button.is-action-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+button.is-action-loading:hover {
+  transform: none;
+  filter: none;
+}
+
+@keyframes action-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

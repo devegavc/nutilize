@@ -213,17 +213,34 @@
       };
 
       const submitQueueAction = async (action, approvalId, sourceButton = null) => {
-        const confirmed = await openActionConfirmModal(action);
-
-        if (!confirmed) {
+        if (sourceButton instanceof HTMLButtonElement && sourceButton.dataset.actionLoading === '1') {
           return false;
         }
 
-        isActing = true;
-        refreshVersion += 1;
-        setButtonsDisabled(true);
+        const pair = sourceButton instanceof HTMLButtonElement && typeof getRequestActionPair === 'function'
+          ? getRequestActionPair(sourceButton)
+          : Array.from(document.querySelectorAll(
+            `.office-queue-approve[data-approval-id="${approvalId}"], .office-queue-reject[data-approval-id="${approvalId}"]`
+          )).filter((node) => node instanceof HTMLButtonElement);
+
+        pair.forEach((node) => {
+          node.disabled = true;
+        });
+
+        if (sourceButton instanceof HTMLButtonElement && typeof startActionButtonLoading === 'function') {
+          startActionButtonLoading(sourceButton);
+        }
 
         try {
+          const confirmed = await openActionConfirmModal(action);
+
+          if (!confirmed) {
+            return false;
+          }
+
+          isActing = true;
+          refreshVersion += 1;
+
           const response = await fetch(resolveUrl(action, approvalId), {
             method: 'PATCH',
             headers: {
@@ -273,13 +290,28 @@
           return false;
         } finally {
           isActing = false;
-          setButtonsDisabled(false);
+          if (sourceButton instanceof HTMLButtonElement && typeof stopActionButtonLoading === 'function') {
+            stopActionButtonLoading(sourceButton);
+          }
+          pair.forEach((node) => {
+            if (node !== sourceButton) {
+              node.disabled = false;
+            }
+          });
         }
       };
 
-      const openReservationDetails = async (reservationId, approvalId, canAct) => {
+      const openReservationDetails = async (reservationId, approvalId, canAct, sourceButton = null) => {
         if (!reservationId) {
           return;
+        }
+
+        if (sourceButton instanceof HTMLButtonElement && sourceButton.dataset.actionLoading === '1') {
+          return;
+        }
+
+        if (sourceButton instanceof HTMLButtonElement && typeof startActionButtonLoading === 'function') {
+          startActionButtonLoading(sourceButton);
         }
 
         try {
@@ -307,11 +339,15 @@
             approvalId,
             canAct: canAct === '1' || canAct === true,
             onAction: async (action, modalApprovalId) => {
-              await submitQueueAction(action, modalApprovalId);
+              return submitQueueAction(action, modalApprovalId);
             },
           });
         } catch (_error) {
           showAppNotice('Unable to load request details.');
+        } finally {
+          if (sourceButton instanceof HTMLButtonElement && typeof stopActionButtonLoading === 'function') {
+            stopActionButtonLoading(sourceButton);
+          }
         }
       };
 
@@ -387,12 +423,6 @@
         actionConfirmModal.addEventListener('click', handleBackdrop);
         document.addEventListener('keydown', handleKeydown);
       });
-
-      const setButtonsDisabled = (state) => {
-        document.querySelectorAll('.office-queue-action-btn').forEach((button) => {
-          button.disabled = state;
-        });
-      };
 
       const showActionToast = (message, status) => {
         const existingToast = document.querySelector('.office-action-toast');
@@ -596,16 +626,25 @@
 
         const viewButton = target.closest('.office-queue-view');
         if (viewButton instanceof HTMLButtonElement) {
+          if (viewButton.dataset.actionLoading === '1' || viewButton.disabled) {
+            return;
+          }
+
           await openReservationDetails(
             viewButton.getAttribute('data-reservation-id'),
             viewButton.getAttribute('data-approval-id'),
             viewButton.getAttribute('data-can-act'),
+            viewButton,
           );
           return;
         }
 
         const button = target.closest('.office-queue-action-btn');
         if (!(button instanceof HTMLButtonElement) || button.classList.contains('office-queue-view')) {
+          return;
+        }
+
+        if (button.dataset.actionLoading === '1' || button.disabled) {
           return;
         }
 

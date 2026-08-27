@@ -12,24 +12,24 @@
   <style>
     .password-field-wrap {
       position: relative;
-      display: flex;
-      align-items: stretch;
+      margin-bottom: 12px;
     }
 
     .password-field-wrap .facilities-input {
       padding-right: 44px;
+      margin-bottom: 0;
     }
 
     .password-toggle-btn {
       position: absolute;
       top: 50%;
-      right: 10px;
+      right: 8px;
       transform: translateY(-50%);
       border: 0;
       background: transparent;
-      color: #38479c;
-      width: 32px;
-      height: 32px;
+      color: #8a93ad;
+      width: 28px;
+      height: 28px;
       border-radius: 8px;
       display: inline-flex;
       align-items: center;
@@ -39,8 +39,8 @@
 
     .password-toggle-btn:hover,
     .password-toggle-btn:focus {
-      background: rgba(56, 71, 156, 0.08);
-      color: #26367b;
+      background: #e8edff;
+      color: #2f3f88;
     }
   </style>
 </head>
@@ -199,6 +199,8 @@
                 <option value="all">All Roles</option>
                 <option value="admin">Admin</option>
                 <option value="item_owner">Item Owner</option>
+                <option value="faculty">Faculty</option>
+                <option value="student">Student</option>
               </select>
             </div>
 
@@ -346,7 +348,7 @@
                     <td colspan="7">
                       <div class="category-header">
                         <i class="bi bi-person-check"></i>
-                        <span>Users</span>
+                        <span>Mobile Users</span>
                         <span class="category-count" data-group-count>{{ $formatUserCount($approvers->count()) }}</span>
                       </div>
                     </td>
@@ -421,66 +423,73 @@
 
   <section class="facilities-modal" id="user-modal" aria-hidden="true">
     <div class="facilities-modal-overlay" data-close-modal="true"></div>
-    <article class="facilities-modal-card" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
-      <div class="facilities-modal-top"></div>
-      <div class="facilities-modal-body">
+    <article class="facilities-modal-card equipment-form-modal-card" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+      <header class="equipment-form-modal-head">
         <h2 id="user-modal-title">Add User</h2>
+      </header>
 
-        <form id="user-form" method="POST" action="{{ route('dashboard.users.store') }}">
-          @csrf
-          <input type="hidden" name="_method" id="user-form-method" value="POST" />
-          <input type="hidden" name="user_id" id="user-id" />
+      <form id="user-form" class="equipment-form-modal-form" method="POST" action="{{ route('dashboard.users.store') }}">
+        @csrf
+        <input type="hidden" name="_method" id="user-form-method" value="POST" />
+        <input type="hidden" name="user_id" id="user-id" />
 
-          <label class="facilities-field-label" for="user-username">Username</label>
-          <input id="user-username" class="facilities-input" name="username" type="text" placeholder="Username" required />
+        <div class="facilities-modal-body equipment-form-modal-body">
+          <section class="equipment-form-section">
+            <label class="facilities-field-label" for="user-username">Username</label>
+            <input id="user-username" class="facilities-input" name="username" type="text" placeholder="Username" required />
 
-          <label class="facilities-field-label" for="user-full-name">Full Name</label>
-          <input id="user-full-name" class="facilities-input" name="full_name" type="text" placeholder="Full Name" />
+            <label class="facilities-field-label" for="user-full-name">Full Name</label>
+            <input id="user-full-name" class="facilities-input" name="full_name" type="text" placeholder="Full Name" />
 
-          <label class="facilities-field-label" for="user-email">Email</label>
-          <input id="user-email" class="facilities-input" name="email" type="email" placeholder="Email address" required />
+            <label class="facilities-field-label" for="user-email">Email</label>
+            <input id="user-email" class="facilities-input" name="email" type="email" placeholder="Email address" required />
+          </section>
 
-          <label class="facilities-field-label" for="user-role">Role</label>
-          <select id="user-role" class="facilities-input facilities-select" name="role" required>
-            <option value="user">USER</option>
-            <option value="admin">ADMIN</option>
-            <option value="item_owner">ITEM OWNER</option>
-          </select>
+          <section class="equipment-form-section">
+            <label class="facilities-field-label" for="user-role">Role</label>
+            <select id="user-role" class="facilities-input facilities-select" name="role" required>
+              <option value="user">USER</option>
+              <option value="admin">ADMIN</option>
+              <option value="item_owner">ITEM OWNER</option>
+            </select>
 
-          <label class="facilities-field-label" for="user-office">Office</label>
-          <select id="user-office" class="facilities-input facilities-select" name="office_id">
-            <option value="">No Office</option>
-            @foreach($offices as $office)
-              <option value="{{ $office->office_id }}">{{ $office->department_name }}</option>
-            @endforeach
-          </select>
-          <small class="facilities-input-note" id="item-owner-office-note" style="display:none;">
-            Item owners are automatically assigned to the Item Owner office and can manage their own equipment inventory.
-          </small>
+            <label class="facilities-field-label" for="user-office">Office</label>
+            <select id="user-office" class="facilities-input facilities-select" name="office_id">
+              <option value="">No Office</option>
+              @foreach($offices as $office)
+                <option value="{{ $office->office_id }}">{{ $office->department_name }}</option>
+              @endforeach
+            </select>
+            <small class="facilities-input-note" id="item-owner-office-note" style="display:none;">
+              Item owners are automatically assigned to the Item Owner office and can manage their own equipment inventory.
+            </small>
+          </section>
 
-          <label class="facilities-field-label" for="user-password">Password</label>
-          <div class="password-field-wrap">
-            <input id="user-password" class="facilities-input" name="password" type="password" placeholder="Password" autocomplete="new-password" />
-            <button type="button" class="password-toggle-btn" data-password-target="user-password" aria-label="Show password" aria-pressed="false">
-              <i class="bi bi-eye"></i>
-            </button>
-          </div>
+          <section class="equipment-form-section">
+            <label class="facilities-field-label" for="user-password">Password</label>
+            <div class="password-field-wrap">
+              <input id="user-password" class="facilities-input" name="password" type="password" placeholder="Password" autocomplete="new-password" />
+              <button type="button" class="password-toggle-btn" data-password-target="user-password" aria-label="Show password" aria-pressed="false">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
 
-          <label class="facilities-field-label" for="user-password-confirmation">Confirm Password</label>
-          <div class="password-field-wrap">
-            <input id="user-password-confirmation" class="facilities-input" name="password_confirmation" type="password" placeholder="Re-enter password" autocomplete="new-password" />
-            <button type="button" class="password-toggle-btn" data-password-target="user-password-confirmation" aria-label="Show confirm password" aria-pressed="false">
-              <i class="bi bi-eye"></i>
-            </button>
-          </div>
-          <small class="facilities-input-note" id="user-password-note">Leave both password fields blank when editing an existing user to keep the current password.</small>
+            <label class="facilities-field-label" for="user-password-confirmation">Confirm Password</label>
+            <div class="password-field-wrap">
+              <input id="user-password-confirmation" class="facilities-input" name="password_confirmation" type="password" placeholder="Re-enter password" autocomplete="new-password" />
+              <button type="button" class="password-toggle-btn" data-password-target="user-password-confirmation" aria-label="Show confirm password" aria-pressed="false">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+            <small class="facilities-input-note" id="user-password-note">Leave both password fields blank when editing an existing user to keep the current password.</small>
+          </section>
+        </div>
 
-          <div class="facilities-modal-actions">
-            <button type="button" class="facilities-action-btn cancel" id="user-cancel-btn">Cancel</button>
-            <button type="submit" class="facilities-action-btn submit" id="user-save-btn">Save User</button>
-          </div>
-        </form>
-      </div>
+        <footer class="equipment-form-modal-footer">
+          <button type="button" class="facilities-action-btn cancel" id="user-cancel-btn">Cancel</button>
+          <button type="submit" class="facilities-action-btn submit" id="user-save-btn">Save User</button>
+        </footer>
+      </form>
     </article>
   </section>
 
@@ -715,7 +724,19 @@
             return rowRole === 'item_owner';
           }
 
-          return ['admin', 'pf_admin', 'pc_admin'].includes(rowRole);
+          if (selectedRole === 'admin') {
+            return ['admin', 'pf_admin', 'pc_admin'].includes(rowRole);
+          }
+
+          if (selectedRole === 'faculty') {
+            return rowRole === 'faculty';
+          }
+
+          if (selectedRole === 'student') {
+            return rowRole === 'student' || rowRole === 'user';
+          }
+
+          return rowRole === selectedRole;
         };
 
         const compareRows = (left, right, sortMode) => {

@@ -261,14 +261,12 @@
         }
       };
 
-      const setButtonsDisabled = (state) => {
-        buttons.forEach((button) => {
-          button.disabled = state;
-        });
-      };
-
       buttons.forEach((button) => {
         button.addEventListener('click', async () => {
+          if (!(button instanceof HTMLButtonElement) || button.dataset.actionLoading === '1' || button.disabled) {
+            return;
+          }
+
           const approvalId = button.getAttribute('data-approval-id');
           const action = button.getAttribute('data-action');
 
@@ -276,20 +274,30 @@
             return;
           }
 
-          const confirmed = await openConfirm({
-            title: action === 'approve' ? 'Confirm Approval' : 'Confirm Rejection',
-            message: `Are you sure you want to ${action} this request? This action cannot be undone.`,
-            confirmText: action === 'approve' ? 'Approve' : 'Reject',
-            mode: action,
+          const pair = typeof getRequestActionPair === 'function'
+            ? getRequestActionPair(button)
+            : [button];
+
+          pair.forEach((node) => {
+            node.disabled = true;
           });
 
-          if (!confirmed) {
-            return;
+          if (typeof startActionButtonLoading === 'function') {
+            startActionButtonLoading(button);
           }
 
-          setButtonsDisabled(true);
-
           try {
+            const confirmed = await openConfirm({
+              title: action === 'approve' ? 'Confirm Approval' : 'Confirm Rejection',
+              message: `Are you sure you want to ${action} this request? This action cannot be undone.`,
+              confirmText: action === 'approve' ? 'Approve' : 'Reject',
+              mode: action,
+            });
+
+            if (!confirmed) {
+              return;
+            }
+
             const response = await fetch(resolveUrl(action, approvalId), {
               method: 'PATCH',
               headers: {
@@ -315,14 +323,24 @@
             if (!response.ok) {
               const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
               showAppNotice((payload.error || payload.message || 'Action failed. Please try again.') + statusMessage);
-              setButtonsDisabled(false);
               return;
             }
 
             window.location.reload();
           } catch (_error) {
             showAppNotice('Request failed. Please check your connection and try again.');
-            setButtonsDisabled(false);
+          } finally {
+            if (typeof stopActionButtonLoading === 'function') {
+              stopActionButtonLoading(button);
+            } else {
+              button.disabled = false;
+            }
+
+            pair.forEach((node) => {
+              if (node !== button) {
+                node.disabled = false;
+              }
+            });
           }
         });
       });

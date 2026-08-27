@@ -84,79 +84,47 @@
         </section>
 
         <section class="profile-grid">
-          <div class="profile-left-col">
-            <article class="profile-card">
-              <h2>Personal Information</h2>
-              <div class="profile-personal-body">
-                <div class="profile-avatar" id="profile-avatar" aria-hidden="true">
-                  <img id="profile-avatar-image" class="profile-avatar-image" alt="Profile avatar" />
-                  <i class="bi bi-person-fill profile-avatar-icon"></i>
-                </div>
-
-                <div class="profile-fields">
-                  <label for="profile-first-name">First Name</label>
-                  <input id="profile-first-name" type="text" value="{{ $firstName !== '' ? $firstName : 'Not Set' }}" readonly />
-
-                  <label for="profile-middle-name">Middle Initial</label>
-                  <input id="profile-middle-name" type="text" value="{{ $middleInitial !== '' ? $middleInitial : 'Not Set' }}" readonly />
-
-                  <label for="profile-last-name">Last Name</label>
-                  <input id="profile-last-name" type="text" value="{{ $lastName !== '' ? $lastName : 'Not Set' }}" readonly />
-
-                  <label for="profile-suffix">Suffix</label>
-                  <input id="profile-suffix" type="text" value="{{ $authUser->suffix ?? 'Not Set' }}" readonly />
-
-                  @if ($shouldSelectProgram)
-                    <label for="profile-program">Program</label>
-                    <input id="profile-program" type="text" value="{{ $programName }}" readonly />
-                  @endif
-                </div>
+          <article class="profile-card">
+            <h2>Personal Information</h2>
+            <div class="profile-personal-body">
+              <div class="profile-avatar" id="profile-avatar" aria-hidden="true">
+                <img id="profile-avatar-image" class="profile-avatar-image" alt="Profile avatar" />
+                <i class="bi bi-person-fill profile-avatar-icon"></i>
               </div>
-            </article>
 
-            <article class="profile-card">
-              <h3 class="profile-admin-head">Administrator Information</h3>
-              <div class="profile-admin-grid">
-                <label for="profile-admin-id">Admin ID</label>
-                <label for="profile-email">Email</label>
-                <input id="profile-admin-id" type="text" value="{{ $authUser->user_id ?? '' }}" readonly />
-                <input id="profile-email" type="text" value="{{ $authUser->email ?? '' }}" readonly />
+              <div class="profile-fields">
+                <label for="profile-first-name">First Name</label>
+                <input id="profile-first-name" type="text" value="{{ $firstName !== '' ? $firstName : 'Not Set' }}" readonly />
 
-                <label for="profile-contact">Contact Number</label>
-                <label for="profile-phone">Phone Number</label>
-                <input id="profile-contact" type="text" value="{{ $authUser->contact_number ?? 'Not Set' }}" readonly />
-                <input id="profile-phone" type="text" value="{{ $authUser->phone_number ?? 'Not Set' }}" readonly />
+                <label for="profile-middle-name">Middle Initial</label>
+                <input id="profile-middle-name" type="text" value="{{ $middleInitial !== '' ? $middleInitial : 'Not Set' }}" readonly />
+
+                <label for="profile-last-name">Last Name</label>
+                <input id="profile-last-name" type="text" value="{{ $lastName !== '' ? $lastName : 'Not Set' }}" readonly />
+
+                <label for="profile-suffix">Suffix</label>
+                <input id="profile-suffix" type="text" value="{{ $authUser->suffix ?? 'Not Set' }}" readonly />
+
+                @if ($shouldSelectProgram)
+                  <label for="profile-program">Program</label>
+                  <input id="profile-program" type="text" value="{{ $programName }}" readonly />
+                @endif
               </div>
-            </article>
-          </div>
+            </div>
+          </article>
 
-          <article class="profile-card profile-log-card">
-            <h2>Admin Activity Log</h2>
-            <div class="profile-log-wrap">
-              <table class="profile-log-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Action</th>
-                    <th>Module</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @forelse(($activityLogs ?? []) as $log)
-                  <tr>
-                    <td>{{ $log['date'] }}</td>
-                    <td>{{ $log['action'] }}</td>
-                    <td>{{ $log['module'] }}</td>
-                    <td><span class="profile-log-status">{{ $log['status'] }}</span></td>
-                  </tr>
-                  @empty
-                  <tr>
-                    <td colspan="4">No activity recorded for this account yet.</td>
-                  </tr>
-                  @endforelse
-                </tbody>
-              </table>
+          <article class="profile-card">
+            <h3 class="profile-admin-head">Administrator Information</h3>
+            <div class="profile-admin-grid">
+              <label for="profile-admin-id">Admin ID</label>
+              <label for="profile-email">Email</label>
+              <input id="profile-admin-id" type="text" value="{{ $authUser->user_id ?? '' }}" readonly />
+              <input id="profile-email" type="text" value="{{ $authUser->email ?? '' }}" readonly />
+
+              <label for="profile-contact">Contact Number</label>
+              <label for="profile-phone">Phone Number</label>
+              <input id="profile-contact" type="text" value="{{ $authUser->contact_number ?? 'Not Set' }}" readonly />
+              <input id="profile-phone" type="text" value="{{ $authUser->phone_number ?? 'Not Set' }}" readonly />
             </div>
           </article>
         </section>

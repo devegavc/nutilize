@@ -6,8 +6,8 @@
   
   <link rel="icon" type="image/png" href="/img/nutilize_favicon.png" />
 <title>NUtilize | Home</title>
-  <link rel="stylesheet" href="/css/landing.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
+  <link rel="stylesheet" href="/css/landing.css?v=5" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 </head>
 <body>
   <header class="top-header">
@@ -28,10 +28,35 @@
 
   <main class="hero" id="home">
     <div class="hero-overlay"></div>
+    @php
+      $nutilizeAppUrl = trim((string) config('services.nutilize.play_store_url', ''));
+      $hasNutilizeAppUrl = $nutilizeAppUrl !== '';
+    @endphp
     <section class="hero-content">
-      <h1>WELCOME TO<br />NUTILIZE</h1>
-      <p>Efficient Facilities Management Solutions</p>
-      <a href="/login" class="cta-btn">Get Started</a>
+      <div class="hero-copy">
+        <p class="hero-kicker">Welcome to</p>
+        <h1>NUtilize</h1>
+        <p class="hero-tagline">Smart Facilities Management,<br />Made Simple.</p>
+        <p class="hero-lead">Manage facilities, equipment, reservations, requests, and maintenance in one centralized platform.</p>
+      </div>
+
+      <div class="hero-actions">
+        <a href="/login" class="cta-btn">Get Started</a>
+        <a
+          href="{{ $hasNutilizeAppUrl ? $nutilizeAppUrl : '#' }}"
+          class="cta-btn cta-btn-secondary{{ $hasNutilizeAppUrl ? '' : ' is-pending' }}"
+          @if ($hasNutilizeAppUrl)
+            target="_blank"
+            rel="noopener noreferrer"
+          @else
+            aria-disabled="true"
+            title="NUtilize mobile app listing coming soon"
+          @endif
+        >
+          <i class="bi bi-google-play" aria-hidden="true"></i>
+          Get the NUtilize App
+        </a>
+      </div>
     </section>
   </main>
 
