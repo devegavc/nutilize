@@ -1021,6 +1021,10 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   background: linear-gradient(90deg, #d44545 0%, #ea6a6a 100%);
 }
 
+.app-confirm-modal.is-success .app-confirm-card::before {
+  background: linear-gradient(90deg, #2f9e44 0%, #51cf66 100%);
+}
+
 .app-confirm-head {
   padding: 14px 16px 10px;
   border-bottom: 1px solid #e6eaf2;
@@ -1032,6 +1036,10 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   font-size: 1.25rem;
   font-weight: 750;
   color: #c53030;
+}
+
+.app-confirm-head h2.is-success {
+  color: #2f9e44;
 }
 
 .app-confirm-body {
@@ -1080,6 +1088,16 @@ body:has(.home-dashboard-card) .home-dashboard-card {
 
 .app-confirm-btn.confirm:hover {
   background: #b83232;
+}
+
+.app-confirm-btn.confirm.is-success {
+  border-color: #2f9e44;
+  background: #2f9e44;
+  color: #fff;
+}
+
+.app-confirm-btn.confirm.is-success:hover {
+  background: #2b8a3e;
 }
 
 .announcement-edit,

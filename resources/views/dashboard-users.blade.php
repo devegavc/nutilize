@@ -849,12 +849,12 @@
       const updateStatusRow = (row, payload) => {
         const isActive = !!payload.isActive;
         const status = isActive ? 'active' : 'inactive';
-        $duration = payload.durationLabel || (isActive ? 'Active for 0 seconds' : 'Inactive for 0 seconds');
+        const duration = payload.durationLabel || (isActive ? 'Active for 0 seconds' : 'Inactive for 0 seconds');
 
         row.dataset.userStatus = status;
 
         // #region agent log
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'ajax-verify',hypothesisId:'W14',location:'dashboard-users.blade.php:updateStatusRow',message:'row status updated after activate/deactivate',data:{userId:row.dataset.userId||null,isActive,duration},timestamp:Date.now()})}).catch(()=>{});
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'W14',location:'dashboard-users.blade.php:updateStatusRow',message:'row status updated after activate/deactivate',data:{userId:row.dataset.userId||null,isActive,duration,buttonWillBe:isActive?'Deactivate':'Activate'},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
 
         const statusCell = row.children[5];
@@ -881,7 +881,7 @@
             isActive ? 'They will not be able to sign in until reactivated.' : ''
           );
           statusForm.setAttribute('data-confirm-text', isActive ? 'Deactivate' : 'Activate');
-          statusForm.setAttribute('data-confirm-variant', isActive ? 'danger' : 'default');
+          statusForm.setAttribute('data-confirm-variant', isActive ? 'danger' : 'success');
 
           const button = statusForm.querySelector('.table-status-btn');
           if (button instanceof HTMLButtonElement) {

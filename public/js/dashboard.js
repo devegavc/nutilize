@@ -730,6 +730,9 @@ function showAppConfirm(message, options = {}) {
           height: 4px;
           background: linear-gradient(90deg, #d44545 0%, #ea6a6a 100%);
         }
+        .app-confirm-modal.is-success .app-confirm-card::before {
+          background: linear-gradient(90deg, #2f9e44 0%, #51cf66 100%);
+        }
         .app-confirm-head {
           padding: 14px 16px 10px;
           border-bottom: 1px solid #e6eaf2;
@@ -740,6 +743,9 @@ function showAppConfirm(message, options = {}) {
           font-size: 1.25rem;
           font-weight: 750;
           color: #c53030;
+        }
+        .app-confirm-head h2.is-success {
+          color: #2f9e44;
         }
         .app-confirm-body {
           padding: 16px;
@@ -778,6 +784,12 @@ function showAppConfirm(message, options = {}) {
           color: #fff;
         }
         .app-confirm-btn.confirm:hover { background: #b83232; }
+        .app-confirm-btn.confirm.is-success {
+          border-color: #2f9e44;
+          background: #2f9e44;
+          color: #fff;
+        }
+        .app-confirm-btn.confirm.is-success:hover { background: #2b8a3e; }
       `;
       document.head.appendChild(style);
     }
@@ -827,10 +839,22 @@ function showAppConfirm(message, options = {}) {
   }
   cancelButton.textContent = cancelText;
   confirmButton.textContent = confirmText;
-  void variant;
+
+  const normalizedVariant = String(variant || 'danger').toLowerCase() === 'success' ? 'success' : 'danger';
+  modal.dataset.variant = normalizedVariant;
+  modal.classList.toggle('is-success', normalizedVariant === 'success');
+  modal.classList.toggle('is-danger', normalizedVariant === 'danger');
+  confirmButton.classList.toggle('is-success', normalizedVariant === 'success');
+  confirmButton.classList.toggle('is-danger', normalizedVariant === 'danger');
+  titleNode.classList.toggle('is-success', normalizedVariant === 'success');
+  titleNode.classList.toggle('is-danger', normalizedVariant === 'danger');
 
   modal.classList.add('is-open');
   modal.setAttribute('aria-hidden', 'false');
+
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'GREEN',location:'dashboard.js:showAppConfirm',message:'confirm modal variant applied',data:{title,variant:normalizedVariant,confirmText},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   return new Promise((resolve) => {
     const finish = (result) => {

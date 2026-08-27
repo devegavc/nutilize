@@ -57,7 +57,7 @@
           data-confirm-message="{{ $userStatus === 'active' ? 'Are you sure you want to deactivate this account?' : 'Are you sure you want to activate this account?' }}"
           data-confirm-note="{{ $userStatus === 'active' ? 'They will not be able to sign in until reactivated.' : '' }}"
           data-confirm-text="{{ $userStatus === 'active' ? 'Deactivate' : 'Activate' }}"
-          data-confirm-variant="{{ $userStatus === 'active' ? 'danger' : 'default' }}"
+          data-confirm-variant="{{ $userStatus === 'active' ? 'danger' : 'success' }}"
         >
           @csrf
           @method('PATCH')
