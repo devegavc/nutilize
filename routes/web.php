@@ -91,6 +91,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/users', [DashboardUserController::class, 'index'])->name('dashboard.users');
             Route::post('/users', [DashboardUserController::class, 'store'])->name('dashboard.users.store');
             Route::patch('/users/{userId}', [DashboardUserController::class, 'update'])->name('dashboard.users.update');
+            Route::patch('/users/{userId}/status', [DashboardUserController::class, 'toggleStatus'])->name('dashboard.users.toggle-status');
             Route::delete('/users/{userId}', [DashboardUserController::class, 'destroy'])->name('dashboard.users.destroy');
         });
 

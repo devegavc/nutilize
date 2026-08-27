@@ -507,10 +507,6 @@
         deleteForm.addEventListener('submit', (event) => {
           event.preventDefault();
 
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'C',location:'dashboard-home.blade.php:deleteSubmit',message:'announcement delete intercepted',data:{hasShowAppConfirm:typeof window.showAppConfirm==='function'||typeof showAppConfirm==='function',action:deleteForm.action},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-
           const confirmFn = (typeof showAppConfirm === 'function')
             ? showAppConfirm
             : (typeof window.showAppConfirm === 'function' ? window.showAppConfirm : null);
@@ -529,10 +525,6 @@
             variant: 'danger',
             dangerNote: 'This action cannot be undone.',
           }).then((confirmed) => {
-            // #region agent log
-            fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,B',location:'dashboard-home.blade.php:deleteConfirmResult',message:'announcement delete confirm result',data:{confirmed},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
-
             if (confirmed) {
               deleteForm.submit();
             }

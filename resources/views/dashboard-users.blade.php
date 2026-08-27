@@ -8,7 +8,7 @@
   <title>NUtilize | Manage Users</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
   <style>
     .password-field-wrap {
       position: relative;
@@ -101,39 +101,22 @@
 
         @php
           use App\Services\ItemOwnerService;
+          use App\Services\UserAccountStatusService;
 
           $adminRoles = ['admin', 'pf_admin', 'pc_admin'];
-          $itemOwners = $users->filter(fn ($user) => ItemOwnerService::isItemOwnerUser($user));
+          $itemOwners = $users->filter(fn ($user) => ItemOwnerService::isItemOwnerUser($user))->values();
           $admins = $users->filter(function ($user) use ($adminRoles) {
               return in_array(strtolower((string) $user->role), $adminRoles, true)
                   && !ItemOwnerService::isItemOwnerUser($user);
-          });
-          $approvers = $users->filter(function ($user) use ($adminRoles) {
+          })->values();
+          $mobilePool = $users->filter(function ($user) use ($adminRoles) {
               return !in_array(strtolower((string) $user->role), $adminRoles, true)
                   && !ItemOwnerService::isItemOwnerUser($user);
           });
-          $displayRole = function ($user) {
-              return ItemOwnerService::isItemOwnerUser($user) ? 'item_owner' : strtolower((string) $user->role);
-          };
-          $resolveUserStatus = function ($user): string {
-              $rawStatus = strtolower(trim((string) ($user->status ?? $user->account_status ?? '')));
-
-              if ($rawStatus !== '') {
-                  return in_array($rawStatus, ['inactive', 'disabled', 'suspended', 'blocked'], true) ? 'inactive' : 'active';
-              }
-
-              if (isset($user->is_active)) {
-                  return (bool) $user->is_active ? 'active' : 'inactive';
-              }
-
-              if (isset($user->active)) {
-                  return (bool) $user->active ? 'active' : 'inactive';
-              }
-
-              return 'active';
-          };
+          $facultyUsers = $mobilePool->filter(fn ($user) => strtolower((string) $user->role) === 'faculty')->values();
+          $studentUsers = $mobilePool->filter(fn ($user) => strtolower((string) $user->role) !== 'faculty')->values();
           $formatUserCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'user' : 'users');
-          $activeUsersCount = $users->filter(fn ($user) => $resolveUserStatus($user) === 'active')->count();
+          $activeUsersCount = $users->filter(fn ($user) => UserAccountStatusService::isActive($user))->count();
           $resolveUserName = fn ($user) => $user->displayName();
           $resolveUserOffice = function ($user): string {
               $officeName = trim((string) ($user->office?->department_name ?? ''));
@@ -171,10 +154,10 @@
             </div>
           </article>
           <article class="users-summary-card">
-            <span class="users-summary-icon"><i class="bi bi-box-seam"></i></span>
+            <span class="users-summary-icon"><i class="bi bi-mortarboard-fill"></i></span>
             <div class="users-summary-copy">
-              <p class="users-summary-value">{{ $itemOwners->count() }}</p>
-              <p class="users-summary-label">Item Owners</p>
+              <p class="users-summary-value">{{ $facultyUsers->count() }}</p>
+              <p class="users-summary-label">Faculties</p>
             </div>
           </article>
           <article class="users-summary-card">
@@ -185,6 +168,10 @@
             </div>
           </article>
         </section>
+
+        <p class="users-policy-note">
+          Users and faculties are marked inactive automatically after {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks without login. PF admins can activate or deactivate accounts at any time.
+        </p>
 
         <section class="users-tools-bar" aria-label="User table filters">
           <div class="users-search-wrap">
@@ -255,41 +242,15 @@
                     </td>
                   </tr>
                   @foreach($admins as $user)
-                    @php
-                      $userStatus = $resolveUserStatus($user);
-                      $userOffice = $resolveUserOffice($user);
-                      $userName = $resolveUserName($user);
-                    @endphp
-                    <tr
-                      class="admin-row"
-                      data-user-id="{{ $user->user_id }}"
-                      data-user-username="{{ $user->username }}"
-                      data-user-full-name="{{ $user->full_name }}"
-                      data-user-name="{{ $userName }}"
-                      data-user-email="{{ $user->email }}"
-                      data-user-office-name="{{ strtolower((string) $userOffice) }}"
-                      data-user-role="{{ $displayRole($user) }}"
-                      data-user-status="{{ $userStatus }}"
-                      data-user-created-at="{{ $user->created_at ? $user->created_at->timestamp : 0 }}"
-                      data-user-office-id="{{ $user->office_id }}"
-                    >
-                      <td><span class="user-cell-text" title="{{ $user->username }}">{{ $user->username }}</span></td>
-                      <td><span class="user-cell-text" title="{{ $userName }}">{{ $userName }}</span></td>
-                      <td><span class="user-cell-text" title="{{ $user->email }}">{{ $user->email }}</span></td>
-                      <td><span class="role-badge admin-badge">{{ strtoupper($user->role) }}</span></td>
-                      <td><span class="user-cell-text" title="{{ $userOffice }}">{{ $userOffice }}</span></td>
-                      <td><span class="status-badge {{ $userStatus === 'active' ? 'is-active' : 'is-inactive' }}">{{ ucfirst($userStatus) }}</span></td>
-                      <td class="table-actions-cell">
-                        <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
-                        @if(auth()->user()->user_id !== $user->user_id)
-                          <form method="POST" action="{{ route('dashboard.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" onsubmit="return confirm('Delete this user?');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="table-delete-btn">Delete</button>
-                          </form>
-                        @endif
-                      </td>
-                    </tr>
+                    @include('partials.dashboard-user-row', [
+                      'user' => $user,
+                      'resolveUserOffice' => $resolveUserOffice,
+                      'resolveUserName' => $resolveUserName,
+                      'rowClass' => 'admin-row',
+                      'roleBadgeClass' => 'admin-badge',
+                      'roleLabel' => strtoupper((string) $user->role),
+                      'deleteConfirm' => 'Delete this user?',
+                    ])
                   @endforeach
                 @endif
 
@@ -304,91 +265,61 @@
                     </td>
                   </tr>
                   @foreach($itemOwners as $user)
-                    @php
-                      $userStatus = $resolveUserStatus($user);
-                      $userOffice = $resolveUserOffice($user);
-                      $userName = $resolveUserName($user);
-                    @endphp
-                    <tr
-                      class="admin-row"
-                      data-user-id="{{ $user->user_id }}"
-                      data-user-username="{{ $user->username }}"
-                      data-user-full-name="{{ $user->full_name }}"
-                      data-user-name="{{ $userName }}"
-                      data-user-email="{{ $user->email }}"
-                      data-user-office-name="{{ strtolower((string) $userOffice) }}"
-                      data-user-role="{{ $displayRole($user) }}"
-                      data-user-status="{{ $userStatus }}"
-                      data-user-created-at="{{ $user->created_at ? $user->created_at->timestamp : 0 }}"
-                      data-user-office-id="{{ $user->office_id }}"
-                    >
-                      <td><span class="user-cell-text" title="{{ $user->username }}">{{ $user->username }}</span></td>
-                      <td><span class="user-cell-text" title="{{ $userName }}">{{ $userName }}</span></td>
-                      <td><span class="user-cell-text" title="{{ $user->email }}">{{ $user->email }}</span></td>
-                      <td><span class="role-badge item-owner-badge">ITEM OWNER</span></td>
-                      <td><span class="user-cell-text" title="{{ $userOffice }}">{{ $userOffice }}</span></td>
-                      <td><span class="status-badge {{ $userStatus === 'active' ? 'is-active' : 'is-inactive' }}">{{ ucfirst($userStatus) }}</span></td>
-                      <td class="table-actions-cell">
-                        <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
-                        @if(auth()->user()->user_id !== $user->user_id)
-                          <form method="POST" action="{{ route('dashboard.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" onsubmit="return confirm('Delete this item owner?');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="table-delete-btn">Delete</button>
-                          </form>
-                        @endif
-                      </td>
-                    </tr>
+                    @include('partials.dashboard-user-row', [
+                      'user' => $user,
+                      'resolveUserOffice' => $resolveUserOffice,
+                      'resolveUserName' => $resolveUserName,
+                      'rowClass' => 'admin-row',
+                      'roleBadgeClass' => 'item-owner-badge',
+                      'roleLabel' => 'ITEM OWNER',
+                      'deleteConfirm' => 'Delete this item owner?',
+                    ])
                   @endforeach
                 @endif
 
-                <!-- Approvers Section -->
-                @if($approvers->count() > 0)
-                  <tr class="category-header-row">
+                @if($facultyUsers->count() > 0)
+                  <tr class="category-header-row" data-group="faculty">
                     <td colspan="7">
                       <div class="category-header">
-                        <i class="bi bi-person-check"></i>
-                        <span>Mobile Users</span>
-                        <span class="category-count" data-group-count>{{ $formatUserCount($approvers->count()) }}</span>
+                        <i class="bi bi-mortarboard"></i>
+                        <span>Faculties</span>
+                        <span class="category-count" data-group-count>{{ $formatUserCount($facultyUsers->count()) }}</span>
                       </div>
                     </td>
                   </tr>
-                  @foreach($approvers as $user)
-                    @php
-                      $userStatus = $resolveUserStatus($user);
-                      $userOffice = $resolveUserOffice($user);
-                      $userName = $resolveUserName($user);
-                    @endphp
-                    <tr
-                      class="approver-row"
-                      data-user-id="{{ $user->user_id }}"
-                      data-user-username="{{ $user->username }}"
-                      data-user-full-name="{{ $user->full_name }}"
-                      data-user-name="{{ $userName }}"
-                      data-user-email="{{ $user->email }}"
-                      data-user-office-name="{{ strtolower((string) $userOffice) }}"
-                      data-user-role="{{ $displayRole($user) }}"
-                      data-user-status="{{ $userStatus }}"
-                      data-user-created-at="{{ $user->created_at ? $user->created_at->timestamp : 0 }}"
-                      data-user-office-id="{{ $user->office_id }}"
-                    >
-                      <td><span class="user-cell-text" title="{{ $user->username }}">{{ $user->username }}</span></td>
-                      <td><span class="user-cell-text" title="{{ $userName }}">{{ $userName }}</span></td>
-                      <td><span class="user-cell-text" title="{{ $user->email }}">{{ $user->email }}</span></td>
-                      <td><span class="role-badge approver-badge">{{ strtoupper($user->role) }}</span></td>
-                      <td><span class="user-cell-text" title="{{ $userOffice }}">{{ $userOffice }}</span></td>
-                      <td><span class="status-badge {{ $userStatus === 'active' ? 'is-active' : 'is-inactive' }}">{{ ucfirst($userStatus) }}</span></td>
-                      <td class="table-actions-cell">
-                        <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
-                        @if(auth()->user()->user_id !== $user->user_id)
-                          <form method="POST" action="{{ route('dashboard.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" onsubmit="return confirm('Delete this user?');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="table-delete-btn">Delete</button>
-                          </form>
-                        @endif
-                      </td>
-                    </tr>
+                  @foreach($facultyUsers as $user)
+                    @include('partials.dashboard-user-row', [
+                      'user' => $user,
+                      'resolveUserOffice' => $resolveUserOffice,
+                      'resolveUserName' => $resolveUserName,
+                      'rowClass' => 'faculty-row',
+                      'roleBadgeClass' => 'faculty-badge',
+                      'roleLabel' => 'FACULTY',
+                      'deleteConfirm' => 'Delete this faculty account?',
+                    ])
+                  @endforeach
+                @endif
+
+                @if($studentUsers->count() > 0)
+                  <tr class="category-header-row" data-group="users">
+                    <td colspan="7">
+                      <div class="category-header">
+                        <i class="bi bi-people"></i>
+                        <span>Users</span>
+                        <span class="category-count" data-group-count>{{ $formatUserCount($studentUsers->count()) }}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  @foreach($studentUsers as $user)
+                    @include('partials.dashboard-user-row', [
+                      'user' => $user,
+                      'resolveUserOffice' => $resolveUserOffice,
+                      'resolveUserName' => $resolveUserName,
+                      'rowClass' => 'approver-row',
+                      'roleBadgeClass' => 'approver-badge',
+                      'roleLabel' => strtoupper((string) $user->role),
+                      'deleteConfirm' => 'Delete this user?',
+                    ])
                   @endforeach
                 @endif
 
@@ -449,6 +380,7 @@
             <label class="facilities-field-label" for="user-role">Role</label>
             <select id="user-role" class="facilities-input facilities-select" name="role" required>
               <option value="user">USER</option>
+              <option value="faculty">FACULTY</option>
               <option value="admin">ADMIN</option>
               <option value="item_owner">ITEM OWNER</option>
             </select>
@@ -858,6 +790,10 @@
         });
 
         applyUsersFilters();
+
+        // #region agent log
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'feature-verify',hypothesisId:'D,E',location:'dashboard-users.blade.php:init',message:'users dashboard groups and status cells',data:{facultyHeaders:document.querySelectorAll('[data-group="faculty"]').length,userHeaders:document.querySelectorAll('[data-group="users"]').length,facultyRows:document.querySelectorAll('.faculty-row').length,userRows:document.querySelectorAll('.approver-row').length,statusDurations:document.querySelectorAll('.user-status-duration').length,toggleButtons:document.querySelectorAll('.table-status-btn').length},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
       }
     }
   </script>

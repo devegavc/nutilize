@@ -832,15 +832,6 @@ function showAppConfirm(message, options = {}) {
   modal.classList.add('is-open');
   modal.setAttribute('aria-hidden', 'false');
 
-  // #region agent log
-  requestAnimationFrame(() => {
-    const cs = getComputedStyle(modal);
-    const announcements = document.getElementById('announcements-modal');
-    const annCs = announcements ? getComputedStyle(announcements) : null;
-    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,B,E',location:'dashboard.js:showAppConfirm',message:'confirm modal computed style',data:{title,hasInlineStyle:!!document.getElementById('app-confirm-style'),hasStylesheetRule:!!Array.from(document.styleSheets).some((s)=>{try{return Array.from(s.cssRules||[]).some((r)=>String(r.selectorText||'').includes('app-confirm-modal'));}catch{return false;}}),display:cs.display,position:cs.position,zIndex:cs.zIndex,rect:(()=>{const r=modal.getBoundingClientRect();return{top:Math.round(r.top),left:Math.round(r.left),w:Math.round(r.width),h:Math.round(r.height)};})(),announcementsZ:annCs?.zIndex||null,announcementsOpen:!!announcements?.classList.contains('is-open')},timestamp:Date.now()})}).catch(()=>{});
-  });
-  // #endregion
-
   return new Promise((resolve) => {
     const finish = (result) => {
       modal.classList.remove('is-open');

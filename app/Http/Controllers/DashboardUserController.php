@@ -6,6 +6,7 @@ use App\Models\Office;
 use App\Models\User;
 use App\Services\AdminActivityService;
 use App\Services\ItemOwnerService;
+use App\Services\UserAccountStatusService;
 use App\Services\UserNameService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +17,27 @@ class DashboardUserController extends Controller
 {
     public function index()
     {
+        $deactivated = UserAccountStatusService::applyInactivityPolicy();
+
+        // #region agent log
+        file_put_contents(
+            base_path('debug-e19b10.log'),
+            json_encode([
+                'sessionId' => 'e19b10',
+                'runId' => 'feature-verify',
+                'hypothesisId' => 'A',
+                'location' => 'DashboardUserController.php:index',
+                'message' => 'users index inactivity sync',
+                'data' => [
+                    'deactivated' => $deactivated,
+                    'inactivityWeeks' => UserAccountStatusService::INACTIVITY_WEEKS,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ])."\n",
+            FILE_APPEND
+        );
+        // #endregion
+
         $users = User::with(['office', 'academicProgram.office'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -40,7 +62,7 @@ class DashboardUserController extends Controller
             'username' => 'required|string|max:50|unique:users,username',
             'email' => 'required|email|max:100|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
-            'role' => ['required', Rule::in(['user', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
+            'role' => ['required', Rule::in(['user', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
             'full_name' => 'nullable|string|max:255',
             'office_id' => ['nullable', 'exists:offices,office_id'],
         ]);
@@ -58,6 +80,8 @@ class DashboardUserController extends Controller
             'middle_initial' => $data['middle_initial'] ?? null,
             'last_name' => $data['last_name'] ?? null,
             'office_id' => $data['office_id'] ?? null,
+            'is_active' => true,
+            'status_changed_at' => now(),
         ]);
 
         ItemOwnerService::syncForUser($user);
@@ -85,7 +109,7 @@ class DashboardUserController extends Controller
             'username' => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($user->user_id, 'user_id')],
             'email' => ['required', 'email', 'max:100', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
             'password' => 'nullable|string|min:8|confirmed',
-            'role' => ['required', Rule::in(['user', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
+            'role' => ['required', Rule::in(['user', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
             'full_name' => 'nullable|string|max:255',
             'office_id' => ['nullable', 'exists:offices,office_id'],
         ]);
@@ -114,6 +138,54 @@ class DashboardUserController extends Controller
         }
 
         return redirect()->route('dashboard.users')->with('success', 'User updated successfully.');
+    }
+
+    public function toggleStatus(int $userId)
+    {
+        $user = User::findOrFail($userId);
+
+        if (Auth::id() === $user->user_id) {
+            return redirect()->route('dashboard.users')->with('error', 'You cannot change the status of your own account.');
+        }
+
+        $before = UserAccountStatusService::isActive($user);
+        UserAccountStatusService::toggle($user);
+        $after = UserAccountStatusService::isActive($user);
+
+        // #region agent log
+        file_put_contents(
+            base_path('debug-e19b10.log'),
+            json_encode([
+                'sessionId' => 'e19b10',
+                'runId' => 'feature-verify',
+                'hypothesisId' => 'B',
+                'location' => 'DashboardUserController.php:toggleStatus',
+                'message' => 'user status toggled',
+                'data' => [
+                    'userId' => $user->user_id,
+                    'beforeActive' => $before,
+                    'afterActive' => $after,
+                    'statusChangedAt' => optional($user->status_changed_at)?->toIso8601String(),
+                    'durationLabel' => UserAccountStatusService::statusDurationLabel($user),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ])."\n",
+            FILE_APPEND
+        );
+        // #endregion
+
+        if ($actorId = (int) (Auth::id() ?? 0)) {
+            AdminActivityService::log(
+                $actorId,
+                $after ? 'Activated user account' : 'Deactivated user account',
+                'Account'
+            );
+        }
+
+        return redirect()->route('dashboard.users')->with(
+            'success',
+            $after ? 'User marked as active.' : 'User marked as inactive.'
+        );
     }
 
     public function destroy(int $userId)

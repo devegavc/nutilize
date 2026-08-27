@@ -65,6 +65,8 @@ class RegisterController extends Controller
         $user->password = Hash::make($validated['password']);
         $user->role = 'user';
         $user->program_id = (int) $validated['program_id'];
+        $user->is_active = true;
+        $user->status_changed_at = now();
         $user->save();
 
         return redirect()->route('login')->with('status', 'Registration successful. Please log in.');
