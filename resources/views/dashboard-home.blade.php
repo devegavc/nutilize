@@ -383,6 +383,27 @@
     </section>
   </div>
 
+  <div
+    class="announcement-delete-confirm-modal"
+    id="announcement-delete-confirm-modal"
+    aria-hidden="true"
+  >
+    <div class="announcement-delete-confirm-overlay" data-close-announcement-delete-confirm="true"></div>
+    <article class="announcement-delete-confirm-card" role="dialog" aria-modal="true" aria-labelledby="announcement-delete-confirm-title">
+      <header class="announcement-delete-confirm-head">
+        <h2 id="announcement-delete-confirm-title">Delete announcement</h2>
+      </header>
+      <div class="announcement-delete-confirm-body">
+        <p>Are you sure you want to delete this announcement?</p>
+        <p class="announcement-delete-confirm-warning">This action cannot be undone.</p>
+      </div>
+      <div class="announcement-delete-confirm-actions">
+        <button type="button" class="announcement-delete-confirm-btn cancel" id="announcement-delete-confirm-cancel">Cancel</button>
+        <button type="button" class="announcement-delete-confirm-btn delete" id="announcement-delete-confirm-submit">Delete</button>
+      </div>
+    </article>
+  </div>
+
   <script>
     (function initAnnouncementsModal() {
       const modal = document.getElementById('announcements-modal');
@@ -417,6 +438,9 @@
       const submitButton = modal.querySelector('[data-announcement-submit]');
       const composerTitle = modal.querySelector('[data-announcement-composer-title] span');
       const composerHint = modal.querySelector('[data-announcement-composer-hint]');
+      const deleteConfirmModal = document.getElementById('announcement-delete-confirm-modal');
+      const deleteConfirmCancel = document.getElementById('announcement-delete-confirm-cancel');
+      const deleteConfirmSubmit = document.getElementById('announcement-delete-confirm-submit');
       let methodInput = null;
 
       const setEditing = (announcement) => {
@@ -477,8 +501,219 @@
 
       cancelButton?.addEventListener('click', () => setEditing(null));
 
+      const closeAnnouncementDeleteConfirm = () => {
+        if (!(deleteConfirmModal instanceof HTMLElement)) {
+          return;
+        }
+
+        deleteConfirmModal.classList.remove('is-open');
+        deleteConfirmModal.setAttribute('aria-hidden', 'true');
+      };
+
+      const openAnnouncementDeleteConfirm = () => new Promise((resolve) => {
+        if (!(deleteConfirmModal instanceof HTMLElement)
+          || !(deleteConfirmCancel instanceof HTMLButtonElement)
+          || !(deleteConfirmSubmit instanceof HTMLButtonElement)) {
+          resolve(window.confirm('Are you sure you want to delete this announcement?\n\nThis action cannot be undone.'));
+          return;
+        }
+
+        const teardown = () => {
+          deleteConfirmCancel.removeEventListener('click', handleCancel);
+          deleteConfirmSubmit.removeEventListener('click', handleSubmit);
+          deleteConfirmModal.removeEventListener('click', handleBackdrop);
+        };
+
+        const handleCancel = () => {
+          teardown();
+          closeAnnouncementDeleteConfirm();
+          resolve(false);
+        };
+
+        const handleSubmit = () => {
+          teardown();
+          closeAnnouncementDeleteConfirm();
+          resolve(true);
+        };
+
+        const handleBackdrop = (event) => {
+          const target = event.target;
+          if (target instanceof HTMLElement && target.dataset.closeAnnouncementDeleteConfirm === 'true') {
+            handleCancel();
+          }
+        };
+
+        deleteConfirmModal.classList.add('is-open');
+        deleteConfirmModal.setAttribute('aria-hidden', 'false');
+        deleteConfirmCancel.addEventListener('click', handleCancel);
+        deleteConfirmSubmit.addEventListener('click', handleSubmit);
+        deleteConfirmModal.addEventListener('click', handleBackdrop);
+        deleteConfirmCancel.focus();
+      });
+
+      const setAnnouncementCardDeleting = (card, isDeleting) => {
+        if (!(card instanceof HTMLElement)) {
+          return;
+        }
+
+        const existingOverlay = card.querySelector('.announcement-card-deleting-overlay');
+
+        if (!isDeleting) {
+          card.classList.remove('is-deleting');
+          card.removeAttribute('aria-busy');
+          card.style.width = '';
+          card.style.height = '';
+          card.style.minWidth = '';
+          card.style.minHeight = '';
+          card.style.flexShrink = '';
+          card.querySelectorAll('.announcement-edit, .announcement-delete').forEach((button) => {
+            if (button instanceof HTMLButtonElement) {
+              button.disabled = false;
+            }
+          });
+          existingOverlay?.remove();
+          return;
+        }
+
+        if (!card.classList.contains('is-deleting')) {
+          const bounds = card.getBoundingClientRect();
+          const width = Math.ceil(bounds.width);
+          const height = Math.ceil(bounds.height);
+
+          if (width > 0) {
+            card.style.width = `${width}px`;
+            card.style.minWidth = `${width}px`;
+          }
+
+          if (height > 0) {
+            card.style.height = `${height}px`;
+            card.style.minHeight = `${height}px`;
+          }
+
+          card.style.flexShrink = '0';
+        }
+
+        card.classList.add('is-deleting');
+        card.setAttribute('aria-busy', 'true');
+
+        card.querySelectorAll('.announcement-edit, .announcement-delete').forEach((button) => {
+          if (button instanceof HTMLButtonElement) {
+            button.disabled = true;
+          }
+        });
+
+        if (existingOverlay) {
+          return;
+        }
+
+        const overlay = document.createElement('div');
+        overlay.className = 'announcement-card-deleting-overlay';
+        overlay.setAttribute('role', 'status');
+        overlay.setAttribute('aria-live', 'polite');
+
+        const spinner = document.createElement('span');
+        spinner.className = 'action-btn-spinner';
+        spinner.setAttribute('aria-hidden', 'true');
+
+        const label = document.createElement('span');
+        label.className = 'announcement-card-deleting-label';
+        label.textContent = 'Deleting...';
+
+        overlay.append(spinner, label);
+        card.appendChild(overlay);
+      };
+
+      modal.querySelectorAll('.announcement-card form').forEach((deleteForm) => {
+        if (!(deleteForm instanceof HTMLFormElement)) {
+          return;
+        }
+
+        deleteForm.addEventListener('submit', async (event) => {
+          const card = deleteForm.closest('.announcement-card');
+          if (!(card instanceof HTMLElement)) {
+            return;
+          }
+
+          event.preventDefault();
+
+          if (card.classList.contains('is-deleting')) {
+            return;
+          }
+
+          if (deleteConfirmModal instanceof HTMLElement && deleteConfirmModal.classList.contains('is-open')) {
+            return;
+          }
+
+          const confirmed = await openAnnouncementDeleteConfirm();
+          if (!confirmed) {
+            return;
+          }
+
+          setAnnouncementCardDeleting(card, true);
+          deleteForm.submit();
+        });
+      });
+
+      if (form instanceof HTMLFormElement) {
+        form.addEventListener('submit', (event) => {
+          if (!(submitButton instanceof HTMLButtonElement)) {
+            return;
+          }
+
+          if (submitButton.dataset.actionLoading === '1' || form.dataset.publishing === '1') {
+            event.preventDefault();
+            return;
+          }
+
+          form.dataset.publishing = '1';
+
+          if (typeof startActionButtonLoading === 'function') {
+            startActionButtonLoading(submitButton);
+          } else {
+            submitButton.disabled = true;
+            submitButton.setAttribute('aria-busy', 'true');
+          }
+        });
+      }
+
+      window.addEventListener('pageshow', (event) => {
+        if (!event.persisted) {
+          return;
+        }
+
+        if (submitButton instanceof HTMLButtonElement) {
+          if (typeof stopActionButtonLoading === 'function') {
+            stopActionButtonLoading(submitButton);
+          } else {
+            submitButton.disabled = false;
+            submitButton.removeAttribute('aria-busy');
+          }
+        }
+
+        if (form instanceof HTMLFormElement) {
+          delete form.dataset.publishing;
+        }
+
+        closeAnnouncementDeleteConfirm();
+
+        modal.querySelectorAll('.announcement-card.is-deleting').forEach((card) => {
+          setAnnouncementCardDeleting(card, false);
+        });
+      });
+
       document.addEventListener('keydown', (event) => {
-        if (event.key !== 'Escape' || !modal.classList.contains('is-open')) {
+        if (event.key !== 'Escape') {
+          return;
+        }
+
+        if (deleteConfirmModal instanceof HTMLElement && deleteConfirmModal.classList.contains('is-open')) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          deleteConfirmCancel?.click();
+          return;
+        }
+
+        if (!modal.classList.contains('is-open')) {
           return;
         }
 

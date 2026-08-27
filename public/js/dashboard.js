@@ -50,11 +50,16 @@ const equipmentUploadName = document.getElementById('equipment-upload-name');
 const equipmentAddCategoryButton = document.getElementById('equipment-add-category-btn');
 const equipmentCategoryModal = document.getElementById('equipment-category-modal');
 const equipmentCategoryModalTitle = document.getElementById('equipment-category-modal-title');
+const equipmentCategoryComposer = document.getElementById('equipment-category-composer');
+const equipmentCategoryComposerToggle = document.getElementById('equipment-category-composer-toggle');
+const equipmentCategoryComposerLabel = document.getElementById('equipment-category-composer-label');
 const equipmentCategoryNameInput = document.getElementById('equipment-category-name-input');
 const equipmentCategoryCancelButton = document.getElementById('equipment-category-cancel-btn');
 const equipmentCategorySaveButton = document.getElementById('equipment-category-save-btn');
 const equipmentCategoryList = document.getElementById('equipment-category-list');
 const equipmentTabGroup = document.querySelector('.facilities-tab-group[aria-label="Equipment category"]');
+const equipmentCategorySlidePrev = document.getElementById('equipment-category-slide-prev');
+const equipmentCategorySlideNext = document.getElementById('equipment-category-slide-next');
 const equipmentTabs = document.querySelectorAll('[data-equipment-tab]');
 const historyTabs = document.querySelectorAll('[data-history-tab]');
 const maintenanceTabs = document.querySelectorAll('[data-maintenance-tab]');
@@ -1262,7 +1267,6 @@ function showQuickReportDetailsModal(report) {
 
         <footer class="quick-report-details-footer">
           <a class="quick-report-footer-link" href="/dashboard/maintenance">Open Item Maintenance</a>
-          <button type="button" class="quick-report-footer-close" data-close-quick-report="true">Close</button>
         </footer>
       </article>
     </div>
@@ -1279,7 +1283,7 @@ function showQuickReportDetailsModal(report) {
       return;
     }
 
-    if (target.closest('.quick-report-details-close') || target.closest('.quick-report-footer-close')) {
+    if (target.closest('.quick-report-details-close')) {
       closeQuickReportDetailsModal();
     }
   });
@@ -1457,13 +1461,34 @@ function showReservationDetailsModal(reservation, options = {}) {
   if (canAct && typeof options.onAction === 'function') {
     modal.querySelectorAll('[data-modal-action]').forEach((button) => {
       button.addEventListener('click', async () => {
+        if (!(button instanceof HTMLButtonElement) || button.dataset.actionLoading === '1') {
+          return;
+        }
+
         const action = button.getAttribute('data-modal-action');
         if (!action) {
           return;
         }
 
-        closeModal();
-        await options.onAction(action, options.approvalId);
+        const pair = getRequestActionPair(button);
+        pair.forEach((node) => {
+          node.disabled = true;
+        });
+        startActionButtonLoading(button);
+
+        try {
+          const succeeded = await options.onAction(action, options.approvalId);
+          if (succeeded !== false) {
+            closeModal();
+          }
+        } finally {
+          stopActionButtonLoading(button);
+          pair.forEach((node) => {
+            if (node !== button) {
+              node.disabled = false;
+            }
+          });
+        }
       });
     });
   }
@@ -2531,6 +2556,76 @@ async function refreshRequestListSafely(explicitUrl) {
   });
 })();
 
+function createActionButtonSpinner() {
+  const spinner = document.createElement('span');
+  spinner.className = 'action-btn-spinner';
+  spinner.setAttribute('aria-hidden', 'true');
+  return spinner;
+}
+
+function startActionButtonLoading(button) {
+  if (!(button instanceof HTMLButtonElement) || button.dataset.actionLoading === '1') {
+    return false;
+  }
+
+  const bounds = button.getBoundingClientRect();
+  button.dataset.actionLoading = '1';
+  button.dataset.actionLoadingHtml = button.innerHTML;
+
+  if (bounds.width > 0) {
+    button.style.minWidth = `${Math.ceil(bounds.width)}px`;
+  }
+
+  if (bounds.height > 0) {
+    button.style.minHeight = `${Math.ceil(bounds.height)}px`;
+  }
+
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  button.classList.add('is-action-loading');
+  button.replaceChildren(createActionButtonSpinner());
+  return true;
+}
+
+function stopActionButtonLoading(button) {
+  if (!(button instanceof HTMLButtonElement) || button.dataset.actionLoading !== '1') {
+    return;
+  }
+
+  button.innerHTML = button.dataset.actionLoadingHtml || '';
+  delete button.dataset.actionLoading;
+  delete button.dataset.actionLoadingHtml;
+  button.style.minWidth = '';
+  button.style.minHeight = '';
+  button.disabled = false;
+  button.removeAttribute('aria-busy');
+  button.classList.remove('is-action-loading');
+}
+
+function getRequestActionPair(button) {
+  if (!(button instanceof HTMLButtonElement)) {
+    return [];
+  }
+
+  const group = button.closest('.office-queue-action-group, .request-action-stack, .reservation-details-footer');
+
+  if (group instanceof HTMLElement) {
+    return Array.from(group.querySelectorAll(
+      '.office-queue-approve, .office-queue-reject, .approve-btn, .reject-btn, [data-modal-action="approve"], [data-modal-action="reject"]'
+    )).filter((node) => node instanceof HTMLButtonElement);
+  }
+
+  const approvalId = button.getAttribute('data-approval-id');
+
+  if (approvalId) {
+    return Array.from(document.querySelectorAll(
+      `.office-queue-approve[data-approval-id="${approvalId}"], .office-queue-reject[data-approval-id="${approvalId}"]`
+    )).filter((node) => node instanceof HTMLButtonElement);
+  }
+
+  return [button];
+}
+
 async function submitRequestDecision(item, button, status) {
   const approvalId = button ? button.dataset.approvalId : '';
 
@@ -2547,13 +2642,23 @@ async function submitRequestDecision(item, button, status) {
     return;
   }
 
-  const confirmed = await confirmRequestDecision(status);
-  if (!confirmed) {
+  if (button instanceof HTMLButtonElement && button.dataset.actionLoading === '1') {
     return;
   }
 
-  if (button) {
-    button.disabled = true;
+  const pair = getRequestActionPair(button);
+  pair.forEach((node) => {
+    node.disabled = true;
+  });
+  startActionButtonLoading(button);
+
+  const confirmed = await confirmRequestDecision(status);
+  if (!confirmed) {
+    stopActionButtonLoading(button);
+    pair.forEach((node) => {
+      node.disabled = false;
+    });
+    return;
   }
 
   try {
@@ -2594,9 +2699,12 @@ async function submitRequestDecision(item, button, status) {
     window.console.error('Request approval error:', error);
     showAppNotice('An error occurred while processing the request.');
   } finally {
-    if (button) {
-      button.disabled = false;
-    }
+    stopActionButtonLoading(button);
+    pair.forEach((node) => {
+      if (node !== button) {
+        node.disabled = false;
+      }
+    });
   }
 }
 
@@ -2616,13 +2724,23 @@ async function submitFinalRequestDecision(item, button, status) {
     return;
   }
 
-  const confirmed = await confirmRequestDecision(status);
-  if (!confirmed) {
+  if (button instanceof HTMLButtonElement && button.dataset.actionLoading === '1') {
     return;
   }
 
-  if (button) {
-    button.disabled = true;
+  const pair = getRequestActionPair(button);
+  pair.forEach((node) => {
+    node.disabled = true;
+  });
+  startActionButtonLoading(button);
+
+  const confirmed = await confirmRequestDecision(status);
+  if (!confirmed) {
+    stopActionButtonLoading(button);
+    pair.forEach((node) => {
+      node.disabled = false;
+    });
+    return;
   }
 
   try {
@@ -2696,9 +2814,12 @@ async function submitFinalRequestDecision(item, button, status) {
     window.console.error('Final request approval error:', error);
     showAppNotice('An error occurred while processing the request.');
   } finally {
-    if (button) {
-      button.disabled = false;
-    }
+    stopActionButtonLoading(button);
+    pair.forEach((node) => {
+      if (node !== button) {
+        node.disabled = false;
+      }
+    });
   }
 }
 
@@ -2946,6 +3067,37 @@ function getEquipmentTabButtons() {
   return equipmentTabs;
 }
 
+function updateEquipmentCategorySliderControls() {
+  if (!(equipmentTabGroup instanceof HTMLElement)) {
+    return;
+  }
+
+  const maxScroll = Math.max(equipmentTabGroup.scrollWidth - equipmentTabGroup.clientWidth, 0);
+  const hasOverflow = maxScroll > 2;
+  const atStart = equipmentTabGroup.scrollLeft <= 2;
+  const atEnd = equipmentTabGroup.scrollLeft >= maxScroll - 2;
+
+  if (equipmentCategorySlidePrev instanceof HTMLButtonElement) {
+    equipmentCategorySlidePrev.hidden = !hasOverflow || atStart;
+  }
+
+  if (equipmentCategorySlideNext instanceof HTMLButtonElement) {
+    equipmentCategorySlideNext.hidden = !hasOverflow || atEnd;
+  }
+}
+
+function slideEquipmentCategoryTabs(direction) {
+  if (!(equipmentTabGroup instanceof HTMLElement)) {
+    return;
+  }
+
+  const distance = Math.max(Math.round(equipmentTabGroup.clientWidth * 0.72), 180);
+  equipmentTabGroup.scrollBy({
+    left: distance * direction,
+    behavior: 'smooth',
+  });
+}
+
 function getFirstRealEquipmentCategoryKey() {
   const categoryKeys = Array.isArray(equipmentCategoriesCache)
     ? equipmentCategoriesCache.map((category) => String(category?.key ?? '').trim()).filter(Boolean)
@@ -3028,8 +3180,12 @@ function renderEquipmentCategoryList() {
       <li class="equipment-category-list-item" data-category-id="${category.id}" data-category-key="${category.key}">
         <span class="equipment-category-list-label">${category.label}</span>
         <div class="equipment-category-list-actions">
-          <button type="button" class="equipment-category-rename-btn" data-rename-equipment-category-id="${category.id}">Rename</button>
-          <button type="button" class="equipment-category-delete-btn" data-delete-equipment-category-id="${category.id}" data-delete-equipment-category-key="${category.key}">Delete</button>
+          <button type="button" class="equipment-category-rename-btn" data-rename-equipment-category-id="${category.id}" title="Rename" aria-label="Rename ${category.label}">
+            <i class="bi bi-pencil" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="equipment-category-delete-btn" data-delete-equipment-category-id="${category.id}" data-delete-equipment-category-key="${category.key}" title="Delete" aria-label="Delete ${category.label}">
+            <i class="bi bi-trash3" aria-hidden="true"></i>
+          </button>
         </div>
       </li>
     `)
@@ -3040,11 +3196,53 @@ function resetEquipmentCategoryModalMode() {
   activeEquipmentCategoryEditingId = null;
 
   if (equipmentCategoryModalTitle) {
-    equipmentCategoryModalTitle.textContent = 'Add Category';
+    equipmentCategoryModalTitle.textContent = 'Categories';
+  }
+
+  if (equipmentCategoryComposerLabel) {
+    equipmentCategoryComposerLabel.textContent = 'New Category';
   }
 
   if (equipmentCategorySaveButton instanceof HTMLButtonElement) {
     equipmentCategorySaveButton.textContent = 'Add Category';
+  }
+}
+
+function setEquipmentCategoryComposerVisible(isVisible) {
+  if (equipmentCategoryComposer instanceof HTMLElement) {
+    equipmentCategoryComposer.hidden = !isVisible;
+  }
+
+  if (equipmentCategoryComposerToggle instanceof HTMLButtonElement) {
+    equipmentCategoryComposerToggle.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
+  }
+}
+
+function hideEquipmentCategoryComposer() {
+  setEquipmentCategoryComposerVisible(false);
+  resetEquipmentCategoryModalMode();
+
+  if (equipmentCategoryNameInput) {
+    equipmentCategoryNameInput.value = '';
+  }
+}
+
+function showEquipmentCategoryComposer(mode = 'add') {
+  if (mode === 'add') {
+    resetEquipmentCategoryModalMode();
+
+    if (equipmentCategoryNameInput) {
+      equipmentCategoryNameInput.value = '';
+    }
+  }
+
+  setEquipmentCategoryComposerVisible(true);
+
+  if (equipmentCategoryNameInput) {
+    equipmentCategoryNameInput.focus();
+    if (mode === 'rename') {
+      equipmentCategoryNameInput.select();
+    }
   }
 }
 
@@ -3056,8 +3254,8 @@ function setEquipmentCategoryEditMode(categoryId, categoryLabel) {
     return;
   }
 
-  if (equipmentCategoryModalTitle) {
-    equipmentCategoryModalTitle.textContent = 'Rename Category';
+  if (equipmentCategoryComposerLabel) {
+    equipmentCategoryComposerLabel.textContent = 'Rename Category';
   }
 
   if (equipmentCategorySaveButton instanceof HTMLButtonElement) {
@@ -3066,9 +3264,9 @@ function setEquipmentCategoryEditMode(categoryId, categoryLabel) {
 
   if (equipmentCategoryNameInput) {
     equipmentCategoryNameInput.value = String(categoryLabel || '').trim();
-    equipmentCategoryNameInput.focus();
-    equipmentCategoryNameInput.select();
   }
+
+  showEquipmentCategoryComposer('rename');
 }
 
 function setEquipmentCategoryActionsDisabled(disabled) {
@@ -3078,6 +3276,14 @@ function setEquipmentCategoryActionsDisabled(disabled) {
 
   if (equipmentAddCategoryButton instanceof HTMLButtonElement) {
     equipmentAddCategoryButton.disabled = disabled;
+  }
+
+  if (equipmentCategoryComposerToggle instanceof HTMLButtonElement) {
+    equipmentCategoryComposerToggle.disabled = disabled;
+  }
+
+  if (equipmentCategoryCancelButton instanceof HTMLButtonElement) {
+    equipmentCategoryCancelButton.disabled = disabled;
   }
 
   if (equipmentCategoryList) {
@@ -3136,6 +3342,7 @@ function syncEquipmentCategoriesInUi(categories, preferredActiveKey = '') {
   }
 
   setActiveEquipmentTab(nextActiveKey);
+  updateEquipmentCategorySliderControls();
 }
 
 function ensureEquipmentCategoryInUi(categoryKey, categoryLabel) {
@@ -3182,7 +3389,7 @@ function closeEquipmentCategoryModal() {
     return;
   }
 
-  resetEquipmentCategoryModalMode();
+  hideEquipmentCategoryComposer();
 
   equipmentCategoryModal.classList.remove('is-open');
   equipmentCategoryModal.setAttribute('aria-hidden', 'true');
@@ -3193,19 +3400,11 @@ function openEquipmentCategoryModal() {
     return;
   }
 
-  if (equipmentCategoryNameInput) {
-    equipmentCategoryNameInput.value = '';
-  }
-
-  resetEquipmentCategoryModalMode();
+  hideEquipmentCategoryComposer();
   renderEquipmentCategoryList();
 
   equipmentCategoryModal.classList.add('is-open');
   equipmentCategoryModal.setAttribute('aria-hidden', 'false');
-
-  if (equipmentCategoryNameInput) {
-    equipmentCategoryNameInput.focus();
-  }
 }
 
 async function submitEquipmentCategoryCreate() {
@@ -3912,7 +4111,7 @@ function openEquipmentAddModal() {
   }
 
   if (equipmentSaveButton) {
-    equipmentSaveButton.textContent = 'Add Item';
+    equipmentSaveButton.textContent = 'Add Equipment';
   }
 
   if (equipmentDeleteButton instanceof HTMLButtonElement) {
@@ -5923,7 +6122,38 @@ if (equipmentTableBody && (equipmentTabGroup || equipmentTabs.length)) {
 
       setActiveEquipmentTab(tabButton.dataset.equipmentTab || 'all');
     });
+
+    equipmentTabGroup.addEventListener('wheel', (event) => {
+      if (equipmentTabGroup.scrollWidth <= equipmentTabGroup.clientWidth) {
+        return;
+      }
+
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+        return;
+      }
+
+      event.preventDefault();
+      equipmentTabGroup.scrollLeft += event.deltaY;
+    }, { passive: false });
+
+    equipmentTabGroup.addEventListener('scroll', updateEquipmentCategorySliderControls, { passive: true });
   }
+
+  if (equipmentCategorySlidePrev instanceof HTMLButtonElement) {
+    equipmentCategorySlidePrev.addEventListener('click', () => slideEquipmentCategoryTabs(-1));
+  }
+
+  if (equipmentCategorySlideNext instanceof HTMLButtonElement) {
+    equipmentCategorySlideNext.addEventListener('click', () => slideEquipmentCategoryTabs(1));
+  }
+
+  if (equipmentTabGroup instanceof HTMLElement && typeof ResizeObserver === 'function') {
+    const sliderObserver = new ResizeObserver(() => updateEquipmentCategorySliderControls());
+    sliderObserver.observe(equipmentTabGroup);
+  }
+
+  window.addEventListener('resize', updateEquipmentCategorySliderControls);
+  updateEquipmentCategorySliderControls();
 
   setActiveEquipmentTab('all');
 
@@ -6027,8 +6257,22 @@ if (inventoryConfirmModal instanceof HTMLElement) {
   });
 }
 
+if (equipmentCategoryComposerToggle) {
+  equipmentCategoryComposerToggle.addEventListener('click', () => {
+    const isComposerOpen = equipmentCategoryComposer instanceof HTMLElement && !equipmentCategoryComposer.hidden;
+    const isRenaming = Number.isInteger(activeEquipmentCategoryEditingId) && activeEquipmentCategoryEditingId > 0;
+
+    if (isComposerOpen && !isRenaming) {
+      hideEquipmentCategoryComposer();
+      return;
+    }
+
+    showEquipmentCategoryComposer('add');
+  });
+}
+
 if (equipmentCategoryCancelButton) {
-  equipmentCategoryCancelButton.addEventListener('click', closeEquipmentCategoryModal);
+  equipmentCategoryCancelButton.addEventListener('click', hideEquipmentCategoryComposer);
 }
 
 if (equipmentCategorySaveButton) {
@@ -6187,6 +6431,11 @@ if (requestListWrap) {
 
     if (actionButton instanceof HTMLButtonElement) {
       event.stopPropagation();
+
+      if (actionButton.dataset.actionLoading === '1' || actionButton.disabled) {
+        return;
+      }
+
       const item = actionButton.closest('.request-item');
 
       if (!(item instanceof HTMLElement)) {

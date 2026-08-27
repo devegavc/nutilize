@@ -2418,15 +2418,21 @@ select.office-history-filter-control option {
 	white-space: normal;
 }
 
-.office-users-card .users-table td:nth-child(4) {
-	text-align: left;
+.office-users-card .users-tools-bar .facilities-add-btn {
+  margin-left: auto;
+}
+
+.office-users-card .users-table th:nth-child(4),
+.office-users-card .users-table td:nth-child(4),
+.office-users-card .users-table td.user-role-cell {
+	text-align: center;
 }
 
 .office-users-card .users-table th:nth-child(7),
 .office-users-card .users-table td:nth-child(7) {
 	width: 12%;
 	min-width: 148px;
-	text-align: left;
+	text-align: center;
 	white-space: nowrap;
 	overflow: visible;
 	vertical-align: middle;
@@ -2434,7 +2440,7 @@ select.office-history-filter-control option {
 
 .office-users-card .users-table td.table-actions-cell {
 	display: table-cell;
-	text-align: left;
+	text-align: center;
 	white-space: nowrap;
 	overflow: visible;
 	vertical-align: middle;
@@ -2445,7 +2451,9 @@ select.office-history-filter-control option {
 .office-users-card .users-table .table-actions-cell .inline-action-form {
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
 	vertical-align: middle;
+	text-align: center;
 }
 
 .office-users-card .users-table .table-actions-cell .inline-action-form {

@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'nutilize' => [
+        'play_store_url' => env('NUTILIZE_PLAY_STORE_URL'),
+    ],
+
 ];

@@ -178,7 +178,7 @@ class OfficeProgramUserController extends Controller
                 $query->orWhere(function ($memberQuery) use ($programIds): void {
                     $memberQuery
                         ->whereIn('program_id', $programIds)
-                        ->whereRaw('LOWER(role) IN (?, ?)', ['user', 'student']);
+                        ->whereRaw('LOWER(role) IN (?, ?, ?)', ['user', 'student', 'faculty']);
                 });
             }
         });

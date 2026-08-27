@@ -47,12 +47,20 @@
       <section class="content-card facilities-content-card">
         <h1 class="section-title">EQUIPMENT INVENTORY</h1>
 
-        <section class="facilities-filter-row">
-          <div class="facilities-tab-group" role="tablist" aria-label="Equipment category">
-            <button class="facilities-tab active" type="button" data-equipment-tab="all">All Items</button>
-            @foreach(($equipmentCategories ?? []) as $category)
-              <button class="facilities-tab" type="button" data-equipment-tab="{{ $category['key'] }}">{{ $category['label'] }}</button>
-            @endforeach
+        <section class="facilities-filter-row equipment-filter-row">
+          <div class="equipment-category-slider">
+            <button type="button" class="equipment-category-slider-btn" id="equipment-category-slide-prev" aria-label="Show previous categories" hidden>
+              <i class="bi bi-chevron-left" aria-hidden="true"></i>
+            </button>
+            <div class="facilities-tab-group equipment-category-tabs" role="tablist" aria-label="Equipment category">
+              <button class="facilities-tab active" type="button" data-equipment-tab="all">All Items</button>
+              @foreach(($equipmentCategories ?? []) as $category)
+                <button class="facilities-tab" type="button" data-equipment-tab="{{ $category['key'] }}">{{ $category['label'] }}</button>
+              @endforeach
+            </div>
+            <button type="button" class="equipment-category-slider-btn" id="equipment-category-slide-next" aria-label="Show next categories" hidden>
+              <i class="bi bi-chevron-right" aria-hidden="true"></i>
+            </button>
           </div>
 
           <div class="facilities-inline-search">
@@ -120,111 +128,151 @@
 
   <section class="facilities-modal" id="equipment-edit-modal" aria-hidden="true">
     <div class="facilities-modal-overlay" data-close-equipment-modal="true"></div>
-    <article class="facilities-modal-card" role="dialog" aria-modal="true" aria-labelledby="equipment-modal-title">
-      <div class="facilities-modal-top"></div>
-      <div class="facilities-modal-body">
+    <article class="facilities-modal-card equipment-form-modal-card" role="dialog" aria-modal="true" aria-labelledby="equipment-modal-title">
+      <header class="equipment-form-modal-head">
         <h2 id="equipment-modal-title">Add Equipment</h2>
+      </header>
 
-        <label class="facilities-field-label" for="equipment-unit-code-single">Unit Code <span class="field-optional">(optional)</span></label>
-        <input id="equipment-unit-code-single" class="facilities-input" type="text" placeholder="Leave blank to auto-generate e.g. #TMP-0007-U001" maxlength="64" />
+      <div class="facilities-modal-body equipment-form-modal-body">
+        <section class="equipment-form-section">
+          <h3 class="equipment-form-section-title">Equipment Information</h3>
 
-        <div id="equipment-unit-codes-multi-wrap" hidden>
-          <label class="facilities-field-label" for="equipment-unit-codes-multi">Unit Codes <span class="field-optional">(optional)</span></label>
-          <textarea id="equipment-unit-codes-multi" class="facilities-input facilities-textarea" rows="8" placeholder="One code per line, or leave blank to auto-generate temporary codes"></textarea>
-          <small id="equipment-unit-codes-hint" class="facilities-input-note">Enter your own codes (one per physical unit), or leave blank and the system will create temporary codes like #TMP-0007-U001. You can replace them later when official asset IDs are ready.</small>
-        </div>
+          <label class="facilities-field-label" for="equipment-unit-code-single">Unit Code <span class="field-optional">(optional)</span></label>
+          <input id="equipment-unit-code-single" class="facilities-input" type="text" placeholder="Leave blank to auto-generate e.g. #TMP-0007-U001" maxlength="64" />
 
-        <button type="button" class="facilities-action-btn cancel equipment-generate-codes-btn" id="equipment-generate-unit-codes-btn">Preview temporary codes</button>
-
-        <label class="facilities-field-label" for="equipment-item-name">Item Name</label>
-        <input id="equipment-item-name" class="facilities-input" type="text" placeholder="Item Name" />
-
-        <div class="facilities-inline-fields">
-          <div>
-            <label class="facilities-field-label" for="equipment-category">Category</label>
-            <select id="equipment-category" class="facilities-input facilities-select">
-              <option value="" selected disabled>Select Category</option>
-              @foreach(($equipmentCategories ?? []) as $category)
-                <option value="{{ $category['key'] }}">{{ $category['label'] }}</option>
-              @endforeach
-            </select>
+          <div id="equipment-unit-codes-multi-wrap" hidden>
+            <label class="facilities-field-label" for="equipment-unit-codes-multi">Unit Codes <span class="field-optional">(optional)</span></label>
+            <textarea id="equipment-unit-codes-multi" class="facilities-input facilities-textarea" rows="8" placeholder="One code per line, or leave blank to auto-generate temporary codes"></textarea>
+            <small id="equipment-unit-codes-hint" class="facilities-input-note">Enter your own codes (one per physical unit), or leave blank and the system will create temporary codes like #TMP-0007-U001. You can replace them later when official asset IDs are ready.</small>
           </div>
-          <div>
-            <label class="facilities-field-label" for="equipment-total-count">Total Count</label>
-            <input id="equipment-total-count" class="facilities-input" type="number" min="0" value="1" />
-          </div>
-        </div>
 
-        <div class="facilities-inline-fields">
-          <div>
-            <label class="facilities-field-label" for="equipment-in-use">In Use</label>
-            <input id="equipment-in-use" class="facilities-input" type="number" min="0" value="0" />
-          </div>
-          <div>
-            <label class="facilities-field-label" for="equipment-status">Status</label>
-            <select id="equipment-status" class="facilities-input facilities-select">
-              <option value="" selected disabled>Select Status</option>
-              <option value="good">Good</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="damaged">Damaged</option>
-            </select>
-          </div>
-        </div>
+          <button type="button" class="equipment-form-preview-btn" id="equipment-generate-unit-codes-btn">Preview temporary codes</button>
 
-        <label class="facilities-field-label" for="equipment-upload-input">Upload Item</label>
-        <div class="facilities-upload-row">
-          <div class="facilities-upload-text">
-            <i class="bi bi-upload"></i>
-            <div class="facilities-upload-meta">
-              <span id="equipment-upload-name">No file selected</span>
-              <small class="facilities-upload-hint">JPG,PNG, up to 5MB</small>
+          <label class="facilities-field-label" for="equipment-item-name">Item Name</label>
+          <input id="equipment-item-name" class="facilities-input" type="text" placeholder="Item Name" />
+
+          <div class="facilities-inline-fields">
+            <div>
+              <label class="facilities-field-label" for="equipment-category">Category</label>
+              <select id="equipment-category" class="facilities-input facilities-select">
+                <option value="" selected disabled>Select Category</option>
+                @foreach(($equipmentCategories ?? []) as $category)
+                  <option value="{{ $category['key'] }}">{{ $category['label'] }}</option>
+                @endforeach
+              </select>
+            </div>
+            <div>
+              <label class="facilities-field-label" for="equipment-total-count">Total Count</label>
+              <input id="equipment-total-count" class="facilities-input" type="number" min="0" value="1" />
             </div>
           </div>
+
+          <div class="facilities-inline-fields">
+            <div>
+              <label class="facilities-field-label" for="equipment-in-use">In Use</label>
+              <input id="equipment-in-use" class="facilities-input" type="number" min="0" value="0" />
+            </div>
+            <div>
+              <label class="facilities-field-label" for="equipment-status">Status</label>
+              <select id="equipment-status" class="facilities-input facilities-select">
+                <option value="" selected disabled>Select Status</option>
+                <option value="good">Good</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="damaged">Damaged</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section class="equipment-form-section">
+          <h3 class="equipment-form-section-title">Item Image</h3>
+          <label class="facilities-field-label" for="equipment-upload-input">Upload Item</label>
+          <button type="button" class="equipment-form-upload-trigger" id="equipment-upload-btn">
+            <i class="bi bi-upload" aria-hidden="true"></i>
+            <span id="equipment-upload-name">No file selected</span>
+          </button>
+          <small class="facilities-upload-hint">JPG, PNG, up to 5MB</small>
           <input id="equipment-upload-input" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
-          <button type="button" class="facilities-upload-btn" id="equipment-upload-btn">Add Item</button>
-        </div>
+        </section>
 
-        <label class="facilities-field-label" for="equipment-description">Description</label>
-        <textarea id="equipment-description" class="facilities-input facilities-textarea" placeholder="Description"></textarea>
-
-        <div class="facilities-modal-actions">
-          <button type="button" class="facilities-action-btn delete" id="equipment-delete-btn" hidden>Delete</button>
-          <button type="button" class="facilities-action-btn cancel" id="equipment-cancel-btn">Cancel</button>
-          <button type="button" class="facilities-action-btn submit" id="equipment-save-btn">Add Item</button>
-        </div>
+        <section class="equipment-form-section">
+          <label class="equipment-form-section-title" for="equipment-description">Description</label>
+          <textarea id="equipment-description" class="facilities-input facilities-textarea" placeholder="Description"></textarea>
+        </section>
       </div>
+
+      <footer class="equipment-form-modal-footer">
+        <button type="button" class="facilities-action-btn delete" id="equipment-delete-btn" hidden>Delete</button>
+        <button type="button" class="facilities-action-btn cancel" id="equipment-cancel-btn">Cancel</button>
+        <button type="button" class="facilities-action-btn submit" id="equipment-save-btn">Add Equipment</button>
+      </footer>
     </article>
   </section>
 
   <section class="facilities-modal" id="equipment-category-modal" aria-hidden="true">
     <div class="facilities-modal-overlay" data-close-equipment-category-modal="true"></div>
     <article class="facilities-modal-card equipment-category-modal-card" role="dialog" aria-modal="true" aria-labelledby="equipment-category-modal-title">
-      <div class="facilities-modal-top"></div>
       <div class="facilities-modal-body">
-        <h2 id="equipment-category-modal-title">Add Category</h2>
+        <div class="equipment-category-modal-head">
+          <h2 id="equipment-category-modal-title">Categories</h2>
+          <button
+            type="button"
+            class="equipment-category-add-btn"
+            id="equipment-category-composer-toggle"
+            aria-label="Add Category"
+            title="Add Category"
+            aria-expanded="false"
+            aria-controls="equipment-category-composer"
+          >
+            <i class="bi bi-plus-lg" aria-hidden="true"></i>
+          </button>
+        </div>
 
-        <label class="facilities-field-label" for="equipment-category-name-input">Category Name</label>
-        <input id="equipment-category-name-input" class="facilities-input" type="text" placeholder="e.g. Audio-Visual" maxlength="100" />
+        <div class="equipment-category-composer" id="equipment-category-composer" hidden>
+          <label class="equipment-category-composer-label" id="equipment-category-composer-label" for="equipment-category-name-input">New Category</label>
+          <input
+            id="equipment-category-name-input"
+            class="facilities-input"
+            type="text"
+            placeholder="Enter category name..."
+            maxlength="100"
+          />
+          <div class="equipment-category-composer-actions">
+            <button type="button" class="facilities-action-btn cancel" id="equipment-category-cancel-btn">Cancel</button>
+            <button type="button" class="facilities-action-btn submit" id="equipment-category-save-btn">Add Category</button>
+          </div>
+        </div>
 
-        <p class="equipment-category-list-title">Existing Categories</p>
         <ul id="equipment-category-list" class="equipment-category-list" aria-live="polite">
           @forelse(($equipmentCategories ?? []) as $category)
             <li class="equipment-category-list-item" data-category-id="{{ $category['id'] }}" data-category-key="{{ $category['key'] }}">
               <span class="equipment-category-list-label">{{ $category['label'] }}</span>
               <div class="equipment-category-list-actions">
-                <button type="button" class="equipment-category-rename-btn" data-rename-equipment-category-id="{{ $category['id'] }}">Rename</button>
-                <button type="button" class="equipment-category-delete-btn" data-delete-equipment-category-id="{{ $category['id'] }}" data-delete-equipment-category-key="{{ $category['key'] }}">Delete</button>
+                <button
+                  type="button"
+                  class="equipment-category-rename-btn"
+                  data-rename-equipment-category-id="{{ $category['id'] }}"
+                  title="Rename"
+                  aria-label="Rename {{ $category['label'] }}"
+                >
+                  <i class="bi bi-pencil" aria-hidden="true"></i>
+                </button>
+                <button
+                  type="button"
+                  class="equipment-category-delete-btn"
+                  data-delete-equipment-category-id="{{ $category['id'] }}"
+                  data-delete-equipment-category-key="{{ $category['key'] }}"
+                  title="Delete"
+                  aria-label="Delete {{ $category['label'] }}"
+                >
+                  <i class="bi bi-trash3" aria-hidden="true"></i>
+                </button>
               </div>
             </li>
           @empty
             <li class="equipment-category-list-empty">No categories yet.</li>
           @endforelse
         </ul>
-
-        <div class="facilities-modal-actions">
-          <button type="button" class="facilities-action-btn cancel" id="equipment-category-cancel-btn">Cancel</button>
-          <button type="button" class="facilities-action-btn submit" id="equipment-category-save-btn">Add Category</button>
-        </div>
       </div>
     </article>
   </section>

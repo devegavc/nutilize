@@ -91,47 +91,45 @@
 
   <section class="facilities-modal" id="facilities-edit-modal" aria-hidden="true">
     <div class="facilities-modal-overlay" data-close-modal="true"></div>
-    <article class="facilities-modal-card" role="dialog" aria-modal="true" aria-labelledby="facilities-modal-title">
-      <div class="facilities-modal-top"></div>
-      <div class="facilities-modal-body">
+    <article class="facilities-modal-card equipment-form-modal-card is-compact" role="dialog" aria-modal="true" aria-labelledby="facilities-modal-title">
+      <header class="equipment-form-modal-head">
         <h2 id="facilities-modal-title">Add Room/Facility</h2>
+      </header>
 
-        <label class="facilities-field-label" for="facility-item-name">Room/Facility Name</label>
-        <input id="facility-item-name" class="facilities-input" type="text" placeholder="Room Number" />
+      <div class="facilities-modal-body equipment-form-modal-body">
+        <section class="equipment-form-section">
+          <label class="facilities-field-label" for="facility-item-name">Room/Facility Name</label>
+          <input id="facility-item-name" class="facilities-input" type="text" placeholder="Room Number" />
 
-        <div class="facilities-inline-fields">
-          <div>
-            <label class="facilities-field-label" for="facility-category">Room Type</label>
-            <select id="facility-category" class="facilities-input facilities-select">
-              <option value="" selected disabled>Select Room Type</option>
-              <option value="rooms">Rooms</option>
-              <option value="lab">Lab</option>
-              <option value="others">Others</option>
-            </select>
-          </div>
-        </div>
+          <label class="facilities-field-label" for="facility-category">Room Type</label>
+          <select id="facility-category" class="facilities-input facilities-select">
+            <option value="" selected disabled>Select Room Type</option>
+            <option value="rooms">Rooms</option>
+            <option value="lab">Lab</option>
+            <option value="others">Others</option>
+          </select>
+        </section>
 
-        <label class="facilities-field-label" for="facility-upload-input">Upload Room/Facility</label>
-        <div class="facilities-upload-row">
-          <div class="facilities-upload-text">
-            <i class="bi bi-upload"></i>
-            <div class="facilities-upload-meta">
-              <span id="facility-upload-name">No file selected</span>
-              <small class="facilities-upload-hint">JPG,PNG, up to 5MB</small>
-            </div>
-          </div>
+        <section class="equipment-form-section">
+          <label class="facilities-field-label" for="facility-upload-input">Upload Room/Facility</label>
+          <button type="button" class="equipment-form-upload-trigger" id="facility-upload-btn">
+            <i class="bi bi-upload" aria-hidden="true"></i>
+            <span id="facility-upload-name">No file selected</span>
+          </button>
+          <small class="facilities-upload-hint">JPG, PNG, up to 5MB</small>
           <input id="facility-upload-input" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
-          <button type="button" class="facilities-upload-btn" id="facility-upload-btn">Add Room/Facility</button>
-        </div>
+        </section>
 
-        <label class="facilities-field-label" for="facility-description">Description</label>
-        <textarea id="facility-description" class="facilities-input facilities-textarea" placeholder="Description"></textarea>
-
-        <div class="facilities-modal-actions">
-          <button type="button" class="facilities-action-btn cancel" id="facility-cancel-btn">Cancel</button>
-          <button type="button" class="facilities-action-btn submit" id="facility-save-btn">Add Room/Facility</button>
-        </div>
+        <section class="equipment-form-section">
+          <label class="equipment-form-section-title" for="facility-description">Description</label>
+          <textarea id="facility-description" class="facilities-input facilities-textarea" placeholder="Description"></textarea>
+        </section>
       </div>
+
+      <footer class="equipment-form-modal-footer">
+        <button type="button" class="facilities-action-btn cancel" id="facility-cancel-btn">Cancel</button>
+        <button type="button" class="facilities-action-btn submit" id="facility-save-btn">Add Room/Facility</button>
+      </footer>
     </article>
   </section>
 

@@ -45,7 +45,7 @@
       @include('partials.dashboard-navbar')
 
       <section class="content-card request-content-card">
-        <h1 class="section-title">TEACHER REQUEST</h1>
+        <h1 class="section-title">REQUESTS</h1>
 
         <section class="request-head">
           <div class="request-tabs" role="tablist" aria-label="Request status">
