@@ -170,7 +170,7 @@
         </section>
 
         <p class="users-policy-note">
-          Users and faculties are marked inactive automatically after {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks without login. PF admins can activate or deactivate accounts at any time.
+          Users and faculties stay active for {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks from activation. When that window ends they become inactive. Activating an account resets the timer to zero and starts a new {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }}-week period. PF admins can activate or deactivate accounts at any time.
         </p>
 
         <section class="users-tools-bar" aria-label="User table filters">
@@ -849,9 +849,13 @@
       const updateStatusRow = (row, payload) => {
         const isActive = !!payload.isActive;
         const status = isActive ? 'active' : 'inactive';
-        const duration = payload.durationLabel || (isActive ? 'Active for 0 seconds' : 'Inactive for 0 seconds');
+        $duration = payload.durationLabel || (isActive ? 'Active for 0 seconds' : 'Inactive for 0 seconds');
 
         row.dataset.userStatus = status;
+
+        // #region agent log
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'ajax-verify',hypothesisId:'W14',location:'dashboard-users.blade.php:updateStatusRow',message:'row status updated after activate/deactivate',data:{userId:row.dataset.userId||null,isActive,duration},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
         const statusCell = row.children[5];
         if (statusCell instanceof HTMLElement) {

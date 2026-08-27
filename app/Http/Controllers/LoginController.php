@@ -25,7 +25,7 @@ class LoginController extends Controller
         $request->session()->regenerate();
         $user = $request->user();
 
-        if ($user && UserAccountStatusService::isPastInactivityLimit($user)) {
+        if ($user && UserAccountStatusService::isPastActiveWindow($user)) {
             UserAccountStatusService::markInactive($user);
 
             // #region agent log
@@ -33,14 +33,14 @@ class LoginController extends Controller
                 base_path('debug-e19b10.log'),
                 json_encode([
                     'sessionId' => 'e19b10',
-                    'runId' => 'feature-verify',
-                    'hypothesisId' => 'C',
+                    'runId' => 'ajax-verify',
+                    'hypothesisId' => 'W14',
                     'location' => 'LoginController.php:authenticate',
-                    'message' => 'login blocked by inactivity policy',
+                    'message' => 'login blocked by expired 14-week active window',
                     'data' => [
                         'userId' => $user->user_id,
                         'role' => $user->role,
-                        'lastLoginAt' => optional($user->last_login_at)?->toIso8601String(),
+                        'statusChangedAt' => optional($user->status_changed_at)?->toIso8601String(),
                     ],
                     'timestamp' => (int) round(microtime(true) * 1000),
                 ])."\n",
@@ -53,7 +53,7 @@ class LoginController extends Controller
             $request->session()->regenerateToken();
 
             return back()->withErrors([
-                'username' => 'This account was deactivated after '.UserAccountStatusService::INACTIVITY_WEEKS.' weeks of inactivity. Contact Physical Facilities to reactivate.',
+                'username' => 'This account was deactivated after '.UserAccountStatusService::INACTIVITY_WEEKS.' weeks. Contact Physical Facilities to reactivate.',
             ])->onlyInput('username');
         }
 
