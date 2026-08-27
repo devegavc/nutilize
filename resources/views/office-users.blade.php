@@ -361,37 +361,44 @@
 
   <section class="facilities-modal" id="user-modal" aria-hidden="true">
     <div class="facilities-modal-overlay" data-close-modal="true"></div>
-    <article class="facilities-modal-card" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
-      <div class="facilities-modal-top"></div>
-      <div class="facilities-modal-body">
-        <h2 id="user-modal-title">Add User</h2>
-        <p class="section-subtitle" style="margin-top:0;">New accounts are added to {{ $programName }}.</p>
+    <article class="facilities-modal-card equipment-form-modal-card is-compact" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+      <header class="equipment-form-modal-head">
+        <div>
+          <h2 id="user-modal-title">Add User</h2>
+          <p class="equipment-form-modal-subtitle">New accounts are added to {{ $programName }}.</p>
+        </div>
+      </header>
 
-        <form id="user-form" method="POST" action="{{ route('office.users.store') }}">
-          @csrf
-          <input type="hidden" name="_method" id="user-form-method" value="POST" />
-          <input type="hidden" name="user_id" id="user-id" />
-          <input type="hidden" name="program_id" value="{{ $programId }}" />
+      <form id="user-form" class="equipment-form-modal-form" method="POST" action="{{ route('office.users.store') }}">
+        @csrf
+        <input type="hidden" name="_method" id="user-form-method" value="POST" />
+        <input type="hidden" name="user_id" id="user-id" />
+        <input type="hidden" name="program_id" value="{{ $programId }}" />
 
-          <label class="facilities-field-label" for="user-username">Username</label>
-          <input id="user-username" class="facilities-input" name="username" type="text" placeholder="Username" required />
+        <div class="facilities-modal-body equipment-form-modal-body">
+          <section class="equipment-form-section">
+            <label class="facilities-field-label" for="user-username">Username</label>
+            <input id="user-username" class="facilities-input" name="username" type="text" placeholder="Username" required />
 
-          <label class="facilities-field-label" for="user-full-name">Full Name</label>
-          <input id="user-full-name" class="facilities-input" name="full_name" type="text" placeholder="Full Name" />
+            <label class="facilities-field-label" for="user-full-name">Full Name</label>
+            <input id="user-full-name" class="facilities-input" name="full_name" type="text" placeholder="Full Name" />
 
-          <label class="facilities-field-label" for="user-email">Email</label>
-          <input id="user-email" class="facilities-input" name="email" type="email" placeholder="Email address" required />
+            <label class="facilities-field-label" for="user-email">Email</label>
+            <input id="user-email" class="facilities-input" name="email" type="email" placeholder="Email address" required />
+          </section>
 
-          <label class="facilities-field-label" for="user-password">Password</label>
-          <input id="user-password" class="facilities-input" name="password" type="password" placeholder="Password" />
-          <small class="facilities-input-note">Leave blank when editing to keep the current password.</small>
+          <section class="equipment-form-section">
+            <label class="facilities-field-label" for="user-password">Password</label>
+            <input id="user-password" class="facilities-input" name="password" type="password" placeholder="Password" />
+            <small class="facilities-input-note">Leave blank when editing to keep the current password.</small>
+          </section>
+        </div>
 
-          <div class="facilities-modal-actions">
-            <button type="button" class="facilities-action-btn cancel" id="user-cancel-btn">Cancel</button>
-            <button type="submit" class="facilities-action-btn submit" id="user-save-btn">Save User</button>
-          </div>
-        </form>
-      </div>
+        <footer class="equipment-form-modal-footer">
+          <button type="button" class="facilities-action-btn cancel" id="user-cancel-btn">Cancel</button>
+          <button type="submit" class="facilities-action-btn submit" id="user-save-btn">Save User</button>
+        </footer>
+      </form>
     </article>
   </section>
 

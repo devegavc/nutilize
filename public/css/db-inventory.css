@@ -1411,6 +1411,14 @@
   letter-spacing: 0.01em;
 }
 
+.equipment-form-modal-subtitle {
+  margin: 4px 0 0;
+  color: #7d86aa;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 .equipment-form-modal-body {
   padding: 16px 18px 8px;
   background: #ffffff;
@@ -1463,6 +1471,10 @@
   color: #243274;
   font-size: 0.95rem;
   padding: 10px 12px;
+}
+
+.equipment-form-modal-card .facilities-input::placeholder {
+  color: #9aa3bf;
 }
 
 .equipment-form-modal-card .facilities-input:focus {
@@ -4933,10 +4945,12 @@ body.insight-filtering .insight-kpi:not(.is-active) {
   min-height: 0;
 }
 
+.user-management-card .inventory-table.users-table,
 .user-management-card .users-table {
   width: 100%;
   min-width: 860px;
   border-collapse: collapse;
+  border-spacing: 0;
   table-layout: fixed;
   background: #f3f5fa;
 }
@@ -4961,7 +4975,8 @@ body.insight-filtering .insight-kpi:not(.is-active) {
 .user-management-card .users-table tbody td {
   padding: 10px 12px;
   color: #1e243b;
-  background: transparent;
+  background-color: #f3f5fa;
+  border: 0;
   border-bottom: 1px solid #c9ccd6;
   font-size: 0.9rem;
   line-height: 1.35;
@@ -4972,14 +4987,24 @@ body.insight-filtering .insight-kpi:not(.is-active) {
 
 .user-management-card .users-table tbody tr {
   background: transparent;
+  border: 0;
 }
 
-.user-management-card .users-table tbody tr:nth-child(even):not(.category-header-row) td {
+.user-management-card .inventory-table.users-table tbody tr:hover {
+  background: transparent;
+}
+
+.user-management-card .users-table tbody tr:nth-child(even):not(.category-header-row):not(.users-empty-state-row) td {
   background: rgba(56, 71, 156, 0.04);
+  background-color: rgba(56, 71, 156, 0.04);
 }
 
-.user-management-card .users-table tbody tr:hover:not(.category-header-row) td {
+.user-management-card .users-table tbody tr:hover:not(.category-header-row):not(.users-empty-state-row) td,
+.user-management-card .users-table tbody tr:hover:not(.category-header-row):not(.users-empty-state-row) td.table-actions-cell,
+.user-management-card .users-table tbody tr:nth-child(even):hover:not(.category-header-row):not(.users-empty-state-row) td,
+.user-management-card .users-table tbody tr:nth-child(even):hover:not(.category-header-row):not(.users-empty-state-row) td.table-actions-cell {
   background: rgba(56, 71, 156, 0.1);
+  background-color: rgba(56, 71, 156, 0.1);
 }
 
 .user-management-card .users-table .category-header-row td {
@@ -5087,22 +5112,40 @@ body.insight-filtering .insight-kpi:not(.is-active) {
 }
 
 .user-management-card .users-table .table-actions-cell {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 7px;
-  flex-wrap: nowrap;
+  display: table-cell;
+  vertical-align: middle;
+  white-space: nowrap;
   overflow: visible;
+}
+
+.user-management-card .users-table .table-actions-cell > * {
+  vertical-align: middle;
+  margin-right: 7px;
+}
+
+.user-management-card .users-table .table-actions-cell > *:last-child {
+  margin-right: 0;
+}
+
+.user-management-card .users-table .table-actions-cell .inline-action-form {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
 }
 
 .user-management-card .users-table .table-edit-btn,
 .user-management-card .users-table .table-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 58px;
   padding: 5px 11px;
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1.2;
   border-radius: 7px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .user-management-card .users-table .table-edit-btn {
