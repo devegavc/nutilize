@@ -118,19 +118,52 @@ class UserAccountStatusService
         return $deactivated;
     }
 
+    public static function isStatusManaged(User $user): bool
+    {
+        return self::isTrackedRole($user);
+    }
+
     public static function statusDurationLabel(User $user, ?CarbonInterface $now = null): string
     {
         $now = $now ?? now();
+
+        // Active time is always counted from account creation.
+        // Inactive time is counted from when the account was deactivated.
+        if (self::isActive($user)) {
+            $since = $user->created_at ?? $now;
+            $diff = $since->diffForHumans($now, true, false, 2);
+
+            return 'Active for '.$diff;
+        }
+
         $since = $user->status_changed_at
-            ?? (self::isActive($user) ? $user->created_at : self::lastActivityAt($user))
+            ?? self::lastActivityAt($user)
             ?? $user->created_at
             ?? $now;
-
         $diff = $since->diffForHumans($now, true, false, 2);
 
-        return self::isActive($user)
-            ? 'Active for '.$diff
-            : 'Inactive for '.$diff;
+        return 'Inactive for '.$diff;
+    }
+
+    /**
+     * @return array{label: string, sinceSource: string, since: ?string, isActive: bool}
+     */
+    public static function statusDurationDebug(User $user, ?CarbonInterface $now = null): array
+    {
+        $now = $now ?? now();
+        $isActive = self::isActive($user);
+        $since = $isActive
+            ? ($user->created_at ?? $now)
+            : ($user->status_changed_at ?? self::lastActivityAt($user) ?? $user->created_at ?? $now);
+
+        return [
+            'label' => self::statusDurationLabel($user, $now),
+            'sinceSource' => $isActive
+                ? 'created_at'
+                : (($user->status_changed_at ? 'status_changed_at' : 'fallback')),
+            'since' => optional($since)?->toIso8601String(),
+            'isActive' => $isActive,
+        ];
     }
 
     public static function recordLogin(User $user): void

@@ -5143,6 +5143,12 @@ body.insight-filtering .insight-kpi:not(.is-active) {
   line-height: 1.25;
 }
 
+.user-management-card .users-table .user-status-na {
+  color: #8a95b0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .user-management-card .users-table .table-status-btn {
   border: 1px solid transparent;
   border-radius: 8px;

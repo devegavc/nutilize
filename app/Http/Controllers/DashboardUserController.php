@@ -42,6 +42,35 @@ class DashboardUserController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // #region agent log
+        $sampleManaged = $users->first(fn ($u) => UserAccountStatusService::isStatusManaged($u));
+        $sampleAdmin = $users->first(fn ($u) => in_array(strtolower((string) $u->role), ['admin', 'pf_admin', 'pc_admin'], true));
+        file_put_contents(
+            base_path('debug-e19b10.log'),
+            json_encode([
+                'sessionId' => 'e19b10',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'A,B',
+                'location' => 'DashboardUserController.php:index',
+                'message' => 'users index status policy sample',
+                'data' => [
+                    'deactivated' => $deactivated,
+                    'managedCount' => $users->filter(fn ($u) => UserAccountStatusService::isStatusManaged($u))->count(),
+                    'unmanagedCount' => $users->reject(fn ($u) => UserAccountStatusService::isStatusManaged($u))->count(),
+                    'sampleManagedDuration' => $sampleManaged
+                        ? UserAccountStatusService::statusDurationDebug($sampleManaged)
+                        : null,
+                    'sampleAdminManaged' => $sampleAdmin
+                        ? UserAccountStatusService::isStatusManaged($sampleAdmin)
+                        : null,
+                    'sampleAdminRole' => $sampleAdmin?->role,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ])."\n",
+            FILE_APPEND
+        );
+        // #endregion
+
         $offices = Office::orderBy('department_name', 'asc')->get();
         $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
 
@@ -148,25 +177,32 @@ class DashboardUserController extends Controller
             return redirect()->route('dashboard.users')->with('error', 'You cannot change the status of your own account.');
         }
 
+        if (!UserAccountStatusService::isStatusManaged($user)) {
+            return redirect()->route('dashboard.users')->with('error', 'Admin accounts do not use active/inactive status.');
+        }
+
         $before = UserAccountStatusService::isActive($user);
         UserAccountStatusService::toggle($user);
         $after = UserAccountStatusService::isActive($user);
+        $durationDebug = UserAccountStatusService::statusDurationDebug($user);
 
         // #region agent log
         file_put_contents(
             base_path('debug-e19b10.log'),
             json_encode([
                 'sessionId' => 'e19b10',
-                'runId' => 'feature-verify',
-                'hypothesisId' => 'B',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'A',
                 'location' => 'DashboardUserController.php:toggleStatus',
                 'message' => 'user status toggled',
                 'data' => [
                     'userId' => $user->user_id,
+                    'role' => $user->role,
                     'beforeActive' => $before,
                     'afterActive' => $after,
+                    'createdAt' => optional($user->created_at)?->toIso8601String(),
                     'statusChangedAt' => optional($user->status_changed_at)?->toIso8601String(),
-                    'durationLabel' => UserAccountStatusService::statusDurationLabel($user),
+                    'duration' => $durationDebug,
                 ],
                 'timestamp' => (int) round(microtime(true) * 1000),
             ])."\n",
