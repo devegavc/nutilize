@@ -803,13 +803,184 @@
     (() => {
       const confirmFn = typeof window.showAppConfirm === 'function' ? window.showAppConfirm : null;
       const table = document.getElementById('users-table-body');
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+      const showUsersToast = (message, type = 'success') => {
+        let host = document.getElementById('users-ajax-toast');
+        if (!(host instanceof HTMLElement)) {
+          host = document.createElement('div');
+          host.id = 'users-ajax-toast';
+          host.className = 'alert';
+          const card = document.querySelector('.user-management-card .dashboard-page-header-top');
+          if (card?.parentElement) {
+            card.insertAdjacentElement('afterend', host);
+          } else {
+            document.body.prepend(host);
+          }
+        }
+
+        host.className = `alert alert-${type === 'error' ? 'error' : 'success'}`;
+        host.textContent = message;
+        window.clearTimeout(host._hideTimer);
+        host._hideTimer = window.setTimeout(() => {
+          host.remove();
+        }, 3200);
+      };
+
+      const refreshActiveSummary = () => {
+        const cards = Array.from(document.querySelectorAll('.users-summary-card'));
+        const activeCard = cards.find((card) => {
+          const label = card.querySelector('.users-summary-label');
+          return label && /active users/i.test(label.textContent || '');
+        });
+        if (!activeCard) {
+          return;
+        }
+
+        const value = activeCard.querySelector('.users-summary-value');
+        if (!(value instanceof HTMLElement)) {
+          return;
+        }
+
+        const activeCount = document.querySelectorAll('.users-table tbody tr[data-user-status="active"]').length;
+        value.textContent = String(activeCount);
+      };
+
+      const updateStatusRow = (row, payload) => {
+        const isActive = !!payload.isActive;
+        const status = isActive ? 'active' : 'inactive';
+        const duration = payload.durationLabel || (isActive ? 'Active for 0 seconds' : 'Inactive for 0 seconds');
+
+        row.dataset.userStatus = status;
+
+        const statusCell = row.children[5];
+        if (statusCell instanceof HTMLElement) {
+          statusCell.innerHTML = `
+            <div class="user-status-cell">
+              <span class="status-badge ${isActive ? 'is-active' : 'is-inactive'}">${isActive ? 'Active' : 'Inactive'}</span>
+              <span class="user-status-duration" title="${duration}">${duration}</span>
+            </div>
+          `;
+        }
+
+        const statusForm = row.querySelector('form[data-user-confirm-form="status"]');
+        if (statusForm instanceof HTMLFormElement) {
+          statusForm.setAttribute('data-confirm-title', isActive ? 'Deactivate account' : 'Activate account');
+          statusForm.setAttribute(
+            'data-confirm-message',
+            isActive
+              ? 'Are you sure you want to deactivate this account?'
+              : 'Are you sure you want to activate this account?'
+          );
+          statusForm.setAttribute(
+            'data-confirm-note',
+            isActive ? 'They will not be able to sign in until reactivated.' : ''
+          );
+          statusForm.setAttribute('data-confirm-text', isActive ? 'Deactivate' : 'Activate');
+          statusForm.setAttribute('data-confirm-variant', isActive ? 'danger' : 'default');
+
+          const button = statusForm.querySelector('.table-status-btn');
+          if (button instanceof HTMLButtonElement) {
+            button.classList.toggle('is-deactivate', isActive);
+            button.classList.toggle('is-activate', !isActive);
+            button.title = isActive ? 'Mark inactive' : 'Mark active';
+            button.textContent = isActive ? 'Deactivate' : 'Activate';
+          }
+        }
+
+        refreshActiveSummary();
+      };
+
+      const removeUserRow = (row) => {
+        let header = row.previousElementSibling;
+        while (header instanceof HTMLTableRowElement && !header.classList.contains('category-header-row')) {
+          header = header.previousElementSibling;
+        }
+
+        row.remove();
+
+        if (!(header instanceof HTMLTableRowElement) || !header.classList.contains('category-header-row')) {
+          refreshActiveSummary();
+          return;
+        }
+
+        let count = 0;
+        let cursor = header.nextElementSibling;
+        while (
+          cursor instanceof HTMLTableRowElement
+          && !cursor.classList.contains('category-header-row')
+          && !cursor.classList.contains('users-empty-state-row')
+          && cursor.hasAttribute('data-user-id')
+        ) {
+          if (!cursor.hidden) {
+            count += 1;
+          }
+          cursor = cursor.nextElementSibling;
+        }
+
+        if (count === 0) {
+          header.remove();
+        } else {
+          const countLabel = header.querySelector('[data-group-count]');
+          if (countLabel) {
+            countLabel.textContent = `${count} ${count === 1 ? 'user' : 'users'}`;
+          }
+        }
+
+        refreshActiveSummary();
+      };
+
+      const submitUserAction = async (form, kind) => {
+        const methodInput = form.querySelector('input[name="_method"]');
+        const method = (methodInput instanceof HTMLInputElement ? methodInput.value : form.method || 'POST').toUpperCase();
+        const body = new FormData(form);
+
+        const response = await fetch(form.action, {
+          method: method === 'GET' ? 'GET' : 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+            ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+          },
+          body,
+          credentials: 'same-origin',
+        });
+
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch (_error) {
+          payload = null;
+        }
+
+        // #region agent log
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'ajax-verify',hypothesisId:'AJAX1,AJAX2',location:'dashboard-users.blade.php:ajaxResult',message:'ajax user action result',data:{kind,ok:!!payload?.ok,status:response.status,pageReloaded:false,userId:payload?.userId||null,isActive:payload?.isActive??null},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.message || 'Request failed.');
+        }
+
+        const row = form.closest('tr');
+        if (!(row instanceof HTMLTableRowElement)) {
+          return payload;
+        }
+
+        if (kind === 'delete') {
+          removeUserRow(row);
+        } else if (kind === 'status') {
+          updateStatusRow(row, payload);
+        }
+
+        return payload;
+      };
 
       // #region agent log
       const actionsTh = document.querySelector('.user-management-card .users-table thead th:last-child');
       const actionsTd = document.querySelector('.user-management-card .users-table tbody td.table-actions-cell');
       const thRect = actionsTh ? actionsTh.getBoundingClientRect() : null;
       const tdRect = actionsTd ? actionsTd.getBoundingClientRect() : null;
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'H1',location:'dashboard-users.blade.php:headerMeasure',message:'actions header vs cell width',data:{hasConfirmFn:!!confirmFn,thWidth:thRect?Math.round(thRect.width):null,tdWidth:tdRect?Math.round(tdRect.width):null,widthDelta:thRect&&tdRect?Math.round(tdRect.width-thRect.width):null,thRight:thRect?Math.round(thRect.right):null,tdRight:tdRect?Math.round(tdRect.right):null},timestamp:Date.now()})}).catch(()=>{});
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'ajax-verify',hypothesisId:'H1',location:'dashboard-users.blade.php:headerMeasure',message:'actions header vs cell width',data:{hasConfirmFn:!!confirmFn,thWidth:thRect?Math.round(thRect.width):null,tdWidth:tdRect?Math.round(tdRect.width):null,widthDelta:thRect&&tdRect?Math.round(tdRect.width-thRect.width):null,thRight:thRect?Math.round(thRect.right):null,tdRight:tdRect?Math.round(tdRect.right):null},timestamp:Date.now()})}).catch(()=>{});
       // #endregion
 
       if (!(table instanceof HTMLElement)) {
@@ -832,7 +1003,7 @@
         const kind = form.getAttribute('data-user-confirm-form') || 'unknown';
 
         // #region agent log
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'H2',location:'dashboard-users.blade.php:confirmSubmit',message:'user action confirm intercepted',data:{kind,title,hasConfirmFn:!!confirmFn},timestamp:Date.now()})}).catch(()=>{});
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'ajax-verify',hypothesisId:'AJAX1,AJAX2',location:'dashboard-users.blade.php:confirmSubmit',message:'user action confirm intercepted',data:{kind,title,hasConfirmFn:!!confirmFn,willUseAjax:true},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
 
         const ask = confirmFn
@@ -845,13 +1016,20 @@
             })
           : Promise.resolve(window.confirm([message, note].filter(Boolean).join('\n')));
 
-        ask.then((confirmed) => {
+        ask.then(async (confirmed) => {
           // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'H2',location:'dashboard-users.blade.php:confirmResult',message:'user action confirm result',data:{kind,confirmed},timestamp:Date.now()})}).catch(()=>{});
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'ajax-verify',hypothesisId:'AJAX1,AJAX2',location:'dashboard-users.blade.php:confirmResult',message:'user action confirm result',data:{kind,confirmed},timestamp:Date.now()})}).catch(()=>{});
           // #endregion
 
-          if (confirmed) {
-            form.submit();
+          if (!confirmed) {
+            return;
+          }
+
+          try {
+            const payload = await submitUserAction(form, kind);
+            showUsersToast(payload.message || 'Updated successfully.');
+          } catch (error) {
+            showUsersToast(error instanceof Error ? error.message : 'Request failed.', 'error');
           }
         });
       });

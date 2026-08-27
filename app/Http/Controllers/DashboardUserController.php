@@ -169,30 +169,44 @@ class DashboardUserController extends Controller
         return redirect()->route('dashboard.users')->with('success', 'User updated successfully.');
     }
 
-    public function toggleStatus(int $userId)
+    public function toggleStatus(Request $request, int $userId)
     {
         $user = User::findOrFail($userId);
 
         if (Auth::id() === $user->user_id) {
-            return redirect()->route('dashboard.users')->with('error', 'You cannot change the status of your own account.');
+            $message = 'You cannot change the status of your own account.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['ok' => false, 'message' => $message], 422);
+            }
+
+            return redirect()->route('dashboard.users')->with('error', $message);
         }
 
         if (!UserAccountStatusService::isStatusManaged($user)) {
-            return redirect()->route('dashboard.users')->with('error', 'Admin accounts do not use active/inactive status.');
+            $message = 'Admin accounts do not use active/inactive status.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['ok' => false, 'message' => $message], 422);
+            }
+
+            return redirect()->route('dashboard.users')->with('error', $message);
         }
 
         $before = UserAccountStatusService::isActive($user);
         UserAccountStatusService::toggle($user);
         $after = UserAccountStatusService::isActive($user);
         $durationDebug = UserAccountStatusService::statusDurationDebug($user);
+        $durationLabel = UserAccountStatusService::statusDurationLabel($user);
+        $message = $after ? 'User marked as active.' : 'User marked as inactive.';
 
         // #region agent log
         file_put_contents(
             base_path('debug-e19b10.log'),
             json_encode([
                 'sessionId' => 'e19b10',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'A',
+                'runId' => 'ajax-verify',
+                'hypothesisId' => 'AJAX1',
                 'location' => 'DashboardUserController.php:toggleStatus',
                 'message' => 'user status toggled',
                 'data' => [
@@ -200,6 +214,7 @@ class DashboardUserController extends Controller
                     'role' => $user->role,
                     'beforeActive' => $before,
                     'afterActive' => $after,
+                    'expectsJson' => $request->expectsJson() || $request->ajax(),
                     'createdAt' => optional($user->created_at)?->toIso8601String(),
                     'statusChangedAt' => optional($user->status_changed_at)?->toIso8601String(),
                     'duration' => $durationDebug,
@@ -218,27 +233,71 @@ class DashboardUserController extends Controller
             );
         }
 
-        return redirect()->route('dashboard.users')->with(
-            'success',
-            $after ? 'User marked as active.' : 'User marked as inactive.'
-        );
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'ok' => true,
+                'message' => $message,
+                'userId' => $user->user_id,
+                'isActive' => $after,
+                'status' => $after ? 'active' : 'inactive',
+                'durationLabel' => $durationLabel,
+            ]);
+        }
+
+        return redirect()->route('dashboard.users')->with('success', $message);
     }
 
-    public function destroy(int $userId)
+    public function destroy(Request $request, int $userId)
     {
         $user = User::findOrFail($userId);
 
         if (Auth::id() === $user->user_id) {
-            return redirect()->route('dashboard.users')->with('error', 'You cannot delete your own account.');
+            $message = 'You cannot delete your own account.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['ok' => false, 'message' => $message], 422);
+            }
+
+            return redirect()->route('dashboard.users')->with('error', $message);
         }
 
+        $deletedId = $user->user_id;
         $user->delete();
+
+        // #region agent log
+        file_put_contents(
+            base_path('debug-e19b10.log'),
+            json_encode([
+                'sessionId' => 'e19b10',
+                'runId' => 'ajax-verify',
+                'hypothesisId' => 'AJAX2',
+                'location' => 'DashboardUserController.php:destroy',
+                'message' => 'user deleted via request',
+                'data' => [
+                    'userId' => $deletedId,
+                    'expectsJson' => $request->expectsJson() || $request->ajax(),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ])."\n",
+            FILE_APPEND
+        );
+        // #endregion
 
         if ($actorId = (int) (Auth::id() ?? 0)) {
             AdminActivityService::log($actorId, 'Deleted user account', 'Account');
         }
 
-        return redirect()->route('dashboard.users')->with('success', 'User deleted successfully.');
+        $message = 'User deleted successfully.';
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'ok' => true,
+                'message' => $message,
+                'userId' => $deletedId,
+            ]);
+        }
+
+        return redirect()->route('dashboard.users')->with('success', $message);
     }
 
     /**
