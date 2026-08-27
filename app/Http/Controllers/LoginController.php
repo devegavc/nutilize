@@ -28,26 +28,6 @@ class LoginController extends Controller
         if ($user && UserAccountStatusService::isPastActiveWindow($user)) {
             UserAccountStatusService::markInactive($user);
 
-            // #region agent log
-            file_put_contents(
-                base_path('debug-e19b10.log'),
-                json_encode([
-                    'sessionId' => 'e19b10',
-                    'runId' => 'ajax-verify',
-                    'hypothesisId' => 'W14',
-                    'location' => 'LoginController.php:authenticate',
-                    'message' => 'login blocked by expired 14-week active window',
-                    'data' => [
-                        'userId' => $user->user_id,
-                        'role' => $user->role,
-                        'statusChangedAt' => optional($user->status_changed_at)?->toIso8601String(),
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ])."\n",
-                FILE_APPEND
-            );
-            // #endregion
-
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
@@ -58,25 +38,6 @@ class LoginController extends Controller
         }
 
         if ($user && !UserAccountStatusService::isActive($user)) {
-            // #region agent log
-            file_put_contents(
-                base_path('debug-e19b10.log'),
-                json_encode([
-                    'sessionId' => 'e19b10',
-                    'runId' => 'feature-verify',
-                    'hypothesisId' => 'C',
-                    'location' => 'LoginController.php:authenticate',
-                    'message' => 'login blocked inactive account',
-                    'data' => [
-                        'userId' => $user->user_id,
-                        'role' => $user->role,
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ])."\n",
-                FILE_APPEND
-            );
-            // #endregion
-
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
@@ -88,26 +49,6 @@ class LoginController extends Controller
 
         if ($user) {
             UserAccountStatusService::recordLogin($user);
-
-            // #region agent log
-            file_put_contents(
-                base_path('debug-e19b10.log'),
-                json_encode([
-                    'sessionId' => 'e19b10',
-                    'runId' => 'feature-verify',
-                    'hypothesisId' => 'C',
-                    'location' => 'LoginController.php:authenticate',
-                    'message' => 'login recorded',
-                    'data' => [
-                        'userId' => $user->user_id,
-                        'isActive' => UserAccountStatusService::isActive($user),
-                        'lastLoginAt' => optional($user->last_login_at)?->toIso8601String(),
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ])."\n",
-                FILE_APPEND
-            );
-            // #endregion
         }
 
         if ($user && (int) $user->user_id === 8) {

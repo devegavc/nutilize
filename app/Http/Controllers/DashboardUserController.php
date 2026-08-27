@@ -17,59 +17,11 @@ class DashboardUserController extends Controller
 {
     public function index()
     {
-        $deactivated = UserAccountStatusService::applyInactivityPolicy();
-
-        // #region agent log
-        file_put_contents(
-            base_path('debug-e19b10.log'),
-            json_encode([
-                'sessionId' => 'e19b10',
-                'runId' => 'feature-verify',
-                'hypothesisId' => 'A',
-                'location' => 'DashboardUserController.php:index',
-                'message' => 'users index inactivity sync',
-                'data' => [
-                    'deactivated' => $deactivated,
-                    'inactivityWeeks' => UserAccountStatusService::INACTIVITY_WEEKS,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ])."\n",
-            FILE_APPEND
-        );
-        // #endregion
+        UserAccountStatusService::applyInactivityPolicy();
 
         $users = User::with(['office', 'academicProgram.office'])
             ->orderBy('created_at', 'desc')
             ->get();
-
-        // #region agent log
-        $sampleManaged = $users->first(fn ($u) => UserAccountStatusService::isStatusManaged($u));
-        $sampleAdmin = $users->first(fn ($u) => in_array(strtolower((string) $u->role), ['admin', 'pf_admin', 'pc_admin'], true));
-        file_put_contents(
-            base_path('debug-e19b10.log'),
-            json_encode([
-                'sessionId' => 'e19b10',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'A,B',
-                'location' => 'DashboardUserController.php:index',
-                'message' => 'users index status policy sample',
-                'data' => [
-                    'deactivated' => $deactivated,
-                    'managedCount' => $users->filter(fn ($u) => UserAccountStatusService::isStatusManaged($u))->count(),
-                    'unmanagedCount' => $users->reject(fn ($u) => UserAccountStatusService::isStatusManaged($u))->count(),
-                    'sampleManagedDuration' => $sampleManaged
-                        ? UserAccountStatusService::statusDurationDebug($sampleManaged)
-                        : null,
-                    'sampleAdminManaged' => $sampleAdmin
-                        ? UserAccountStatusService::isStatusManaged($sampleAdmin)
-                        : null,
-                    'sampleAdminRole' => $sampleAdmin?->role,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ])."\n",
-            FILE_APPEND
-        );
-        // #endregion
 
         $offices = Office::orderBy('department_name', 'asc')->get();
         $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
@@ -91,13 +43,17 @@ class DashboardUserController extends Controller
             'username' => 'required|string|max:50|unique:users,username',
             'email' => 'required|email|max:100|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
-            'role' => ['required', Rule::in(['user', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
+            'role' => ['required', Rule::in(['user', 'student', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
             'full_name' => 'nullable|string|max:255',
             'office_id' => ['nullable', 'exists:offices,office_id'],
         ]);
 
         $data = $this->normalizeRolePayload($data);
         $data = UserNameService::applyToUserData($data);
+
+        // #region agent log
+        file_put_contents(base_path('debug-e19b10.log'), json_encode(['sessionId'=>'e19b10','runId'=>'post-fix','hypothesisId'=>'B,D','location'=>'DashboardUserController.php:store','message'=>'creating account with role','data'=>['role'=>$data['role']??null],'timestamp'=>(int)round(microtime(true)*1000)])."\n", FILE_APPEND);
+        // #endregion
 
         $user = User::create([
             'username' => $data['username'],
@@ -138,7 +94,7 @@ class DashboardUserController extends Controller
             'username' => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($user->user_id, 'user_id')],
             'email' => ['required', 'email', 'max:100', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
             'password' => 'nullable|string|min:8|confirmed',
-            'role' => ['required', Rule::in(['user', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
+            'role' => ['required', Rule::in(['user', 'student', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
             'full_name' => 'nullable|string|max:255',
             'office_id' => ['nullable', 'exists:offices,office_id'],
         ]);
@@ -193,37 +149,10 @@ class DashboardUserController extends Controller
             return redirect()->route('dashboard.users')->with('error', $message);
         }
 
-        $before = UserAccountStatusService::isActive($user);
         UserAccountStatusService::toggle($user);
         $after = UserAccountStatusService::isActive($user);
-        $durationDebug = UserAccountStatusService::statusDurationDebug($user);
         $durationLabel = UserAccountStatusService::statusDurationLabel($user);
         $message = $after ? 'User marked as active.' : 'User marked as inactive.';
-
-        // #region agent log
-        file_put_contents(
-            base_path('debug-e19b10.log'),
-            json_encode([
-                'sessionId' => 'e19b10',
-                'runId' => 'ajax-verify',
-                'hypothesisId' => 'AJAX1',
-                'location' => 'DashboardUserController.php:toggleStatus',
-                'message' => 'user status toggled',
-                'data' => [
-                    'userId' => $user->user_id,
-                    'role' => $user->role,
-                    'beforeActive' => $before,
-                    'afterActive' => $after,
-                    'expectsJson' => $request->expectsJson() || $request->ajax(),
-                    'createdAt' => optional($user->created_at)?->toIso8601String(),
-                    'statusChangedAt' => optional($user->status_changed_at)?->toIso8601String(),
-                    'duration' => $durationDebug,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ])."\n",
-            FILE_APPEND
-        );
-        // #endregion
 
         if ($actorId = (int) (Auth::id() ?? 0)) {
             AdminActivityService::log(
@@ -263,25 +192,6 @@ class DashboardUserController extends Controller
 
         $deletedId = $user->user_id;
         $user->delete();
-
-        // #region agent log
-        file_put_contents(
-            base_path('debug-e19b10.log'),
-            json_encode([
-                'sessionId' => 'e19b10',
-                'runId' => 'ajax-verify',
-                'hypothesisId' => 'AJAX2',
-                'location' => 'DashboardUserController.php:destroy',
-                'message' => 'user deleted via request',
-                'data' => [
-                    'userId' => $deletedId,
-                    'expectsJson' => $request->expectsJson() || $request->ajax(),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ])."\n",
-            FILE_APPEND
-        );
-        // #endregion
 
         if ($actorId = (int) (Auth::id() ?? 0)) {
             AdminActivityService::log($actorId, 'Deleted user account', 'Account');

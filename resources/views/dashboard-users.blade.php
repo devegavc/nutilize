@@ -116,6 +116,7 @@
           $facultyUsers = $mobilePool->filter(fn ($user) => strtolower((string) $user->role) === 'faculty')->values();
           $studentUsers = $mobilePool->filter(fn ($user) => strtolower((string) $user->role) !== 'faculty')->values();
           $formatUserCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'user' : 'users');
+          $formatStudentCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'student' : 'students');
           $activeUsersCount = $users->filter(fn ($user) => UserAccountStatusService::isActive($user))->count();
           $resolveUserName = fn ($user) => $user->displayName();
           $resolveUserOffice = function ($user): string {
@@ -170,7 +171,7 @@
         </section>
 
         <p class="users-policy-note">
-          Users and faculties stay active for {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks from activation. When that window ends they become inactive. Activating an account resets the timer to zero and starts a new {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }}-week period. PF admins can activate or deactivate accounts at any time.
+          Students and faculties stay active for {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks from activation. When that window ends they become inactive. Activating an account resets the timer to zero and starts a new {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }}-week period. PF admins can activate or deactivate accounts at any time.
         </p>
 
         <section class="users-tools-bar" aria-label="User table filters">
@@ -301,12 +302,12 @@
                 @endif
 
                 @if($studentUsers->count() > 0)
-                  <tr class="category-header-row" data-group="users">
+                  <tr class="category-header-row" data-group="students">
                     <td colspan="7">
                       <div class="category-header">
                         <i class="bi bi-people"></i>
-                        <span>Users</span>
-                        <span class="category-count" data-group-count>{{ $formatUserCount($studentUsers->count()) }}</span>
+                        <span>Students</span>
+                        <span class="category-count" data-group-count>{{ $formatStudentCount($studentUsers->count()) }}</span>
                       </div>
                     </td>
                   </tr>
@@ -317,8 +318,8 @@
                       'resolveUserName' => $resolveUserName,
                       'rowClass' => 'approver-row',
                       'roleBadgeClass' => 'approver-badge',
-                      'roleLabel' => strtoupper((string) $user->role),
-                      'deleteConfirm' => 'Delete this user?',
+                      'roleLabel' => in_array(strtolower((string) $user->role), ['user', 'student'], true) ? 'STUDENT' : strtoupper((string) $user->role),
+                      'deleteConfirm' => 'Delete this student?',
                     ])
                   @endforeach
                 @endif
@@ -379,7 +380,7 @@
           <section class="equipment-form-section">
             <label class="facilities-field-label" for="user-role">Role</label>
             <select id="user-role" class="facilities-input facilities-select" name="role" required>
-              <option value="user">USER</option>
+              <option value="student">STUDENT</option>
               <option value="faculty">FACULTY</option>
               <option value="admin">ADMIN</option>
               <option value="item_owner">ITEM OWNER</option>
@@ -492,7 +493,7 @@
       }
     };
 
-    const resetModal = (presetRole = 'user') => {
+    const resetModal = (presetRole = 'student') => {
       userForm.action = window.userStoreEndpoint;
       userFormMethod.value = 'POST';
       userModalTitle.textContent = presetRole === 'item_owner' ? 'Add Item Owner' : 'Add User';
@@ -500,7 +501,7 @@
       userUsernameInput.value = '';
       userFullNameInput.value = '';
       userEmailInput.value = '';
-      userRoleInput.value = presetRole;
+      userRoleInput.value = presetRole === 'user' ? 'student' : presetRole;
       userOfficeInput.value = presetRole === 'item_owner' ? itemOwnerOfficeId : '';
       userPasswordInput.value = '';
       userPasswordConfirmInput.value = '';
@@ -515,7 +516,7 @@
       const username = row.dataset.userUsername;
       const fullName = row.dataset.userFullName || row.dataset.userName;
       const email = row.dataset.userEmail;
-      const role = row.dataset.userRole;
+      const role = row.dataset.userRole === 'user' ? 'student' : row.dataset.userRole;
       const officeId = row.dataset.userOfficeId;
 
       userForm.action = `${window.userEndpointBase}/${userId}`;
@@ -538,8 +539,12 @@
 
     if (userAddBtn) {
       userAddBtn.addEventListener('click', () => {
-        resetModal('user');
+        resetModal('student');
         openUserModal();
+
+        // #region agent log
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A',location:'dashboard-users.blade.php:addUser',message:'add user role options',data:{options:Array.from(userRoleInput.options).map((o)=>({value:o.value,label:o.textContent.trim()})),selected:userRoleInput.value,sectionTitle:document.querySelector('[data-group="students"] span')?.textContent||null},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
       });
     }
 
@@ -645,7 +650,15 @@
         });
 
         const normalizeText = (value) => String(value || '').toLowerCase().trim();
-        const formatCount = (value) => `${value} ${value === 1 ? 'user' : 'users'}`;
+        const formatCount = (value, group = '') => {
+          if (group === 'students') {
+            return `${value} ${value === 1 ? 'student' : 'students'}`;
+          }
+          if (group === 'faculty') {
+            return `${value} ${value === 1 ? 'faculty' : 'faculties'}`;
+          }
+          return `${value} ${value === 1 ? 'user' : 'users'}`;
+        };
 
         const roleFilterMatch = (rowRole, selectedRole) => {
           if (selectedRole === 'all') {
@@ -732,7 +745,10 @@
             section.headerRow.hidden = visibleInSection === 0;
 
             if (section.countLabel) {
-              section.countLabel.textContent = formatCount(visibleInSection);
+              section.countLabel.textContent = formatCount(
+                visibleInSection,
+                section.headerRow.getAttribute('data-group') || ''
+              );
             }
 
             section.rows.sort((left, right) => compareRows(left, right, sortMode));
@@ -790,10 +806,6 @@
         });
 
         applyUsersFilters();
-
-        // #region agent log
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A,B',location:'dashboard-users.blade.php:init',message:'users dashboard status rendering',data:{facultyHeaders:document.querySelectorAll('[data-group="faculty"]').length,userHeaders:document.querySelectorAll('[data-group="users"]').length,managedRows:document.querySelectorAll('[data-user-status-managed="1"]').length,unmanagedRows:document.querySelectorAll('[data-user-status-managed="0"]').length,adminRowsWithoutToggle:Array.from(document.querySelectorAll('.admin-row')).filter((r)=>!r.querySelector('.table-status-btn')).length,sampleActiveDurations:Array.from(document.querySelectorAll('.user-status-duration')).slice(0,5).map((el)=>el.textContent.trim()),naCells:document.querySelectorAll('.user-status-na').length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
       }
     }
   </script>
@@ -852,10 +864,6 @@
         const duration = payload.durationLabel || (isActive ? 'Active for 0 seconds' : 'Inactive for 0 seconds');
 
         row.dataset.userStatus = status;
-
-        // #region agent log
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'W14',location:'dashboard-users.blade.php:updateStatusRow',message:'row status updated after activate/deactivate',data:{userId:row.dataset.userId||null,isActive,duration,buttonWillBe:isActive?'Deactivate':'Activate'},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
 
         const statusCell = row.children[5];
         if (statusCell instanceof HTMLElement) {
@@ -927,7 +935,13 @@
         } else {
           const countLabel = header.querySelector('[data-group-count]');
           if (countLabel) {
-            countLabel.textContent = `${count} ${count === 1 ? 'user' : 'users'}`;
+            const group = header.getAttribute('data-group') || '';
+            const unit = group === 'students'
+              ? (count === 1 ? 'student' : 'students')
+              : group === 'faculty'
+                ? (count === 1 ? 'faculty' : 'faculties')
+                : (count === 1 ? 'user' : 'users');
+            countLabel.textContent = `${count} ${unit}`;
           }
         }
 
@@ -957,10 +971,6 @@
           payload = null;
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'ajax-verify',hypothesisId:'AJAX1,AJAX2',location:'dashboard-users.blade.php:ajaxResult',message:'ajax user action result',data:{kind,ok:!!payload?.ok,status:response.status,pageReloaded:false,userId:payload?.userId||null,isActive:payload?.isActive??null},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-
         if (!response.ok || !payload?.ok) {
           throw new Error(payload?.message || 'Request failed.');
         }
@@ -978,14 +988,6 @@
 
         return payload;
       };
-
-      // #region agent log
-      const actionsTh = document.querySelector('.user-management-card .users-table thead th:last-child');
-      const actionsTd = document.querySelector('.user-management-card .users-table tbody td.table-actions-cell');
-      const thRect = actionsTh ? actionsTh.getBoundingClientRect() : null;
-      const tdRect = actionsTd ? actionsTd.getBoundingClientRect() : null;
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'ajax-verify',hypothesisId:'H1',location:'dashboard-users.blade.php:headerMeasure',message:'actions header vs cell width',data:{hasConfirmFn:!!confirmFn,thWidth:thRect?Math.round(thRect.width):null,tdWidth:tdRect?Math.round(tdRect.width):null,widthDelta:thRect&&tdRect?Math.round(tdRect.width-thRect.width):null,thRight:thRect?Math.round(thRect.right):null,tdRight:tdRect?Math.round(tdRect.right):null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
 
       if (!(table instanceof HTMLElement)) {
         return;
@@ -1006,10 +1008,6 @@
         const variant = form.getAttribute('data-confirm-variant') || 'danger';
         const kind = form.getAttribute('data-user-confirm-form') || 'unknown';
 
-        // #region agent log
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'ajax-verify',hypothesisId:'AJAX1,AJAX2',location:'dashboard-users.blade.php:confirmSubmit',message:'user action confirm intercepted',data:{kind,title,hasConfirmFn:!!confirmFn,willUseAjax:true},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-
         const ask = confirmFn
           ? confirmFn(message, {
               title,
@@ -1021,10 +1019,6 @@
           : Promise.resolve(window.confirm([message, note].filter(Boolean).join('\n')));
 
         ask.then(async (confirmed) => {
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'ajax-verify',hypothesisId:'AJAX1,AJAX2',location:'dashboard-users.blade.php:confirmResult',message:'user action confirm result',data:{kind,confirmed},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-
           if (!confirmed) {
             return;
           }

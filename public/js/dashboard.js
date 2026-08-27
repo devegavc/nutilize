@@ -852,10 +852,6 @@ function showAppConfirm(message, options = {}) {
   modal.classList.add('is-open');
   modal.setAttribute('aria-hidden', 'false');
 
-  // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'GREEN',location:'dashboard.js:showAppConfirm',message:'confirm modal variant applied',data:{title,variant:normalizedVariant,confirmText},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
   return new Promise((resolve) => {
     const finish = (result) => {
       modal.classList.remove('is-open');

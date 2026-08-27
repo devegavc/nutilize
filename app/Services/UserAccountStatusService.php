@@ -149,34 +149,6 @@ class UserAccountStatusService
         return 'Inactive for '.$diff;
     }
 
-    /**
-     * @return array{label: string, sinceSource: string, since: ?string, isActive: bool, weeksRemaining: ?float}
-     */
-    public static function statusDurationDebug(User $user, ?CarbonInterface $now = null): array
-    {
-        $now = $now ?? now();
-        $isActive = self::isActive($user);
-        $since = $isActive
-            ? (self::activePeriodStartedAt($user) ?? $now)
-            : ($user->status_changed_at ?? $user->created_at ?? $now);
-
-        $weeksRemaining = null;
-        if ($isActive) {
-            $elapsedWeeks = $since->diffInSeconds($now) / (7 * 24 * 60 * 60);
-            $weeksRemaining = max(0, self::INACTIVITY_WEEKS - $elapsedWeeks);
-        }
-
-        return [
-            'label' => self::statusDurationLabel($user, $now),
-            'sinceSource' => $isActive
-                ? ($user->status_changed_at ? 'status_changed_at' : 'created_at')
-                : ($user->status_changed_at ? 'status_changed_at' : 'created_at'),
-            'since' => optional($since)?->toIso8601String(),
-            'isActive' => $isActive,
-            'weeksRemaining' => $weeksRemaining,
-        ];
-    }
-
     public static function recordLogin(User $user): void
     {
         $user->last_login_at = now();
