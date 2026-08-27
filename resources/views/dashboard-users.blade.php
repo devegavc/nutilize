@@ -541,10 +541,6 @@
       userAddBtn.addEventListener('click', () => {
         resetModal('student');
         openUserModal();
-
-        // #region agent log
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'A',location:'dashboard-users.blade.php:addUser',message:'add user role options',data:{options:Array.from(userRoleInput.options).map((o)=>({value:o.value,label:o.textContent.trim()})),selected:userRoleInput.value,sectionTitle:document.querySelector('[data-group="students"] span')?.textContent||null},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
       });
     }
 

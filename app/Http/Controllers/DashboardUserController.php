@@ -51,10 +51,6 @@ class DashboardUserController extends Controller
         $data = $this->normalizeRolePayload($data);
         $data = UserNameService::applyToUserData($data);
 
-        // #region agent log
-        file_put_contents(base_path('debug-e19b10.log'), json_encode(['sessionId'=>'e19b10','runId'=>'post-fix','hypothesisId'=>'B,D','location'=>'DashboardUserController.php:store','message'=>'creating account with role','data'=>['role'=>$data['role']??null],'timestamp'=>(int)round(microtime(true)*1000)])."\n", FILE_APPEND);
-        // #endregion
-
         $user = User::create([
             'username' => $data['username'],
             'email' => $data['email'],

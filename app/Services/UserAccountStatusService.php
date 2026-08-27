@@ -151,8 +151,6 @@ class UserAccountStatusService
 
     public static function recordLogin(User $user): void
     {
-        $user->last_login_at = now();
-
         // Do not reset the 14-week active window on login — only Activate does.
         if ($user->status_changed_at === null) {
             $user->status_changed_at = $user->created_at ?? now();
