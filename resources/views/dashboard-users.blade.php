@@ -798,6 +798,64 @@
     }
   </script>
 
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
+  <script>
+    (() => {
+      const confirmFn = typeof window.showAppConfirm === 'function' ? window.showAppConfirm : null;
+      const table = document.getElementById('users-table-body');
+
+      // #region agent log
+      const actionsTh = document.querySelector('.user-management-card .users-table thead th:last-child');
+      const actionsTd = document.querySelector('.user-management-card .users-table tbody td.table-actions-cell');
+      const thRect = actionsTh ? actionsTh.getBoundingClientRect() : null;
+      const tdRect = actionsTd ? actionsTd.getBoundingClientRect() : null;
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'H1',location:'dashboard-users.blade.php:headerMeasure',message:'actions header vs cell width',data:{hasConfirmFn:!!confirmFn,thWidth:thRect?Math.round(thRect.width):null,tdWidth:tdRect?Math.round(tdRect.width):null,widthDelta:thRect&&tdRect?Math.round(tdRect.width-thRect.width):null,thRight:thRect?Math.round(thRect.right):null,tdRight:tdRect?Math.round(tdRect.right):null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+
+      if (!(table instanceof HTMLElement)) {
+        return;
+      }
+
+      table.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-user-confirm-form')) {
+          return;
+        }
+
+        event.preventDefault();
+
+        const title = form.getAttribute('data-confirm-title') || 'Confirm';
+        const message = form.getAttribute('data-confirm-message') || 'Are you sure?';
+        const note = form.getAttribute('data-confirm-note') || '';
+        const confirmText = form.getAttribute('data-confirm-text') || 'Confirm';
+        const variant = form.getAttribute('data-confirm-variant') || 'danger';
+        const kind = form.getAttribute('data-user-confirm-form') || 'unknown';
+
+        // #region agent log
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'H2',location:'dashboard-users.blade.php:confirmSubmit',message:'user action confirm intercepted',data:{kind,title,hasConfirmFn:!!confirmFn},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+
+        const ask = confirmFn
+          ? confirmFn(message, {
+              title,
+              confirmText,
+              cancelText: 'Cancel',
+              variant,
+              dangerNote: note,
+            })
+          : Promise.resolve(window.confirm([message, note].filter(Boolean).join('\n')));
+
+        ask.then((confirmed) => {
+          // #region agent log
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e19b10'},body:JSON.stringify({sessionId:'e19b10',runId:'post-fix',hypothesisId:'H2',location:'dashboard-users.blade.php:confirmResult',message:'user action confirm result',data:{kind,confirmed},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+
+          if (confirmed) {
+            form.submit();
+          }
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

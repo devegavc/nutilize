@@ -48,7 +48,17 @@
     <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
     @if(auth()->user()->user_id !== $user->user_id)
       @if($showsAccountStatus)
-        <form method="POST" action="{{ route('dashboard.users.toggle-status', ['userId' => $user->user_id]) }}" class="inline-action-form">
+        <form
+          method="POST"
+          action="{{ route('dashboard.users.toggle-status', ['userId' => $user->user_id]) }}"
+          class="inline-action-form"
+          data-user-confirm-form="status"
+          data-confirm-title="{{ $userStatus === 'active' ? 'Deactivate account' : 'Activate account' }}"
+          data-confirm-message="{{ $userStatus === 'active' ? 'Are you sure you want to deactivate this account?' : 'Are you sure you want to activate this account?' }}"
+          data-confirm-note="{{ $userStatus === 'active' ? 'They will not be able to sign in until reactivated.' : '' }}"
+          data-confirm-text="{{ $userStatus === 'active' ? 'Deactivate' : 'Activate' }}"
+          data-confirm-variant="{{ $userStatus === 'active' ? 'danger' : 'default' }}"
+        >
           @csrf
           @method('PATCH')
           <button
@@ -60,7 +70,17 @@
           </button>
         </form>
       @endif
-      <form method="POST" action="{{ route('dashboard.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" onsubmit="return confirm(@json($deleteConfirm));">
+      <form
+        method="POST"
+        action="{{ route('dashboard.users.destroy', ['userId' => $user->user_id]) }}"
+        class="inline-action-form"
+        data-user-confirm-form="delete"
+        data-confirm-title="Delete account"
+        data-confirm-message="{{ $deleteConfirm }}"
+        data-confirm-note="This action cannot be undone."
+        data-confirm-text="Delete"
+        data-confirm-variant="danger"
+      >
         @csrf
         @method('DELETE')
         <button type="submit" class="table-delete-btn">Delete</button>
