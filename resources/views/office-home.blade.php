@@ -259,13 +259,21 @@
             try {
               payload = JSON.parse(responseText);
             } catch (_error) {
-              payload = { error: responseText };
+              payload = {
+                error: response.status === 504
+                  ? 'The server took too long to finish this approval. Please refresh and try again.'
+                  : 'Action failed. Please try again.',
+              };
             }
           }
 
           if (!response.ok) {
             const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
-            showAppNotice((payload.error || payload.message || 'Action failed. Please try again.') + statusMessage);
+            const rawError = payload.error || payload.message || 'Action failed. Please try again.';
+            const safeError = typeof rawError === 'string' && rawError.includes('<html')
+              ? 'The server took too long to finish this approval. Please refresh and try again.'
+              : rawError;
+            showAppNotice(safeError + statusMessage);
             return false;
           }
 

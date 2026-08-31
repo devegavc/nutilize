@@ -2799,7 +2799,11 @@ async function submitFinalRequestDecision(item, button, status) {
         try {
           data = JSON.parse(responseText);
         } catch (parseError) {
-          data = { error: responseText };
+          data = {
+            error: finalStatus === 504
+              ? 'The server took too long to finish this approval. Please refresh and try again.'
+              : 'Unable to process this request.',
+          };
         }
       }
 
@@ -2810,7 +2814,11 @@ async function submitFinalRequestDecision(item, button, status) {
       const isTransientServerError = finalStatus >= 500 && finalStatus < 600;
       if (!(isTransientServerError && attempt < 2)) {
         const statusMessage = finalStatus ? ` (HTTP ${finalStatus})` : '';
-        showAppNotice((data.error || data.message || 'Unable to process this request.') + statusMessage);
+        const rawError = data.error || data.message || 'Unable to process this request.';
+        const safeError = typeof rawError === 'string' && rawError.includes('<html')
+          ? 'The server took too long to finish this approval. Please refresh and try again.'
+          : rawError;
+        showAppNotice(safeError + statusMessage);
         return;
       }
     }

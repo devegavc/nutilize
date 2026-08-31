@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 
 class Announcement extends Model
@@ -60,9 +61,33 @@ class Announcement extends Model
         return $updatedAt->gt($publishedAt);
     }
 
+    public static function tableReady(): bool
+    {
+        return (bool) Cache::remember('schema.table.announcements', 3600, static function () {
+            return Schema::hasTable('announcements');
+        });
+    }
+
+    public static function hasAnnouncementsColumn(string $column): bool
+    {
+        $column = trim($column);
+        if ($column === '') {
+            return false;
+        }
+
+        return (bool) Cache::remember("schema.column.announcements.{$column}", 3600, static function () use ($column) {
+            return Schema::hasColumn('announcements', $column);
+        });
+    }
+
     public static function purgeExpired(): int
     {
-        if (!Schema::hasTable('announcements') || !Schema::hasColumn('announcements', 'expires_at')) {
+        if (!self::tableReady() || !self::hasAnnouncementsColumn('expires_at')) {
+            return 0;
+        }
+
+        // Hostinger request budgets are tight; do not run a delete on every announce/home hit.
+        if (!Cache::add('announcements.purge_expired.gate', 1, now()->addMinutes(30))) {
             return 0;
         }
 

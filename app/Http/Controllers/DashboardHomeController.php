@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Announcement;
 use App\Services\DashboardCacheService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
 
 class DashboardHomeController extends Controller
 {
@@ -16,7 +15,7 @@ class DashboardHomeController extends Controller
         $__dbgLog = static function (string $hypothesisId, string $message, array $data = []) use ($__dbgT0): void {
             file_put_contents(base_path('debug-fa7298.log'), json_encode([
                 'sessionId' => 'fa7298',
-                'runId' => 'pre-fix',
+                'runId' => 'post-fix',
                 'hypothesisId' => $hypothesisId,
                 'location' => 'DashboardHomeController.php:index',
                 'message' => $message,
@@ -49,7 +48,7 @@ class DashboardHomeController extends Controller
         $__dbgStep = microtime(true);
         // #endregion
 
-        $announcementsTableReady = Schema::hasTable('announcements');
+        $announcementsTableReady = Announcement::tableReady();
         // #region agent log
         $__dbgLog('F,G', 'after Schema::hasTable announcements', [
             'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
@@ -76,7 +75,7 @@ class DashboardHomeController extends Controller
                 ->orderByDesc('created_at')
                 ->limit(30);
 
-            if (Schema::hasColumn('announcements', 'expires_at')) {
+            if (Announcement::hasAnnouncementsColumn('expires_at')) {
                 $query->active();
             }
 

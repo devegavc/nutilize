@@ -171,7 +171,7 @@ class ApprovalController extends Controller
         $__dbgLog = static function (string $hypothesisId, string $message, array $data = []) use ($__dbgT0, $approvalId): void {
             file_put_contents(base_path('debug-fa7298.log'), json_encode([
                 'sessionId' => 'fa7298',
-                'runId' => 'pre-fix',
+                'runId' => 'post-fix',
                 'hypothesisId' => $hypothesisId,
                 'location' => 'ApprovalController.php:approve',
                 'message' => $message,
@@ -254,17 +254,22 @@ class ApprovalController extends Controller
             // Load reservation once and reuse across all subsequent helpers.
             $reservation = Reservation::with('user')->find((int) $approval->reservation_id);
 
-            // Route program-chair rows to the correct office before notifying the next approver.
-            $this->prepareReservationWorkflowHandoff((int) $approval->reservation_id);
+            // Hot approve path: do not run full workflow handoff rebuild here.
+            // Approval rows already exist; opportunistic sync gates repair drift later.
             // #region agent log
-            $__dbgLog('H', 'after prepareReservationWorkflowHandoff', [
+            $__dbgLog('H', 'skipped prepareReservationWorkflowHandoff on approve', [
                 'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
             ]);
             $__dbgStep = microtime(true);
             // #endregion
             ReservationApprovalWorkflowService::reconcileItemOwnerApprovals((int) $approval->reservation_id);
             ReservationApprovalDeduper::deduplicatePendingForReservations([(int) $approval->reservation_id]);
-            $this->actionableOfficeIdsRequestCache = null;
+            // Only recompute this reservation's actionable office after the status change.
+            if (is_array($this->actionableOfficeIdsRequestCache)) {
+                unset($this->actionableOfficeIdsRequestCache[(int) $approval->reservation_id]);
+            } else {
+                $this->actionableOfficeIdsRequestCache = null;
+            }
             // #region agent log
             $__dbgLog('H', 'after reconcile + dedupe', [
                 'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
@@ -1742,14 +1747,16 @@ class ApprovalController extends Controller
         );
     }
 
-    private function prepareReservationWorkflowHandoff(int $reservationId): void
+    private function prepareReservationWorkflowHandoff(int $reservationId, bool $ensureRows = true): void
     {
         $this->warmBatchWorkflowLookups([$reservationId]);
         ProgramChairOfficeResolver::reconcilePendingLegacyPcApproval($reservationId);
 
-        $workflowOfficeIds = $this->resolveWorkflowOfficeIds($reservationId, true);
-        if ($workflowOfficeIds !== []) {
-            ReservationApprovalWorkflowService::ensureApprovalRows($reservationId, $workflowOfficeIds);
+        if ($ensureRows) {
+            $workflowOfficeIds = $this->resolveWorkflowOfficeIds($reservationId, true);
+            if ($workflowOfficeIds !== []) {
+                ReservationApprovalWorkflowService::ensureApprovalRows($reservationId, $workflowOfficeIds);
+            }
         }
 
         $this->fixNullApprovalStatuses($reservationId);

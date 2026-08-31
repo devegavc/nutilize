@@ -7,7 +7,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class DashboardAnnouncementController extends Controller
@@ -32,7 +31,7 @@ class DashboardAnnouncementController extends Controller
         $__dbgLog = static function (string $hypothesisId, string $message, array $data = []) use ($__dbgT0): void {
             file_put_contents(base_path('debug-fa7298.log'), json_encode([
                 'sessionId' => 'fa7298',
-                'runId' => 'pre-fix',
+                'runId' => 'post-fix',
                 'hypothesisId' => $hypothesisId,
                 'location' => 'DashboardAnnouncementController.php:store',
                 'message' => $message,
@@ -53,7 +52,7 @@ class DashboardAnnouncementController extends Controller
         // #region agent log
         $__dbgStep = microtime(true);
         // #endregion
-        if (!Schema::hasTable('announcements')) {
+        if (!Announcement::tableReady()) {
             // #region agent log
             $__dbgLog('F', 'announcements table missing', [
                 'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
@@ -110,11 +109,11 @@ class DashboardAnnouncementController extends Controller
             // #region agent log
             $__dbgStep = microtime(true);
             // #endregion
-            if (Schema::hasColumn('announcements', 'announcer_name')) {
+            if (Announcement::hasAnnouncementsColumn('announcer_name')) {
                 $payload['announcer_name'] = $announcerName;
             }
 
-            if (Schema::hasColumn('announcements', 'expires_at')) {
+            if (Announcement::hasAnnouncementsColumn('expires_at')) {
                 $payload['expires_at'] = $now->copy()->addDays(Announcement::DEFAULT_TTL_DAYS);
             }
             // #region agent log
@@ -161,7 +160,7 @@ class DashboardAnnouncementController extends Controller
             return redirect('/dashboard/office/home')->with('error', 'Unauthorized access.');
         }
 
-        if (!Schema::hasTable('announcements')) {
+        if (!Announcement::tableReady()) {
             return redirect()
                 ->route('dashboard.home')
                 ->with('open_announcements', true)
@@ -198,7 +197,7 @@ class DashboardAnnouncementController extends Controller
                 'updated_at' => now(),
             ];
 
-            if (Schema::hasColumn('announcements', 'announcer_name')) {
+            if (Announcement::hasAnnouncementsColumn('announcer_name')) {
                 $payload['announcer_name'] = $announcerName;
             }
 
@@ -229,7 +228,7 @@ class DashboardAnnouncementController extends Controller
             return redirect('/dashboard/office/home')->with('error', 'Unauthorized access.');
         }
 
-        if (!Schema::hasTable('announcements')) {
+        if (!Announcement::tableReady()) {
             return redirect()
                 ->route('dashboard.home')
                 ->with('open_announcements', true)
