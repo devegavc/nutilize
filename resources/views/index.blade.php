@@ -216,32 +216,6 @@
       window.addEventListener('scroll', setActiveLink, { passive: true });
       // initial
       setActiveLink();
-
-      // #region agent log
-      try {
-        const imgs = Array.from(document.images).map((img) => ({
-          src: (img.currentSrc || img.src || '').split('/').pop(),
-          naturalWidth: img.naturalWidth,
-          naturalHeight: img.naturalHeight,
-          displayW: Math.round(img.getBoundingClientRect().width),
-          displayH: Math.round(img.getBoundingClientRect().height),
-          hasWH: img.hasAttribute('width') && img.hasAttribute('height'),
-        }));
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'fa7298' },
-          body: JSON.stringify({
-            sessionId: 'fa7298',
-            runId: 'landing-perf',
-            hypothesisId: 'A,B',
-            location: 'index.blade.php:DOMContentLoaded',
-            message: 'landing image metrics',
-            data: { imgCount: imgs.length, imgs, speedIndexHintMs: Math.round(performance.now()) },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-      } catch (_e) {}
-      // #endregion
     });
   </script>
   <footer class="contact" id="contact">
