@@ -64,8 +64,35 @@ body {
 
 .brand-logo {
   width: 146px;
-  height: auto;
+  height: 49px;
+  object-fit: contain;
   display: block;
+}
+
+.icon {
+  display: inline-block;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+
+.cta-btn .icon {
+  margin-right: 0.35rem;
+}
+
+.about-icon .icon,
+.contact-list .icon {
+  display: block;
+}
+
+.contact-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.contact-list .icon {
+  margin-top: 0.2em;
+  color: #ffffff;
 }
 
 .top-nav {
@@ -137,10 +164,15 @@ body {
 .hero {
   position: relative;
   min-height: 100vh;
-  background-image: url("../img/nulipa_front.jpg");
+  /* Prefer WebP; JPEG fallback. Avoid fixed attachment (hurts mobile paint / Speed Index). */
+  background-image: image-set(
+    url("../img/nulipa_front.webp") type("image/webp"),
+    url("../img/nulipa_front.jpg") type("image/jpeg")
+  );
   background-size: cover;
   background-position: center;
-  background-attachment: fixed;
+  background-attachment: scroll;
+  background-repeat: no-repeat;
   display: flex;
   align-items: center;
   padding-top: 82px;
@@ -562,13 +594,14 @@ body {
     box-shadow: 0 14px 28px rgba(38, 52, 140, 0.24);
   }
 
-  .about-icon i {
-    font-size: 34px;
+  .about-icon .icon {
+    width: 34px;
+    height: 34px;
     line-height: 1;
     transition: transform 0.28s ease;
   }
 
-  .about-card:hover .about-icon i {
+  .about-card:hover .about-icon .icon {
     transform: scale(1.12) rotate(-8deg);
   }
 
@@ -649,8 +682,9 @@ body {
     color: rgba(255, 255, 255, 0.97);
   }
 
-  .contact-list i {
-    font-size: 1rem;
+  .contact-list .icon {
+    width: 1rem;
+    height: 1rem;
     margin-top: 2px;
     color: #fff;
   }
