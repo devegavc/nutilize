@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Schema;
 
 class OfficeRequestController extends Controller
 {
-    private const WORKFLOW_BATCH_LIMIT = 40;
+    private const WORKFLOW_BATCH_LIMIT = 12;
 
     private ?array $officeIdsByShortCodeCache = null;
     private ?int $physicalFacilitiesOfficeIdCache = null;
@@ -106,7 +106,7 @@ class OfficeRequestController extends Controller
                 $officeId,
                 self::WORKFLOW_BATCH_LIMIT
             );
-            if ($reconcileIds !== []) {
+            if ($shouldSync && $reconcileIds !== []) {
                 ProgramChairOfficeResolver::reconcileOpenReservationPcApprovals($reconcileIds);
             }
 
@@ -160,8 +160,8 @@ class OfficeRequestController extends Controller
             }
         }
 
-        // Seed missing inbox rows for this approver only (insert-if-missing). No deletes.
-        if ($actionableReservationIds !== []) {
+        // Seed missing inbox rows rarely — every page load was too expensive on Hostinger.
+        if ($actionableReservationIds !== [] && $this->shouldSeedOfficeHomeNotifications($user)) {
             ReservationApprovalNotifier::ensureUnreadForUser(
                 $user,
                 $actionableReservationIds,
@@ -797,6 +797,23 @@ class OfficeRequestController extends Controller
         // sync is already running, this user gets another chance in two minutes rather
         // than being locked out for the full cooldown.
         Cache::put($key, true, now()->addMinutes(2));
+
+        return true;
+    }
+
+    private function shouldSeedOfficeHomeNotifications($user): bool
+    {
+        $userId = (int) ($user->user_id ?? 0);
+        if ($userId <= 0) {
+            return false;
+        }
+
+        $key = 'office_home_notification_seed.user.' . $userId;
+        if (Cache::has($key)) {
+            return false;
+        }
+
+        Cache::put($key, true, now()->addMinutes(10));
 
         return true;
     }

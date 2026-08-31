@@ -21,35 +21,16 @@ class DashboardCacheService
      */
     public static function getDashboardData(int $userId, int $officeId): array
     {
-        $cacheKey = "dashboard.data.v6.user.{$userId}.office.{$officeId}";
+        $cacheKey = "dashboard.data.v7.user.{$userId}.office.{$officeId}";
 
-        return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId, $cacheKey) {
-            // #region agent log
-            $__dbgT0 = microtime(true);
-            // #endregion
-            $payload = [
+        return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
+            return [
                 'stats' => self::getStats(),
-                'quickReports' => self::getQuickReports(),
-                'upcomingRequests' => self::getUpcomingRequests(8),
+                'quickReports' => self::getQuickReports(4),
+                'upcomingRequests' => self::getUpcomingRequests(5),
                 'tasks' => self::getTasks($officeId),
                 'dailyHighlights' => self::getDailyHighlights(),
             ];
-            // #region agent log
-            file_put_contents(base_path('debug-fa7298.log'), json_encode([
-                'sessionId' => 'fa7298',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'G',
-                'location' => 'DashboardCacheService.php:getDashboardData',
-                'message' => 'cache miss rebuilt dashboard data',
-                'data' => [
-                    'cacheKey' => $cacheKey,
-                    'rebuild_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ])."\n", FILE_APPEND);
-            // #endregion
-
-            return $payload;
         });
     }
 
@@ -97,9 +78,6 @@ class DashboardCacheService
         }
 
         if (self::hasTable('item_units')) {
-            // #region agent log
-            $__dbgStatsT0 = microtime(true);
-            // #endregion
             // Do not reconcile units on the dashboard request path — that walk is handled by
             // items:sync-in-use and was timing out Hostinger (504) on announce/home loads.
             $unitStats = DB::table('item_units')
@@ -113,19 +91,6 @@ class DashboardCacheService
             $stats['borrowed'] = $borrowed;
             $stats['available'] = max(0, $serviceable - $borrowed);
             $stats['maintenance'] = (int) ($unitStats->maintenance ?? 0);
-            // #region agent log
-            file_put_contents(base_path('debug-fa7298.log'), json_encode([
-                'sessionId' => 'fa7298',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'G',
-                'location' => 'DashboardCacheService.php:getStats',
-                'message' => 'stats without reconcile',
-                'data' => [
-                    'stats_ms' => (int) round((microtime(true) - $__dbgStatsT0) * 1000),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ])."\n", FILE_APPEND);
-            // #endregion
         } elseif (self::hasTable('items')) {
             $itemStats = DB::table('items')
                 ->selectRaw('SUM(COALESCE(quantity_in_use, 0)) as borrowed')
@@ -570,8 +535,8 @@ class DashboardCacheService
      */
     public static function clearCache(int $userId, int $officeId): void
     {
-        $cacheKey = "dashboard.data.v6.user.{$userId}.office.{$officeId}";
-        Cache::forget($cacheKey);
+        Cache::forget("dashboard.data.v6.user.{$userId}.office.{$officeId}");
+        Cache::forget("dashboard.data.v7.user.{$userId}.office.{$officeId}");
     }
 
     /**
