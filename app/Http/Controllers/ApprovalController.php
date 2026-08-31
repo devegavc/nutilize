@@ -166,6 +166,24 @@ class ApprovalController extends Controller
 
     public function approve($approvalId)
     {
+        // #region agent log
+        $__dbgT0 = microtime(true);
+        $__dbgLog = static function (string $hypothesisId, string $message, array $data = []) use ($__dbgT0, $approvalId): void {
+            file_put_contents(base_path('debug-fa7298.log'), json_encode([
+                'sessionId' => 'fa7298',
+                'runId' => 'pre-fix',
+                'hypothesisId' => $hypothesisId,
+                'location' => 'ApprovalController.php:approve',
+                'message' => $message,
+                'data' => array_merge([
+                    'approvalId' => (int) $approvalId,
+                    'elapsed_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+                ], $data),
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ])."\n", FILE_APPEND);
+        };
+        // #endregion
+
         try {
             $user = Auth::user();
             
@@ -173,6 +191,9 @@ class ApprovalController extends Controller
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
 
+            // #region agent log
+            $__dbgStep = microtime(true);
+            // #endregion
             $approval = ReservationApproval::findOrFail($approvalId);
 
             if ($approval->office_id !== $user->office_id) {
@@ -180,12 +201,25 @@ class ApprovalController extends Controller
             }
 
             if (!$user->isPhysicalFacilitiesAdmin() && $this->getCurrentActionableOfficeId((int) $approval->reservation_id) !== (int) $user->office_id) {
+                // #region agent log
+                $__dbgLog('H', 'blocked: not actionable office', [
+                    'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+                    'reservationId' => (int) $approval->reservation_id,
+                ]);
+                // #endregion
                 return response()->json(['error' => 'This request is waiting for a previous office approval.'], 422);
             }
 
             if (!ReservationApprovalWorkflowService::userCanActOnApproval($user, $approval)) {
                 return response()->json(['error' => 'This request is waiting for the item owner who registered the borrowed equipment.'], 403);
             }
+            // #region agent log
+            $__dbgLog('H', 'after auth/actionable checks', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+                'reservationId' => (int) $approval->reservation_id,
+            ]);
+            $__dbgStep = microtime(true);
+            // #endregion
 
             $now = now();
             $updatePayload = [
@@ -210,26 +244,56 @@ class ApprovalController extends Controller
 
             // Fix any null-status rows without the expensive full sync (rows already exist from workflow setup).
             $this->fixNullApprovalStatuses((int) $approval->reservation_id);
+            // #region agent log
+            $__dbgLog('H', 'after update + history + null-status fix', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+            ]);
+            $__dbgStep = microtime(true);
+            // #endregion
 
             // Load reservation once and reuse across all subsequent helpers.
             $reservation = Reservation::with('user')->find((int) $approval->reservation_id);
 
             // Route program-chair rows to the correct office before notifying the next approver.
             $this->prepareReservationWorkflowHandoff((int) $approval->reservation_id);
+            // #region agent log
+            $__dbgLog('H', 'after prepareReservationWorkflowHandoff', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+            ]);
+            $__dbgStep = microtime(true);
+            // #endregion
             ReservationApprovalWorkflowService::reconcileItemOwnerApprovals((int) $approval->reservation_id);
             ReservationApprovalDeduper::deduplicatePendingForReservations([(int) $approval->reservation_id]);
             $this->actionableOfficeIdsRequestCache = null;
+            // #region agent log
+            $__dbgLog('H', 'after reconcile + dedupe', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+            ]);
+            $__dbgStep = microtime(true);
+            // #endregion
 
             // Clear only the acting approver's notification; other item owners may still need to act.
             $this->clearApprovalNotificationsForUser((int) $approval->reservation_id, (int) $user->user_id);
 
             // Notify the next actionable office when workflow advances
             $this->notifyNextActionableOfficeWithReservation($reservation, (int) $approval->office_id, true);
+            // #region agent log
+            $__dbgLog('H', 'after notify next office', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+            ]);
+            $__dbgStep = microtime(true);
+            // #endregion
 
             // Update the overall reservation status if all office approvals are done
             $this->updateReservationStatus($approval->reservation_id, $reservation);
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.approved');
             Cache::forget('notification_unread_count.user.' . (int) $user->user_id);
+            // #region agent log
+            $__dbgLog('H', 'office approve complete', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+                'total_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+            ]);
+            // #endregion
 
             return response()->json([
                 'success' => true,
@@ -237,6 +301,12 @@ class ApprovalController extends Controller
                 'approval' => $approval,
             ]);
         } catch (Throwable $throwable) {
+            // #region agent log
+            $__dbgLog('H', 'office approve threw', [
+                'error' => $throwable->getMessage(),
+                'total_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+            ]);
+            // #endregion
             report($throwable);
 
             return response()->json([
@@ -322,6 +392,25 @@ class ApprovalController extends Controller
 
     private function finalizePhysicalFacilitiesDecision($reservationId, string $status)
     {
+        // #region agent log
+        $__dbgT0 = microtime(true);
+        $__dbgLog = static function (string $hypothesisId, string $message, array $data = []) use ($__dbgT0, $reservationId, $status): void {
+            file_put_contents(base_path('debug-fa7298.log'), json_encode([
+                'sessionId' => 'fa7298',
+                'runId' => 'pre-fix',
+                'hypothesisId' => $hypothesisId,
+                'location' => 'ApprovalController.php:finalizePhysicalFacilitiesDecision',
+                'message' => $message,
+                'data' => array_merge([
+                    'reservationId' => (int) $reservationId,
+                    'status' => $status,
+                    'elapsed_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+                ], $data),
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ])."\n", FILE_APPEND);
+        };
+        // #endregion
+
         try {
             $user = Auth::user();
 
@@ -329,10 +418,26 @@ class ApprovalController extends Controller
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
 
+            // #region agent log
+            $__dbgStep = microtime(true);
+            // #endregion
             $reservation = Reservation::with('approvals')->findOrFail($reservationId);
             $physicalFacilitiesOfficeId = $this->getPhysicalFacilitiesOfficeId();
+            // #region agent log
+            $__dbgLog('C', 'loaded reservation + pf office', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+                'pfOfficeId' => $physicalFacilitiesOfficeId,
+            ]);
+            $__dbgStep = microtime(true);
+            // #endregion
 
             ReservationApprovalDeduper::deduplicatePendingForReservations([(int) $reservationId]);
+            // #region agent log
+            $__dbgLog('C', 'after dedupe', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+            ]);
+            $__dbgStep = microtime(true);
+            // #endregion
 
             DB::transaction(function () use ($reservation, $physicalFacilitiesOfficeId, $status, $user) {
                 $reservation->update(['overall_status' => $status]);
@@ -401,16 +506,40 @@ class ApprovalController extends Controller
                     $now,
                 );
             });
+            // #region agent log
+            $__dbgLog('C', 'after status transaction', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+            ]);
+            $__dbgStep = microtime(true);
+            // #endregion
 
             if ($status === 'approved') {
                 $this->recordEquipmentUnitUsageForApprovedReservation((int) $reservation->reservation_id);
+                // #region agent log
+                $__dbgLog('A', 'after recordEquipmentUnitUsage', [
+                    'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+                ]);
+                $__dbgStep = microtime(true);
+                // #endregion
             }
 
             if (in_array($status, ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled', 'expired'], true)) {
                 $this->clearAllApprovalNotificationsForReservation((int) $reservation->reservation_id);
+                // #region agent log
+                $__dbgLog('B', 'after clearAllApprovalNotifications', [
+                    'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+                ]);
+                $__dbgStep = microtime(true);
+                // #endregion
             }
 
             \App\Services\DashboardInventoryCacheService::clearCache();
+            // #region agent log
+            $__dbgLog('A,B,C', 'finalize complete', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+                'total_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+            ]);
+            // #endregion
 
             return response()->json([
                 'success' => true,
@@ -424,6 +553,12 @@ class ApprovalController extends Controller
                 'reservation_id' => $reservation->reservation_id,
             ]);
         } catch (Throwable $throwable) {
+            // #region agent log
+            $__dbgLog('A,B,C', 'finalize threw', [
+                'error' => $throwable->getMessage(),
+                'total_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+            ]);
+            // #endregion
             report($throwable);
 
             return response()->json([

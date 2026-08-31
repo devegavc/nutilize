@@ -73,6 +73,23 @@ class DashboardRequestController extends Controller
         // Display the current page without a full-table walk. Occasional gated sync
         // keeps workflow steps aligned; polls and pagination skip that write path.
 
+        // #region agent log
+        $__dbgT0 = microtime(true);
+        $__dbgLog = static function (string $hypothesisId, string $message, array $data = []) use ($__dbgT0): void {
+            file_put_contents(base_path('debug-fa7298.log'), json_encode([
+                'sessionId' => 'fa7298',
+                'runId' => 'pre-fix',
+                'hypothesisId' => $hypothesisId,
+                'location' => 'DashboardRequestController.php:buildRequestPageViewData',
+                'message' => $message,
+                'data' => array_merge([
+                    'elapsed_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+                ], $data),
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ])."\n", FILE_APPEND);
+        };
+        // #endregion
+
         $isPfAdmin = $user->isPhysicalFacilitiesAdmin();
 
         $reservationsQuery = Reservation::query()
@@ -97,9 +114,19 @@ class DashboardRequestController extends Controller
             });
         }
 
+        // #region agent log
+        $__dbgStep = microtime(true);
+        // #endregion
         $reservations = $reservationsQuery
             ->simplePaginate(20)
             ->withQueryString();
+        // #region agent log
+        $__dbgLog('D,E', 'after paginate', [
+            'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+            'count' => $reservations->count(),
+            'allowWorkflowSync' => $allowWorkflowSync,
+        ]);
+        // #endregion
 
         $reservationIds = $reservations->getCollection()->pluck('reservation_id')->map(fn ($id) => (int) $id)->all();
 
@@ -116,8 +143,17 @@ class DashboardRequestController extends Controller
                 ->all();
 
             if ($syncReservationIds !== [] && $this->shouldSyncRequestWorkflow($user)) {
+                // #region agent log
+                $__dbgStep = microtime(true);
+                // #endregion
                 $this->syncReservationApprovalsForReservationIds($syncReservationIds);
                 $didSync = true;
+                // #region agent log
+                $__dbgLog('E', 'after workflow sync', [
+                    'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+                    'syncCount' => count($syncReservationIds),
+                ]);
+                // #endregion
             }
         }
 
@@ -127,10 +163,19 @@ class DashboardRequestController extends Controller
             ]);
         }
 
+        // #region agent log
+        $__dbgStep = microtime(true);
+        // #endregion
         $this->warmBatchWorkflowLookups($reservationIds);
         $resourceMap = $this->buildResourceMap($reservationIds);
         $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($reservationIds);
         $pfOfficeId = $this->getOfficeIdsByShortCode()['PF'] ?? $this->getPhysicalFacilitiesOfficeId();
+        // #region agent log
+        $__dbgLog('D,E', 'after lookups/resources/actionable', [
+            'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+            'reservationCount' => count($reservationIds),
+        ]);
+        // #endregion
 
         if ($allowWorkflowSync && $isPfAdmin && !is_null($pfOfficeId)) {
             $pfActionableIds = [];
@@ -146,10 +191,23 @@ class DashboardRequestController extends Controller
                 }
             }
 
+            // #region agent log
+            $__dbgStep = microtime(true);
+            // #endregion
             ReservationApprovalNotifier::ensureUnreadForUser($user, $pfActionableIds, 40);
+            // #region agent log
+            $__dbgLog('D', 'after ensureUnreadForUser', [
+                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+                'pfActionableCount' => count($pfActionableIds),
+            ]);
+            // #endregion
         }
 
-        $preparedRequests = $reservations->getCollection()->map(function (Reservation $reservation) use ($resourceMap, $actionableOfficeIds, $isPfAdmin, $pfOfficeId) {
+        // #region agent log
+        $__dbgStep = microtime(true);
+        $__dbgFinalTabCount = 0;
+        // #endregion
+        $preparedRequests = $reservations->getCollection()->map(function (Reservation $reservation) use ($resourceMap, $actionableOfficeIds, $isPfAdmin, $pfOfficeId, &$__dbgFinalTabCount) {
             $overallStatus = strtolower((string) $reservation->overall_status);
             $isFinalDecision = $overallStatus === 'rejected';
             $isWaitingReturn = $overallStatus === 'approved';
@@ -173,6 +231,12 @@ class DashboardRequestController extends Controller
                 ? 'return'
                 : ($isFinalDecision ? 'rejected' : ($isFinal ? 'final' : 'pending')));
 
+            // #region agent log
+            if ($tab === 'final') {
+                $__dbgFinalTabCount++;
+            }
+            // #endregion
+
             return [
                 'reservation' => $reservation,
                 'tab' => $tab,
@@ -187,6 +251,13 @@ class DashboardRequestController extends Controller
                     : ($tab === 'closed' ? ($overallStatus === 'damaged' ? 'is-rejected' : 'is-approved') : ($tab === 'rejected' ? 'is-rejected' : '')),
             ];
         });
+        // #region agent log
+        $__dbgLog('D', 'after prepare map', [
+            'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+            'finalTabCount' => $__dbgFinalTabCount,
+            'total_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+        ]);
+        // #endregion
 
         $reservations->setCollection($preparedRequests);
 

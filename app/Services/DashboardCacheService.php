@@ -23,14 +23,33 @@ class DashboardCacheService
     {
         $cacheKey = "dashboard.data.v6.user.{$userId}.office.{$officeId}";
 
-        return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
-            return [
+        return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId, $cacheKey) {
+            // #region agent log
+            $__dbgT0 = microtime(true);
+            // #endregion
+            $payload = [
                 'stats' => self::getStats(),
                 'quickReports' => self::getQuickReports(),
                 'upcomingRequests' => self::getUpcomingRequests(8),
                 'tasks' => self::getTasks($officeId),
                 'dailyHighlights' => self::getDailyHighlights(),
             ];
+            // #region agent log
+            file_put_contents(base_path('debug-fa7298.log'), json_encode([
+                'sessionId' => 'fa7298',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'G',
+                'location' => 'DashboardCacheService.php:getDashboardData',
+                'message' => 'cache miss rebuilt dashboard data',
+                'data' => [
+                    'cacheKey' => $cacheKey,
+                    'rebuild_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ])."\n", FILE_APPEND);
+            // #endregion
+
+            return $payload;
         });
     }
 
@@ -78,7 +97,23 @@ class DashboardCacheService
         }
 
         if (self::hasTable('item_units')) {
+            // #region agent log
+            $__dbgReconcileT0 = microtime(true);
+            // #endregion
             ItemUnitService::reconcileLiveBorrowedUnits();
+            // #region agent log
+            file_put_contents(base_path('debug-fa7298.log'), json_encode([
+                'sessionId' => 'fa7298',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'G',
+                'location' => 'DashboardCacheService.php:getStats',
+                'message' => 'reconcileLiveBorrowedUnits finished',
+                'data' => [
+                    'reconcile_ms' => (int) round((microtime(true) - $__dbgReconcileT0) * 1000),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ])."\n", FILE_APPEND);
+            // #endregion
 
             $unitStats = DB::table('item_units')
                 ->selectRaw("SUM(CASE WHEN status IN ('available', 'in_use') THEN 1 ELSE 0 END) as serviceable")
