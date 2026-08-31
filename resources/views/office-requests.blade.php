@@ -334,7 +334,24 @@
               return;
             }
 
-            window.location.reload();
+            // Avoid a full page reload (that re-walks workflow lookups and feels like a hang).
+            const row = button.closest('tr');
+            if (row instanceof HTMLElement) {
+              row.querySelectorAll('.office-queue-approve, .office-queue-reject').forEach((node) => {
+                if (node instanceof HTMLButtonElement) {
+                  node.disabled = true;
+                  node.hidden = true;
+                }
+              });
+              const badge = row.querySelector('.status-badge, .badge, [data-status-badge]');
+              if (badge instanceof HTMLElement) {
+                badge.textContent = action === 'approve' ? 'Approved' : 'Rejected';
+              }
+            }
+            showAppNotice(
+              action === 'approve' ? 'Request approved successfully.' : 'Request rejected.',
+              { title: 'Done' }
+            );
           } catch (_error) {
             showAppNotice('Request failed. Please check your connection and try again.');
           } finally {

@@ -14,7 +14,7 @@ class DashboardCacheService
      * Cache TTL in minutes. Borrowed/available are reconciled to "in use today"
      * before counting so future reservations do not look borrowed.
      */
-    private const CACHE_TTL = 5;
+    private const CACHE_TTL = 15;
 
     /**
      * Get all dashboard data with caching
@@ -473,17 +473,16 @@ class DashboardCacheService
             && self::hasColumn('item_units', 'status')
             && self::hasTable('items')
         ) {
-            $unitQuery = DB::table('item_units as units')
+            $unitCounts = DB::table('item_units as units')
                 ->join('items as items', 'items.item_id', '=', 'units.item_id')
-                ->whereIn('items.owner_id', $pfOwnerIds);
+                ->whereIn('items.owner_id', $pfOwnerIds)
+                ->whereIn(DB::raw("LOWER(TRIM(COALESCE(units.status, '')))"), ['damaged', 'maintenance'])
+                ->selectRaw("SUM(CASE WHEN LOWER(TRIM(COALESCE(units.status, ''))) = 'damaged' THEN 1 ELSE 0 END) as damaged_total")
+                ->selectRaw("SUM(CASE WHEN LOWER(TRIM(COALESCE(units.status, ''))) = 'maintenance' THEN 1 ELSE 0 END) as maintenance_total")
+                ->first();
 
-            $reviewDamagedItems = (int) (clone $unitQuery)
-                ->whereRaw("LOWER(TRIM(COALESCE(units.status, ''))) = ?", ['damaged'])
-                ->count();
-
-            $needRepair = (int) (clone $unitQuery)
-                ->whereRaw("LOWER(TRIM(COALESCE(units.status, ''))) = ?", ['maintenance'])
-                ->count();
+            $reviewDamagedItems = (int) ($unitCounts->damaged_total ?? 0);
+            $needRepair = (int) ($unitCounts->maintenance_total ?? 0);
         } elseif (
             $pfOwnerIds !== []
             && self::hasTable('items')
@@ -516,25 +515,17 @@ class DashboardCacheService
      */
     private static function getDailyHighlights(): array
     {
+        $today = now()->toDateString();
+
         $resolvedToday = 0;
         if (self::hasTable('maintenance') && self::hasColumn('maintenance', 'date_resolved')) {
             $resolvedToday = (int) DB::table('maintenance')
-                ->whereDate('date_resolved', now()->toDateString())
+                ->whereDate('date_resolved', $today)
                 ->count();
-        }
-
-        // If no maintenance records, check reservation issues / legacy reports marked solved today.
-        if ($resolvedToday === 0 && self::hasTable('reservation_issues') && self::hasColumn('reservation_issues', 'status')) {
+        } elseif (self::hasTable('reservation_issues') && self::hasColumn('reservation_issues', 'status')) {
             $resolvedToday = (int) DB::table('reservation_issues')
                 ->whereRaw("LOWER(COALESCE(status, '')) IN ('solved', 'resolved', 'fixed', 'closed', 'done', 'dismissed')")
-                ->whereDate('created_at', now()->toDateString())
-                ->count();
-        }
-
-        if ($resolvedToday === 0 && self::hasTable('reports') && self::hasColumn('reports', 'status') && self::hasColumn('reports', 'updated_at')) {
-            $resolvedToday = (int) DB::table('reports')
-                ->whereRaw("LOWER(COALESCE(status, '')) IN ('solved', 'resolved', 'fixed', 'closed', 'done')")
-                ->whereDate('updated_at', now()->toDateString())
+                ->whereDate('created_at', $today)
                 ->count();
         }
 
@@ -546,39 +537,23 @@ class DashboardCacheService
                         ->orWhereRaw("LOWER(COALESCE(status, '')) NOT IN ('resolved', 'solved', 'fixed', 'closed', 'done', 'dismissed')");
                 })
                 ->count();
-        } elseif (self::hasTable('reports')) {
-            if (self::hasColumn('reports', 'status')) {
-                $pendingReports = (int) DB::table('reports')
-                    ->whereRaw("LOWER(COALESCE(status, 'pending')) NOT IN ('solved', 'resolved', 'fixed', 'closed', 'done')")
-                    ->count();
-            } else {
-                $pendingReports = (int) DB::table('reports')->count();
-            }
-        }
-
-        $roomsUtilized = 0;
-        if (self::hasTable('rooms') && self::hasColumn('rooms', 'date_reserved')) {
-            $roomsUtilized = (int) DB::table('rooms')
-                ->whereNotNull('date_reserved')
-                ->whereDate('date_reserved', now()->toDateString())
+        } elseif (self::hasTable('reports') && self::hasColumn('reports', 'status')) {
+            $pendingReports = (int) DB::table('reports')
+                ->whereRaw("LOWER(COALESCE(status, 'pending')) NOT IN ('solved', 'resolved', 'fixed', 'closed', 'done')")
                 ->count();
         }
 
-        // Fallback: Check reservations for today
-        if ($roomsUtilized === 0 && self::hasTable('reservations')) {
+        $roomsUtilized = 0;
+        if (self::hasTable('reservations')) {
             $roomsUtilized = (int) DB::table('reservations')
-                ->whereDate('created_at', now()->toDateString())
+                ->whereDate('created_at', $today)
                 ->count();
         }
 
         $equipmentChecked = 0;
         if (self::hasTable('item_units')) {
             $equipmentChecked = (int) DB::table('item_units')
-                ->whereDate('updated_at', now()->toDateString())
-                ->count();
-        } elseif (self::hasTable('items')) {
-            $equipmentChecked = (int) DB::table('items')
-                ->whereDate('updated_at', now()->toDateString())
+                ->whereDate('updated_at', $today)
                 ->count();
         }
 

@@ -43,10 +43,13 @@ class ApprovalController extends Controller
     /** @var array<int, true>|null */
     private ?array $batchGymWithItemsLookup = null;
 
-    /** @var array<int, int> */
+    /** @var array<int, int|null> */
     private array $batchPcOfficeLookup = [];
 
-    /** @var array<int, int>|null */
+    /** @var array<int, int> */
+    private array $warmedReservationIds = [];
+
+    /** @var array<int, int|null>|null */
     private ?array $actionableOfficeIdsRequestCache = null;
 
     /** @var array<string, bool> — static cache so Schema::hasTable() only queries DB once per process */
@@ -228,8 +231,9 @@ class ApprovalController extends Controller
                 'approved_by_user_id' => (int) $user->user_id,
             ];
 
+            $isItemOwnerApprover = ItemOwnerService::isItemOwnerUser($user);
             if (
-                ItemOwnerService::isItemOwnerUser($user)
+                $isItemOwnerApprover
                 && ReservationApprovalWorkflowService::supportsOwnerScopedApprovals()
             ) {
                 $ownerId = ItemOwnerService::ownerIdForUser((int) $user->user_id);
@@ -254,25 +258,16 @@ class ApprovalController extends Controller
             // Load reservation once and reuse across all subsequent helpers.
             $reservation = Reservation::with('user')->find((int) $approval->reservation_id);
 
-            // Hot approve path: do not run full workflow handoff rebuild here.
-            // Approval rows already exist; opportunistic sync gates repair drift later.
-            // #region agent log
-            $__dbgLog('H', 'skipped prepareReservationWorkflowHandoff on approve', [
-                'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
-            ]);
-            $__dbgStep = microtime(true);
-            // #endregion
-            ReservationApprovalWorkflowService::reconcileItemOwnerApprovals((int) $approval->reservation_id);
-            ReservationApprovalDeduper::deduplicatePendingForReservations([(int) $approval->reservation_id]);
-            // Only recompute this reservation's actionable office after the status change.
-            if (is_array($this->actionableOfficeIdsRequestCache)) {
-                unset($this->actionableOfficeIdsRequestCache[(int) $approval->reservation_id]);
-            } else {
-                $this->actionableOfficeIdsRequestCache = null;
+            // Only item-owner offices need owner-scoped reconcile on the hot path.
+            if ($isItemOwnerApprover) {
+                ReservationApprovalWorkflowService::reconcileItemOwnerApprovals((int) $approval->reservation_id);
             }
+            // Invalidate cached actionable office so the next office is recomputed once.
+            $this->forgetActionableOfficeCache((int) $approval->reservation_id);
             // #region agent log
-            $__dbgLog('H', 'after reconcile + dedupe', [
+            $__dbgLog('H', 'after optional owner reconcile', [
                 'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
+                'didOwnerReconcile' => $isItemOwnerApprover,
             ]);
             $__dbgStep = microtime(true);
             // #endregion
@@ -358,6 +353,7 @@ class ApprovalController extends Controller
 
             // Request rejected: remove approval notifications tied to this reservation.
             $this->clearAllApprovalNotificationsForReservation((int) $approval->reservation_id);
+            $this->forgetActionableOfficeCache((int) $approval->reservation_id);
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.rejected');
             Cache::forget('notification_unread_count.user.' . (int) $user->user_id);
 
@@ -436,9 +432,8 @@ class ApprovalController extends Controller
             $__dbgStep = microtime(true);
             // #endregion
 
-            ReservationApprovalDeduper::deduplicatePendingForReservations([(int) $reservationId]);
             // #region agent log
-            $__dbgLog('C', 'after dedupe', [
+            $__dbgLog('C', 'skipped dedupe on final decision', [
                 'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
             ]);
             $__dbgStep = microtime(true);
@@ -518,18 +513,9 @@ class ApprovalController extends Controller
             $__dbgStep = microtime(true);
             // #endregion
 
-            if ($status === 'approved') {
-                $this->recordEquipmentUnitUsageForApprovedReservation((int) $reservation->reservation_id);
-                // #region agent log
-                $__dbgLog('A', 'after recordEquipmentUnitUsage', [
-                    'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
-                ]);
-                $__dbgStep = microtime(true);
-                // #endregion
-            }
-
             if (in_array($status, ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled', 'expired'], true)) {
                 $this->clearAllApprovalNotificationsForReservation((int) $reservation->reservation_id);
+                $this->forgetActionableOfficeCache((int) $reservation->reservation_id);
                 // #region agent log
                 $__dbgLog('B', 'after clearAllApprovalNotifications', [
                     'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
@@ -539,10 +525,32 @@ class ApprovalController extends Controller
             }
 
             \App\Services\DashboardInventoryCacheService::clearCache();
+
+            // Record equipment usage after the HTTP response so Hostinger does not 504
+            // while unit picking / reconcile runs against the remote DB.
+            if ($status === 'approved') {
+                $approvedReservationId = (int) $reservation->reservation_id;
+                app()->terminating(function () use ($approvedReservationId, $__dbgLog, $__dbgT0) {
+                    $step = microtime(true);
+                    try {
+                        $this->recordEquipmentUnitUsageForApprovedReservation($approvedReservationId);
+                    } catch (Throwable $throwable) {
+                        report($throwable);
+                    }
+                    // #region agent log
+                    $__dbgLog('A', 'after recordEquipmentUnitUsage (terminating)', [
+                        'step_ms' => (int) round((microtime(true) - $step) * 1000),
+                        'total_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+                    ]);
+                    // #endregion
+                });
+            }
+
             // #region agent log
-            $__dbgLog('A,B,C', 'finalize complete', [
+            $__dbgLog('A,B,C', 'finalize complete (response ready)', [
                 'step_ms' => (int) round((microtime(true) - $__dbgStep) * 1000),
                 'total_ms' => (int) round((microtime(true) - $__dbgT0) * 1000),
+                'deferredEquipment' => $status === 'approved',
             ]);
             // #endregion
 
@@ -1173,6 +1181,8 @@ class ApprovalController extends Controller
 
     private function getCurrentActionableOfficeId(int $reservationId): ?int
     {
+        $reservationId = (int) $reservationId;
+
         if (
             is_array($this->actionableOfficeIdsRequestCache)
             && array_key_exists($reservationId, $this->actionableOfficeIdsRequestCache)
@@ -1180,10 +1190,36 @@ class ApprovalController extends Controller
             return $this->actionableOfficeIdsRequestCache[$reservationId];
         }
 
+        $cacheKey = $this->actionableOfficeCacheKey($reservationId);
+        if (Cache::has($cacheKey)) {
+            $cached = (int) Cache::get($cacheKey);
+            $value = $cached > 0 ? $cached : null;
+            $this->actionableOfficeIdsRequestCache[$reservationId] = $value;
+
+            return $value;
+        }
+
         $map = $this->getActionableOfficeIdsForReservations([$reservationId]);
         $this->actionableOfficeIdsRequestCache = array_merge($this->actionableOfficeIdsRequestCache ?? [], $map);
+        $value = $map[$reservationId] ?? null;
+        Cache::put($cacheKey, $value ?? 0, now()->addMinutes(2));
 
-        return $map[$reservationId] ?? null;
+        return $value;
+    }
+
+    private function forgetActionableOfficeCache(int $reservationId): void
+    {
+        $reservationId = (int) $reservationId;
+        Cache::forget($this->actionableOfficeCacheKey($reservationId));
+
+        if (is_array($this->actionableOfficeIdsRequestCache)) {
+            unset($this->actionableOfficeIdsRequestCache[$reservationId]);
+        }
+    }
+
+    private function actionableOfficeCacheKey(int $reservationId): string
+    {
+        return 'actionable.office.' . $reservationId;
     }
 
     private function getActionableOfficeIdsForReservations(array $reservationIds): array
@@ -1198,57 +1234,63 @@ class ApprovalController extends Controller
         );
         $this->warmBatchWorkflowLookups($reservationIds);
 
-        try {
-            $approvalsByReservation = ReservationApproval::query()
-                ->whereIn('reservation_id', $reservationIds)
-                ->get(['reservation_id', 'office_id', 'owner_id', 'status', 'approved_at'])
-                ->groupBy('reservation_id');
+        $approvalsByReservation = ReservationApproval::query()
+            ->whereIn('reservation_id', $reservationIds)
+            ->get(['reservation_id', 'office_id', 'owner_id', 'status', 'approved_at'])
+            ->groupBy('reservation_id');
 
-            $actionableOfficeIds = [];
+        $actionableOfficeIds = [];
 
-            foreach ($reservationIds as $reservationId) {
-                $reservationId = (int) $reservationId;
-                $actionSequence = $this->resolveWorkflowOfficeIds($reservationId, false);
+        foreach ($reservationIds as $reservationId) {
+            $reservationId = (int) $reservationId;
+            $actionSequence = $this->resolveWorkflowOfficeIds($reservationId, false);
 
-                if (empty($actionSequence)) {
-                    continue;
-                }
-
-                $approvals = ReservationApprovalDeduper::collapseByOfficeId(
-                    $approvalsByReservation->get($reservationId) ?? collect()
-                );
-
-                foreach ($actionSequence as $officeId) {
-                    $officeId = (int) $officeId;
-                    $approval = $approvals->get($officeId);
-                    $status = strtolower((string) ($approval?->status ?? 'pending'));
-
-                    if ($status === 'rejected' && !is_null($approval?->approved_at)) {
-                        continue 2;
-                    }
-
-                    if ($status !== 'approved' || is_null($approval?->approved_at)) {
-                        $actionableOfficeIds[$reservationId] = (int) $officeId;
-                        continue 2;
-                    }
-                }
+            if (empty($actionSequence)) {
+                continue;
             }
 
-            return $actionableOfficeIds;
-        } finally {
-            $this->batchGymLookup = null;
-            $this->batchGymWithItemsLookup = null;
-            $this->batchPcOfficeLookup = [];
+            $approvals = ReservationApprovalDeduper::collapseByOfficeId(
+                $approvalsByReservation->get($reservationId) ?? collect()
+            );
+
+            foreach ($actionSequence as $officeId) {
+                $officeId = (int) $officeId;
+                $approval = $approvals->get($officeId);
+                $status = strtolower((string) ($approval?->status ?? 'pending'));
+
+                if ($status === 'rejected' && !is_null($approval?->approved_at)) {
+                    continue 2;
+                }
+
+                if ($status !== 'approved' || is_null($approval?->approved_at)) {
+                    $actionableOfficeIds[$reservationId] = (int) $officeId;
+                    continue 2;
+                }
+            }
         }
+
+        return $actionableOfficeIds;
     }
 
     private function warmBatchWorkflowLookups(array $reservationIds): void
     {
+        $reservationIds = array_values(array_unique(array_map('intval', $reservationIds)));
+        sort($reservationIds);
+
+        // Keep warm lookups for the rest of the request (do not wipe after each actionable check).
+        if ($reservationIds !== [] && ($this->warmedReservationIds ?? []) === $reservationIds && !is_null($this->batchGymLookup)) {
+            return;
+        }
+
         $this->batchGymLookup = [];
         $this->batchGymWithItemsLookup = [];
         $this->batchPcOfficeLookup = ProgramChairOfficeResolver::batchResolveForReservations($reservationIds);
+        $this->warmedReservationIds = $reservationIds;
 
-        if (!Schema::hasTable('reservation_details')) {
+        $detailsReady = Cache::remember('schema.table.reservation_details', 3600, static function () {
+            return Schema::hasTable('reservation_details');
+        });
+        if (!$detailsReady) {
             return;
         }
 
