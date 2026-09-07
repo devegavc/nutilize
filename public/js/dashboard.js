@@ -1397,6 +1397,24 @@ function showReservationDetailsModal(reservation, options = {}) {
 
   const statusLabel = reservation.status || 'Unknown';
   const statusClass = String(statusLabel).toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  const hasOutsideParticipants = reservation.outside_participants === true
+    || reservation.outside_participants === 1
+    || reservation.outside_participants === '1'
+    || reservation.has_outside_participants === true;
+  const outsiderPill = hasOutsideParticipants
+    ? '<span class="reservation-status-pill status-outsider office-queue-outsider-badge">Outsider involved</span>'
+    : '';
+  const outsiderInfoRow = hasOutsideParticipants
+    ? `
+                <div class="info-row">
+                  <strong>Participants</strong>
+                  <span>Includes outsider</span>
+                </div>
+              `
+    : '';
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fec4e0'},body:JSON.stringify({sessionId:'fec4e0',runId:'post-fix',hypothesisId:'H7',location:'dashboard.js:showReservationDetailsModal',message:'details modal outsider flag',data:{reservationId:reservation.id || null,outside_participants:reservation.outside_participants,hasOutsideParticipants},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   const reservationCode = reservation.reservation_code
     || (reservation.id ? `NU-${String(reservation.id).padStart(6, '0')}` : 'Reservation');
   const proofUrls = parseReservationProofUrls(reservation);
@@ -1468,6 +1486,7 @@ function showReservationDetailsModal(reservation, options = {}) {
             <div class="reservation-details-meta">
               <span class="reservation-details-kicker">Request ${escapeReservationDetailsHtml(reservationCode)}</span>
               <span class="reservation-status-pill status-${escapeReservationDetailsHtml(statusClass)}">${escapeReservationDetailsHtml(statusLabel)}</span>
+              ${outsiderPill}
             </div>
             <h2>${escapeReservationDetailsHtml(reservation.activity_name || 'Reservation Details')}</h2>
             <p class="reservation-details-submitted">Submitted ${escapeReservationDetailsHtml(reservation.requested_date || 'N/A')}</p>
@@ -1499,6 +1518,7 @@ function showReservationDetailsModal(reservation, options = {}) {
                   <strong>Phone</strong>
                   <span>${escapeReservationDetailsHtml(reservation.requester_phone || 'N/A')}</span>
                 </div>
+                ${outsiderInfoRow}
               </div>
 
               <div class="reservation-panel-heading reservation-panel-heading-spaced">

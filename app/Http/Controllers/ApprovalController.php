@@ -2706,6 +2706,7 @@ class ApprovalController extends Controller
             'start_time' => $eventAt ? $eventAt->format('g:i A') : 'N/A',
             'end_time' => $eventEndAt ? $eventEndAt->format('g:i A') : 'N/A',
             'status' => (string) ($reservation->overall_status ?? $reservation->status ?? 'Unknown'),
+            'outside_participants' => $reservation->hasOutsideParticipants(),
             'proof_of_consent_url' => $proofOfConsentUrl,
             'proof_of_consent_urls' => $proofOfConsentUrls,
             'attachment_heading' => $attachmentHeading,
@@ -2714,6 +2715,25 @@ class ApprovalController extends Controller
             // Approvers only need primary student + request details — not the full trail.
             'approvals' => [],
         ];
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-fec4e0.log'), json_encode([
+                'sessionId' => 'fec4e0',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'H7',
+                'location' => 'ApprovalController.php:getReservationDetails',
+                'message' => 'reservation details outsider flag',
+                'data' => [
+                    'reservation_id' => (int) $reservation->reservation_id,
+                    'outside_participants' => $reservationData['outside_participants'],
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]) . PHP_EOL, FILE_APPEND);
+        } catch (\Throwable $throwable) {
+            // Ignore debug log failures.
+        }
+        // #endregion
 
         return response()->json([
             'success' => true,

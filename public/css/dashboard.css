@@ -1686,6 +1686,11 @@ body {
   color: #9a6700;
 }
 
+.reservation-status-pill.status-outsider {
+  background: #f5de8f;
+  color: #7a4f00;
+}
+
 .reservation-status-pill.status-approved {
   background: #ddf6e5;
   color: #0f7a34;

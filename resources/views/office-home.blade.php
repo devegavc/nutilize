@@ -726,6 +726,11 @@
       background: #f0ab06 !important;
     }
 
+    .reservation-status-pill.status-outsider {
+      background: #f5de8f !important;
+      color: #7a4f00 !important;
+    }
+
     .office-queue-action-btn {
       border: 1px solid transparent;
       border-radius: 8px;
