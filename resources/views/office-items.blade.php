@@ -114,6 +114,22 @@
     </section>
   </main>
 
+  <div class="inventory-confirm-modal" id="inventory-confirm-modal" aria-hidden="true">
+    <div class="inventory-confirm-overlay" data-close-inventory-confirm="true"></div>
+    <article class="inventory-confirm-card" role="dialog" aria-modal="true" aria-labelledby="inventory-confirm-title">
+      <header class="inventory-confirm-head">
+        <h2 id="inventory-confirm-title">Confirm Delete</h2>
+      </header>
+      <div class="inventory-confirm-body">
+        <p id="inventory-confirm-message">Are you sure you want to delete this item? This cannot be undone.</p>
+      </div>
+      <div class="inventory-confirm-actions">
+        <button type="button" class="inventory-confirm-btn cancel" id="inventory-confirm-cancel">Cancel</button>
+        <button type="button" class="inventory-confirm-btn delete" id="inventory-confirm-submit">Delete</button>
+      </div>
+    </article>
+  </div>
+
   <section class="facilities-modal" id="equipment-edit-modal" aria-hidden="true">
     <div class="facilities-modal-overlay" data-close-equipment-modal="true"></div>
     <article class="facilities-modal-card" role="dialog" aria-modal="true" aria-labelledby="equipment-modal-title">

@@ -3702,7 +3702,11 @@ function openInventoryConfirmModal(options = {}) {
   // #endregion
 
   if (missingConfirmUi) {
-    return Promise.resolve(true);
+    return showAppConfirm(options.message || 'Are you sure you want to delete this item? This cannot be undone.', {
+      title: options.title || 'Confirm Delete',
+      confirmText: options.confirmText || 'Delete',
+      variant: 'danger',
+    });
   }
 
   const {
@@ -3728,6 +3732,9 @@ function openInventoryConfirmModal(options = {}) {
   inventoryConfirmModal.dataset.confirmVariant = variant;
   inventoryConfirmModal.classList.add('is-open');
   inventoryConfirmModal.setAttribute('aria-hidden', 'false');
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'post-fix',hypothesisId:'A',location:'dashboard.js:openInventoryConfirmModal:opened',message:'inventory confirm modal opened',data:{isOpen:inventoryConfirmModal.classList.contains('is-open'),variant,pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   return new Promise((resolve) => {
     inventoryConfirmResolver = resolve;

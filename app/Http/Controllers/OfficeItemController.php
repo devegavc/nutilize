@@ -319,6 +319,10 @@ class OfficeItemController extends Controller
             ->where('owner_id', $ownerId)
             ->delete();
 
+        // #region agent log
+        @file_put_contents(base_path('debug-f8769b.log'), json_encode(['sessionId' => 'f8769b', 'runId' => 'post-fix', 'hypothesisId' => 'C', 'location' => 'OfficeItemController.php:destroy', 'message' => 'office item delete executed', 'data' => ['itemId' => (int) $itemId], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
+        // #endregion
+
         return response()->json([
             'success' => true,
             'deleted_item_id' => (int) $itemId,
