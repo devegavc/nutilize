@@ -28,6 +28,8 @@ Route::view('/', 'index')
         \Illuminate\Session\Middleware\StartSession::class,
         \Illuminate\View\Middleware\ShareErrorsFromSession::class,
         \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+        \Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
+        \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
     ])
     ->middleware('cache.headers:public;max_age=300;etag');
 
