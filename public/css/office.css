@@ -486,52 +486,63 @@
 }
 
 .office-request-history-table .office-queue-activity {
-	min-width: 150px;
-	max-width: 220px;
-	text-align: left;
-	overflow: visible;
-	white-space: normal;
-}
-
-.office-queue-activity-inner {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	justify-content: center;
-	gap: 2px;
-	width: 100%;
-}
-
-.office-queue-activity-name {
-	display: block;
-	max-width: 100%;
+	max-width: 140px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	color: #18255a;
-	font-weight: 600;
 }
 
-.office-request-history-table tr.office-queue-has-outsider td:first-child {
-	box-shadow: inset 4px 0 0 #f0ab06;
+.office-queue-id-inner {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
 }
 
 .office-queue-outsider-badge {
-	display: block;
-	padding: 0;
-	border: 0;
-	border-radius: 0;
-	background: transparent;
-	color: #8a5b07;
-	font-size: 0.75rem;
-	font-weight: 700;
-	letter-spacing: 0;
-	line-height: 1.25;
-	text-transform: none;
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: #e8eefc;
+	border: 1px solid #b7c6ea;
+	color: #2f3f88;
+	font-size: 0.72rem;
+	cursor: help;
+	flex-shrink: 0;
 }
 
 .office-queue-outsider-badge i {
-	display: none;
+	display: inline-flex;
+	line-height: 1;
+}
+
+.office-queue-outsider-tip {
+	position: absolute;
+	left: calc(100% + 8px);
+	top: 50%;
+	transform: translateY(-50%);
+	padding: 5px 8px;
+	border-radius: 6px;
+	background: #18255a;
+	color: #fff;
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0;
+	line-height: 1.2;
+	white-space: nowrap;
+	opacity: 0;
+	pointer-events: none;
+	z-index: 40;
+	box-shadow: 0 6px 16px rgba(24, 37, 90, 0.25);
+}
+
+.office-queue-outsider-badge:hover .office-queue-outsider-tip,
+.office-queue-outsider-badge:focus-visible .office-queue-outsider-tip {
+	opacity: 1;
 }
 
 .office-request-history-table .office-queue-actions-cell {
