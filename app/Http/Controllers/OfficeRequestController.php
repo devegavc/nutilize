@@ -41,27 +41,6 @@ class OfficeRequestController extends Controller
     {
         $user = Auth::user();
 
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-fec4e0.log'), json_encode([
-                'sessionId' => 'fec4e0',
-                'runId' => 'pre-verify',
-                'hypothesisId' => 'H5',
-                'location' => 'OfficeRequestController.php:index',
-                'message' => 'office home index hit',
-                'data' => [
-                    'user_id' => (int) ($user->user_id ?? 0),
-                    'role' => (string) ($user->role ?? ''),
-                    'office_id' => (int) ($user->office_id ?? 0),
-                    'is_office_approver' => $user ? $user->isOfficeApprover() : false,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ]) . PHP_EOL, FILE_APPEND);
-        } catch (\Throwable $throwable) {
-            // Ignore debug log failures.
-        }
-        // #endregion
-
         if (!$user || !$user->isOfficeApprover()) {
             return redirect('/dashboard/home')->with('error', 'Unauthorized access.');
         }
@@ -233,40 +212,6 @@ class OfficeRequestController extends Controller
             ->orderByDesc('created_at');
 
         $requests = $requestsQuery->paginate(10);
-
-        // #region agent log
-        try {
-            $outsiderRows = $requests->getCollection()->map(static function ($approval) {
-                $reservation = $approval->reservation;
-
-                return [
-                    'reservation_id' => (int) $approval->reservation_id,
-                    'activity_name' => (string) ($reservation?->activity_name ?? ''),
-                    'raw_outside_participants' => $reservation?->getAttributes()['outside_participants'] ?? null,
-                    'cast_outside_participants' => $reservation?->outside_participants,
-                    'has_outside_participants' => $reservation ? $reservation->hasOutsideParticipants() : false,
-                ];
-            })->values()->all();
-
-            file_put_contents(base_path('debug-fec4e0.log'), json_encode([
-                'sessionId' => 'fec4e0',
-                'runId' => 'pre-verify',
-                'hypothesisId' => 'H1',
-                'location' => 'OfficeRequestController.php:buildOfficeHomeData',
-                'message' => 'office queue outsider flags',
-                'data' => [
-                    'office_id' => (int) ($user->office_id ?? 0),
-                    'role' => (string) ($user->role ?? ''),
-                    'queue_count' => count($outsiderRows),
-                    'outsider_count' => count(array_filter($outsiderRows, static fn ($row) => !empty($row['has_outside_participants']))),
-                    'rows' => $outsiderRows,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ]) . PHP_EOL, FILE_APPEND);
-        } catch (\Throwable $throwable) {
-            // Ignore debug log failures.
-        }
-        // #endregion
 
         $waitingOnByReservation = [];
         $showWaitingQueueContext = $user->isProgramChairAdmin();

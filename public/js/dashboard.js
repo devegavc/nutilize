@@ -1412,9 +1412,6 @@ function showReservationDetailsModal(reservation, options = {}) {
                 </div>
               `
     : '';
-  // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fec4e0'},body:JSON.stringify({sessionId:'fec4e0',runId:'post-fix',hypothesisId:'H7',location:'dashboard.js:showReservationDetailsModal',message:'details modal outsider flag',data:{reservationId:reservation.id || null,outside_participants:reservation.outside_participants,hasOutsideParticipants},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   const reservationCode = reservation.reservation_code
     || (reservation.id ? `NU-${String(reservation.id).padStart(6, '0')}` : 'Reservation');
   const proofUrls = parseReservationProofUrls(reservation);

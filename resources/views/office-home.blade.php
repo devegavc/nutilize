@@ -172,19 +172,6 @@
         return;
       }
 
-      const reportOutsiderBadges = (source) => {
-        // #region agent log
-        const rows = Array.from(queueBody.querySelectorAll('tr[data-outside-participants]')).map((row) => ({
-          reservation: (row.querySelector('td')?.textContent || '').trim(),
-          activity: (row.querySelector('.office-queue-activity-name')?.textContent || '').trim(),
-          outside: row.getAttribute('data-outside-participants'),
-          hasBadge: Boolean(row.querySelector('.office-queue-outsider-badge')),
-        }));
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fec4e0'},body:JSON.stringify({sessionId:'fec4e0',runId:'pre-verify',hypothesisId:'H6',location:'office-home.blade.php:reportOutsiderBadges',message:'rendered outsider badges',data:{source,badgeCount:queueBody.querySelectorAll('.office-queue-outsider-badge').length,rowCount:rows.length,rows},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-      };
-      reportOutsiderBadges('initial');
-
       const summaryIds = [
         'office-summary-actionable',
         'office-summary-pending',
@@ -547,7 +534,6 @@
 
         if (typeof payload.rows_html === 'string') {
           queueBody.innerHTML = payload.rows_html;
-          reportOutsiderBadges('snapshot');
         }
 
         if (paginationWrap instanceof HTMLElement && typeof payload.pagination_html === 'string') {

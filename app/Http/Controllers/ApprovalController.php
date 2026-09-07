@@ -2716,25 +2716,6 @@ class ApprovalController extends Controller
             'approvals' => [],
         ];
 
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-fec4e0.log'), json_encode([
-                'sessionId' => 'fec4e0',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'H7',
-                'location' => 'ApprovalController.php:getReservationDetails',
-                'message' => 'reservation details outsider flag',
-                'data' => [
-                    'reservation_id' => (int) $reservation->reservation_id,
-                    'outside_participants' => $reservationData['outside_participants'],
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ]) . PHP_EOL, FILE_APPEND);
-        } catch (\Throwable $throwable) {
-            // Ignore debug log failures.
-        }
-        // #endregion
-
         return response()->json([
             'success' => true,
             'reservation' => $reservationData,
