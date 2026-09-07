@@ -10,7 +10,16 @@ class Reservation extends Model
     use HasFactory;
 
     protected $primaryKey = 'reservation_id';
-    protected $fillable = ['user_id', 'activity_name', 'overall_status', 'date_of_activity', 'start_of_activity', 'Date_of_Activity', 'Start_of_activity'];
+    protected $fillable = [
+        'user_id',
+        'activity_name',
+        'overall_status',
+        'date_of_activity',
+        'start_of_activity',
+        'Date_of_Activity',
+        'Start_of_activity',
+        'outside_participants',
+    ];
     protected $casts = [
         'date_of_activity' => 'datetime',
         'start_of_activity' => 'datetime',
@@ -18,6 +27,7 @@ class Reservation extends Model
         'Start_of_activity' => 'datetime',
         'End_of_Activity' => 'datetime',
         'end_of_activity' => 'datetime',
+        'outside_participants' => 'boolean',
     ];
 
     public function user()
@@ -33,6 +43,11 @@ class Reservation extends Model
     public function details()
     {
         return $this->hasMany(ReservationDetail::class, 'reservation_id', 'reservation_id');
+    }
+
+    public function hasOutsideParticipants(): bool
+    {
+        return (bool) $this->outside_participants;
     }
 
     /**

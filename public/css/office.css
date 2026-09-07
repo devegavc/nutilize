@@ -486,10 +486,41 @@
 }
 
 .office-request-history-table .office-queue-activity {
-	max-width: 140px;
+	max-width: 240px;
+	overflow: visible;
+	white-space: nowrap;
+}
+
+.office-queue-activity-inner {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	max-width: 100%;
+}
+
+.office-queue-activity-name {
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.office-queue-outsider-badge {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+	gap: 4px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: #efe6ff;
+	border: 1px solid #c9b3ef;
+	color: #5b2d9a;
+	font-size: 0.72rem;
+	font-weight: 800;
+	letter-spacing: 0.02em;
+	line-height: 1.2;
+	text-transform: uppercase;
 }
 
 .office-request-history-table .office-queue-actions-cell {

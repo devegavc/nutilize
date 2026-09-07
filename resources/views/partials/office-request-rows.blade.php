@@ -8,6 +8,7 @@
       || in_array((int) $request->reservation_id, array_map('intval', $actionableReservationIds), true);
     $isOpenStep = is_null($request->approved_at) && !in_array($status, ['approved', 'rejected'], true);
     $waitingOnLabel = $waitingOnByReservation[(int) $request->reservation_id] ?? null;
+    $hasOutsideParticipants = $reservation?->hasOutsideParticipants() ?? false;
 
     if ($isOpenStep && $isActionable) {
       $badgeClass = 'pending';
@@ -29,10 +30,20 @@
       $badgeText = 'Pending';
     }
   @endphp
-  <tr data-request-date="{{ $eventDate !== 'N/A' ? $eventDate : '' }}">
+  <tr data-request-date="{{ $eventDate !== 'N/A' ? $eventDate : '' }}" data-outside-participants="{{ $hasOutsideParticipants ? '1' : '0' }}">
     <td>#{{ $request->reservation_id }}</td>
     <td class="office-queue-requester">{{ $reservation?->user?->full_name ?? $reservation?->user?->username ?? 'Unknown' }}</td>
-    <td class="office-queue-activity">{{ $reservation?->activity_name ?? 'N/A' }}</td>
+    <td class="office-queue-activity">
+      <span class="office-queue-activity-inner">
+        <span class="office-queue-activity-name">{{ $reservation?->activity_name ?? 'N/A' }}</span>
+        @if($hasOutsideParticipants)
+          <span class="office-queue-outsider-badge" title="This event includes outside participants">
+            <i class="bi bi-people-fill" aria-hidden="true"></i>
+            Outsider
+          </span>
+        @endif
+      </span>
+    </td>
     <td>{{ $eventDate }}</td>
     <td>{{ optional($reservation?->created_at)->format('M d, Y h:i A') }}</td>
     <td><span class="badge {{ $badgeClass }}">{{ $badgeText }}</span></td>
