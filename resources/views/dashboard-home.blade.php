@@ -252,7 +252,7 @@
             data-announcement-form
             data-store-action="{{ route('dashboard.announcements.store') }}"
             data-update-action="{{ route('dashboard.announcements.update', ['announcementId' => '__ID__']) }}"
-            data-default-announcer="{{ old('announcer_name', auth()->user()?->displayName() ?: (auth()->user()?->username ?? '')) }}"
+            data-default-announcer="{{ $announcementAnnouncerDefault ?? 'Physical Facilities Admin' }}"
           >
             @csrf
             <label for="announcement-announcer">Announced by</label>
@@ -261,7 +261,7 @@
               name="announcer_name"
               type="text"
               maxlength="180"
-              value="{{ old('announcer_name', auth()->user()?->displayName() ?: (auth()->user()?->username ?? '')) }}"
+              value="{{ $announcementAnnouncerDefault ?? 'Physical Facilities Admin' }}"
               placeholder="Your name"
               required
               @disabled(!($announcementsTableReady ?? false))
@@ -448,6 +448,10 @@
       const deleteConfirmCancel = document.getElementById('announcement-delete-confirm-cancel');
       const deleteConfirmSubmit = document.getElementById('announcement-delete-confirm-submit');
       let methodInput = null;
+
+      // #region agent log
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',runId:'post-fix',hypothesisId:'F',location:'dashboard-home.blade.php:announcer-input',message:'announcer field value',data:{isPfAdminLabel:(announcerInput?.value||'')==='Physical Facilities Admin',includesNotSet:(announcerInput?.value||'').toLowerCase().includes('not set'),datasetDefaultIsPfAdmin:(form instanceof HTMLFormElement)&&form.dataset.defaultAnnouncer==='Physical Facilities Admin'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
 
       const setEditing = (announcement) => {
         if (!(form instanceof HTMLFormElement)) {

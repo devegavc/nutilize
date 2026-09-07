@@ -42,11 +42,36 @@ class DashboardHomeController extends Controller
             $announcements = $query->get();
         }
 
+        $suffix = trim((string) ($user->suffix ?? ''));
+        $announcementAnnouncerDefault = trim((string) old('announcer_name', 'Physical Facilities Admin'));
+        if ($announcementAnnouncerDefault === '' || preg_match('/not set/i', $announcementAnnouncerDefault)) {
+            $announcementAnnouncerDefault = 'Physical Facilities Admin';
+        }
+
+        // #region agent log
+        $debugLog = base_path('.cursor/debug-61468c.log');
+        @file_put_contents($debugLog, json_encode([
+            'sessionId' => '61468c',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'F',
+            'location' => 'DashboardHomeController.php:announcer',
+            'message' => 'announcer default computed',
+            'data' => [
+                'suffixIsPlaceholder' => strcasecmp($suffix, 'Not Set') === 0,
+                'hasMiddleInitial' => trim((string) ($user->middle_initial ?? '')) !== '',
+                'displayNameHasNotSet' => str_contains($user->displayName(), 'Not Set'),
+                'defaultIsPfAdmin' => $announcementAnnouncerDefault === 'Physical Facilities Admin',
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ])."\n", FILE_APPEND);
+        // #endregion
+
         return response()
             ->view('dashboard-home', array_merge($data, [
                 'announcements' => $announcements,
                 'announcementsTableReady' => $announcementsTableReady,
                 'announcementTtlDays' => Announcement::DEFAULT_TTL_DAYS,
+                'announcementAnnouncerDefault' => $announcementAnnouncerDefault,
                 'openAnnouncementsModal' => (bool) (
                     session('open_announcements')
                     || request()->boolean('announcements')

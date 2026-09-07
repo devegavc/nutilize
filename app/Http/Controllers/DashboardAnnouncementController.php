@@ -50,13 +50,7 @@ class DashboardAnnouncementController extends Controller
             Announcement::purgeExpired();
 
             $now = now();
-            $announcerName = trim($validated['announcer_name']);
-            if ($announcerName === '') {
-                $announcerName = trim((string) $user->displayName());
-            }
-            if ($announcerName === '' || strcasecmp($announcerName, 'Unknown') === 0) {
-                $announcerName = trim((string) ($user->username ?? '')) ?: 'Physical Facilities staff';
-            }
+            $announcerName = $this->resolveAnnouncerName($validated['announcer_name']);
 
             $payload = [
                 'created_by' => (int) $user->user_id,
@@ -125,13 +119,7 @@ class DashboardAnnouncementController extends Controller
         }
 
         try {
-            $announcerName = trim($validated['announcer_name']);
-            if ($announcerName === '') {
-                $announcerName = trim((string) $user->displayName());
-            }
-            if ($announcerName === '' || strcasecmp($announcerName, 'Unknown') === 0) {
-                $announcerName = trim((string) ($user->username ?? '')) ?: 'Physical Facilities staff';
-            }
+            $announcerName = $this->resolveAnnouncerName($validated['announcer_name']);
 
             $payload = [
                 'title' => trim($validated['title']),
@@ -185,5 +173,16 @@ class DashboardAnnouncementController extends Controller
             ->route('dashboard.home')
             ->with('open_announcements', true)
             ->with('success', 'Announcement removed.');
+    }
+
+    private function resolveAnnouncerName(string $submitted): string
+    {
+        $announcerName = trim($submitted);
+
+        if ($announcerName === '' || strcasecmp($announcerName, 'Unknown') === 0 || preg_match('/not set/i', $announcerName)) {
+            return 'Physical Facilities Admin';
+        }
+
+        return $announcerName;
     }
 }
