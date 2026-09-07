@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
 </head>
-<body class="page-facilities-inventory">
+<body>
   <script>
     window.authUser = {
       id: {{ auth()->user()->user_id ?? 'null' }},
@@ -40,24 +40,24 @@
       @include('partials.dashboard-navbar')
 
       <section class="content-card facilities-content-card">
-        <header class="facilities-toolbar">
-          <h1 class="facilities-toolbar-title">Facilities Inventory</h1>
+        <h1 class="section-title">FACILITIES INVENTORY</h1>
 
+        <section class="facilities-filter-row">
           <div class="facilities-tab-group" role="tablist" aria-label="Inventory category">
             <button class="facilities-tab active" type="button" data-tab="rooms">Rooms</button>
             <button class="facilities-tab" type="button" data-tab="lab">Lab</button>
             <button class="facilities-tab" type="button" data-tab="others">Others</button>
           </div>
 
-          <div class="facilities-action-group">
-            <div class="facilities-inline-search">
-              <i class="bi bi-search"></i>
-              <input type="text" placeholder="Search" />
-            </div>
+          <div class="facilities-inline-search">
+            <i class="bi bi-search"></i>
+            <input type="text" placeholder="Search" />
+          </div>
 
+          <div class="facilities-action-group">
             <button class="facilities-add-btn" id="facilities-add-btn" type="button">Add Facilities</button>
           </div>
-        </header>
+        </section>
 
         <section class="inventory-grid facilities-grid">
           <div class="table-wrap">
