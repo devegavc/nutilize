@@ -2641,32 +2641,6 @@ class ApprovalController extends Controller
         $proofOfConsentUrl = $proofOfConsentUrls[0] ?? '';
         $requesterType = $this->requesterTypeLabel($requester);
         $attachmentHeading = $requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent';
-        // #region agent log
-        $__rawForLog = is_array($rawProofOfConsent) ? json_encode($rawProofOfConsent) : trim((string) $rawProofOfConsent);
-        $__decodedProof = is_array($rawProofOfConsent) ? $rawProofOfConsent : json_decode($__rawForLog, true);
-        $__logPayload = json_encode([
-            'sessionId' => '46f7af',
-            'runId' => 'post-fix-multi',
-            'hypothesisId' => 'F',
-            'location' => 'ApprovalController.php:getReservationDetails',
-            'message' => 'parsed proof_of_consent_url',
-            'data' => [
-                'reservationId' => (int) $reservationId,
-                'rawIsArray' => is_array($rawProofOfConsent),
-                'rawLength' => strlen($__rawForLog),
-                'rawPrefix' => substr($__rawForLog, 0, 16),
-                'startsHttp' => (bool) preg_match('#^https?://#i', $__rawForLog),
-                'startsJsonArray' => str_starts_with(ltrim($__rawForLog), '['),
-                'jsonIsArray' => is_array($__decodedProof),
-                'jsonUrlCount' => is_array($__decodedProof) ? count($__decodedProof) : 0,
-                'parsedUrlCount' => count($proofOfConsentUrls),
-                'requesterType' => $requesterType,
-                'attachmentHeading' => $attachmentHeading,
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ]) . "\n";
-        file_put_contents(base_path('debug-46f7af.log'), $__logPayload, FILE_APPEND);
-        // #endregion
 
         $resourceRows = DB::table('reservation_details as details')
             ->leftJoin('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')

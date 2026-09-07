@@ -1404,9 +1404,6 @@ function showReservationDetailsModal(reservation, options = {}) {
   const requesterType = String(reservation.requester_type || '').trim() || 'Unknown';
   const attachmentHeading = String(reservation.attachment_heading || '').trim()
     || (requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent');
-  // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46f7af'},body:JSON.stringify({sessionId:'46f7af',runId:'post-fix-multi',hypothesisId:'F',location:'dashboard.js:showReservationDetailsModal',message:'proof urls received by modal',data:{reservationId:reservation.id||null,proofLength:proofUrl.length,urlCount:proofUrls.length,hasUrlsArray:Array.isArray(reservation.proof_of_consent_urls),urlsArrayLength:Array.isArray(reservation.proof_of_consent_urls)?reservation.proof_of_consent_urls.length:0,hasProof:proofUrls.length>0,prefix:proofUrl.slice(0,16),requesterType,attachmentHeading},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   const scheduleLabel = reservation.event_schedule
     || [
       reservation.event_date || reservation.start_date,
@@ -1639,9 +1636,6 @@ function showReservationDetailsModal(reservation, options = {}) {
   }
 
   document.body.appendChild(modal);
-  // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46f7af'},body:JSON.stringify({sessionId:'46f7af',runId:'layout-carousel',hypothesisId:'G',location:'dashboard.js:showReservationDetailsModal',message:'proof carousel rendered',data:{reservationId:reservation.id||null,urlCount:proofUrls.length,frameCount:modal.querySelectorAll('.reservation-proof-frame').length,navCount:modal.querySelectorAll('[data-proof-nav]').length},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 }
 
 function hideReservationDetailsLoadingModal() {
