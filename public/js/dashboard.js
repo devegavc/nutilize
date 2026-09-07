@@ -1341,6 +1341,34 @@ if (reportTableBody instanceof HTMLElement) {
   });
 }
 
+function parseReservationProofUrls(reservation) {
+  if (Array.isArray(reservation?.proof_of_consent_urls) && reservation.proof_of_consent_urls.length) {
+    return reservation.proof_of_consent_urls
+      .map((url) => String(url || '').trim())
+      .filter((url) => /^https?:\/\//i.test(url));
+  }
+
+  const raw = String(reservation?.proof_of_consent_url || '').trim();
+  if (!raw) {
+    return [];
+  }
+
+  if (raw.startsWith('[')) {
+    try {
+      const decoded = JSON.parse(raw);
+      if (Array.isArray(decoded)) {
+        return decoded
+          .map((url) => String(url || '').trim())
+          .filter((url) => /^https?:\/\//i.test(url));
+      }
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  return /^https?:\/\//i.test(raw) ? [raw] : [];
+}
+
 function showReservationDetailsModal(reservation, options = {}) {
   const resources = Array.isArray(reservation.resources) && reservation.resources.length
     ? reservation.resources
@@ -1364,9 +1392,13 @@ function showReservationDetailsModal(reservation, options = {}) {
   const statusClass = String(statusLabel).toLowerCase().replace(/[^a-z0-9_-]/g, '-');
   const reservationCode = reservation.reservation_code
     || (reservation.id ? `NU-${String(reservation.id).padStart(6, '0')}` : 'Reservation');
-  const proofUrl = String(reservation.proof_of_consent_url || '').trim();
+  const proofUrls = parseReservationProofUrls(reservation);
+  const proofUrl = proofUrls[0] || '';
+  const requesterType = String(reservation.requester_type || '').trim() || 'Unknown';
+  const attachmentHeading = String(reservation.attachment_heading || '').trim()
+    || (requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent');
   // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46f7af'},body:JSON.stringify({sessionId:'46f7af',runId:'pre-fix',hypothesisId:'C',location:'dashboard.js:showReservationDetailsModal',message:'proof url received by modal',data:{reservationId:reservation.id||null,proofLength:proofUrl.length,hasProof:Boolean(proofUrl),prefix:proofUrl.slice(0,16),looksJson:proofUrl.trim().startsWith('[')},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46f7af'},body:JSON.stringify({sessionId:'46f7af',runId:'post-fix',hypothesisId:'A',location:'dashboard.js:showReservationDetailsModal',message:'proof urls received by modal',data:{reservationId:reservation.id||null,proofLength:proofUrl.length,urlCount:proofUrls.length,hasProof:proofUrls.length>0,prefix:proofUrl.slice(0,16),requesterType,attachmentHeading},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
   const scheduleLabel = reservation.event_schedule
     || [
@@ -1385,24 +1417,32 @@ function showReservationDetailsModal(reservation, options = {}) {
     `
     : '';
 
-  const proofMarkup = proofUrl
+  const proofMarkup = proofUrls.length
     ? `
       <section class="reservation-details-panel reservation-proof-panel">
         <div class="reservation-panel-heading">
-          <h3>Proof of Consent</h3>
-          <a class="reservation-proof-open" href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">Open full image</a>
+          <h3>${escapeReservationDetailsHtml(attachmentHeading)}</h3>
+          ${proofUrls.length === 1
+            ? `<a class="reservation-proof-open" href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">Open full image</a>`
+            : `<span class="reservation-proof-count">${proofUrls.length} images</span>`}
         </div>
-        <a class="reservation-proof-frame" href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">
-          <img src="${escapeReservationDetailsHtml(proofUrl)}" alt="Proof of consent for ${escapeReservationDetailsHtml(reservationCode)}" loading="lazy" />
-        </a>
+        <div class="reservation-proof-gallery${proofUrls.length === 1 ? ' is-single' : ''}">
+          ${proofUrls.map((url, index) => `
+            <a class="reservation-proof-frame" href="${escapeReservationDetailsHtml(url)}" target="_blank" rel="noopener noreferrer">
+              <img src="${escapeReservationDetailsHtml(url)}" alt="${escapeReservationDetailsHtml(attachmentHeading)} ${index + 1} for ${escapeReservationDetailsHtml(reservationCode)}" loading="lazy" />
+            </a>
+          `).join('')}
+        </div>
       </section>
     `
     : `
       <section class="reservation-details-panel reservation-proof-panel is-empty">
         <div class="reservation-panel-heading">
-          <h3>Proof of Consent</h3>
+          <h3>${escapeReservationDetailsHtml(attachmentHeading)}</h3>
         </div>
-        <p class="reservation-empty-note">No supporting image was attached to this request.</p>
+        <p class="reservation-empty-note">${requesterType === 'Teacher'
+          ? 'No attachment was added to this request.'
+          : 'No letter of consent was attached to this request.'}</p>
       </section>
     `;
 
@@ -1434,6 +1474,10 @@ function showReservationDetailsModal(reservation, options = {}) {
                 <div class="info-row">
                   <strong>Full Name</strong>
                   <span>${escapeReservationDetailsHtml(reservation.requester || 'Unknown')}</span>
+                </div>
+                <div class="info-row">
+                  <strong>Role</strong>
+                  <span>${escapeReservationDetailsHtml(requesterType)}</span>
                 </div>
                 <div class="info-row">
                   <strong>Email</strong>
@@ -3691,17 +3735,11 @@ function closeInventoryConfirmModal() {
 }
 
 function openInventoryConfirmModal(options = {}) {
-  const hasModal = inventoryConfirmModal instanceof HTMLElement;
-  const hasTitle = inventoryConfirmTitle instanceof HTMLElement;
-  const hasMessage = inventoryConfirmMessage instanceof HTMLElement;
-  const hasCancel = inventoryConfirmCancel instanceof HTMLButtonElement;
-  const hasSubmit = inventoryConfirmSubmit instanceof HTMLButtonElement;
-  const missingConfirmUi = !hasModal || !hasTitle || !hasMessage || !hasCancel || !hasSubmit;
-  // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'pre-fix',hypothesisId:'A',location:'dashboard.js:openInventoryConfirmModal',message:'confirm modal availability',data:{hasModal,hasTitle,hasMessage,hasCancel,hasSubmit,missingConfirmUi,pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
-  if (missingConfirmUi) {
+  if (!(inventoryConfirmModal instanceof HTMLElement)
+    || !(inventoryConfirmTitle instanceof HTMLElement)
+    || !(inventoryConfirmMessage instanceof HTMLElement)
+    || !(inventoryConfirmCancel instanceof HTMLButtonElement)
+    || !(inventoryConfirmSubmit instanceof HTMLButtonElement)) {
     return showAppConfirm(options.message || 'Are you sure you want to delete this item? This cannot be undone.', {
       title: options.title || 'Confirm Delete',
       confirmText: options.confirmText || 'Delete',
@@ -3732,9 +3770,6 @@ function openInventoryConfirmModal(options = {}) {
   inventoryConfirmModal.dataset.confirmVariant = variant;
   inventoryConfirmModal.classList.add('is-open');
   inventoryConfirmModal.setAttribute('aria-hidden', 'false');
-  // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'post-fix',hypothesisId:'A',location:'dashboard.js:openInventoryConfirmModal:opened',message:'inventory confirm modal opened',data:{isOpen:inventoryConfirmModal.classList.contains('is-open'),variant,pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 
   return new Promise((resolve) => {
     inventoryConfirmResolver = resolve;
@@ -3819,9 +3854,6 @@ function removeEquipmentEmptyStateRows() {
 }
 
 async function submitEquipmentDelete() {
-  // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'pre-fix',hypothesisId:'E',location:'dashboard.js:submitEquipmentDelete:entry',message:'delete click entered handler',data:{hasEditingRow:Boolean(activeEquipmentEditingRow),itemId:activeEquipmentEditingRow?.dataset?.itemId||null,pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!activeEquipmentEditingRow || !equipmentTableBody) {
     return;
   }
@@ -3842,9 +3874,6 @@ async function submitEquipmentDelete() {
 
   const alreadyConfirmed = equipmentDeleteButton instanceof HTMLButtonElement
     && equipmentDeleteButton.dataset.officeDeleteConfirmed === '1';
-  // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'post-fix-2',hypothesisId:'G',location:'dashboard.js:submitEquipmentDelete:confirmGate',message:'delete confirm gate',data:{alreadyConfirmed,itemId},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 
   const confirmed = alreadyConfirmed
     ? true
@@ -3854,10 +3883,6 @@ async function submitEquipmentDelete() {
       cancelText: 'Cancel',
       variant: 'danger',
     });
-
-  // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'pre-fix',hypothesisId:'A',location:'dashboard.js:submitEquipmentDelete:afterConfirm',message:'delete confirmation result',data:{confirmed,itemId,modalIsOpen:inventoryConfirmModal instanceof HTMLElement && inventoryConfirmModal.classList.contains('is-open')},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 
   if (!confirmed) {
     return;
@@ -3872,9 +3897,6 @@ async function submitEquipmentDelete() {
   }
 
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'pre-fix',hypothesisId:'C',location:'dashboard.js:submitEquipmentDelete:beforeFetch',message:'proceeding to DELETE request',data:{itemId,endpoint:`${equipmentEndpointBase}/${encodeURIComponent(itemId)}`},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const response = await fetch(`${equipmentEndpointBase}/${encodeURIComponent(itemId)}`, {
       method: 'DELETE',
       headers: {

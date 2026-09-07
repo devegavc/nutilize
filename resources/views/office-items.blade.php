@@ -230,9 +230,6 @@
         event.stopImmediatePropagation();
 
         const finishAsk = async function () {
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'post-fix-2',hypothesisId:'G',location:'office-items.blade.php:deleteInterceptor',message:'inline delete interceptor caught click',data:{pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           let ok = false;
           try {
             if (typeof window.showAppConfirm === 'function') {
@@ -246,10 +243,6 @@
           } catch (_error) {
             ok = window.confirm('Are you sure you want to delete this item? This cannot be undone.');
           }
-
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'post-fix-2',hypothesisId:'G',location:'office-items.blade.php:deleteInterceptor:result',message:'inline delete interceptor confirm result',data:{ok},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
 
           if (!ok) {
             return;

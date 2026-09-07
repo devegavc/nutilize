@@ -2636,43 +2636,30 @@ class ApprovalController extends Controller
             }
         }
 
-        $proofOfConsentUrl = trim((string) ($reservation->proof_of_consent_url ?? ''));
+        $rawProofOfConsent = trim((string) ($reservation->proof_of_consent_url ?? ''));
+        $proofOfConsentUrls = $this->parseProofOfConsentUrls($rawProofOfConsent);
+        $proofOfConsentUrl = $proofOfConsentUrls[0] ?? '';
+        $requesterType = $this->requesterTypeLabel($requester);
+        $attachmentHeading = $requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent';
         // #region agent log
-        $__rawProof = $proofOfConsentUrl;
-        $__decodedProof = json_decode($__rawProof, true);
+        $__decodedProof = json_decode($rawProofOfConsent, true);
         $__logPayload = json_encode([
             'sessionId' => '46f7af',
-            'runId' => 'pre-fix',
+            'runId' => 'post-fix',
             'hypothesisId' => 'A',
             'location' => 'ApprovalController.php:getReservationDetails',
-            'message' => 'raw proof_of_consent_url before http check',
+            'message' => 'parsed proof_of_consent_url',
             'data' => [
                 'reservationId' => (int) $reservationId,
-                'rawLength' => strlen($__rawProof),
-                'rawPrefix' => substr($__rawProof, 0, 16),
-                'startsHttp' => (bool) preg_match('#^https?://#i', $__rawProof),
-                'startsJsonArray' => str_starts_with(ltrim($__rawProof), '['),
+                'rawLength' => strlen($rawProofOfConsent),
+                'rawPrefix' => substr($rawProofOfConsent, 0, 16),
+                'startsHttp' => (bool) preg_match('#^https?://#i', $rawProofOfConsent),
+                'startsJsonArray' => str_starts_with(ltrim($rawProofOfConsent), '['),
                 'jsonIsArray' => is_array($__decodedProof),
                 'jsonUrlCount' => is_array($__decodedProof) ? count($__decodedProof) : 0,
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ]) . "\n";
-        file_put_contents(base_path('debug-46f7af.log'), $__logPayload, FILE_APPEND);
-        // #endregion
-        if ($proofOfConsentUrl !== '' && !preg_match('#^https?://#i', $proofOfConsentUrl)) {
-            $proofOfConsentUrl = '';
-        }
-        // #region agent log
-        $__logPayload = json_encode([
-            'sessionId' => '46f7af',
-            'runId' => 'pre-fix',
-            'hypothesisId' => 'A',
-            'location' => 'ApprovalController.php:getReservationDetails',
-            'message' => 'proof url after http check',
-            'data' => [
-                'reservationId' => (int) $reservationId,
-                'finalLength' => strlen($proofOfConsentUrl),
-                'wasCleared' => $__rawProof !== '' && $proofOfConsentUrl === '',
+                'parsedUrlCount' => count($proofOfConsentUrls),
+                'requesterType' => $requesterType,
+                'attachmentHeading' => $attachmentHeading,
             ],
             'timestamp' => (int) round(microtime(true) * 1000),
         ]) . "\n";
@@ -2729,6 +2716,7 @@ class ApprovalController extends Controller
             'requester_username' => (string) ($requester?->username ?? ''),
             'requester_email' => (string) ($requester?->email ?? 'N/A'),
             'requester_phone' => (string) ($requester?->phone_number ?? $requester?->contact_number ?? 'N/A'),
+            'requester_type' => $requesterType,
             'requested_date' => $reservation->created_at
                 ? $reservation->created_at->format('M d, Y h:i A')
                 : 'N/A',
@@ -2743,6 +2731,8 @@ class ApprovalController extends Controller
             'end_time' => $eventEndAt ? $eventEndAt->format('g:i A') : 'N/A',
             'status' => (string) ($reservation->overall_status ?? $reservation->status ?? 'Unknown'),
             'proof_of_consent_url' => $proofOfConsentUrl,
+            'proof_of_consent_urls' => $proofOfConsentUrls,
+            'attachment_heading' => $attachmentHeading,
             'resources' => $resources,
             'items' => array_values(array_filter($resources, fn ($resource) => ($resource['type'] ?? '') === 'item')),
             // Approvers only need primary student + request details — not the full trail.
@@ -2753,6 +2743,70 @@ class ApprovalController extends Controller
             'success' => true,
             'reservation' => $reservationData,
         ]);
+    }
+
+    /**
+     * Consent files are stored as either one https URL or a JSON array of URLs.
+     *
+     * @return list<string>
+     */
+    private function parseProofOfConsentUrls(?string $raw): array
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            if (is_string($decoded)) {
+                $candidates = [$decoded];
+            } elseif (is_array($decoded)) {
+                $candidates = $decoded;
+            } else {
+                $candidates = [$raw];
+            }
+        } else {
+            $candidates = [$raw];
+        }
+
+        $urls = [];
+        foreach ($candidates as $candidate) {
+            if (!is_string($candidate)) {
+                continue;
+            }
+
+            $url = trim($candidate);
+            if ($url !== '' && preg_match('#^https?://#i', $url)) {
+                $urls[] = $url;
+            }
+        }
+
+        return array_values(array_unique($urls));
+    }
+
+    private function requesterTypeLabel($requester): string
+    {
+        if (!$requester) {
+            return 'Unknown';
+        }
+
+        if (method_exists($requester, 'isFaculty') && $requester->isFaculty()) {
+            return 'Teacher';
+        }
+
+        if (method_exists($requester, 'isStudentUser') && $requester->isStudentUser()) {
+            return 'Student';
+        }
+
+        $role = strtolower(trim((string) ($requester->role ?? '')));
+
+        return match ($role) {
+            'faculty' => 'Teacher',
+            'user', 'student' => 'Student',
+            '' => 'Unknown',
+            default => ucfirst($role),
+        };
     }
 
     private function formatReservationScheduleLabel($eventAt, $eventEndAt): string
