@@ -9,7 +9,7 @@
   <title>NUtilize | Office Home</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}-outsider-icon" />
+  <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}-outsider-status" />
 </head>
 <body>
   <script>
@@ -705,64 +705,25 @@
   </script>
 
   <style>
-    .office-request-history-table td.office-queue-id {
-      overflow: visible !important;
+    .office-request-history-table tbody tr.office-queue-has-outsider,
+    .office-request-history-table tbody tr.office-queue-has-outsider:nth-child(even) {
+      background: #fff6d8 !important;
     }
 
-    .office-request-history-table .office-queue-id-inner {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 6px !important;
+    .office-queue-status-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
     }
 
-    .office-request-history-table .office-queue-outsider-badge {
-      position: relative !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      width: 22px !important;
-      height: 22px !important;
-      padding: 0 !important;
-      border-radius: 50% !important;
-      background: #e8eefc !important;
-      border: 1px solid #b7c6ea !important;
-      color: #2f3f88 !important;
-      font-size: 0.72rem !important;
-      font-weight: 700 !important;
-      letter-spacing: 0 !important;
-      line-height: 1 !important;
-      text-transform: none !important;
-      cursor: help !important;
-      flex-shrink: 0 !important;
+    .office-request-history-table .badge.outsider {
+      background: #f5de8f !important;
+      color: #7a4f00 !important;
     }
 
-    .office-request-history-table .office-queue-outsider-badge i {
-      display: inline-flex !important;
-      line-height: 1 !important;
-    }
-
-    .office-queue-outsider-tip {
-      position: absolute;
-      left: calc(100% + 8px);
-      top: 50%;
-      transform: translateY(-50%);
-      padding: 5px 8px;
-      border-radius: 6px;
-      background: #18255a;
-      color: #fff;
-      font-size: 0.72rem;
-      font-weight: 700;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 40;
-      box-shadow: 0 6px 16px rgba(24, 37, 90, 0.25);
-    }
-
-    .office-request-history-table .office-queue-outsider-badge:hover .office-queue-outsider-tip,
-    .office-request-history-table .office-queue-outsider-badge:focus-visible .office-queue-outsider-tip {
-      opacity: 1;
+    .office-request-history-table .badge.outsider::before {
+      background: #f0ab06 !important;
     }
 
     .office-queue-action-btn {

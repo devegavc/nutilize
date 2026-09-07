@@ -31,24 +31,21 @@
     }
   @endphp
   <tr class="{{ $hasOutsideParticipants ? 'office-queue-has-outsider' : '' }}" data-request-date="{{ $eventDate !== 'N/A' ? $eventDate : '' }}" data-outside-participants="{{ $hasOutsideParticipants ? '1' : '0' }}">
-    <td class="office-queue-id">
-      <span class="office-queue-id-inner">
-        @if($hasOutsideParticipants)
-          <span class="office-queue-outsider-badge" tabindex="0" aria-label="Outsider involved">
-            <i class="bi bi-people-fill" aria-hidden="true"></i>
-            <span class="office-queue-outsider-tip">Outsider involved</span>
-          </span>
-        @endif
-        <span>#{{ $request->reservation_id }}</span>
-      </span>
-    </td>
+    <td>#{{ $request->reservation_id }}</td>
     <td class="office-queue-requester">{{ $reservation?->user?->full_name ?? $reservation?->user?->username ?? 'Unknown' }}</td>
     <td class="office-queue-activity">
       <span class="office-queue-activity-name">{{ $reservation?->activity_name ?? 'N/A' }}</span>
     </td>
     <td>{{ $eventDate }}</td>
     <td>{{ optional($reservation?->created_at)->format('M d, Y h:i A') }}</td>
-    <td><span class="badge {{ $badgeClass }}">{{ $badgeText }}</span></td>
+    <td>
+      <div class="office-queue-status-stack">
+        <span class="badge {{ $badgeClass }}">{{ $badgeText }}</span>
+        @if($hasOutsideParticipants)
+          <span class="badge outsider office-queue-outsider-badge" title="This event includes outside participants">Outsider involved</span>
+        @endif
+      </div>
+    </td>
     <td class="office-queue-actions-cell">
       <div class="office-queue-action-group">
         <button
