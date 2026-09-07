@@ -40,9 +40,9 @@
       @include('partials.dashboard-navbar')
 
       <section class="content-card facilities-content-card">
-        <h1 class="section-title">FACILITIES INVENTORY</h1>
+        <header class="facilities-toolbar">
+          <h1 class="facilities-toolbar-title">Facilities Inventory</h1>
 
-        <section class="facilities-filter-row">
           <div class="facilities-tab-group" role="tablist" aria-label="Inventory category">
             <button class="facilities-tab active" type="button" data-tab="rooms">Rooms</button>
             <button class="facilities-tab" type="button" data-tab="lab">Lab</button>
@@ -57,7 +57,7 @@
 
             <button class="facilities-add-btn" id="facilities-add-btn" type="button">Add Facilities</button>
           </div>
-        </section>
+        </header>
 
         <section class="inventory-grid facilities-grid">
           <div class="table-wrap">

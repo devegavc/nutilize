@@ -5910,61 +5910,88 @@ body.page-insights .compact-table {
   }
 }
 
-body.page-facilities-inventory .workspace-grid {
-  gap: 16px;
-}
-
-body.page-facilities-inventory .facilities-content-card > .section-title {
-  padding: 10px 18px;
-  font-size: 1.18rem;
-  line-height: 1.2;
-  letter-spacing: 0.03em;
-  border-bottom-width: 3px;
-}
-
-body.page-facilities-inventory .facilities-content-card .facilities-filter-row {
-  flex-wrap: nowrap;
+.facilities-content-card:has(.facilities-inventory-table) .facilities-toolbar,
+body.page-facilities-inventory .facilities-toolbar {
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 18px;
+  gap: 12px;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, #26367b 0%, #38479c 58%, #566bc4 100%);
+  flex-shrink: 0;
+  min-width: 0;
 }
 
-body.page-facilities-inventory .facilities-content-card .facilities-tab {
-  padding: 5px 14px;
-  font-size: 0.86rem;
+.facilities-content-card:has(.facilities-inventory-table) .facilities-toolbar-title,
+body.page-facilities-inventory .facilities-toolbar-title {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-body.page-facilities-inventory .facilities-content-card .facilities-action-group {
-  margin-left: auto;
+.facilities-content-card:has(.facilities-inventory-table) .facilities-toolbar .facilities-tab-group,
+body.page-facilities-inventory .facilities-toolbar .facilities-tab-group {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-body.page-facilities-inventory .facilities-content-card .facilities-action-group .facilities-add-btn {
+.facilities-content-card:has(.facilities-inventory-table) .facilities-toolbar .facilities-tab,
+body.page-facilities-inventory .facilities-toolbar .facilities-tab {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+  padding: 4px 12px;
+  font-size: 0.82rem;
+}
+
+.facilities-content-card:has(.facilities-inventory-table) .facilities-toolbar .facilities-tab.active,
+body.page-facilities-inventory .facilities-toolbar .facilities-tab.active {
+  background: #fff;
+  border-color: #fff;
+  color: #243274;
+}
+
+.facilities-content-card:has(.facilities-inventory-table) .facilities-toolbar .facilities-action-group,
+body.page-facilities-inventory .facilities-toolbar .facilities-action-group {
+  margin-left: 0;
+}
+
+.facilities-content-card:has(.facilities-inventory-table) .facilities-toolbar .facilities-add-btn,
+body.page-facilities-inventory .facilities-toolbar .facilities-add-btn {
   margin-left: 0;
   min-width: 0;
-  padding: 7px 14px;
-  font-size: 0.88rem;
-  box-shadow: 0 6px 12px rgba(244, 183, 10, 0.2);
-}
-
-body.page-facilities-inventory .inventory-grid.facilities-grid {
-  margin: 0 16px 16px;
-  min-height: 0;
-  background: #f3f5fa;
-  border: 1px solid #d5dced;
+  padding: 6px 14px;
+  font-size: 0.84rem;
   box-shadow: none;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .inventory-grid.facilities-grid,
+body.page-facilities-inventory .inventory-grid.facilities-grid {
+  margin: 0;
+  min-height: 0;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  background: #fff;
+}
+
+.facilities-content-card:has(.facilities-inventory-table) .facilities-grid .table-wrap,
 body.page-facilities-inventory .facilities-grid .table-wrap {
   padding: 0;
   background: #ffffff;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table,
 body.page-facilities-inventory .facilities-inventory-table {
   table-layout: fixed;
   width: 100%;
   border-collapse: collapse;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table thead th,
 body.page-facilities-inventory .facilities-inventory-table thead th {
   position: sticky;
   top: 0;
@@ -5976,6 +6003,7 @@ body.page-facilities-inventory .facilities-inventory-table thead th {
   border-radius: 0;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table tbody td,
 body.page-facilities-inventory .facilities-inventory-table tbody td {
   padding: 7px 12px;
   font-size: 0.9rem;
@@ -5984,14 +6012,18 @@ body.page-facilities-inventory .facilities-inventory-table tbody td {
   border-bottom: 1px solid #dce1ee;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table tbody tr:nth-child(even),
 body.page-facilities-inventory .facilities-inventory-table tbody tr:nth-child(even) {
   background: #f7f8fc;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table tbody tr:hover,
 body.page-facilities-inventory .facilities-inventory-table tbody tr:hover {
   background: #eef1fb;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table th,
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table td,
 body.page-facilities-inventory .facilities-inventory-table th,
 body.page-facilities-inventory .facilities-inventory-table td {
   white-space: nowrap;
@@ -6000,36 +6032,48 @@ body.page-facilities-inventory .facilities-inventory-table td {
   vertical-align: middle;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table th:nth-child(1),
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table td:nth-child(1),
 body.page-facilities-inventory .facilities-inventory-table th:nth-child(1),
 body.page-facilities-inventory .facilities-inventory-table td:nth-child(1) {
   width: 15%;
   text-align: left;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table th:nth-child(2),
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table td:nth-child(2),
 body.page-facilities-inventory .facilities-inventory-table th:nth-child(2),
 body.page-facilities-inventory .facilities-inventory-table td:nth-child(2) {
   width: 22%;
   text-align: left;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table th:nth-child(3),
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table td:nth-child(3),
 body.page-facilities-inventory .facilities-inventory-table th:nth-child(3),
 body.page-facilities-inventory .facilities-inventory-table td:nth-child(3) {
   width: 16%;
   text-align: left;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table th:nth-child(4),
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table td:nth-child(4),
 body.page-facilities-inventory .facilities-inventory-table th:nth-child(4),
 body.page-facilities-inventory .facilities-inventory-table td:nth-child(4) {
   width: 22%;
   text-align: left;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table th:nth-child(5),
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table td:nth-child(5),
 body.page-facilities-inventory .facilities-inventory-table th:nth-child(5),
 body.page-facilities-inventory .facilities-inventory-table td:nth-child(5) {
   width: 11%;
   text-align: center;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table th:nth-child(6),
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table td:nth-child(6),
 body.page-facilities-inventory .facilities-inventory-table th:nth-child(6),
 body.page-facilities-inventory .facilities-inventory-table td:nth-child(6) {
   width: 14%;
@@ -6037,17 +6081,20 @@ body.page-facilities-inventory .facilities-inventory-table td:nth-child(6) {
   overflow: visible;
 }
 
+.facilities-content-card:has(.facilities-inventory-table) .facilities-inventory-table .table-edit-btn,
 body.page-facilities-inventory .facilities-inventory-table .table-edit-btn {
   padding: 4px 12px;
   font-size: 0.82rem;
 }
 
-@media (max-width: 720px) {
-  body.page-facilities-inventory .facilities-content-card .facilities-filter-row {
+@media (max-width: 900px) {
+  .facilities-content-card:has(.facilities-inventory-table) .facilities-toolbar,
+  body.page-facilities-inventory .facilities-toolbar {
     flex-wrap: wrap;
   }
 
-  body.page-facilities-inventory .facilities-content-card .facilities-action-group {
+  .facilities-content-card:has(.facilities-inventory-table) .facilities-toolbar .facilities-action-group,
+  body.page-facilities-inventory .facilities-toolbar .facilities-action-group {
     width: 100%;
     justify-content: flex-end;
   }
