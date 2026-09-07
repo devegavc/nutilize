@@ -104,7 +104,7 @@
                 <tr>
                   <th>Reservation ID</th>
                   <th>Requested By</th>
-                  <th>Activity</th>
+                  <th class="office-queue-activity">Activity</th>
                   <th>Event Date</th>
                   <th>Submitted</th>
                   <th>Status</th>
