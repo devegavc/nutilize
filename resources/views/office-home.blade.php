@@ -9,7 +9,7 @@
   <title>NUtilize | Office Home</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}" />
+  <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}-outsider3" />
 </head>
 <body>
   <script>
@@ -705,6 +705,46 @@
   </script>
 
   <style>
+    .office-request-history-table th.office-queue-activity,
+    .office-request-history-table td.office-queue-activity {
+      text-align: left !important;
+      white-space: normal !important;
+    }
+
+    .office-request-history-table .office-queue-activity-inner {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      justify-content: center !important;
+      gap: 2px !important;
+      width: 100% !important;
+    }
+
+    .office-request-history-table tr.office-queue-has-outsider td:first-child {
+      box-shadow: inset 4px 0 0 #f0ab06 !important;
+    }
+
+    .office-request-history-table .office-queue-outsider-badge {
+      display: block !important;
+      align-items: flex-start !important;
+      flex-shrink: 0 !important;
+      gap: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      color: #8a5b07 !important;
+      font-size: 0.75rem !important;
+      font-weight: 700 !important;
+      letter-spacing: 0 !important;
+      line-height: 1.25 !important;
+      text-transform: none !important;
+    }
+
+    .office-request-history-table .office-queue-outsider-badge i {
+      display: none !important;
+    }
+
     .office-queue-action-btn {
       border: 1px solid transparent;
       border-radius: 8px;

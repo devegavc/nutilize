@@ -30,17 +30,14 @@
       $badgeText = 'Pending';
     }
   @endphp
-  <tr data-request-date="{{ $eventDate !== 'N/A' ? $eventDate : '' }}" data-outside-participants="{{ $hasOutsideParticipants ? '1' : '0' }}">
+  <tr class="{{ $hasOutsideParticipants ? 'office-queue-has-outsider' : '' }}" data-request-date="{{ $eventDate !== 'N/A' ? $eventDate : '' }}" data-outside-participants="{{ $hasOutsideParticipants ? '1' : '0' }}">
     <td>#{{ $request->reservation_id }}</td>
     <td class="office-queue-requester">{{ $reservation?->user?->full_name ?? $reservation?->user?->username ?? 'Unknown' }}</td>
     <td class="office-queue-activity">
       <span class="office-queue-activity-inner">
         <span class="office-queue-activity-name">{{ $reservation?->activity_name ?? 'N/A' }}</span>
         @if($hasOutsideParticipants)
-          <span class="office-queue-outsider-badge" title="This event includes outside participants">
-            <i class="bi bi-people-fill" aria-hidden="true"></i>
-            Outsider
-          </span>
+          <span class="office-queue-outsider-badge" title="This event includes outside participants">Includes outsider</span>
         @endif
       </span>
     </td>
