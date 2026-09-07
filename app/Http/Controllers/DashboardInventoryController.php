@@ -302,40 +302,74 @@ class DashboardInventoryController extends Controller
 
     public function facilities()
     {
+        $selectColumns = ['room_id', 'room_number', 'room_type'];
+
+        if (Schema::hasColumn('rooms', 'room_table_type')) {
+            $selectColumns[] = 'room_table_type';
+        }
+
+        if (Schema::hasColumn('rooms', 'room_chair_quantity')) {
+            $selectColumns[] = 'room_chair_quantity';
+        }
+
         $roomRows = DB::table('rooms')
-            ->select(['room_id', 'room_number', 'room_type'])
+            ->select($selectColumns)
             ->orderBy('room_number')
             ->get()
             ->map(function ($room) {
                 $roomNumber = (string) ($room->room_number ?? 'N/A');
                 $roomType = (string) ($room->room_type ?? $this->deriveFacilityType($roomNumber));
                 $classification = $this->normalizeFacilityCategory($roomType, $roomNumber);
+                $tableType = trim((string) ($room->room_table_type ?? ''));
+                $chairQuantity = $room->room_chair_quantity ?? null;
 
                 return [
                     'room_id' => (int) $room->room_id,
                     'asset_id' => '#ROOM-' . str_pad((string) $room->room_id, 4, '0', STR_PAD_LEFT),
                     'item_name' => preg_match('/^\d+$/', $roomNumber) === 1 ? 'Room ' . $roomNumber : $roomNumber,
                     'room_type' => $roomType,
+                    'table_type' => $tableType,
+                    'table_type_label' => $this->facilityTableTypeLabel($tableType),
+                    'chair_quantity' => is_null($chairQuantity) ? '' : (string) max(0, (int) $chairQuantity),
                     'classification' => $this->facilityCategoryLabel($classification),
                     'classification_key' => $classification,
                     'location' => $this->locationFromRoomNumber($roomNumber, $classification),
                 ];
             });
 
+        // #region agent log
+        $sampleRoom = $roomRows->first();
+        file_put_contents(base_path('debug-a53051.log'), json_encode([
+            'sessionId' => 'a53051',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'C',
+            'location' => 'DashboardInventoryController.php:facilities',
+            'message' => 'Facilities list includes furniture columns',
+            'data' => [
+                'hasTableTypeColumn' => Schema::hasColumn('rooms', 'room_table_type'),
+                'hasChairQtyColumn' => Schema::hasColumn('rooms', 'room_chair_quantity'),
+                'rowCount' => $roomRows->count(),
+                'sampleTableType' => is_array($sampleRoom) ? ($sampleRoom['table_type'] ?? null) : null,
+                'sampleChairQuantity' => is_array($sampleRoom) ? ($sampleRoom['chair_quantity'] ?? null) : null,
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ], JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
+        // #endregion
+
         return view('dashboard-inventory-facilities', [
             'facilityRows' => $roomRows,
+            'facilityTableTypes' => $this->facilityTableTypeOptions(),
         ]);
     }
 
     public function storeFacility(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'item_name' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'in:rooms,lab,others'],
-        ]);
+        $validated = $this->validateFacilityPayload($request);
 
         $roomNumber = trim($validated['item_name']);
         $roomType = $this->roomTypeFromFacilityCategory($validated['category']);
+        $tableType = $this->normalizeFacilityTableType($validated['table_type'] ?? null);
+        $chairQuantity = $this->normalizeFacilityChairQuantity($validated['chair_quantity'] ?? null);
 
         $insertPayload = [
             'room_number' => $roomNumber,
@@ -354,39 +388,52 @@ class DashboardInventoryController extends Controller
         }
 
         if (Schema::hasColumn('rooms', 'room_chair_quantity')) {
-            $insertPayload['room_chair_quantity'] = max(1, (int) ($template->room_chair_quantity ?? 1));
+            $insertPayload['room_chair_quantity'] = $chairQuantity;
         }
 
         if (Schema::hasColumn('rooms', 'room_table_type')) {
-            $insertPayload['room_table_type'] = (string) ($template->room_table_type ?? 'Triangular_Table');
+            $insertPayload['room_table_type'] = $tableType;
         }
 
         if (Schema::hasColumn('rooms', 'room_table_count')) {
-            $insertPayload['room_table_count'] = max(1, (int) ($template->room_table_count ?? 1));
+            $insertPayload['room_table_count'] = max(0, (int) ($template->room_table_count ?? 0));
         }
+
+        // #region agent log
+        file_put_contents(base_path('debug-a53051.log'), json_encode([
+            'sessionId' => 'a53051',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'B',
+            'location' => 'DashboardInventoryController.php:storeFacility',
+            'message' => 'Storing facility furniture fields',
+            'data' => [
+                'requestTableType' => $request->input('table_type'),
+                'requestChairQuantity' => $request->input('chair_quantity'),
+                'persistedTableType' => $insertPayload['room_table_type'] ?? null,
+                'persistedChairQuantity' => $insertPayload['room_chair_quantity'] ?? null,
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ], JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
+        // #endregion
 
         $roomId = DB::table('rooms')->insertGetId($insertPayload, 'room_id');
 
         return response()->json([
             'success' => true,
-            'facility' => [
-                'room_id' => $roomId,
-                'asset_id' => '#ROOM-' . str_pad((string) $roomId, 4, '0', STR_PAD_LEFT),
-                'item_name' => $roomNumber,
-                'room_type' => $roomType,
-                'classification' => $this->facilityCategoryLabel($validated['category']),
-                'classification_key' => $validated['category'],
-                'location' => $this->locationFromRoomNumber($roomNumber, $validated['category']),
-            ],
+            'facility' => $this->facilityJsonPayload(
+                $roomId,
+                $roomNumber,
+                $roomType,
+                $validated['category'],
+                $tableType,
+                $chairQuantity
+            ),
         ]);
     }
 
     public function updateFacility(Request $request, int $roomId): JsonResponse
     {
-        $validated = $request->validate([
-            'item_name' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'in:rooms,lab,others'],
-        ]);
+        $validated = $this->validateFacilityPayload($request);
 
         $room = DB::table('rooms')->where('room_id', $roomId)->first();
 
@@ -397,26 +444,55 @@ class DashboardInventoryController extends Controller
         }
 
         $roomType = $this->roomTypeFromFacilityCategory($validated['category']);
+        $tableType = $this->normalizeFacilityTableType($validated['table_type'] ?? null);
+        $chairQuantity = $this->normalizeFacilityChairQuantity($validated['chair_quantity'] ?? null);
+        $updatePayload = [
+            'room_number' => trim($validated['item_name']),
+            'room_type' => $roomType,
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('rooms', 'room_table_type')) {
+            $updatePayload['room_table_type'] = $tableType;
+        }
+
+        if (Schema::hasColumn('rooms', 'room_chair_quantity')) {
+            $updatePayload['room_chair_quantity'] = $chairQuantity;
+        }
+
+        // #region agent log
+        file_put_contents(base_path('debug-a53051.log'), json_encode([
+            'sessionId' => 'a53051',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'B',
+            'location' => 'DashboardInventoryController.php:updateFacility',
+            'message' => 'Updating facility furniture fields',
+            'data' => [
+                'roomId' => $roomId,
+                'requestKeys' => array_keys($request->all()),
+                'requestTableType' => $request->input('table_type'),
+                'requestChairQuantity' => $request->input('chair_quantity'),
+                'persistedTableType' => $updatePayload['room_table_type'] ?? null,
+                'persistedChairQuantity' => $updatePayload['room_chair_quantity'] ?? null,
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ], JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
+        // #endregion
 
         DB::table('rooms')
             ->where('room_id', $roomId)
-            ->update([
-                'room_number' => trim($validated['item_name']),
-                'room_type' => $roomType,
-                'updated_at' => now(),
-            ]);
+            ->update($updatePayload);
 
         return response()->json([
             'success' => true,
-            'facility' => [
-                'room_id' => $roomId,
-                'asset_id' => '#ROOM-' . str_pad((string) $roomId, 4, '0', STR_PAD_LEFT),
-                'item_name' => trim($validated['item_name']),
-                'room_type' => $roomType,
-                'classification' => $this->facilityCategoryLabel($validated['category']),
-                'classification_key' => $validated['category'],
-                'location' => $this->locationFromRoomNumber(trim($validated['item_name']), $validated['category']),
-            ],
+            'facility' => $this->facilityJsonPayload(
+                $roomId,
+                trim($validated['item_name']),
+                $roomType,
+                $validated['category'],
+                $tableType,
+                $chairQuantity
+            ),
         ]);
     }
 
@@ -1527,6 +1603,92 @@ class DashboardInventoryController extends Controller
         }
 
         return 'Reported Issue';
+    }
+
+    private function validateFacilityPayload(Request $request): array
+    {
+        return $request->validate([
+            'item_name' => ['required', 'string', 'max:255'],
+            'category' => ['required', 'in:rooms,lab,others'],
+            'table_type' => ['required', 'string', 'max:255'],
+            'chair_quantity' => ['required', 'integer', 'min:0', 'max:9999'],
+        ]);
+    }
+
+    private function facilityTableTypeOptions(): array
+    {
+        $values = ['arm chair', 'accounting table', 'Trapezoidal'];
+
+        if (Schema::hasTable('rooms') && Schema::hasColumn('rooms', 'room_table_type')) {
+            $existing = DB::table('rooms')
+                ->whereNotNull('room_table_type')
+                ->where('room_table_type', '!=', '')
+                ->distinct()
+                ->orderBy('room_table_type')
+                ->pluck('room_table_type')
+                ->all();
+
+            $values = array_values(array_unique(array_merge($values, array_map('strval', $existing))));
+        }
+
+        return array_map(
+            fn (string $value) => [
+                'value' => $value,
+                'label' => $this->facilityTableTypeLabel($value),
+            ],
+            $values
+        );
+    }
+
+    private function facilityTableTypeLabel(string $value): string
+    {
+        return match ($value) {
+            'arm chair' => 'Arm Chair',
+            'accounting table' => 'Accounting Table',
+            'Trapezoidal' => 'Trapezoidal',
+            '' => '—',
+            default => $value,
+        };
+    }
+
+    private function normalizeFacilityTableType(mixed $value): ?string
+    {
+        $tableType = trim((string) $value);
+
+        return $tableType !== '' ? $tableType : null;
+    }
+
+    private function normalizeFacilityChairQuantity(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return max(0, (int) $value);
+    }
+
+    private function facilityJsonPayload(
+        int $roomId,
+        string $roomNumber,
+        ?string $roomType,
+        string $category,
+        ?string $tableType,
+        ?int $chairQuantity
+    ): array {
+        $tableType = trim((string) $tableType);
+
+        return [
+            'room_id' => $roomId,
+            'asset_id' => '#ROOM-' . str_pad((string) $roomId, 4, '0', STR_PAD_LEFT),
+            'item_name' => $roomNumber,
+            'room_type' => $roomType,
+            'table_type' => $tableType,
+            'table_type_label' => $this->facilityTableTypeLabel($tableType),
+            'chair_quantity' => is_null($chairQuantity) ? '' : (string) $chairQuantity,
+            'classification' => $this->facilityCategoryLabel($category),
+            'classification_key' => $category,
+            'location' => $this->locationFromRoomNumber($roomNumber, $category),
+        ];
     }
 
     private function roomTypeFromFacilityCategory(string $category): ?string

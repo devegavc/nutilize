@@ -65,20 +65,30 @@
                   <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>
                   <th>Room Number</th>
                   <th>Classification</th>
+                  <th>Table Type</th>
+                  <th>Chair Qty</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="facilities-table-body">
                 @forelse(($facilityRows ?? []) as $facility)
-                <tr data-facility-id="{{ $facility['room_id'] }}" data-facility-category="{{ $facility['classification_key'] }}" data-facility-room-type="{{ $facility['room_type'] }}">
+                <tr
+                  data-facility-id="{{ $facility['room_id'] }}"
+                  data-facility-category="{{ $facility['classification_key'] }}"
+                  data-facility-room-type="{{ $facility['room_type'] }}"
+                  data-facility-table-type="{{ $facility['table_type'] }}"
+                  data-facility-chair-quantity="{{ $facility['chair_quantity'] }}"
+                >
                   <td>{{ $facility['asset_id'] }}</td>
                   <td>{{ $facility['item_name'] }}</td>
                   <td>{{ $facility['classification'] }}</td>
+                  <td>{{ $facility['table_type_label'] !== '' ? $facility['table_type_label'] : '—' }}</td>
+                  <td>{{ $facility['chair_quantity'] !== '' ? $facility['chair_quantity'] : '—' }}</td>
                   <td><button class="table-edit-btn" type="button">Edit</button></td>
                 </tr>
                 @empty
                 <tr>
-                  <td colspan="4">No rooms found in the database.</td>
+                  <td colspan="6">No rooms found in the database.</td>
                 </tr>
                 @endforelse
               </tbody>
@@ -108,6 +118,22 @@
             <option value="lab">Lab</option>
             <option value="others">Others</option>
           </select>
+
+          <div class="facilities-inline-fields">
+            <div>
+              <label class="facilities-field-label" for="facility-table-type">Table Type</label>
+              <select id="facility-table-type" class="facilities-input facilities-select">
+                <option value="" selected disabled>Select Table Type</option>
+                @foreach(($facilityTableTypes ?? []) as $tableType)
+                  <option value="{{ $tableType['value'] }}">{{ $tableType['label'] }}</option>
+                @endforeach
+              </select>
+            </div>
+            <div>
+              <label class="facilities-field-label" for="facility-chair-quantity">Chair Quantity</label>
+              <input id="facility-chair-quantity" class="facilities-input" type="number" min="0" max="9999" step="1" placeholder="0" />
+            </div>
+          </div>
         </section>
 
         <section class="equipment-form-section">

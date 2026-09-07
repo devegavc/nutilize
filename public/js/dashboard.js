@@ -14,6 +14,8 @@ const facilitiesInlineSearchInput = document.querySelector('.facilities-inline-s
 const facilitiesEditModal = document.getElementById('facilities-edit-modal');
 const facilitiesItemNameInput = document.getElementById('facility-item-name');
 const facilitiesCategoryInput = document.getElementById('facility-category');
+const facilitiesTableTypeInput = document.getElementById('facility-table-type');
+const facilitiesChairQuantityInput = document.getElementById('facility-chair-quantity');
 const facilitiesDescriptionInput = document.getElementById('facility-description');
 const facilitiesCancelButton = document.getElementById('facility-cancel-btn');
 const facilitiesSaveButton = document.getElementById('facility-save-btn');
@@ -3092,6 +3094,48 @@ function setRequestTabMode(mode) {
   requestContentCard.classList.toggle('final-mode', requestMode === 'final');
 }
 
+function setFacilityTableTypeSelect(value) {
+  if (!(facilitiesTableTypeInput instanceof HTMLSelectElement)) {
+    return;
+  }
+
+  const nextValue = String(value || '').trim();
+
+  if (nextValue && !Array.from(facilitiesTableTypeInput.options).some((option) => option.value === nextValue)) {
+    const option = document.createElement('option');
+    option.value = nextValue;
+    option.textContent = nextValue;
+    facilitiesTableTypeInput.appendChild(option);
+  }
+
+  facilitiesTableTypeInput.value = nextValue;
+}
+
+function syncFacilityRowFurniture(row, facility) {
+  if (!(row instanceof HTMLElement)) {
+    return;
+  }
+
+  const tableType = String(facility?.table_type ?? '').trim();
+  const tableTypeLabel = String(facility?.table_type_label ?? tableType).trim() || '—';
+  const chairQuantity = facility?.chair_quantity == null || facility?.chair_quantity === ''
+    ? ''
+    : String(facility.chair_quantity);
+
+  row.dataset.facilityTableType = tableType;
+  row.dataset.facilityChairQuantity = chairQuantity;
+
+  const cells = row.querySelectorAll('td');
+
+  if (cells[3]) {
+    cells[3].textContent = tableTypeLabel;
+  }
+
+  if (cells[4]) {
+    cells[4].textContent = chairQuantity === '' ? '—' : chairQuantity;
+  }
+}
+
 function openFacilitiesEditModal(row) {
   if (!facilitiesEditModal) {
     return;
@@ -3106,6 +3150,12 @@ function openFacilitiesEditModal(row) {
 
   if (facilitiesCategoryInput) {
     facilitiesCategoryInput.value = row.dataset.facilityCategory || 'rooms';
+  }
+
+  setFacilityTableTypeSelect(row.dataset.facilityTableType || '');
+
+  if (facilitiesChairQuantityInput) {
+    facilitiesChairQuantityInput.value = row.dataset.facilityChairQuantity || '';
   }
 
   if (facilitiesDescriptionInput) {
@@ -3128,6 +3178,10 @@ function openFacilitiesEditModal(row) {
     facilitiesSaveButton.textContent = 'Save Room/Facility';
   }
 
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a53051'},body:JSON.stringify({sessionId:'a53051',runId:'post-fix',hypothesisId:'C',location:'dashboard.js:openFacilitiesEditModal',message:'Opened edit modal with furniture fields',data:{facilityId:row.dataset.facilityId || null,tableType:row.dataset.facilityTableType || '',chairQuantity:row.dataset.facilityChairQuantity || '',selectValue:facilitiesTableTypeInput ? facilitiesTableTypeInput.value : null,inputValue:facilitiesChairQuantityInput ? facilitiesChairQuantityInput.value : null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
   facilitiesEditModal.classList.add('is-open');
   facilitiesEditModal.setAttribute('aria-hidden', 'false');
 }
@@ -3145,6 +3199,12 @@ function openFacilitiesAddModal() {
 
   if (facilitiesCategoryInput) {
     facilitiesCategoryInput.value = '';
+  }
+
+  setFacilityTableTypeSelect('');
+
+  if (facilitiesChairQuantityInput) {
+    facilitiesChairQuantityInput.value = '';
   }
 
   if (facilitiesDescriptionInput) {
@@ -6689,9 +6749,23 @@ if (facilitiesSaveButton) {
 
     const itemName = facilitiesItemNameInput.value.trim();
     const category = facilitiesCategoryInput.value.trim();
+    const tableType = facilitiesTableTypeInput ? facilitiesTableTypeInput.value.trim() : '';
+    const chairQuantity = facilitiesChairQuantityInput ? facilitiesChairQuantityInput.value.trim() : '';
 
     if (!itemName || !category) {
       showAppNotice('Please complete Facility Name and Room Type.');
+      return;
+    }
+
+    if (!tableType || chairQuantity === '') {
+      showAppNotice('Please complete Table Type and Chair Quantity.');
+      return;
+    }
+
+    const parsedChairQuantity = Number.parseInt(chairQuantity, 10);
+
+    if (!Number.isInteger(parsedChairQuantity) || parsedChairQuantity < 0) {
+      showAppNotice('Chair Quantity must be a whole number of 0 or greater.');
       return;
     }
 
@@ -6707,6 +6781,17 @@ if (facilitiesSaveButton) {
       const endpoint = isEditing
         ? `/dashboard/inventory/facilities/${encodeURIComponent(activeEditingRow.dataset.facilityId)}`
         : '/dashboard/inventory/facilities';
+      const requestBody = {
+        item_name: itemName,
+        category,
+        table_type: tableType,
+        chair_quantity: parsedChairQuantity,
+      };
+
+      // #region agent log
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a53051'},body:JSON.stringify({sessionId:'a53051',runId:'post-fix',hypothesisId:'A',location:'dashboard.js:facilitiesSave',message:'Saving facility furniture fields',data:{isEditing,endpoint,tableType:requestBody.table_type,chairQuantity:requestBody.chair_quantity},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+
       const response = await fetch(endpoint, {
         method: isEditing ? 'PATCH' : 'POST',
         headers: {
@@ -6715,10 +6800,7 @@ if (facilitiesSaveButton) {
           Accept: 'application/json',
           'X-Requested-With': 'XMLHttpRequest',
         },
-        body: JSON.stringify({
-          item_name: itemName,
-          category,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const responseText = await response.text();
@@ -6741,6 +6823,7 @@ if (facilitiesSaveButton) {
         const cells = activeEditingRow.querySelectorAll('td');
         activeEditingRow.dataset.facilityCategory = facility.classification_key || facility.category || 'rooms';
         activeEditingRow.dataset.facilityRoomType = facility.room_type || '';
+        syncFacilityRowFurniture(activeEditingRow, facility);
 
         if (cells[0]) {
           cells[0].textContent = facility.asset_id;
@@ -6762,8 +6845,11 @@ if (facilitiesSaveButton) {
           <td>${facility.asset_id}</td>
           <td>${facility.item_name}</td>
           <td>${facility.classification}</td>
+          <td></td>
+          <td></td>
           <td><button class="table-edit-btn" type="button">Edit</button></td>
         `;
+        syncFacilityRowFurniture(row, facility);
 
         facilitiesTableBody.prepend(row);
       }
