@@ -231,45 +231,6 @@
       setActiveLink();
     });
   </script>
-  <script>
-    // #region agent log
-    window.addEventListener('load', function () {
-      try {
-        var nav = performance.getEntriesByType('navigation')[0];
-        var resources = performance.getEntriesByType('resource').map(function (r) {
-          return {
-            name: String(r.name).replace(/^https?:\/\/[^/]+/, '').slice(0, 140),
-            type: r.initiatorType,
-            dur: Math.round(r.duration),
-            size: r.transferSize || 0,
-            ttfb: Math.round(r.responseStart - r.requestStart)
-          };
-        }).filter(function (r) {
-          return /landing|font|nulipa|googleapis|gstatic|favicon|nutilize_logo|nulp_logo/.test(r.name);
-        });
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'fa7298' },
-          body: JSON.stringify({
-            sessionId: 'fa7298',
-            runId: 'pre-fix',
-            hypothesisId: 'A,B,C,D',
-            location: 'index.blade.php:load',
-            message: 'landing nav+resources',
-            data: {
-              ttfbMs: nav ? Math.round(nav.responseStart - nav.requestStart) : null,
-              dclMs: nav ? Math.round(nav.domContentLoadedEventEnd) : null,
-              loadMs: nav ? Math.round(nav.loadEventEnd) : null,
-              transferSize: nav ? nav.transferSize : null,
-              resources: resources
-            },
-            timestamp: Date.now()
-          })
-        }).catch(function () {});
-      } catch (_e) {}
-    });
-    // #endregion
-  </script>
   <footer class="contact" id="contact">
     <div class="contact-content">
       <div class="contact-brand-block">
