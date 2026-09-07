@@ -23,31 +23,6 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->report(function (\Throwable $e) {
-            // #region agent log
-            try {
-                $path = '/';
-                try { $path = request()->getPathInfo() ?: '/'; } catch (\Throwable) {}
-                if ($path === '/' || $path === '') {
-                    $payload = json_encode([
-                        'sessionId' => 'fa7298',
-                        'runId' => 'landing-500',
-                        'hypothesisId' => 'A',
-                        'location' => 'bootstrap/app.php:report',
-                        'message' => 'uncaught exception on landing',
-                        'data' => [
-                            'class' => $e::class,
-                            'error' => $e->getMessage(),
-                            'file' => basename($e->getFile()).':'.$e->getLine(),
-                        ],
-                        'timestamp' => (int) (microtime(true) * 1000),
-                    ])."\n";
-                    file_put_contents(base_path('debug-fa7298.log'), $payload, FILE_APPEND);
-                }
-            } catch (\Throwable) {}
-            // #endregion
-        });
-
         $exceptions->render(function (QueryException|\PDOException $e, Request $request) {
             $message = $e->getMessage();
 

@@ -42,17 +42,19 @@ class DashboardHomeController extends Controller
             $announcements = $query->get();
         }
 
-        return view('dashboard-home', array_merge($data, [
-            'announcements' => $announcements,
-            'announcementsTableReady' => $announcementsTableReady,
-            'announcementTtlDays' => Announcement::DEFAULT_TTL_DAYS,
-            'openAnnouncementsModal' => (bool) (
-                session('open_announcements')
-                || request()->boolean('announcements')
-                || old('title') !== null
-                || old('body') !== null
-                || old('announcer_name') !== null
-            ),
-        ]));
+        return response()
+            ->view('dashboard-home', array_merge($data, [
+                'announcements' => $announcements,
+                'announcementsTableReady' => $announcementsTableReady,
+                'announcementTtlDays' => Announcement::DEFAULT_TTL_DAYS,
+                'openAnnouncementsModal' => (bool) (
+                    session('open_announcements')
+                    || request()->boolean('announcements')
+                    || old('title') !== null
+                    || old('body') !== null
+                    || old('announcer_name') !== null
+                ),
+            ]))
+            ->header('Cache-Control', 'private, no-store, no-cache, must-revalidate');
     }
 }

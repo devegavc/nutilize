@@ -414,6 +414,7 @@
       // #region agent log
       window.__announcementInitCount = (window.__announcementInitCount || 0) + 1;
       fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',hypothesisId:'C',location:'dashboard-home.blade.php:init',message:'initAnnouncementsModal ran',data:{initCount:window.__announcementInitCount,deleteFormAttrCount:modal.querySelectorAll('[data-announcement-delete-form]').length,cardFormCount:modal.querySelectorAll('.announcement-card form').length,dedicatedModalCount:document.querySelectorAll('#announcement-delete-confirm-modal').length,appConfirmExists:typeof window.showAppConfirm === 'function'},timestamp:Date.now()})}).catch(()=>{});
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',runId:'post-fix',hypothesisId:'A',location:'dashboard-home.blade.php:init-build',message:'post-fix single-handler build',data:{build:'61468c-2'},timestamp:Date.now()})}).catch(()=>{});
       // #endregion
 
       const setOpen = (isOpen) => {
@@ -500,43 +501,6 @@
             title: button.getAttribute('data-title') || '',
             body: button.getAttribute('data-body') || '',
             announcer: button.getAttribute('data-announcer') || '',
-          });
-        });
-      });
-
-      modal.querySelectorAll('[data-announcement-delete-form]').forEach((deleteForm) => {
-        if (!(deleteForm instanceof HTMLFormElement)) {
-          return;
-        }
-
-        deleteForm.addEventListener('submit', (event) => {
-          event.preventDefault();
-
-          const confirmFn = (typeof showAppConfirm === 'function')
-            ? showAppConfirm
-            : (typeof window.showAppConfirm === 'function' ? window.showAppConfirm : null);
-
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',hypothesisId:'A',location:'dashboard-home.blade.php:attr-submit',message:'data-announcement-delete-form submit handler',data:{hasConfirmFn:!!confirmFn,action:deleteForm.action,defaultPrevented:event.defaultPrevented,listenerCountHint:'attr-handler'},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-
-          if (!confirmFn) {
-            if (window.confirm('Are you sure you want to delete this announcement? This action cannot be undone.')) {
-              deleteForm.submit();
-            }
-            return;
-          }
-
-          confirmFn('Are you sure you want to delete this announcement?', {
-            title: 'Delete announcement',
-            confirmText: 'Delete',
-            cancelText: 'Cancel',
-            variant: 'danger',
-            dangerNote: 'This action cannot be undone.',
-          }).then((confirmed) => {
-            if (confirmed) {
-              deleteForm.submit();
-            }
           });
         });
       });
@@ -787,7 +751,7 @@
       });
     })();
   </script>
-  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}&b=61468c2"></script>
 </body>
 </html>
 

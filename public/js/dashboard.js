@@ -694,6 +694,17 @@ function showAppConfirm(message, options = {}) {
   fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',hypothesisId:'B',location:'dashboard.js:showAppConfirm',message:'showAppConfirm called',data:{title:String(title||''),message:String(message||'').slice(0,80),confirmText:String(confirmText||''),alreadyOpen:!!document.getElementById('app-confirm-modal')?.classList.contains('is-open'),dedicatedOpen:!!document.getElementById('announcement-delete-confirm-modal')?.classList.contains('is-open')},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
 
+  const dedicatedAnnouncementModal = document.getElementById('announcement-delete-confirm-modal');
+  if (
+    dedicatedAnnouncementModal instanceof HTMLElement
+    && String(title || '') === 'Delete announcement'
+  ) {
+    // #region agent log
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',runId:'post-fix',hypothesisId:'A',location:'dashboard.js:showAppConfirm-skip',message:'skipped duplicate announcement confirm',data:{title:String(title||'')},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return Promise.resolve(false);
+  }
+
   let modal = document.getElementById('app-confirm-modal');
 
   if (!(modal instanceof HTMLElement)) {
