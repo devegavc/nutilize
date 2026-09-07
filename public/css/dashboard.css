@@ -1740,7 +1740,7 @@ body {
 
 .reservation-details-layout {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1.1fr) minmax(240px, 0.9fr);
   gap: 14px;
   margin-bottom: 14px;
 }
@@ -1830,28 +1830,37 @@ body {
   line-height: 1.35;
 }
 
-.reservation-proof-gallery {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 48vh;
-  overflow-y: auto;
-  padding-right: 4px;
+.reservation-proof-viewer {
+  position: relative;
 }
 
-.reservation-proof-item {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.reservation-proof-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(30, 42, 90, 0.82);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 
-.reservation-proof-item-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: #5b6cb3;
+.reservation-proof-nav.is-prev {
+  left: 8px;
+}
+
+.reservation-proof-nav.is-next {
+  right: 8px;
+}
+
+.reservation-proof-nav:hover {
+  background: rgba(30, 42, 90, 0.95);
 }
 
 .reservation-proof-frame {
@@ -1860,14 +1869,13 @@ body {
   overflow: hidden;
   border: 1px solid #dde3f0;
   background: #eef2f9;
-  min-height: 220px;
+  aspect-ratio: 4 / 3;
 }
 
 .reservation-proof-frame img {
   display: block;
   width: 100%;
-  height: auto;
-  max-height: 360px;
+  height: 100%;
   object-fit: contain;
   background: #eef2f9;
 }
@@ -2052,8 +2060,8 @@ body {
     max-height: 92vh;
   }
 
-  .reservation-proof-frame img {
-    max-height: 280px;
+  .reservation-proof-frame {
+    aspect-ratio: 16 / 10;
   }
 }
 

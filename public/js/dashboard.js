@@ -1429,17 +1429,24 @@ function showReservationDetailsModal(reservation, options = {}) {
       <section class="reservation-details-panel reservation-proof-panel">
         <div class="reservation-panel-heading">
           <h3>${escapeReservationDetailsHtml(attachmentHeading)}</h3>
-          <span class="reservation-proof-count">${proofUrls.length} ${proofUrls.length === 1 ? 'image' : 'images'}</span>
+          ${proofUrls.length > 1
+            ? `<span class="reservation-proof-count" data-proof-counter>1 / ${proofUrls.length}</span>`
+            : `<a class="reservation-proof-open" href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">Open full image</a>`}
         </div>
-        <div class="reservation-proof-gallery">
-          ${proofUrls.map((url, index) => `
-            <figure class="reservation-proof-item">
-              <figcaption class="reservation-proof-item-label">${index + 1} of ${proofUrls.length}</figcaption>
-              <a class="reservation-proof-frame" href="${escapeReservationDetailsHtml(url)}" target="_blank" rel="noopener noreferrer">
-                <img src="${escapeReservationDetailsHtml(url)}" alt="${escapeReservationDetailsHtml(attachmentHeading)} ${index + 1} of ${proofUrls.length} for ${escapeReservationDetailsHtml(reservationCode)}" loading="lazy" />
-              </a>
-            </figure>
-          `).join('')}
+        <div class="reservation-proof-viewer">
+          ${proofUrls.length > 1 ? `
+            <button type="button" class="reservation-proof-nav is-prev" data-proof-nav="-1" aria-label="Previous image">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+          ` : ''}
+          <a class="reservation-proof-frame" data-proof-link href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">
+            <img data-proof-image src="${escapeReservationDetailsHtml(proofUrl)}" alt="${escapeReservationDetailsHtml(attachmentHeading)} for ${escapeReservationDetailsHtml(reservationCode)}" />
+          </a>
+          ${proofUrls.length > 1 ? `
+            <button type="button" class="reservation-proof-nav is-next" data-proof-nav="1" aria-label="Next image">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          ` : ''}
         </div>
       </section>
     `
@@ -1515,9 +1522,9 @@ function showReservationDetailsModal(reservation, options = {}) {
                 </div>
               </div>
             </section>
-          </div>
 
-          ${proofMarkup}
+            ${proofMarkup}
+          </div>
 
           <section class="reservation-details-panel reservation-resources-panel">
             <div class="reservation-panel-heading">
@@ -1533,8 +1540,48 @@ function showReservationDetailsModal(reservation, options = {}) {
 
   const closeBtn = modal.querySelector('.reservation-details-close');
   const overlay = modal.querySelector('.reservation-details-overlay');
+  let proofIndex = 0;
+
+  const showProofAt = (index) => {
+    if (!proofUrls.length) {
+      return;
+    }
+
+    proofIndex = (index + proofUrls.length) % proofUrls.length;
+    const url = proofUrls[proofIndex];
+    const proofImage = modal.querySelector('[data-proof-image]');
+    const proofLink = modal.querySelector('[data-proof-link]');
+    const proofCounter = modal.querySelector('[data-proof-counter]');
+
+    if (proofImage instanceof HTMLImageElement) {
+      proofImage.src = url;
+      proofImage.alt = `${attachmentHeading} ${proofIndex + 1} of ${proofUrls.length} for ${reservationCode}`;
+    }
+    if (proofLink instanceof HTMLAnchorElement) {
+      proofLink.href = url;
+    }
+    if (proofCounter instanceof HTMLElement) {
+      proofCounter.textContent = `${proofIndex + 1} / ${proofUrls.length}`;
+    }
+  };
+
+  const onProofKeydown = (event) => {
+    if (event.key === 'Escape') {
+      closeModal();
+      return;
+    }
+    if (proofUrls.length < 2) {
+      return;
+    }
+    if (event.key === 'ArrowLeft') {
+      showProofAt(proofIndex - 1);
+    } else if (event.key === 'ArrowRight') {
+      showProofAt(proofIndex + 1);
+    }
+  };
 
   const closeModal = () => {
+    document.removeEventListener('keydown', onProofKeydown);
     modal.remove();
   };
 
@@ -1544,6 +1591,17 @@ function showReservationDetailsModal(reservation, options = {}) {
       closeModal();
     }
   });
+
+  modal.querySelectorAll('[data-proof-nav]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const step = Number.parseInt(button.getAttribute('data-proof-nav') || '0', 10) || 0;
+      showProofAt(proofIndex + step);
+    });
+  });
+
+  document.addEventListener('keydown', onProofKeydown);
 
   if (canAct && typeof options.onAction === 'function') {
     modal.querySelectorAll('[data-modal-action]').forEach((button) => {
@@ -1582,7 +1640,7 @@ function showReservationDetailsModal(reservation, options = {}) {
 
   document.body.appendChild(modal);
   // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46f7af'},body:JSON.stringify({sessionId:'46f7af',runId:'post-fix-multi',hypothesisId:'G',location:'dashboard.js:showReservationDetailsModal',message:'proof frames rendered in modal',data:{reservationId:reservation.id||null,urlCount:proofUrls.length,frameCount:modal.querySelectorAll('.reservation-proof-frame').length},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46f7af'},body:JSON.stringify({sessionId:'46f7af',runId:'layout-carousel',hypothesisId:'G',location:'dashboard.js:showReservationDetailsModal',message:'proof carousel rendered',data:{reservationId:reservation.id||null,urlCount:proofUrls.length,frameCount:modal.querySelectorAll('.reservation-proof-frame').length,navCount:modal.querySelectorAll('[data-proof-nav]').length},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
 }
 
