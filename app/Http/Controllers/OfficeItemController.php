@@ -71,6 +71,10 @@ class OfficeItemController extends Controller
             ];
         });
 
+        // #region agent log
+        @file_put_contents(base_path('debug-f8769b.log'), json_encode(['sessionId' => 'f8769b', 'runId' => 'post-fix-2', 'hypothesisId' => 'F', 'location' => 'OfficeItemController.php:index', 'message' => 'office items page rendered', 'data' => ['host' => $request->getHost(), 'path' => $request->path()], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
+        // #endregion
+
         return view('office-items', [
             'equipmentRows' => $rows,
             'equipmentCategories' => $equipmentCategories,

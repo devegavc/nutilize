@@ -114,7 +114,7 @@
     </section>
   </main>
 
-  <div class="inventory-confirm-modal" id="inventory-confirm-modal" aria-hidden="true">
+  <div class="inventory-confirm-modal" id="inventory-confirm-modal" aria-hidden="true" style="z-index: 5000;">
     <div class="inventory-confirm-overlay" data-close-inventory-confirm="true"></div>
     <article class="inventory-confirm-card" role="dialog" aria-modal="true" aria-labelledby="inventory-confirm-title">
       <header class="inventory-confirm-head">
@@ -208,6 +208,61 @@
     </article>
   </section>
 
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
+  <script>
+    (function () {
+      document.addEventListener('click', function (event) {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+
+        const btn = target.closest('#equipment-delete-btn');
+        if (!(btn instanceof HTMLButtonElement) || btn.hidden || btn.disabled) {
+          return;
+        }
+
+        if (btn.dataset.officeDeleteConfirmed === '1') {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const finishAsk = async function () {
+          // #region agent log
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'post-fix-2',hypothesisId:'G',location:'office-items.blade.php:deleteInterceptor',message:'inline delete interceptor caught click',data:{pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+          let ok = false;
+          try {
+            if (typeof window.showAppConfirm === 'function') {
+              ok = await window.showAppConfirm(
+                'Are you sure you want to delete this item? This cannot be undone.',
+                { title: 'Delete Item', confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' }
+              );
+            } else {
+              ok = window.confirm('Are you sure you want to delete this item? This cannot be undone.');
+            }
+          } catch (_error) {
+            ok = window.confirm('Are you sure you want to delete this item? This cannot be undone.');
+          }
+
+          // #region agent log
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'post-fix-2',hypothesisId:'G',location:'office-items.blade.php:deleteInterceptor:result',message:'inline delete interceptor confirm result',data:{ok},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+
+          if (!ok) {
+            return;
+          }
+
+          btn.dataset.officeDeleteConfirmed = '1';
+          btn.click();
+          delete btn.dataset.officeDeleteConfirmed;
+        };
+
+        finishAsk();
+      }, true);
+    })();
+  </script>
 </body>
 </html>

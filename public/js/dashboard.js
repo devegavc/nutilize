@@ -3840,12 +3840,20 @@ async function submitEquipmentDelete() {
     return;
   }
 
-  const confirmed = await openInventoryConfirmModal({
-    title: 'Delete Item',
-    message: 'Are you sure you want to delete this item? This cannot be undone.',
-    confirmText: 'Delete',
-    variant: 'delete',
-  });
+  const alreadyConfirmed = equipmentDeleteButton instanceof HTMLButtonElement
+    && equipmentDeleteButton.dataset.officeDeleteConfirmed === '1';
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'post-fix-2',hypothesisId:'G',location:'dashboard.js:submitEquipmentDelete:confirmGate',message:'delete confirm gate',data:{alreadyConfirmed,itemId},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
+  const confirmed = alreadyConfirmed
+    ? true
+    : await showAppConfirm('Are you sure you want to delete this item? This cannot be undone.', {
+      title: 'Delete Item',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
 
   // #region agent log
   fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'pre-fix',hypothesisId:'A',location:'dashboard.js:submitEquipmentDelete:afterConfirm',message:'delete confirmation result',data:{confirmed,itemId,modalIsOpen:inventoryConfirmModal instanceof HTMLElement && inventoryConfirmModal.classList.contains('is-open')},timestamp:Date.now()})}).catch(()=>{});
