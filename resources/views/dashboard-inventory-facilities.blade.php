@@ -7,9 +7,9 @@
 <meta name="csrf-token" content="{{ csrf_token() }}" />  <title>NUtilize | Inventory Facilities</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
 </head>
-<body>
+<body class="page-facilities-inventory">
   <script>
     window.authUser = {
       id: {{ auth()->user()->user_id ?? 'null' }},
@@ -161,7 +161,7 @@
     </article>
   </section>
 
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
 </html>
 

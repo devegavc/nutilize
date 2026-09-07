@@ -6295,7 +6295,7 @@ if (facilitiesTableBody && facilitiesTabs.length) {
   // #region agent log
   const facilitiesLayoutTable = document.querySelector('.facilities-inventory-table');
   const facilitiesLayoutHeads = facilitiesLayoutTable ? Array.from(facilitiesLayoutTable.querySelectorAll('thead th')) : [];
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a53051'},body:JSON.stringify({sessionId:'a53051',runId:'layout-fix',hypothesisId:'A',location:'dashboard.js:facilitiesLayout',message:'Facilities table column layout',data:{columnCount:facilitiesLayoutHeads.length,headers:facilitiesLayoutHeads.map((th)=>th.textContent.trim()),widths:facilitiesLayoutHeads.map((th)=>Math.round(th.getBoundingClientRect().width)),tableWidth:facilitiesLayoutTable?Math.round(facilitiesLayoutTable.getBoundingClientRect().width):0},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a53051'},body:JSON.stringify({sessionId:'a53051',runId:'layout-fix-2',hypothesisId:'A',location:'dashboard.js:facilitiesLayout',message:'Facilities table column layout',data:{pageClass:document.body.className,columnCount:facilitiesLayoutHeads.length,headers:facilitiesLayoutHeads.map((th)=>th.textContent.trim()),widths:facilitiesLayoutHeads.map((th)=>Math.round(th.getBoundingClientRect().width)),paddings:facilitiesLayoutHeads.map((th)=>window.getComputedStyle(th).padding),tableWidth:facilitiesLayoutTable?Math.round(facilitiesLayoutTable.getBoundingClientRect().width):0},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
 }
 
