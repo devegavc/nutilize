@@ -1740,7 +1740,7 @@ body {
 
 .reservation-details-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(240px, 0.9fr);
+  grid-template-columns: 1fr;
   gap: 14px;
   margin-bottom: 14px;
 }
@@ -1831,13 +1831,27 @@ body {
 }
 
 .reservation-proof-gallery {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 48vh;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
-.reservation-proof-gallery:not(.is-single) {
-  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+.reservation-proof-item {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reservation-proof-item-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #5b6cb3;
 }
 
 .reservation-proof-frame {
@@ -1846,17 +1860,14 @@ body {
   overflow: hidden;
   border: 1px solid #dde3f0;
   background: #eef2f9;
-  aspect-ratio: 4 / 3;
-}
-
-.reservation-proof-gallery:not(.is-single) .reservation-proof-frame {
-  aspect-ratio: 1;
+  min-height: 220px;
 }
 
 .reservation-proof-frame img {
   display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: 360px;
   object-fit: contain;
   background: #eef2f9;
 }
@@ -2041,8 +2052,8 @@ body {
     max-height: 92vh;
   }
 
-  .reservation-proof-frame {
-    aspect-ratio: 16 / 10;
+  .reservation-proof-frame img {
+    max-height: 280px;
   }
 }
 

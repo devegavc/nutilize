@@ -2636,25 +2636,27 @@ class ApprovalController extends Controller
             }
         }
 
-        $rawProofOfConsent = trim((string) ($reservation->proof_of_consent_url ?? ''));
+        $rawProofOfConsent = $reservation->proof_of_consent_url ?? '';
         $proofOfConsentUrls = $this->parseProofOfConsentUrls($rawProofOfConsent);
         $proofOfConsentUrl = $proofOfConsentUrls[0] ?? '';
         $requesterType = $this->requesterTypeLabel($requester);
         $attachmentHeading = $requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent';
         // #region agent log
-        $__decodedProof = json_decode($rawProofOfConsent, true);
+        $__rawForLog = is_array($rawProofOfConsent) ? json_encode($rawProofOfConsent) : trim((string) $rawProofOfConsent);
+        $__decodedProof = is_array($rawProofOfConsent) ? $rawProofOfConsent : json_decode($__rawForLog, true);
         $__logPayload = json_encode([
             'sessionId' => '46f7af',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'A',
+            'runId' => 'post-fix-multi',
+            'hypothesisId' => 'F',
             'location' => 'ApprovalController.php:getReservationDetails',
             'message' => 'parsed proof_of_consent_url',
             'data' => [
                 'reservationId' => (int) $reservationId,
-                'rawLength' => strlen($rawProofOfConsent),
-                'rawPrefix' => substr($rawProofOfConsent, 0, 16),
-                'startsHttp' => (bool) preg_match('#^https?://#i', $rawProofOfConsent),
-                'startsJsonArray' => str_starts_with(ltrim($rawProofOfConsent), '['),
+                'rawIsArray' => is_array($rawProofOfConsent),
+                'rawLength' => strlen($__rawForLog),
+                'rawPrefix' => substr($__rawForLog, 0, 16),
+                'startsHttp' => (bool) preg_match('#^https?://#i', $__rawForLog),
+                'startsJsonArray' => str_starts_with(ltrim($__rawForLog), '['),
                 'jsonIsArray' => is_array($__decodedProof),
                 'jsonUrlCount' => is_array($__decodedProof) ? count($__decodedProof) : 0,
                 'parsedUrlCount' => count($proofOfConsentUrls),
@@ -2750,24 +2752,28 @@ class ApprovalController extends Controller
      *
      * @return list<string>
      */
-    private function parseProofOfConsentUrls(?string $raw): array
+    private function parseProofOfConsentUrls(mixed $raw): array
     {
-        $raw = trim((string) $raw);
-        if ($raw === '') {
-            return [];
-        }
+        if (is_array($raw)) {
+            $candidates = $raw;
+        } else {
+            $raw = trim((string) $raw);
+            if ($raw === '' || strcasecmp($raw, 'Array') === 0) {
+                return [];
+            }
 
-        $decoded = json_decode($raw, true);
-        if (json_last_error() === JSON_ERROR_NONE) {
-            if (is_string($decoded)) {
-                $candidates = [$decoded];
-            } elseif (is_array($decoded)) {
-                $candidates = $decoded;
+            $decoded = json_decode($raw, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                if (is_string($decoded)) {
+                    $candidates = [$decoded];
+                } elseif (is_array($decoded)) {
+                    $candidates = $decoded;
+                } else {
+                    $candidates = [$raw];
+                }
             } else {
                 $candidates = [$raw];
             }
-        } else {
-            $candidates = [$raw];
         }
 
         $urls = [];

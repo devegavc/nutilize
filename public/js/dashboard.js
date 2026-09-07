@@ -1341,14 +1341,14 @@ if (reportTableBody instanceof HTMLElement) {
   });
 }
 
-function parseReservationProofUrls(reservation) {
-  if (Array.isArray(reservation?.proof_of_consent_urls) && reservation.proof_of_consent_urls.length) {
-    return reservation.proof_of_consent_urls
+function normalizeReservationProofUrlList(value) {
+  if (Array.isArray(value)) {
+    return value
       .map((url) => String(url || '').trim())
       .filter((url) => /^https?:\/\//i.test(url));
   }
 
-  const raw = String(reservation?.proof_of_consent_url || '').trim();
+  const raw = String(value || '').trim();
   if (!raw) {
     return [];
   }
@@ -1357,9 +1357,7 @@ function parseReservationProofUrls(reservation) {
     try {
       const decoded = JSON.parse(raw);
       if (Array.isArray(decoded)) {
-        return decoded
-          .map((url) => String(url || '').trim())
-          .filter((url) => /^https?:\/\//i.test(url));
+        return normalizeReservationProofUrlList(decoded);
       }
     } catch (_error) {
       return [];
@@ -1367,6 +1365,15 @@ function parseReservationProofUrls(reservation) {
   }
 
   return /^https?:\/\//i.test(raw) ? [raw] : [];
+}
+
+function parseReservationProofUrls(reservation) {
+  const fromList = normalizeReservationProofUrlList(reservation?.proof_of_consent_urls);
+  if (fromList.length) {
+    return fromList;
+  }
+
+  return normalizeReservationProofUrlList(reservation?.proof_of_consent_url);
 }
 
 function showReservationDetailsModal(reservation, options = {}) {
@@ -1398,7 +1405,7 @@ function showReservationDetailsModal(reservation, options = {}) {
   const attachmentHeading = String(reservation.attachment_heading || '').trim()
     || (requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent');
   // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46f7af'},body:JSON.stringify({sessionId:'46f7af',runId:'post-fix',hypothesisId:'A',location:'dashboard.js:showReservationDetailsModal',message:'proof urls received by modal',data:{reservationId:reservation.id||null,proofLength:proofUrl.length,urlCount:proofUrls.length,hasProof:proofUrls.length>0,prefix:proofUrl.slice(0,16),requesterType,attachmentHeading},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46f7af'},body:JSON.stringify({sessionId:'46f7af',runId:'post-fix-multi',hypothesisId:'F',location:'dashboard.js:showReservationDetailsModal',message:'proof urls received by modal',data:{reservationId:reservation.id||null,proofLength:proofUrl.length,urlCount:proofUrls.length,hasUrlsArray:Array.isArray(reservation.proof_of_consent_urls),urlsArrayLength:Array.isArray(reservation.proof_of_consent_urls)?reservation.proof_of_consent_urls.length:0,hasProof:proofUrls.length>0,prefix:proofUrl.slice(0,16),requesterType,attachmentHeading},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
   const scheduleLabel = reservation.event_schedule
     || [
@@ -1422,15 +1429,16 @@ function showReservationDetailsModal(reservation, options = {}) {
       <section class="reservation-details-panel reservation-proof-panel">
         <div class="reservation-panel-heading">
           <h3>${escapeReservationDetailsHtml(attachmentHeading)}</h3>
-          ${proofUrls.length === 1
-            ? `<a class="reservation-proof-open" href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">Open full image</a>`
-            : `<span class="reservation-proof-count">${proofUrls.length} images</span>`}
+          <span class="reservation-proof-count">${proofUrls.length} ${proofUrls.length === 1 ? 'image' : 'images'}</span>
         </div>
-        <div class="reservation-proof-gallery${proofUrls.length === 1 ? ' is-single' : ''}">
+        <div class="reservation-proof-gallery">
           ${proofUrls.map((url, index) => `
-            <a class="reservation-proof-frame" href="${escapeReservationDetailsHtml(url)}" target="_blank" rel="noopener noreferrer">
-              <img src="${escapeReservationDetailsHtml(url)}" alt="${escapeReservationDetailsHtml(attachmentHeading)} ${index + 1} for ${escapeReservationDetailsHtml(reservationCode)}" loading="lazy" />
-            </a>
+            <figure class="reservation-proof-item">
+              <figcaption class="reservation-proof-item-label">${index + 1} of ${proofUrls.length}</figcaption>
+              <a class="reservation-proof-frame" href="${escapeReservationDetailsHtml(url)}" target="_blank" rel="noopener noreferrer">
+                <img src="${escapeReservationDetailsHtml(url)}" alt="${escapeReservationDetailsHtml(attachmentHeading)} ${index + 1} of ${proofUrls.length} for ${escapeReservationDetailsHtml(reservationCode)}" loading="lazy" />
+              </a>
+            </figure>
           `).join('')}
         </div>
       </section>
@@ -1507,9 +1515,9 @@ function showReservationDetailsModal(reservation, options = {}) {
                 </div>
               </div>
             </section>
-
-            ${proofMarkup}
           </div>
+
+          ${proofMarkup}
 
           <section class="reservation-details-panel reservation-resources-panel">
             <div class="reservation-panel-heading">
@@ -1573,6 +1581,9 @@ function showReservationDetailsModal(reservation, options = {}) {
   }
 
   document.body.appendChild(modal);
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46f7af'},body:JSON.stringify({sessionId:'46f7af',runId:'post-fix-multi',hypothesisId:'G',location:'dashboard.js:showReservationDetailsModal',message:'proof frames rendered in modal',data:{reservationId:reservation.id||null,urlCount:proofUrls.length,frameCount:modal.querySelectorAll('.reservation-proof-frame').length},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 }
 
 function hideReservationDetailsLoadingModal() {

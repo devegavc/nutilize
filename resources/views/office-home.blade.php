@@ -9,7 +9,7 @@
   <title>NUtilize | Office Home</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/office.css" />
+  <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}" />
 </head>
 <body>
   <script>
@@ -153,7 +153,7 @@
     window.officeQueueSnapshotUrl = '{{ route('office.requests.snapshot') }}';
     window.reservationDetailsUrlTemplate = '{{ route('reservation.details', ['reservationId' => '__RESERVATION_ID__']) }}';
   </script>
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
   <script>
     (function () {
       const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
