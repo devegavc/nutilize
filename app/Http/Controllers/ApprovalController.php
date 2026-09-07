@@ -273,12 +273,40 @@ class ApprovalController extends Controller
                 return response()->json(['error' => 'This request is waiting for the item owner who registered the borrowed equipment.'], 403);
             }
 
-            $approval->update([
+            $rejectionReason = trim((string) request()->input('rejection_reason', ''));
+            // #region agent log
+            $this->debugRejectLog('B', 'ApprovalController.php:reject', 'reject payload received', [
+                'approvalId' => (int) $approvalId,
+                'reasonLength' => mb_strlen($rejectionReason),
+                'hasReason' => $rejectionReason !== '',
+            ]);
+            // #endregion
+            if ($rejectionReason === '') {
+                return response()->json(['error' => 'Please provide a rejection reason.'], 422);
+            }
+
+            if (mb_strlen($rejectionReason) > 500) {
+                return response()->json(['error' => 'Rejection reason must be 500 characters or fewer.'], 422);
+            }
+
+            $updatePayload = [
                 'status' => 'rejected',
                 'approved_at' => now(),
                 'approved_by_user_id' => (int) $user->user_id,
-            ]);
+            ];
 
+            if (Schema::hasColumn('reservation_approvals', 'rejection_reason')) {
+                $updatePayload['rejection_reason'] = $rejectionReason;
+            }
+
+            $approval->update($updatePayload);
+            // #region agent log
+            $this->debugRejectLog('B', 'ApprovalController.php:reject', 'rejection saved', [
+                'approvalId' => (int) $approval->approval_id,
+                'savedReasonLength' => mb_strlen((string) ($approval->rejection_reason ?? '')),
+                'columnPresent' => Schema::hasColumn('reservation_approvals', 'rejection_reason'),
+            ]);
+            // #endregion
             $this->recordApprovalHistory($approval);
             $this->forgetActionableOfficeCache((int) $approval->reservation_id);
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.rejected');
@@ -1731,27 +1759,57 @@ class ApprovalController extends Controller
             (string) $approval->status,
             $approval->approved_by_user_id ? (int) $approval->approved_by_user_id : null,
             $approval->approved_at,
+            $approval->rejection_reason ?? null,
         );
     }
 
-    private function upsertApprovalHistory(int $approvalId, int $reservationId, int $officeId, string $status, ?int $approvedByUserId, $approvedAt): void
+    private function upsertApprovalHistory(int $approvalId, int $reservationId, int $officeId, string $status, ?int $approvedByUserId, $approvedAt, ?string $rejectionReason = null): void
     {
         if (!Schema::hasTable('reservation_approval_histories')) {
             return;
         }
 
+        $payload = [
+            'reservation_id' => $reservationId,
+            'office_id' => $officeId,
+            'approved_by_user_id' => $approvedByUserId,
+            'status' => $status,
+            'approved_at' => $approvedAt,
+            'updated_at' => now(),
+            'created_at' => now(),
+        ];
+
+        if (Schema::hasColumn('reservation_approval_histories', 'rejection_reason')) {
+            $payload['rejection_reason'] = $rejectionReason;
+        }
+
         DB::table('reservation_approval_histories')->updateOrInsert(
             ['approval_id' => $approvalId],
-            [
-                'reservation_id' => $reservationId,
-                'office_id' => $officeId,
-                'approved_by_user_id' => $approvedByUserId,
-                'status' => $status,
-                'approved_at' => $approvedAt,
-                'updated_at' => now(),
-                'created_at' => now(),
-            ]
+            $payload
         );
+    }
+
+    private function debugRejectLog(string $hypothesisId, string $location, string $message, array $data = []): void
+    {
+        // #region agent log
+        try {
+            file_put_contents(
+                base_path('debug-6794ce.log'),
+                json_encode([
+                    'sessionId' => '6794ce',
+                    'runId' => 'reject-reason',
+                    'hypothesisId' => $hypothesisId,
+                    'location' => $location,
+                    'message' => $message,
+                    'data' => $data,
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES) . PHP_EOL,
+                FILE_APPEND | LOCK_EX
+            );
+        } catch (Throwable $throwable) {
+            // Ignore debug log failures.
+        }
+        // #endregion
     }
 
     private function prepareReservationWorkflowHandoff(int $reservationId, bool $ensureRows = true): void

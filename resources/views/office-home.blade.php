@@ -137,6 +137,10 @@
       </header>
       <div class="office-action-confirm-body">
         <p id="office-action-confirm-message">Are you sure you want to approve this reservation request? This action cannot be undone.</p>
+        <div class="office-action-confirm-reason" id="office-action-confirm-reason-wrap" hidden>
+          <label for="office-action-confirm-reason">Rejection reason <span>(required)</span></label>
+          <textarea id="office-action-confirm-reason" rows="3" maxlength="500" placeholder="Explain why this request is being rejected..."></textarea>
+        </div>
       </div>
       <div class="office-action-confirm-actions">
         <button type="button" class="office-modal-btn cancel" id="office-action-confirm-cancel">Cancel</button>
@@ -164,6 +168,8 @@
       const actionConfirmMessage = document.getElementById('office-action-confirm-message');
       const actionConfirmCancel = document.getElementById('office-action-confirm-cancel');
       const actionConfirmSubmit = document.getElementById('office-action-confirm-submit');
+      const actionConfirmReasonWrap = document.getElementById('office-action-confirm-reason-wrap');
+      const actionConfirmReason = document.getElementById('office-action-confirm-reason');
       const actionConfirmCard = actionConfirmModal instanceof HTMLElement
         ? actionConfirmModal.querySelector('.office-action-confirm-card')
         : null;
@@ -232,14 +238,35 @@
         }
 
         try {
-          const confirmed = await openActionConfirmModal(action);
+          const confirmedResult = await openActionConfirmModal(action);
+          const confirmed = confirmedResult === true || Boolean(confirmedResult?.confirmed);
+          const rejectionReason = typeof confirmedResult?.reason === 'string'
+            ? confirmedResult.reason.trim()
+            : '';
+
+          // #region agent log
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6794ce'},body:JSON.stringify({sessionId:'6794ce',runId:'reject-reason',hypothesisId:'A',location:'office-home.blade.php:submitQueueAction',message:'confirm result before reject request',data:{action,confirmed,reasonLength:rejectionReason.length},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
 
           if (!confirmed) {
             return false;
           }
 
+          if (action === 'reject' && rejectionReason === '') {
+            showAppNotice('Please provide a rejection reason before rejecting this request.');
+            return false;
+          }
+
           isActing = true;
           refreshVersion += 1;
+
+          const requestBody = action === 'reject'
+            ? { rejection_reason: rejectionReason }
+            : {};
+
+          // #region agent log
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6794ce'},body:JSON.stringify({sessionId:'6794ce',runId:'reject-reason',hypothesisId:'E',location:'office-home.blade.php:submitQueueAction',message:'PATCH body prepared',data:{action,hasReason:Boolean(requestBody.rejection_reason),reasonLength:rejectionReason.length},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
 
           const response = await fetch(resolveUrl(action, approvalId), {
             method: 'PATCH',
@@ -249,7 +276,7 @@
               'X-CSRF-TOKEN': token,
               'X-Requested-With': 'XMLHttpRequest',
             },
-            body: JSON.stringify({}),
+            body: JSON.stringify(requestBody),
           });
 
           const responseText = await response.text();
@@ -266,6 +293,10 @@
               };
             }
           }
+
+          // #region agent log
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6794ce'},body:JSON.stringify({sessionId:'6794ce',runId:'reject-reason',hypothesisId:'B',location:'office-home.blade.php:submitQueueAction',message:'reject API response',data:{action,ok:response.ok,status:response.status,success:Boolean(payload.success)},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
 
           if (!response.ok) {
             const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
@@ -368,13 +399,29 @@
         actionConfirmModal.setAttribute('aria-hidden', 'true');
       };
 
+      const syncRejectReasonSubmitState = () => {
+        if (!(actionConfirmSubmit instanceof HTMLButtonElement)) {
+          return;
+        }
+
+        if (!(actionConfirmReasonWrap instanceof HTMLElement) || actionConfirmReasonWrap.hidden) {
+          actionConfirmSubmit.disabled = false;
+          return;
+        }
+
+        const reasonLength = actionConfirmReason instanceof HTMLTextAreaElement
+          ? actionConfirmReason.value.trim().length
+          : 0;
+        actionConfirmSubmit.disabled = reasonLength === 0;
+      };
+
       const openActionConfirmModal = (action) => new Promise((resolve) => {
         if (!(actionConfirmModal instanceof HTMLElement)
           || !(actionConfirmTitle instanceof HTMLElement)
           || !(actionConfirmMessage instanceof HTMLElement)
           || !(actionConfirmCancel instanceof HTMLButtonElement)
           || !(actionConfirmSubmit instanceof HTMLButtonElement)) {
-          resolve(true);
+          resolve({ confirmed: true, reason: '' });
           return;
         }
 
@@ -391,19 +438,57 @@
           actionConfirmCard.classList.toggle('is-reject', !isApprove);
         }
 
+        if (actionConfirmReasonWrap instanceof HTMLElement) {
+          actionConfirmReasonWrap.hidden = isApprove;
+        }
+
+        if (actionConfirmReason instanceof HTMLTextAreaElement) {
+          actionConfirmReason.value = '';
+        }
+
+        syncRejectReasonSubmitState();
+
+        // #region agent log
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6794ce'},body:JSON.stringify({sessionId:'6794ce',runId:'reject-reason',hypothesisId:'A',location:'office-home.blade.php:openActionConfirmModal',message:'confirm modal opened',data:{action,reasonFieldVisible:!isApprove,submitDisabled:actionConfirmSubmit.disabled},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+
         actionConfirmModal.classList.add('is-open');
         actionConfirmModal.setAttribute('aria-hidden', 'false');
+
+        if (!isApprove && actionConfirmReason instanceof HTMLTextAreaElement) {
+          actionConfirmReason.focus();
+        }
 
         const handleCancel = () => {
           teardown();
           closeActionConfirmModal();
-          resolve(false);
+          resolve({ confirmed: false, reason: '' });
         };
 
         const handleSubmit = () => {
+          const reason = actionConfirmReason instanceof HTMLTextAreaElement
+            ? actionConfirmReason.value.trim()
+            : '';
+
+          if (!isApprove && reason === '') {
+            syncRejectReasonSubmitState();
+            if (actionConfirmReason instanceof HTMLTextAreaElement) {
+              actionConfirmReason.focus();
+            }
+            return;
+          }
+
+          // #region agent log
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6794ce'},body:JSON.stringify({sessionId:'6794ce',runId:'reject-reason',hypothesisId:'D',location:'office-home.blade.php:handleSubmit',message:'confirm submit clicked',data:{action,reasonLength:reason.length},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+
           teardown();
           closeActionConfirmModal();
-          resolve(true);
+          resolve({ confirmed: true, reason });
+        };
+
+        const handleReasonInput = () => {
+          syncRejectReasonSubmitState();
         };
 
         const handleBackdrop = (event) => {
@@ -424,12 +509,18 @@
           actionConfirmSubmit.removeEventListener('click', handleSubmit);
           actionConfirmModal.removeEventListener('click', handleBackdrop);
           document.removeEventListener('keydown', handleKeydown);
+          if (actionConfirmReason instanceof HTMLTextAreaElement) {
+            actionConfirmReason.removeEventListener('input', handleReasonInput);
+          }
         };
 
         actionConfirmCancel.addEventListener('click', handleCancel);
         actionConfirmSubmit.addEventListener('click', handleSubmit);
         actionConfirmModal.addEventListener('click', handleBackdrop);
         document.addEventListener('keydown', handleKeydown);
+        if (actionConfirmReason instanceof HTMLTextAreaElement) {
+          actionConfirmReason.addEventListener('input', handleReasonInput);
+        }
       });
 
       const showActionToast = (message, status) => {
@@ -881,6 +972,50 @@
 
     .office-action-confirm-body p {
       margin: 0;
+    }
+
+    .office-action-confirm-reason {
+      margin-top: 12px;
+    }
+
+    .office-action-confirm-reason label {
+      display: block;
+      margin-bottom: 6px;
+      color: #1f2432;
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .office-action-confirm-reason label span {
+      color: #c53030;
+      font-weight: 600;
+    }
+
+    .office-action-confirm-reason textarea {
+      width: 100%;
+      min-height: 84px;
+      resize: vertical;
+      border: 1px solid #d1d8e6;
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: #1f2432;
+      font: inherit;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      background: #fff;
+      box-sizing: border-box;
+    }
+
+    .office-action-confirm-reason textarea:focus {
+      outline: none;
+      border-color: #c53030;
+      box-shadow: 0 0 0 3px rgba(197, 48, 48, 0.12);
+    }
+
+    #office-action-confirm-submit.reject:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      filter: grayscale(0.15);
     }
 
     .office-action-confirm-actions {
