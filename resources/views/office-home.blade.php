@@ -244,10 +244,6 @@
             ? confirmedResult.reason.trim()
             : '';
 
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6794ce'},body:JSON.stringify({sessionId:'6794ce',runId:'reject-reason',hypothesisId:'A',location:'office-home.blade.php:submitQueueAction',message:'confirm result before reject request',data:{action,confirmed,reasonLength:rejectionReason.length},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-
           if (!confirmed) {
             return false;
           }
@@ -263,10 +259,6 @@
           const requestBody = action === 'reject'
             ? { rejection_reason: rejectionReason }
             : {};
-
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6794ce'},body:JSON.stringify({sessionId:'6794ce',runId:'reject-reason',hypothesisId:'E',location:'office-home.blade.php:submitQueueAction',message:'PATCH body prepared',data:{action,hasReason:Boolean(requestBody.rejection_reason),reasonLength:rejectionReason.length},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
 
           const response = await fetch(resolveUrl(action, approvalId), {
             method: 'PATCH',
@@ -293,10 +285,6 @@
               };
             }
           }
-
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6794ce'},body:JSON.stringify({sessionId:'6794ce',runId:'reject-reason',hypothesisId:'B',location:'office-home.blade.php:submitQueueAction',message:'reject API response',data:{action,ok:response.ok,status:response.status,success:Boolean(payload.success)},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
 
           if (!response.ok) {
             const statusMessage = response.status ? ` (HTTP ${response.status})` : '';
@@ -448,10 +436,6 @@
 
         syncRejectReasonSubmitState();
 
-        // #region agent log
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6794ce'},body:JSON.stringify({sessionId:'6794ce',runId:'reject-reason',hypothesisId:'A',location:'office-home.blade.php:openActionConfirmModal',message:'confirm modal opened',data:{action,reasonFieldVisible:!isApprove,submitDisabled:actionConfirmSubmit.disabled},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-
         actionConfirmModal.classList.add('is-open');
         actionConfirmModal.setAttribute('aria-hidden', 'false');
 
@@ -477,10 +461,6 @@
             }
             return;
           }
-
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6794ce'},body:JSON.stringify({sessionId:'6794ce',runId:'reject-reason',hypothesisId:'D',location:'office-home.blade.php:handleSubmit',message:'confirm submit clicked',data:{action,reasonLength:reason.length},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
 
           teardown();
           closeActionConfirmModal();

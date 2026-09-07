@@ -274,13 +274,6 @@ class ApprovalController extends Controller
             }
 
             $rejectionReason = trim((string) request()->input('rejection_reason', ''));
-            // #region agent log
-            $this->debugRejectLog('B', 'ApprovalController.php:reject', 'reject payload received', [
-                'approvalId' => (int) $approvalId,
-                'reasonLength' => mb_strlen($rejectionReason),
-                'hasReason' => $rejectionReason !== '',
-            ]);
-            // #endregion
             if ($rejectionReason === '') {
                 return response()->json(['error' => 'Please provide a rejection reason.'], 422);
             }
@@ -300,14 +293,6 @@ class ApprovalController extends Controller
             }
 
             $approval->update($updatePayload);
-            // #region agent log
-            $this->debugRejectLog('B', 'ApprovalController.php:reject', 'rejection saved', [
-                'approvalId' => (int) $approval->approval_id,
-                'savedReasonLength' => mb_strlen((string) ($approval->rejection_reason ?? '')),
-                'savedOnApprovals' => Schema::hasColumn('reservation_approvals', 'rejection_reason'),
-                'savedOnHistories' => Schema::hasColumn('reservation_approval_histories', 'rejection_reason'),
-            ]);
-            // #endregion
             $this->recordApprovalHistory($approval);
             $this->forgetActionableOfficeCache((int) $approval->reservation_id);
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.rejected');
@@ -1781,29 +1766,6 @@ class ApprovalController extends Controller
                 'created_at' => now(),
             ]
         );
-    }
-
-    private function debugRejectLog(string $hypothesisId, string $location, string $message, array $data = []): void
-    {
-        // #region agent log
-        try {
-            file_put_contents(
-                base_path('debug-6794ce.log'),
-                json_encode([
-                    'sessionId' => '6794ce',
-                    'runId' => 'reject-reason',
-                    'hypothesisId' => $hypothesisId,
-                    'location' => $location,
-                    'message' => $message,
-                    'data' => $data,
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES) . PHP_EOL,
-                FILE_APPEND | LOCK_EX
-            );
-        } catch (Throwable $throwable) {
-            // Ignore debug log failures.
-        }
-        // #endregion
     }
 
     private function prepareReservationWorkflowHandoff(int $reservationId, bool $ensureRows = true): void
