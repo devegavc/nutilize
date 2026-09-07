@@ -49,17 +49,19 @@
             <button class="facilities-tab" type="button" data-tab="others">Others</button>
           </div>
 
-          <div class="facilities-inline-search">
-            <i class="bi bi-search"></i>
-            <input type="text" placeholder="Search" />
-          </div>
+          <div class="facilities-action-group">
+            <div class="facilities-inline-search">
+              <i class="bi bi-search"></i>
+              <input type="text" placeholder="Search" />
+            </div>
 
-          <button class="facilities-add-btn" id="facilities-add-btn" type="button">Add Facilities</button>
+            <button class="facilities-add-btn" id="facilities-add-btn" type="button">Add Facilities</button>
+          </div>
         </section>
 
         <section class="inventory-grid facilities-grid">
           <div class="table-wrap">
-            <table class="inventory-table">
+            <table class="inventory-table facilities-inventory-table">
               <thead>
                 <tr>
                   <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>
