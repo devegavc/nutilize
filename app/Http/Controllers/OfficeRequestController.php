@@ -41,6 +41,27 @@ class OfficeRequestController extends Controller
     {
         $user = Auth::user();
 
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-fec4e0.log'), json_encode([
+                'sessionId' => 'fec4e0',
+                'runId' => 'pre-verify',
+                'hypothesisId' => 'H5',
+                'location' => 'OfficeRequestController.php:index',
+                'message' => 'office home index hit',
+                'data' => [
+                    'user_id' => (int) ($user->user_id ?? 0),
+                    'role' => (string) ($user->role ?? ''),
+                    'office_id' => (int) ($user->office_id ?? 0),
+                    'is_office_approver' => $user ? $user->isOfficeApprover() : false,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]) . PHP_EOL, FILE_APPEND);
+        } catch (\Throwable $throwable) {
+            // Ignore debug log failures.
+        }
+        // #endregion
+
         if (!$user || !$user->isOfficeApprover()) {
             return redirect('/dashboard/home')->with('error', 'Unauthorized access.');
         }
