@@ -1365,6 +1365,9 @@ function showReservationDetailsModal(reservation, options = {}) {
   const reservationCode = reservation.reservation_code
     || (reservation.id ? `NU-${String(reservation.id).padStart(6, '0')}` : 'Reservation');
   const proofUrl = String(reservation.proof_of_consent_url || '').trim();
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46f7af'},body:JSON.stringify({sessionId:'46f7af',runId:'pre-fix',hypothesisId:'C',location:'dashboard.js:showReservationDetailsModal',message:'proof url received by modal',data:{reservationId:reservation.id||null,proofLength:proofUrl.length,hasProof:Boolean(proofUrl),prefix:proofUrl.slice(0,16),looksJson:proofUrl.trim().startsWith('[')},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   const scheduleLabel = reservation.event_schedule
     || [
       reservation.event_date || reservation.start_date,
@@ -3688,11 +3691,17 @@ function closeInventoryConfirmModal() {
 }
 
 function openInventoryConfirmModal(options = {}) {
-  if (!(inventoryConfirmModal instanceof HTMLElement)
-    || !(inventoryConfirmTitle instanceof HTMLElement)
-    || !(inventoryConfirmMessage instanceof HTMLElement)
-    || !(inventoryConfirmCancel instanceof HTMLButtonElement)
-    || !(inventoryConfirmSubmit instanceof HTMLButtonElement)) {
+  const hasModal = inventoryConfirmModal instanceof HTMLElement;
+  const hasTitle = inventoryConfirmTitle instanceof HTMLElement;
+  const hasMessage = inventoryConfirmMessage instanceof HTMLElement;
+  const hasCancel = inventoryConfirmCancel instanceof HTMLButtonElement;
+  const hasSubmit = inventoryConfirmSubmit instanceof HTMLButtonElement;
+  const missingConfirmUi = !hasModal || !hasTitle || !hasMessage || !hasCancel || !hasSubmit;
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'pre-fix',hypothesisId:'A',location:'dashboard.js:openInventoryConfirmModal',message:'confirm modal availability',data:{hasModal,hasTitle,hasMessage,hasCancel,hasSubmit,missingConfirmUi,pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
+  if (missingConfirmUi) {
     return Promise.resolve(true);
   }
 
@@ -3803,6 +3812,9 @@ function removeEquipmentEmptyStateRows() {
 }
 
 async function submitEquipmentDelete() {
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'pre-fix',hypothesisId:'E',location:'dashboard.js:submitEquipmentDelete:entry',message:'delete click entered handler',data:{hasEditingRow:Boolean(activeEquipmentEditingRow),itemId:activeEquipmentEditingRow?.dataset?.itemId||null,pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!activeEquipmentEditingRow || !equipmentTableBody) {
     return;
   }
@@ -3828,6 +3840,10 @@ async function submitEquipmentDelete() {
     variant: 'delete',
   });
 
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'pre-fix',hypothesisId:'A',location:'dashboard.js:submitEquipmentDelete:afterConfirm',message:'delete confirmation result',data:{confirmed,itemId,modalIsOpen:inventoryConfirmModal instanceof HTMLElement && inventoryConfirmModal.classList.contains('is-open')},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
   if (!confirmed) {
     return;
   }
@@ -3841,6 +3857,9 @@ async function submitEquipmentDelete() {
   }
 
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f8769b'},body:JSON.stringify({sessionId:'f8769b',runId:'pre-fix',hypothesisId:'C',location:'dashboard.js:submitEquipmentDelete:beforeFetch',message:'proceeding to DELETE request',data:{itemId,endpoint:`${equipmentEndpointBase}/${encodeURIComponent(itemId)}`},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const response = await fetch(`${equipmentEndpointBase}/${encodeURIComponent(itemId)}`, {
       method: 'DELETE',
       headers: {

@@ -2637,9 +2637,47 @@ class ApprovalController extends Controller
         }
 
         $proofOfConsentUrl = trim((string) ($reservation->proof_of_consent_url ?? ''));
+        // #region agent log
+        $__rawProof = $proofOfConsentUrl;
+        $__decodedProof = json_decode($__rawProof, true);
+        $__logPayload = json_encode([
+            'sessionId' => '46f7af',
+            'runId' => 'pre-fix',
+            'hypothesisId' => 'A',
+            'location' => 'ApprovalController.php:getReservationDetails',
+            'message' => 'raw proof_of_consent_url before http check',
+            'data' => [
+                'reservationId' => (int) $reservationId,
+                'rawLength' => strlen($__rawProof),
+                'rawPrefix' => substr($__rawProof, 0, 16),
+                'startsHttp' => (bool) preg_match('#^https?://#i', $__rawProof),
+                'startsJsonArray' => str_starts_with(ltrim($__rawProof), '['),
+                'jsonIsArray' => is_array($__decodedProof),
+                'jsonUrlCount' => is_array($__decodedProof) ? count($__decodedProof) : 0,
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ]) . "\n";
+        file_put_contents(base_path('debug-46f7af.log'), $__logPayload, FILE_APPEND);
+        // #endregion
         if ($proofOfConsentUrl !== '' && !preg_match('#^https?://#i', $proofOfConsentUrl)) {
             $proofOfConsentUrl = '';
         }
+        // #region agent log
+        $__logPayload = json_encode([
+            'sessionId' => '46f7af',
+            'runId' => 'pre-fix',
+            'hypothesisId' => 'A',
+            'location' => 'ApprovalController.php:getReservationDetails',
+            'message' => 'proof url after http check',
+            'data' => [
+                'reservationId' => (int) $reservationId,
+                'finalLength' => strlen($proofOfConsentUrl),
+                'wasCleared' => $__rawProof !== '' && $proofOfConsentUrl === '',
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ]) . "\n";
+        file_put_contents(base_path('debug-46f7af.log'), $__logPayload, FILE_APPEND);
+        // #endregion
 
         $resourceRows = DB::table('reservation_details as details')
             ->leftJoin('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
