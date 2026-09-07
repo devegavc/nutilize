@@ -304,7 +304,8 @@ class ApprovalController extends Controller
             $this->debugRejectLog('B', 'ApprovalController.php:reject', 'rejection saved', [
                 'approvalId' => (int) $approval->approval_id,
                 'savedReasonLength' => mb_strlen((string) ($approval->rejection_reason ?? '')),
-                'columnPresent' => Schema::hasColumn('reservation_approvals', 'rejection_reason'),
+                'savedOnApprovals' => Schema::hasColumn('reservation_approvals', 'rejection_reason'),
+                'savedOnHistories' => Schema::hasColumn('reservation_approval_histories', 'rejection_reason'),
             ]);
             // #endregion
             $this->recordApprovalHistory($approval);
@@ -1759,33 +1760,26 @@ class ApprovalController extends Controller
             (string) $approval->status,
             $approval->approved_by_user_id ? (int) $approval->approved_by_user_id : null,
             $approval->approved_at,
-            $approval->rejection_reason ?? null,
         );
     }
 
-    private function upsertApprovalHistory(int $approvalId, int $reservationId, int $officeId, string $status, ?int $approvedByUserId, $approvedAt, ?string $rejectionReason = null): void
+    private function upsertApprovalHistory(int $approvalId, int $reservationId, int $officeId, string $status, ?int $approvedByUserId, $approvedAt): void
     {
         if (!Schema::hasTable('reservation_approval_histories')) {
             return;
         }
 
-        $payload = [
-            'reservation_id' => $reservationId,
-            'office_id' => $officeId,
-            'approved_by_user_id' => $approvedByUserId,
-            'status' => $status,
-            'approved_at' => $approvedAt,
-            'updated_at' => now(),
-            'created_at' => now(),
-        ];
-
-        if (Schema::hasColumn('reservation_approval_histories', 'rejection_reason')) {
-            $payload['rejection_reason'] = $rejectionReason;
-        }
-
         DB::table('reservation_approval_histories')->updateOrInsert(
             ['approval_id' => $approvalId],
-            $payload
+            [
+                'reservation_id' => $reservationId,
+                'office_id' => $officeId,
+                'approved_by_user_id' => $approvedByUserId,
+                'status' => $status,
+                'approved_at' => $approvedAt,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
         );
     }
 
