@@ -18,7 +18,18 @@ use App\Http\Controllers\RegisterController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'index')->name('index');
+// Public landing page: skip session/CSRF/cookies so Hostinger does not hit the
+// database just to render a static view (this was ~1.6s of origin TTFB).
+Route::view('/', 'index')
+    ->name('index')
+    ->withoutMiddleware([
+        \Illuminate\Cookie\Middleware\EncryptCookies::class,
+        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+    ])
+    ->middleware('cache.headers:public;max_age=300;etag');
 
 Route::view('/login', 'login')->name('login');
 Route::post('/login', [LoginController::class, 'authenticate'])->name('login.authenticate');

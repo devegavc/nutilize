@@ -7,12 +7,12 @@
   <link rel="icon" type="image/png" href="/img/nutilize_favicon.png" />
   <title>NUtilize | Home</title>
 
-  {{-- Preload LCP hero (WebP only — avoid downloading JPEG + WebP) --}}
+  {{-- Preload LCP hero + above-the-fold font (local, no Google round-trip) --}}
   <link rel="preload" as="image" href="/img/nulipa_front.webp" type="image/webp" />
+  <link rel="preload" href="/fonts/poppins-800.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/fonts/poppins-400.woff2" as="font" type="font/woff2" crossorigin />
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="/css/landing.css?v=6" />
+  <link rel="stylesheet" href="/css/landing.css?v=7" />
 </head>
 <body>
   <header class="top-header">
@@ -42,6 +42,19 @@
   </header>
 
   <main class="hero" id="home">
+    <picture class="hero-bg-picture">
+      <source srcset="/img/nulipa_front.webp" type="image/webp" />
+      <img
+        class="hero-bg"
+        src="/img/nulipa_front.jpg"
+        alt=""
+        width="1600"
+        height="927"
+        fetchpriority="high"
+        decoding="async"
+        aria-hidden="true"
+      />
+    </picture>
     <div class="hero-overlay"></div>
     @php
       $nutilizeAppUrl = trim((string) config('services.nutilize.play_store_url', ''));

@@ -47,6 +47,14 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
+        // Landing page must not wait on schema/DB checks.
+        if (! $this->app->runningInConsole()) {
+            $path = ltrim((string) $this->app['request']->path(), '/');
+            if ($path === '') {
+                return;
+            }
+        }
+
         try {
             if (! Schema::hasTable('cache')) {
                 Schema::create('cache', function (Blueprint $table) {
