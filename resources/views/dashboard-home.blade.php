@@ -411,12 +411,6 @@
         return;
       }
 
-      // #region agent log
-      window.__announcementInitCount = (window.__announcementInitCount || 0) + 1;
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',hypothesisId:'C',location:'dashboard-home.blade.php:init',message:'initAnnouncementsModal ran',data:{initCount:window.__announcementInitCount,deleteFormAttrCount:modal.querySelectorAll('[data-announcement-delete-form]').length,cardFormCount:modal.querySelectorAll('.announcement-card form').length,dedicatedModalCount:document.querySelectorAll('#announcement-delete-confirm-modal').length,appConfirmExists:typeof window.showAppConfirm === 'function'},timestamp:Date.now()})}).catch(()=>{});
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',runId:'post-fix',hypothesisId:'A',location:'dashboard-home.blade.php:init-build',message:'post-fix single-handler build',data:{build:'61468c-2'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-
       const setOpen = (isOpen) => {
         modal.classList.toggle('is-open', isOpen);
         modal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
@@ -448,10 +442,6 @@
       const deleteConfirmCancel = document.getElementById('announcement-delete-confirm-cancel');
       const deleteConfirmSubmit = document.getElementById('announcement-delete-confirm-submit');
       let methodInput = null;
-
-      // #region agent log
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',runId:'post-fix',hypothesisId:'F',location:'dashboard-home.blade.php:announcer-input',message:'announcer field value',data:{isPfAdminLabel:(announcerInput?.value||'')==='Physical Facilities Admin',includesNotSet:(announcerInput?.value||'').toLowerCase().includes('not set'),datasetDefaultIsPfAdmin:(form instanceof HTMLFormElement)&&form.dataset.defaultAnnouncer==='Physical Facilities Admin'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
 
       const setEditing = (announcement) => {
         if (!(form instanceof HTMLFormElement)) {
@@ -535,9 +525,6 @@
         };
 
         const handleCancel = () => {
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',hypothesisId:'A',location:'dashboard-home.blade.php:dedicated-cancel',message:'dedicated delete confirm cancel',data:{dedicatedOpen:deleteConfirmModal.classList.contains('is-open'),appConfirmOpen:!!document.getElementById('app-confirm-modal')?.classList.contains('is-open')},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           teardown();
           closeAnnouncementDeleteConfirm();
           resolve(false);
@@ -558,9 +545,6 @@
 
         deleteConfirmModal.classList.add('is-open');
         deleteConfirmModal.setAttribute('aria-hidden', 'false');
-        // #region agent log
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',hypothesisId:'C',location:'dashboard-home.blade.php:openAnnouncementDeleteConfirm',message:'dedicated delete confirm opened',data:{dedicatedOpen:true,appConfirmOpen:!!document.getElementById('app-confirm-modal')?.classList.contains('is-open'),appConfirmCount:document.querySelectorAll('#app-confirm-modal').length,dedicatedCount:document.querySelectorAll('#announcement-delete-confirm-modal, .announcement-delete-confirm-modal').length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         deleteConfirmCancel.addEventListener('click', handleCancel);
         deleteConfirmSubmit.addEventListener('click', handleSubmit);
         deleteConfirmModal.addEventListener('click', handleBackdrop);
@@ -651,10 +635,6 @@
           }
 
           event.preventDefault();
-
-          // #region agent log
-          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'61468c'},body:JSON.stringify({sessionId:'61468c',hypothesisId:'A',location:'dashboard-home.blade.php:card-submit',message:'announcement-card form submit handler',data:{isDeleting:card.classList.contains('is-deleting'),dedicatedAlreadyOpen:deleteConfirmModal instanceof HTMLElement && deleteConfirmModal.classList.contains('is-open'),action:deleteForm.action,hasAttr:deleteForm.hasAttribute('data-announcement-delete-form')},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
 
           if (card.classList.contains('is-deleting')) {
             return;
@@ -755,7 +735,7 @@
       });
     })();
   </script>
-  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}&b=61468c2"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
 </html>
 
