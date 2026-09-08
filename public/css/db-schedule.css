@@ -800,9 +800,19 @@ body {
   display: none;
 }
 
-.day.selected {
+.calendar-grid .day.selected,
+.calendar-grid .day.selected.marked,
+.calendar-grid .day.selected.density-low,
+.calendar-grid .day.selected.density-mid,
+.calendar-grid .day.selected.density-high,
+.calendar-grid .day.selected.today,
+.calendar-grid .day.selected.fully-approved,
+.calendar-grid .day.density-low.marked.selected,
+.calendar-grid .day.density-mid.marked.selected,
+.calendar-grid .day.density-high.marked.selected,
+.calendar-grid .day.today.marked.selected {
   outline: none;
-  background: linear-gradient(150deg, #556bc7 0%, #31408a 100%);
+  background: linear-gradient(135deg, #4c60bc 0%, #31408a 100%);
   color: #ffffff;
   border-color: transparent;
   box-shadow:
@@ -810,39 +820,55 @@ body {
     0 12px 24px rgba(49, 64, 138, 0.32);
 }
 
-.day.selected::before {
+.calendar-grid .day.selected::before,
+.calendar-grid .day.selected.marked::before,
+.calendar-grid .day.density-low.marked.selected::before,
+.calendar-grid .day.density-mid.marked.selected::before,
+.calendar-grid .day.density-high.marked.selected::before,
+.calendar-grid .day.today.marked.selected::before {
   background: #ffd24f;
 }
 
-.day.selected .day-number {
+.calendar-grid .day.selected .day-number,
+.calendar-grid .day.selected.marked .day-number,
+.calendar-grid .day.selected.today .day-number,
+.calendar-grid .day.today.marked.selected .day-number {
   color: #ffffff;
   background: transparent;
   box-shadow: none;
 }
 
-.day.selected:hover,
-.day.selected:active {
-  background: linear-gradient(150deg, #6075d0 0%, #364794 100%);
+.calendar-grid .day.selected:hover,
+.calendar-grid .day.selected:active,
+.calendar-grid .day.selected.marked:hover,
+.calendar-grid .day.selected.marked:active,
+.calendar-grid .day.density-high.marked.selected:hover {
+  background: linear-gradient(135deg, #5a6fcf 0%, #364794 100%);
   color: #ffffff;
   transform: translateY(-1px);
 }
 
-.day.today.selected {
+.calendar-grid .day.today.selected,
+.calendar-grid .day.today.marked.selected {
   box-shadow:
     0 0 0 2px #ffd24f,
     0 12px 24px rgba(49, 64, 138, 0.32);
 }
 
-.day.today.selected .day-number {
+.calendar-grid .day.selected .day-indicator,
+.calendar-grid .day.selected .day-count,
+.calendar-grid .day.selected.marked .day-indicator,
+.calendar-grid .day.selected.marked .day-count,
+.calendar-grid .day.selected.density-high .day-count,
+.calendar-grid .day.selected.density-high .day-indicator,
+.calendar-grid .day.density-high.marked.selected .day-count,
+.calendar-grid .day.density-high.marked.selected .day-indicator,
+.calendar-grid .day.selected.fully-approved .day-count,
+.calendar-grid .day.selected.fully-approved .day-indicator {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
   box-shadow: none;
-}
-
-.day.selected .day-indicator,
-.day.selected .day-count {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.42);
 }
 
 .day-indicator.is-approved,
