@@ -146,7 +146,13 @@
                 <span class="day-label">Sat</span>
               </div>
               <div class="calendar-grid">
-                @foreach ($calendarCells as $cell)
+                @php
+                  $visibleCalendarCells = $calendarCells;
+                  while (count($visibleCalendarCells) % 7 !== 0) {
+                      $visibleCalendarCells[] = ['blank' => true];
+                  }
+                @endphp
+                @foreach ($visibleCalendarCells as $cell)
                   @if (!empty($cell['blank']))
                     <span class="day day-empty" aria-hidden="true"></span>
                   @else
@@ -200,45 +206,49 @@
               <h3>Request Information</h3>
 
               <div class="schedule-inline-detail-groups">
-                <div class="schedule-inline-detail-group">
-                  <span class="schedule-inline-detail-group-label">Requester</span>
-                  <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-requester">-</span>
-                </div>
+                <div class="schedule-inline-detail-fields">
+                  <div class="schedule-inline-detail-group">
+                    <span class="schedule-inline-detail-group-label">Requester</span>
+                    <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-requester">-</span>
+                  </div>
 
-                <div class="schedule-inline-detail-group">
-                  <span class="schedule-inline-detail-group-label">Activity</span>
-                  <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-activity">-</span>
-                </div>
+                  <div class="schedule-inline-detail-group">
+                    <span class="schedule-inline-detail-group-label">Activity</span>
+                    <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-activity">-</span>
+                  </div>
 
-                <div class="schedule-inline-detail-group">
-                  <span class="schedule-inline-detail-group-label">Date &amp; Time</span>
-                  <div class="schedule-inline-detail-group-stack">
-                    <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-requested-on">-</span>
-                    <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-requested-time">-</span>
+                  <div class="schedule-inline-detail-group">
+                    <span class="schedule-inline-detail-group-label">Date &amp; Time</span>
+                    <div class="schedule-inline-detail-group-stack">
+                      <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-requested-on">-</span>
+                      <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-requested-time">-</span>
+                    </div>
+                  </div>
+
+                  <div class="schedule-inline-detail-group">
+                    <span class="schedule-inline-detail-group-label">Reservation</span>
+                    <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-reservation-code">-</span>
                   </div>
                 </div>
 
-                <div class="schedule-inline-detail-group">
-                  <span class="schedule-inline-detail-group-label">Reservation</span>
-                  <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-reservation-code">-</span>
-                </div>
-
-                <div class="schedule-inline-detail-group">
+                <div class="schedule-inline-detail-group schedule-inline-detail-status-row">
                   <span class="schedule-inline-detail-group-label">Status</span>
                   <span id="schedule-inline-detail-status">-</span>
                 </div>
 
-                <div class="schedule-inline-detail-group">
-                  <span class="schedule-inline-detail-group-label">Resources</span>
-                  <div class="schedule-inline-extra-list" id="schedule-inline-detail-resources">
-                    <div>No resource details available.</div>
+                <div class="schedule-inline-detail-extras">
+                  <div class="schedule-inline-detail-group">
+                    <span class="schedule-inline-detail-group-label">Resources</span>
+                    <div class="schedule-inline-extra-list" id="schedule-inline-detail-resources">
+                      <div>No resource details available.</div>
+                    </div>
                   </div>
-                </div>
 
-                <div class="schedule-inline-detail-group">
-                  <span class="schedule-inline-detail-group-label">Approval Trail</span>
-                  <div class="schedule-inline-extra-list" id="schedule-inline-detail-approvals">
-                    <div>No approval trail available.</div>
+                  <div class="schedule-inline-detail-group">
+                    <span class="schedule-inline-detail-group-label">Approval Trail</span>
+                    <div class="schedule-inline-extra-list" id="schedule-inline-detail-approvals">
+                      <div>No approval trail available.</div>
+                    </div>
                   </div>
                 </div>
               </div>
