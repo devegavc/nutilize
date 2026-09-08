@@ -22,6 +22,8 @@ body {
   --schedule-yellow-grad: linear-gradient(135deg, #ffd24f 0%, #f4b70a 100%);
   --schedule-panel-border: rgba(76, 96, 188, 0.18);
   --schedule-panel-shadow: 0 18px 40px rgba(27, 38, 92, 0.14);
+  --cal-row-h: 44px;
+  --cal-gap: 4px;
 }
 
 .schedule-content-card {
@@ -39,6 +41,8 @@ body {
 }
 
 .schedule-content-card.has-schedule-details {
+  --cal-row-h: 40px;
+  --cal-gap: 4px;
   display: grid;
   grid-template-columns: minmax(300px, 0.88fr) minmax(440px, 1.32fr);
   grid-template-rows: auto minmax(0, 1fr);
@@ -79,6 +83,27 @@ body {
   flex-shrink: 1;
   display: flex;
   flex-direction: column;
+}
+
+.schedule-content-card.has-schedule-details .schedule-inline-table-wrap {
+  min-height: 0;
+  flex: 0 1 30%;
+  max-height: 32%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.schedule-content-card.has-schedule-details .schedule-inline-detail-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .schedule-layout {
@@ -181,8 +206,8 @@ body {
 .schedule-content-card.has-schedule-details .calendar-grid {
   flex: 0 0 auto;
   min-height: 0;
-  grid-template-rows: none;
-  grid-auto-rows: 46px;
+  grid-template-rows: repeat(6, var(--cal-row-h));
+  grid-auto-rows: var(--cal-row-h);
 }
 
 .schedule-month-row {
@@ -473,8 +498,8 @@ body {
   overflow-x: hidden;
   max-width: 100%;
   margin: 8px 14px 0;
-  padding: 10px;
-  border-radius: 16px;
+  padding: 8px;
+  border-radius: 14px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(232, 236, 248, 0.85) 100%);
   border: 1px solid rgba(76, 96, 188, 0.1);
@@ -489,8 +514,8 @@ body {
 .calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 5px;
-  padding: 0 1px;
+  gap: var(--cal-gap);
+  padding: 0;
   flex-shrink: 0;
 }
 
@@ -500,12 +525,22 @@ body {
   flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-template-rows: none;
-  grid-auto-rows: 52px;
-  gap: 5px;
+  grid-template-rows: repeat(6, var(--cal-row-h));
+  grid-auto-rows: var(--cal-row-h);
+  gap: var(--cal-gap);
   align-items: stretch;
   align-content: start;
+  justify-items: stretch;
   padding: 0;
+}
+
+.calendar-grid > .day {
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .schedule-legend {
@@ -583,16 +618,17 @@ body {
 
 .day-label {
   text-align: center;
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-weight: 750;
   color: #6b7696;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 5px 0;
+  padding: 4px 0;
   margin: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, 0.55);
   border: 0;
+  line-height: 1;
 }
 
 .day {
@@ -604,41 +640,36 @@ body {
   min-width: 0;
   height: 100%;
   min-height: 0;
+  max-height: 100%;
   aspect-ratio: auto;
   margin: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 2px;
-  padding: 5px 6px 4px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 5px 6px;
   color: #1a2558;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   font-family: inherit;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
   background: #ffffff;
-  border: 1px solid rgba(76, 96, 188, 0.12);
-  box-shadow: 0 1px 4px rgba(27, 38, 92, 0.04);
+  border: 1px solid rgba(76, 96, 188, 0.14);
+  box-shadow: none;
   cursor: pointer;
   box-sizing: border-box;
+  overflow: hidden;
   transform: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
 }
 
 .day::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 7px;
-  bottom: 7px;
-  width: 2.5px;
-  border-radius: 0 3px 3px 0;
-  background: transparent;
-  transition: background 0.15s ease;
+  content: none;
 }
 
 .day-number {
@@ -646,11 +677,11 @@ body {
   z-index: 1;
   width: auto;
   height: auto;
-  min-height: 1.05em;
+  min-height: 0;
   border-radius: 0;
   display: block;
-  line-height: 1.1;
-  font-size: 0.78rem;
+  line-height: 1;
+  font-size: 0.76rem;
   font-weight: 750;
   color: inherit;
   background: transparent;
@@ -671,10 +702,10 @@ body {
 }
 
 .day:hover:not(.day-empty):not(.selected) {
-  background: #f4f6fc;
-  border-color: rgba(76, 96, 188, 0.28);
-  box-shadow: 0 8px 18px rgba(27, 38, 92, 0.1);
-  transform: translateY(-1px);
+  background: #f3f6fd;
+  border-color: rgba(76, 96, 188, 0.36);
+  box-shadow: 0 4px 10px rgba(27, 38, 92, 0.08);
+  transform: none;
 }
 
 .day:hover:not(.day-empty):not(.selected) .day-number {
@@ -682,19 +713,22 @@ body {
 }
 
 .day:active:not(.day-empty):not(.selected) {
-  transform: translateY(0) scale(0.985);
+  transform: none;
   background: #e9edf8;
 }
 
 .day-indicators {
-  position: relative;
+  position: absolute;
   z-index: 1;
+  right: 4px;
+  bottom: 4px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 3px;
-  min-height: 16px;
+  justify-content: flex-end;
+  gap: 2px;
+  min-height: 0;
   line-height: 0;
+  pointer-events: none;
 }
 
 .day-indicator,
@@ -702,50 +736,50 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 16px;
+  min-width: 16px;
+  height: 15px;
   padding: 0 5px;
   border-radius: 999px;
   background: linear-gradient(135deg, #4c60bc 0%, #31408a 100%);
   color: #fff;
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   font-weight: 800;
   letter-spacing: 0.01em;
   line-height: 1;
-  box-shadow: 0 2px 6px rgba(49, 64, 138, 0.28);
+  box-shadow: 0 1px 3px rgba(49, 64, 138, 0.28);
 }
 
 .day.marked {
-  background: linear-gradient(160deg, #f7f8ff 0%, #e7ebf8 100%);
+  background: #eef1fb;
   color: #15214f;
-  border-color: rgba(76, 96, 188, 0.22);
-  box-shadow: 0 3px 10px rgba(49, 64, 138, 0.08);
+  border-color: rgba(76, 96, 188, 0.28);
+  box-shadow: none;
   cursor: pointer;
 }
 
 .day.marked::before {
-  background: linear-gradient(180deg, #4c60bc 0%, #31408a 100%);
+  content: none;
 }
 
 .day.density-low.marked {
-  background: linear-gradient(160deg, #f8f9ff 0%, #eceff9 100%);
+  background: #f3f5fc;
 }
 
 .day.density-mid.marked {
-  background: linear-gradient(160deg, #eef1fb 0%, #dce3f5 100%);
-  border-color: rgba(76, 96, 188, 0.28);
+  background: #e8edf8;
+  border-color: rgba(76, 96, 188, 0.32);
 }
 
 .day.density-high.marked {
-  background: linear-gradient(160deg, #e4e9f8 0%, #cfd8f0 100%);
-  border-color: rgba(49, 64, 138, 0.35);
+  background: #dde4f4;
+  border-color: rgba(49, 64, 138, 0.38);
 }
 
 .day.density-high.marked .day-count,
 .day.density-high.marked .day-indicator {
   background: linear-gradient(135deg, #ffd24f 0%, #f4b70a 100%);
   color: #3d2f00;
-  box-shadow: 0 3px 8px rgba(244, 183, 10, 0.35);
+  box-shadow: 0 1px 3px rgba(244, 183, 10, 0.35);
 }
 
 .day.marked .day-indicator,
@@ -755,20 +789,20 @@ body {
 }
 
 .day.marked:hover:not(.selected) {
-  transform: translateY(-1px);
-  background: linear-gradient(160deg, #eef1fa 0%, #dde4f5 100%);
-  border-color: rgba(76, 96, 188, 0.38);
-  box-shadow: 0 10px 20px rgba(49, 64, 138, 0.14);
+  transform: none;
+  background: #e4eaf8;
+  border-color: rgba(76, 96, 188, 0.45);
+  box-shadow: 0 4px 10px rgba(49, 64, 138, 0.12);
 }
 
 .day.today:not(.selected) {
-  background: linear-gradient(160deg, #fffdf5 0%, #fff3cc 100%);
+  background: #fff8e0;
   border-color: #f4b70a;
-  box-shadow: 0 0 0 1px rgba(244, 183, 10, 0.35), 0 4px 12px rgba(244, 183, 10, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(244, 183, 10, 0.35);
 }
 
 .day.today:not(.selected)::before {
-  background: linear-gradient(180deg, #ffd24f 0%, #f4b70a 100%);
+  content: none;
 }
 
 .day.today:not(.selected) .day-number {
@@ -785,14 +819,15 @@ body {
 .day.day-empty {
   visibility: visible;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.28);
-  border: 1px dashed rgba(76, 96, 188, 0.12);
+  background: rgba(232, 236, 248, 0.45);
+  border: 1px solid rgba(76, 96, 188, 0.08);
   box-shadow: none;
-  opacity: 0.55;
+  opacity: 1;
+  cursor: default;
 }
 
 .day.day-empty::before {
-  display: none;
+  content: none;
 }
 
 .day.selected {
@@ -800,13 +835,11 @@ body {
   background: linear-gradient(150deg, #556bc7 0%, #31408a 100%);
   color: #ffffff;
   border-color: transparent;
-  box-shadow:
-    0 0 0 2px rgba(244, 183, 10, 0.55),
-    0 12px 24px rgba(49, 64, 138, 0.32);
+  box-shadow: 0 0 0 2px rgba(244, 183, 10, 0.7);
 }
 
 .day.selected::before {
-  background: #ffd24f;
+  content: none;
 }
 
 .day.selected .day-number {
@@ -819,13 +852,11 @@ body {
 .day.selected:active {
   background: linear-gradient(150deg, #6075d0 0%, #364794 100%);
   color: #ffffff;
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .day.today.selected {
-  box-shadow:
-    0 0 0 2px #ffd24f,
-    0 12px 24px rgba(49, 64, 138, 0.32);
+  box-shadow: 0 0 0 2px #ffd24f;
 }
 
 .day.today.selected .day-number {
@@ -925,8 +956,8 @@ body {
 }
 
 .schedule-content-card.has-schedule-details .day {
-  padding: 4px 5px 3px;
-  border-radius: 8px;
+  padding: 4px 5px;
+  border-radius: 7px;
 }
 
 .schedule-content-card.has-schedule-details .day-number {
@@ -949,25 +980,6 @@ body {
   margin-top: 0;
   align-items: stretch;
   flex: 1 1 auto;
-}
-
-.schedule-content-card.has-schedule-details .schedule-inline-table-wrap {
-  min-height: 0;
-  flex: 0 1 38%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.schedule-content-card.has-schedule-details .schedule-inline-detail-card {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 62%;
-  max-height: none;
-  min-height: 0;
-  overflow: auto;
-  margin: 0;
-  width: 100%;
 }
 
 .schedule-content-card.has-schedule-details .schedule-inline-detail-groups {
@@ -1081,8 +1093,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 140px;
-  padding: 24px 16px;
+  min-height: 72px;
+  padding: 16px 14px;
   text-align: center;
   color: #5c6890;
   background:
@@ -1110,23 +1122,22 @@ body {
 .schedule-inline-request-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   margin: 0;
-  padding: 13px 14px;
+  padding: 10px 12px;
   border: 1px solid rgba(76, 96, 188, 0.14);
   border-radius: 12px;
   background: #ffffff;
   box-shadow: 0 2px 8px rgba(27, 38, 92, 0.05);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
 
 .schedule-inline-request-card:hover {
   border-color: rgba(76, 96, 188, 0.3);
   box-shadow: 0 6px 14px rgba(27, 38, 92, 0.1);
-  transform: translateY(-1px);
 }
 
 .schedule-inline-request-card.is-active {
@@ -1275,9 +1286,9 @@ body {
 
 .schedule-inline-detail-fields,
 .schedule-inline-detail-extras {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   width: 100%;
   min-width: 0;
 }
@@ -1318,14 +1329,15 @@ body {
 
 .schedule-inline-detail-group-value {
   background: #ffffff;
-  border: 1px solid rgba(76, 96, 188, 0.14);
+  border: 1px solid rgba(76, 96, 188, 0.16);
   border-radius: 10px;
-  padding: 10px 12px;
-  min-height: 42px;
+  padding: 12px 14px;
+  min-height: 44px;
   width: 100%;
+  max-width: 100%;
   display: flex;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   font-weight: 650;
   color: #1c244c;
   word-break: break-word;
@@ -1384,11 +1396,11 @@ body {
 .schedule-inline-extra-list {
   margin-top: 4px;
   background: #ffffff;
-  border: 1px solid rgba(76, 96, 188, 0.14);
+  border: 1px solid rgba(76, 96, 188, 0.16);
   border-radius: 10px;
-  padding: 10px 12px;
-  min-height: 64px;
-  font-size: 0.84rem;
+  padding: 12px 14px;
+  min-height: 96px;
+  font-size: 0.88rem;
   color: #222;
   display: grid;
   gap: 6px;
@@ -1803,6 +1815,7 @@ body {
 
   .schedule-content-card.has-schedule-details .schedule-inline-table-wrap {
     flex: 1 1 auto;
+    max-height: none;
     overflow: visible;
   }
 
@@ -1821,9 +1834,10 @@ body {
 
   .calendar-grid,
   .schedule-content-card.has-schedule-details .calendar-grid {
-    grid-template-rows: none;
-    grid-auto-rows: 48px;
-    gap: 4px;
+    --cal-row-h: 42px;
+    grid-template-rows: repeat(6, var(--cal-row-h));
+    grid-auto-rows: var(--cal-row-h);
+    gap: var(--cal-gap);
   }
 
   .calendar-weekdays {
@@ -1879,27 +1893,22 @@ body {
   }
 
   .calendar-grid {
-    grid-template-rows: none;
-    grid-auto-rows: 48px;
+    --cal-row-h: 42px;
+    grid-template-rows: repeat(6, var(--cal-row-h));
+    grid-auto-rows: var(--cal-row-h);
     gap: 4px;
-  }
-
-  .schedule-content-card.has-schedule-details .calendar-grid {
-    grid-auto-rows: 48px;
   }
 
   .day {
     max-width: none;
-    font-size: 0.8rem;
-    gap: 2px;
-    padding: 6px 5px 5px;
-    border-radius: 11px;
+    font-size: 0.74rem;
+    gap: 0;
+    padding: 4px 5px;
+    border-radius: 8px;
   }
 
   .day::before {
-    top: 8px;
-    bottom: 8px;
-    width: 2.5px;
+    content: none;
   }
 
   .day-number {
@@ -1981,7 +1990,7 @@ body {
   }
 
   .calendar-grid {
-    grid-template-rows: none;
+    grid-template-rows: repeat(6, var(--cal-row-h));
     grid-auto-rows: 46px;
     gap: 3px;
   }
@@ -2031,7 +2040,7 @@ body {
   }
 
   .calendar-grid {
-    grid-template-rows: none;
+    grid-template-rows: repeat(6, var(--cal-row-h));
     grid-auto-rows: 46px;
     gap: 3px;
   }
@@ -2071,7 +2080,7 @@ body {
 
 @media (max-width: 390px) {
   .calendar-grid {
-    grid-template-rows: none;
+    grid-template-rows: repeat(6, var(--cal-row-h));
     grid-auto-rows: 44px;
     gap: 3px;
   }
@@ -2110,7 +2119,7 @@ body {
 @media (max-width: 375px),
   (max-width: 360px) {
   .calendar-grid {
-    grid-template-rows: none;
+    grid-template-rows: repeat(6, var(--cal-row-h));
     grid-auto-rows: 42px;
     gap: 2px;
   }
@@ -2125,7 +2134,7 @@ body {
   }
 
   .day-indicators {
-    min-height: 14px;
+    min-height: 0;
   }
 
   .schedule-month-row {

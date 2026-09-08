@@ -148,7 +148,7 @@
               <div class="calendar-grid">
                 @php
                   $visibleCalendarCells = $calendarCells;
-                  while (count($visibleCalendarCells) % 7 !== 0) {
+                  while (count($visibleCalendarCells) < 42) {
                       $visibleCalendarCells[] = ['blank' => true];
                   }
                 @endphp
