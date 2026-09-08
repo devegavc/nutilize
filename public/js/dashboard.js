@@ -2431,7 +2431,7 @@ if (scheduleRequestBody) {
 }
 
 function applyScheduleCategory(category) {
-  if (!scheduleFilterButtons.length || !scheduleDayCells.length) {
+  if (!scheduleDayCells.length) {
     return;
   }
 
@@ -6587,7 +6587,7 @@ if (scheduleTodayButton) {
   scheduleTodayButton.addEventListener('click', goToScheduleToday);
 }
 
-if (scheduleFilterButtons.length && scheduleDayCells.length) {
+if (scheduleDayCells.length) {
   scheduleFilterButtons.forEach((button) => {
     button.addEventListener('click', () => {
       applyScheduleCategory(button.dataset.scheduleFilter || 'all');

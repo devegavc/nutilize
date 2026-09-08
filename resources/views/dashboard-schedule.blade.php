@@ -43,18 +43,10 @@
     <section class="workspace-grid">
       @include('partials.dashboard-navbar')
 
-      <section class="content-card schedule-content-card">
+      <section class="content-card schedule-content-card has-schedule-details">
         <h1 class="section-title">SCHEDULE DASHBOARD</h1>
 
         <section class="schedule-layout">
-          <article class="schedule-filter-card">
-            <button class="schedule-filter-btn active" type="button" data-schedule-filter="all">All</button>
-            <button class="schedule-filter-btn" type="button" data-schedule-filter="rooms">Rooms</button>
-            <button class="schedule-filter-btn" type="button" data-schedule-filter="tv">TV</button>
-            <button class="schedule-filter-btn" type="button" data-schedule-filter="speaker">Speaker</button>
-            <button class="schedule-filter-btn" type="button" data-schedule-filter="furniture">Furniture</button>
-          </article>
-
           <article class="schedule-calendar-card">
             @php
               [$selectedYear, $selectedMonth] = explode('-', $monthKey);
@@ -148,7 +140,7 @@
               <div class="calendar-grid">
                 @php
                   $visibleCalendarCells = $calendarCells;
-                  while (count($visibleCalendarCells) < 42) {
+                  while (count($visibleCalendarCells) % 7 !== 0) {
                       $visibleCalendarCells[] = ['blank' => true];
                   }
                 @endphp
@@ -183,7 +175,7 @@
           </article>
         </section>
 
-        <section class="schedule-inline-panel" id="schedule-inline-panel" hidden aria-live="polite">
+        <section class="schedule-inline-panel" id="schedule-inline-panel" aria-live="polite">
           <div class="schedule-inline-content">
             <div class="schedule-inline-table-wrap">
               <div class="schedule-inline-table-title">
@@ -229,11 +221,13 @@
                     <span class="schedule-inline-detail-group-label">Reservation</span>
                     <span class="schedule-inline-detail-group-value" id="schedule-inline-detail-reservation-code">-</span>
                   </div>
-                </div>
 
-                <div class="schedule-inline-detail-group schedule-inline-detail-status-row">
-                  <span class="schedule-inline-detail-group-label">Status</span>
-                  <span id="schedule-inline-detail-status">-</span>
+                  <div class="schedule-inline-detail-group schedule-inline-detail-status-row">
+                    <span class="schedule-inline-detail-group-label">Status</span>
+                    <span class="schedule-inline-detail-group-value schedule-inline-detail-status-value">
+                      <span id="schedule-inline-detail-status">-</span>
+                    </span>
+                  </div>
                 </div>
 
                 <div class="schedule-inline-detail-extras">
