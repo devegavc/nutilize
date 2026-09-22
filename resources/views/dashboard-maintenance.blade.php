@@ -9,7 +9,7 @@
   <title>NUtilize | Maintenance</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
 </head>
 <body>
   <script>
@@ -41,20 +41,19 @@
     <section class="workspace-grid">
       @include('partials.dashboard-navbar')
 
-      <section class="content-card maintenance-content-card">
+      <section class="content-card maintenance-content-card pf-maintenance-page">
         <h1 class="section-title">MAINTENANCE DASHBOARD</h1>
 
-        <section class="maintenance-head-row">
-          <div>
-            <p><i class="bi bi-tools"></i> Maintenance Details</p>
-          </div>
-        </section>
-
         <section class="maintenance-filter-row">
-          <div class="maintenance-tab-group" role="tablist" aria-label="Maintenance status">
-            <button class="maintenance-tab active" type="button" data-maintenance-tab="maintenance">Maintenance <span class="maintenance-tab-count" data-tab-count="maintenance" hidden></span></button>
-            <button class="maintenance-tab" type="button" data-maintenance-tab="damaged">Damaged <span class="maintenance-tab-count" data-tab-count="damaged" hidden></span></button>
-            <button class="maintenance-tab" type="button" data-maintenance-tab="reported">Reported <span class="maintenance-tab-count" data-tab-count="reported" hidden></span></button>
+          <div class="maintenance-toolbar-group">
+            <span class="history-category-label" id="maintenance-category-label">Category</span>
+            <div class="maintenance-tab-group pf-maintenance-tabs" role="tablist" aria-labelledby="maintenance-category-label">
+              <button class="maintenance-tab is-active active" type="button" role="tab" data-maintenance-tab="all" aria-pressed="true">All</button>
+              <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="maintenance" aria-pressed="false">Maintenance</button>
+              <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="damaged" aria-pressed="false">Damaged</button>
+              <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="reported" aria-pressed="false">Reported</button>
+              <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="addressed" aria-pressed="false">Addressed</button>
+            </div>
           </div>
 
           <div class="maintenance-head-actions">
@@ -73,7 +72,7 @@
 
         <section class="inventory-grid maintenance-grid">
           <div class="table-wrap">
-            <table class="inventory-table maintenance-table pf-maintenance-table">
+            <table class="inventory-table maintenance-table pf-maintenance-table is-showing-category-status">
               <thead>
                 <tr>
                   <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>
@@ -81,7 +80,7 @@
                   <th>Reported By</th>
                   <th>Count</th>
                   <th>Date</th>
-                  <th>Status</th>
+                  <th class="maintenance-status-head">Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -114,15 +113,27 @@
         </button>
       </header>
 
-      <div class="maintenance-eval-grid">
-        <span>Name of Item</span>
-        <span id="maintenance-eval-item-name">-</span>
-
-        <span>Reported By</span>
-        <span id="maintenance-eval-reporter">-</span>
-
-        <span>Description</span>
-        <span id="maintenance-eval-description">-</span>
+      <div class="maintenance-eval-fields">
+        <div class="maintenance-eval-field">
+          <span class="maintenance-eval-label">Name of Item</span>
+          <div class="maintenance-eval-value" id="maintenance-eval-item-name">-</div>
+        </div>
+        <div class="maintenance-eval-field">
+          <span class="maintenance-eval-label">Asset ID</span>
+          <div class="maintenance-eval-value" id="maintenance-eval-asset-id">-</div>
+        </div>
+        <div class="maintenance-eval-field">
+          <span class="maintenance-eval-label">Reported By</span>
+          <div class="maintenance-eval-value" id="maintenance-eval-reporter">-</div>
+        </div>
+        <div class="maintenance-eval-field">
+          <span class="maintenance-eval-label">Description</span>
+          <div class="maintenance-eval-value" id="maintenance-eval-description">-</div>
+        </div>
+        <div class="maintenance-eval-field">
+          <span class="maintenance-eval-label">Reported Items</span>
+          <div class="maintenance-eval-reported" id="maintenance-eval-reported-items">-</div>
+        </div>
       </div>
 
       <div class="maintenance-eval-proof" id="maintenance-eval-proof-wrap" style="display:none">
@@ -139,36 +150,25 @@
         </div>
       </div>
 
+      <div class="maintenance-eval-fields maintenance-eval-fields-follow">
+        <div class="maintenance-eval-field" id="maintenance-eval-assessment-field">
+          <label class="maintenance-eval-label" for="maintenance-assessment-input">Assessment (Optional)</label>
+          <textarea id="maintenance-assessment-input" rows="3" placeholder="Add notes if needed..."></textarea>
+        </div>
+        <div class="maintenance-eval-field" id="maintenance-eval-status-field" hidden>
+          <label class="maintenance-eval-label" for="maintenance-status-select">Status</label>
+          <select id="maintenance-status-select">
+            <option value="">Choose one</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="damaged">Damaged</option>
+            <option value="good">Good</option>
+          </select>
+        </div>
+      </div>
+
       <div class="maintenance-eval-actions">
         <button type="button" class="maintenance-modal-btn" id="maintenance-eval-back-btn">Back</button>
         <button type="button" class="maintenance-modal-btn" id="maintenance-eval-settle-btn">Settle</button>
-      </div>
-    </article>
-  </section>
-
-  <section class="maintenance-form-modal" id="maintenance-form-modal" aria-hidden="true">
-    <div class="maintenance-form-overlay" data-close-maintenance-form="true"></div>
-    <article class="maintenance-form-card" role="dialog" aria-modal="true" aria-labelledby="maintenance-form-title">
-      <h2 id="maintenance-form-title">Maintenance Evaluation</h2>
-
-      <div class="maintenance-form-grid">
-        <span>Name of Item:</span>
-        <span id="maintenance-form-item-name">-</span>
-
-        <label for="maintenance-assessment-input">Assessment (optional):</label>
-        <textarea id="maintenance-assessment-input" rows="3" placeholder="Add notes if needed..."></textarea>
-
-        <label for="maintenance-status-select">Status</label>
-        <select id="maintenance-status-select">
-          <option value="">Choose one</option>
-          <option value="maintenance">Maintenance</option>
-          <option value="damaged">Damaged</option>
-          <option value="good">Good</option>
-        </select>
-      </div>
-
-      <div class="maintenance-form-actions">
-        <button type="button" class="maintenance-modal-btn" id="maintenance-form-submit-btn">Submit</button>
       </div>
     </article>
   </section>
@@ -179,7 +179,7 @@
     window.maintenanceRoomsEndpointBase = '{{ url('/dashboard/maintenance/rooms') }}';
     window.maintenanceReportsEndpointBase = '{{ url('/dashboard/maintenance/reports') }}';
   </script>
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
 </html>
 

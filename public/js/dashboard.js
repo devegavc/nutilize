@@ -891,7 +891,7 @@ let activeFacilitiesTab = 'all';
 let activeEquipmentTab = 'all';
 let activeHistoryCategory = 'all';
 let activeHistorySort = 'latest';
-let activeMaintenanceTab = 'maintenance';
+let activeMaintenanceTab = document.querySelector('[data-maintenance-tab].is-active, [data-maintenance-tab].active')?.dataset.maintenanceTab || 'maintenance';
 let activeEditingRow = null;
 let activeEquipmentEditingRow = null;
 let activeScheduleCategory = 'all';
@@ -1717,11 +1717,13 @@ const maintenanceRowsByTab = (window.maintenanceRowsByTab && typeof window.maint
     maintenance: Array.isArray(window.maintenanceRowsByTab.maintenance) ? window.maintenanceRowsByTab.maintenance : [],
     damaged: Array.isArray(window.maintenanceRowsByTab.damaged) ? window.maintenanceRowsByTab.damaged : [],
     reported: Array.isArray(window.maintenanceRowsByTab.reported) ? window.maintenanceRowsByTab.reported : [],
+    addressed: Array.isArray(window.maintenanceRowsByTab.addressed) ? window.maintenanceRowsByTab.addressed : [],
   }
   : {
     maintenance: [],
     damaged: [],
     reported: [],
+    addressed: [],
   };
 
 const fallbackHistoryRowsByTab = {
@@ -2043,28 +2045,69 @@ function maintenanceTableShowsLocation() {
 }
 
 function formatMaintenanceDescription(raw) {
+  const parts = splitMaintenanceDescription(raw);
+  if (parts.notes && parts.items) {
+    return `${parts.notes}\n\nReported items: ${parts.items}`;
+  }
+  if (parts.items) {
+    return `Reported items: ${parts.items}`;
+  }
+
+  return parts.notes;
+}
+
+function splitMaintenanceDescription(raw) {
   const text = String(raw || '')
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
   if (!text) {
-    return '';
+    return { notes: '', items: '' };
   }
 
   const reportedMatch = text.match(/reported items?:\s*(.+)$/im);
-  if (reportedMatch) {
-    const reportedItems = reportedMatch[1].trim();
-    const notes = text.replace(/reported items?:\s*.+$/im, '').trim();
-    if (notes && reportedItems) {
-      return `${notes}\n\nReported items: ${reportedItems}`;
-    }
-    if (reportedItems) {
-      return `Reported items: ${reportedItems}`;
-    }
+  if (!reportedMatch) {
+    return { notes: text, items: '' };
   }
 
-  return text;
+  return {
+    notes: text.replace(/reported items?:\s*.+$/im, '').trim(),
+    items: reportedMatch[1].trim(),
+  };
+}
+
+function maintenanceRowIdentity(row) {
+  return [
+    row.row_type || 'unit',
+    row.unit_id || 0,
+    row.room_id || 0,
+    row.report_id || 0,
+    row.maintenance_id || 0,
+    row.id || '',
+  ].join(':');
+}
+
+function getMaintenanceRowsForActiveTab() {
+  if (activeMaintenanceTab !== 'all') {
+    return Array.isArray(maintenanceRowsByTab[activeMaintenanceTab]) ? maintenanceRowsByTab[activeMaintenanceTab] : [];
+  }
+
+  const seen = new Set();
+  const combined = [];
+  ['maintenance', 'damaged', 'reported', 'addressed'].forEach((key) => {
+    const rows = Array.isArray(maintenanceRowsByTab[key]) ? maintenanceRowsByTab[key] : [];
+    rows.forEach((row) => {
+      const identity = maintenanceRowIdentity(row);
+      if (seen.has(identity)) {
+        return;
+      }
+      seen.add(identity);
+      combined.push(row);
+    });
+  });
+
+  return combined;
 }
 
 function applyMaintenanceFilters() {
@@ -2072,12 +2115,17 @@ function applyMaintenanceFilters() {
     return;
   }
 
-  const rows = maintenanceRowsByTab[activeMaintenanceTab] || maintenanceRowsByTab.maintenance;
+  const rows = getMaintenanceRowsForActiveTab();
   const topTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
   const inlineTerm = maintenanceInlineSearchInput ? maintenanceInlineSearchInput.value.trim().toLowerCase() : '';
   const showReporter = maintenanceTableShowsReporter();
   const showLocation = maintenanceTableShowsLocation();
-  const columnCount = showReporter ? 7 : 6;
+  const maintenanceTable = maintenanceTableBody.closest('table');
+  const hideStatusColumn = Boolean(maintenanceTable && maintenanceTable.classList.contains('pf-maintenance-table') && activeMaintenanceTab !== 'all');
+  if (maintenanceTable) {
+    maintenanceTable.classList.toggle('is-showing-category-status', !hideStatusColumn);
+  }
+  const columnCount = (showReporter ? 7 : 6) - (hideStatusColumn ? 1 : 0);
 
   const filteredRows = rows.filter((row) => {
     const rowText = `${row.id} ${row.item} ${row.count} ${row.date} ${row.status} ${row.reporter || ''} ${row.description || ''}`.toLowerCase();
@@ -2121,7 +2169,7 @@ function applyMaintenanceFilters() {
         ${reporterCell}
         <td>${row.count}</td>
         <td>${row.date}</td>
-        <td><span class="maintenance-status ${row.statusClass}">${row.status}</span></td>
+        <td class="maintenance-status-cell"><span class="maintenance-status ${row.statusClass}">${row.status}</span></td>
         ${locationCell}
         <td><button class="maintenance-action-btn" type="button">Address</button></td>
       </tr>
@@ -2152,9 +2200,17 @@ function openMaintenanceEvalModal(row) {
   const description = row && row.dataset.description ? row.dataset.description.trim() : '';
   const proofImage = row && row.dataset.proofImage ? row.dataset.proofImage.trim() : '';
   const itemDisplay = unitCode ? `${itemName || '-'} (${unitCode})` : (itemName || '-');
+  const assetIdField = document.getElementById('maintenance-eval-asset-id');
+  const reportedItemsField = document.getElementById('maintenance-eval-reported-items');
+  const statusField = document.getElementById('maintenance-eval-status-field');
+  const rowType = row && row.dataset.rowType ? row.dataset.rowType : 'unit';
 
   if (maintenanceEvalItemName) {
-    maintenanceEvalItemName.textContent = itemDisplay;
+    maintenanceEvalItemName.textContent = assetIdField ? (itemName || '-') : itemDisplay;
+  }
+
+  if (assetIdField) {
+    assetIdField.textContent = unitCode || '-';
   }
 
   if (maintenanceEvalReason) {
@@ -2164,25 +2220,66 @@ function openMaintenanceEvalModal(row) {
   const evalReporter = document.getElementById('maintenance-eval-reporter');
   if (evalReporter) {
     evalReporter.textContent = reporter || '-';
-    evalReporter.closest('.maintenance-eval-grid') && (evalReporter.parentElement.style.display = reporter ? '' : 'none');
-    // show/hide the row via the label span
-    const labelSpan = evalReporter.previousElementSibling;
-    if (labelSpan) {
-      labelSpan.style.display = reporter ? '' : 'none';
-      evalReporter.style.display = reporter ? '' : 'none';
+    const usesStackedFields = Boolean(evalReporter.closest('.maintenance-eval-fields'));
+    if (!usesStackedFields) {
+      const labelSpan = evalReporter.previousElementSibling;
+      if (labelSpan) {
+        labelSpan.style.display = reporter ? '' : 'none';
+        evalReporter.style.display = reporter ? '' : 'none';
+      }
     }
   }
 
   const evalDescription = document.getElementById('maintenance-eval-description');
+  const descriptionParts = splitMaintenanceDescription(description || reason || '');
   if (evalDescription) {
-    const formattedDescription = formatMaintenanceDescription(description || reason || '');
-    evalDescription.textContent = formattedDescription || '-';
-    const labelSpan = evalDescription.previousElementSibling;
-    if (labelSpan) {
-      const hasDetails = Boolean(formattedDescription);
-      labelSpan.style.display = hasDetails ? '' : 'none';
-      evalDescription.style.display = hasDetails ? '' : 'none';
+    if (reportedItemsField) {
+      evalDescription.textContent = descriptionParts.notes || '-';
+    } else {
+      const formattedDescription = formatMaintenanceDescription(description || reason || '');
+      evalDescription.textContent = formattedDescription || '-';
+      const labelSpan = evalDescription.previousElementSibling;
+      if (labelSpan) {
+        const hasDetails = Boolean(formattedDescription);
+        labelSpan.style.display = hasDetails ? '' : 'none';
+        evalDescription.style.display = hasDetails ? '' : 'none';
+      }
     }
+  }
+
+  if (reportedItemsField) {
+    reportedItemsField.replaceChildren();
+    const reportedParts = descriptionParts.items
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    if (!reportedParts.length) {
+      reportedItemsField.textContent = '-';
+    } else {
+      reportedParts.forEach((part) => {
+        const chip = document.createElement('span');
+        chip.className = 'maintenance-reported-chip';
+        chip.textContent = part;
+        reportedItemsField.appendChild(chip);
+      });
+    }
+  }
+
+  if (maintenanceAssessmentInput) {
+    maintenanceAssessmentInput.required = false;
+    maintenanceAssessmentInput.removeAttribute('required');
+    maintenanceAssessmentInput.value = '';
+  }
+
+  if (maintenanceStatusSelect) {
+    maintenanceStatusSelect.required = false;
+    maintenanceStatusSelect.removeAttribute('required');
+    maintenanceStatusSelect.value = '';
+  }
+
+  if (statusField) {
+    statusField.hidden = rowType === 'report';
   }
 
   const proofWrap = document.getElementById('maintenance-eval-proof-wrap');
@@ -6574,10 +6671,15 @@ if (historyTableBody) {
 if (maintenanceTableBody && maintenanceTabs.length) {
   maintenanceTabs.forEach((tabButton) => {
     tabButton.addEventListener('click', () => {
-      activeMaintenanceTab = tabButton.dataset.maintenanceTab || 'maintenance';
+      activeMaintenanceTab = tabButton.dataset.maintenanceTab || 'all';
 
       maintenanceTabs.forEach((button) => {
-        button.classList.toggle('active', button === tabButton);
+        const isSelected = button === tabButton;
+        button.classList.toggle('active', isSelected);
+        button.classList.toggle('is-active', isSelected);
+        if (button.hasAttribute('aria-pressed')) {
+          button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+        }
       });
 
       applyMaintenanceFilters();
@@ -6622,29 +6724,35 @@ if (maintenanceEvalBackButton) {
 
 if (maintenanceEvalSettleButton) {
   maintenanceEvalSettleButton.addEventListener('click', () => {
-    closeMaintenanceEvalModal();
-    openMaintenanceFormModal();
-  });
-}
-
-if (maintenanceFormSubmitButton) {
-  maintenanceFormSubmitButton.addEventListener('click', async () => {
-    if (!maintenanceAssessmentInput || !maintenanceStatusSelect) {
-      closeMaintenanceFormModal();
-      activeMaintenanceAddressRow = null;
+    if (maintenanceFormModal) {
+      closeMaintenanceEvalModal();
+      openMaintenanceFormModal();
       return;
     }
 
-    const assessmentValue = maintenanceAssessmentInput.value.trim();
-    const statusValue = maintenanceStatusSelect.value.trim();
+    submitMaintenanceEvaluation();
+  });
+}
+
+async function submitMaintenanceEvaluation() {
+    const submitButton = maintenanceFormSubmitButton || maintenanceEvalSettleButton;
+    const assessmentValue = maintenanceAssessmentInput instanceof HTMLTextAreaElement
+      ? maintenanceAssessmentInput.value.trim()
+      : '';
+    const statusField = document.getElementById('maintenance-eval-status-field');
+    const statusIsVisible = statusField instanceof HTMLElement ? !statusField.hidden : Boolean(maintenanceStatusSelect);
+    const statusValue = maintenanceStatusSelect instanceof HTMLSelectElement
+      ? maintenanceStatusSelect.value.trim()
+      : '';
     const rowType = activeMaintenanceAddressRow?.dataset.rowType || 'unit';
     const unitId = Number.parseInt(activeMaintenanceAddressRow?.dataset.unitId || '', 10);
     const roomId = Number.parseInt(activeMaintenanceAddressRow?.dataset.roomId || '', 10);
     const reportId = Number.parseInt(activeMaintenanceAddressRow?.dataset.reportId || '', 10);
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const statusRequired = rowType !== 'report' && statusIsVisible;
 
-    if (!assessmentValue || !statusValue) {
-      showAppNotice('Please complete Assessment and Status.');
+    if (statusRequired && !statusValue) {
+      showAppNotice('Please choose a status.');
       return;
     }
 
@@ -6655,7 +6763,7 @@ if (maintenanceFormSubmitButton) {
 
     let endpoint = '';
     let requestBody = {
-      assessment: assessmentValue,
+      assessment: assessmentValue === '' ? null : assessmentValue,
       status: statusValue,
     };
 
@@ -6663,7 +6771,7 @@ if (maintenanceFormSubmitButton) {
       endpoint = `${maintenanceRoomsEndpointBase}/${encodeURIComponent(roomId)}`;
     } else if (rowType === 'report' && Number.isInteger(reportId) && reportId > 0) {
       endpoint = `${maintenanceReportsEndpointBase}/${encodeURIComponent(reportId)}`;
-      requestBody = { assessment: assessmentValue };
+      requestBody = { assessment: assessmentValue === '' ? null : assessmentValue };
     } else if (Number.isInteger(unitId) && unitId > 0) {
       endpoint = `${maintenanceUnitsEndpointBase}/${encodeURIComponent(unitId)}`;
     } else {
@@ -6671,7 +6779,9 @@ if (maintenanceFormSubmitButton) {
       return;
     }
 
-    maintenanceFormSubmitButton.disabled = true;
+    if (submitButton instanceof HTMLButtonElement) {
+      submitButton.disabled = true;
+    }
 
     try {
       const response = await fetch(endpoint, {
@@ -6721,6 +6831,27 @@ if (maintenanceFormSubmitButton) {
           maintenanceRowsByTab[targetTab] = [];
         }
         maintenanceRowsByTab[targetTab].unshift(resolvedRecord);
+      } else if (resolved && activeMaintenanceAddressRow instanceof HTMLTableRowElement) {
+        const cells = activeMaintenanceAddressRow.children;
+        if (!Array.isArray(maintenanceRowsByTab.addressed)) {
+          maintenanceRowsByTab.addressed = [];
+        }
+        maintenanceRowsByTab.addressed.unshift({
+          row_type: rowType,
+          unit_id: Number.isInteger(unitId) ? unitId : 0,
+          room_id: Number.isInteger(roomId) ? roomId : 0,
+          report_id: Number.isInteger(reportId) ? reportId : 0,
+          id: cells[0] ? cells[0].textContent.trim() : '',
+          item: cells[1] ? cells[1].textContent.trim() : '',
+          reporter: activeMaintenanceAddressRow.dataset.reporter || '',
+          count: cells[3] ? cells[3].textContent.trim() : '1',
+          date: cells[4] ? cells[4].textContent.trim() : '',
+          status: 'Addressed',
+          statusClass: 'addressed',
+          description: activeMaintenanceAddressRow.dataset.description || '',
+          reason: activeMaintenanceAddressRow.dataset.maintenanceReason || '',
+          proof_image_url: activeMaintenanceAddressRow.dataset.proofImage || '',
+        });
       }
 
       closeMaintenanceFormModal();
@@ -6731,8 +6862,15 @@ if (maintenanceFormSubmitButton) {
     } catch (error) {
       showAppNotice('Unable to submit maintenance update right now.');
     } finally {
-      maintenanceFormSubmitButton.disabled = false;
+      if (submitButton instanceof HTMLButtonElement) {
+        submitButton.disabled = false;
+      }
     }
+}
+
+if (maintenanceFormSubmitButton) {
+  maintenanceFormSubmitButton.addEventListener('click', () => {
+    submitMaintenanceEvaluation();
   });
 }
 

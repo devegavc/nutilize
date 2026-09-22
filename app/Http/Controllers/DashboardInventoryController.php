@@ -504,6 +504,7 @@ class DashboardInventoryController extends Controller
             'maintenance' => [],
             'damaged' => [],
             'reported' => [],
+            'addressed' => [],
         ];
 
         if (!Schema::hasTable('item_units')) {
@@ -639,6 +640,75 @@ class DashboardInventoryController extends Controller
                     'description' => $description,
                     'proof_image_url' => $proofUrl,
                 ];
+            }
+
+            if (Schema::hasColumn('reservation_issues', 'status')) {
+                $addressedIssueQuery = DB::table('reservation_issues as issues')
+                    ->leftJoin('users as users', 'users.user_id', '=', 'issues.user_id')
+                    ->leftJoin('reservations as reservations', 'reservations.reservation_id', '=', 'issues.reservation_id')
+                    ->select([
+                        'issues.issue_id',
+                        'issues.reservation_id',
+                        'issues.user_id',
+                        'issues.reported_by',
+                        'issues.description',
+                        'issues.image_name',
+                        'issues.image_url',
+                        'issues.status',
+                        'issues.created_at',
+                        'reservations.activity_name',
+                        'users.full_name as reporter_full_name',
+                        'users.first_name as reporter_first_name',
+                        'users.last_name as reporter_last_name',
+                        'users.username as reporter_username',
+                    ])
+                    ->whereRaw("LOWER(COALESCE(issues.status, '')) IN ('resolved', 'solved', 'fixed', 'closed', 'done', 'dismissed', 'addressed')")
+                    ->orderByDesc('issues.created_at')
+                    ->limit(100);
+
+                foreach ($addressedIssueQuery->get() as $issue) {
+                    $description = trim((string) ($issue->description ?? ''));
+                    $itemLabel = $this->itemLabelFromReservationIssue($description, (string) ($issue->activity_name ?? ''));
+
+                    $reporterName = trim((string) ($issue->reporter_full_name ?? ''));
+                    if ($reporterName === '') {
+                        $first = trim((string) ($issue->reporter_first_name ?? ''));
+                        $last = trim((string) ($issue->reporter_last_name ?? ''));
+                        $reporterName = trim("{$first} {$last}");
+                    }
+                    if ($reporterName === '') {
+                        $reporterName = trim((string) ($issue->reported_by ?? $issue->reporter_username ?? 'Unknown'));
+                    }
+
+                    $proofUrl = trim((string) ($issue->image_url ?? ''));
+                    if ($proofUrl !== '' && !preg_match('#^https?://#i', $proofUrl)) {
+                        $proofUrl = '';
+                    }
+
+                    $dateValue = $issue->created_at;
+                    $reservationId = (int) ($issue->reservation_id ?? 0);
+                    $displayId = $reservationId > 0
+                        ? ('NU-' . str_pad((string) $reservationId, 6, '0', STR_PAD_LEFT))
+                        : ('issue_' . (int) $issue->issue_id);
+
+                    $rowsByTab['addressed'][] = [
+                        'row_type' => 'report',
+                        'unit_id' => 0,
+                        'report_id' => (int) $issue->issue_id,
+                        'reservation_id' => $reservationId,
+                        'id' => $displayId,
+                        'item' => $itemLabel,
+                        'count' => '1',
+                        'date' => $dateValue ? date('d/m/Y', strtotime((string) $dateValue)) : date('d/m/Y'),
+                        'status' => 'Addressed',
+                        'statusClass' => 'addressed',
+                        'location' => 'Reservation',
+                        'reason' => $description !== '' ? $description : 'Addressed reservation issue',
+                        'reporter' => $reporterName,
+                        'description' => $description,
+                        'proof_image_url' => $proofUrl,
+                    ];
+                }
             }
         } elseif (Schema::hasTable('reports')) {
             // Legacy fallback while older report rows still exist.
@@ -786,6 +856,58 @@ class DashboardInventoryController extends Controller
                     'statusClass' => 'maintenance',
                     'location' => 'Room',
                     'reason' => 'Requires maintenance',
+                ];
+            }
+        }
+
+        if (Schema::hasTable('maintenance')) {
+            $resolvedMaintenance = DB::table('maintenance as maintenance')
+                ->leftJoin('rooms as rooms', 'rooms.room_id', '=', 'maintenance.room_id')
+                ->leftJoin('items as items', 'items.item_id', '=', 'maintenance.item_id')
+                ->whereNotNull('maintenance.date_resolved')
+                ->select([
+                    'maintenance.maintenance_id',
+                    'maintenance.room_id',
+                    'maintenance.item_id',
+                    'maintenance.issue_description',
+                    'maintenance.action_taken',
+                    'maintenance.date_resolved',
+                    'rooms.room_number',
+                    'items.item_name',
+                    'items.owner_id',
+                ])
+                ->orderByDesc('maintenance.date_resolved')
+                ->limit(100)
+                ->get();
+
+            foreach ($resolvedMaintenance as $row) {
+                $isRoom = (int) ($row->room_id ?? 0) > 0;
+                $ownerId = (int) ($row->owner_id ?? 0);
+                if (!$isRoom && $pfOwnerIds !== [] && !in_array($ownerId, array_map('intval', $pfOwnerIds), true)) {
+                    continue;
+                }
+
+                $itemLabel = trim((string) ($row->item_name ?? ''));
+                if ($itemLabel === '') {
+                    $roomNumber = trim((string) ($row->room_number ?? ''));
+                    $itemLabel = $roomNumber !== '' ? ('Room ' . $roomNumber) : 'Addressed item';
+                }
+
+                $dateSource = $row->date_resolved;
+                $rowsByTab['addressed'][] = [
+                    'row_type' => $isRoom ? 'room' : 'unit',
+                    'unit_id' => 0,
+                    'room_id' => (int) ($row->room_id ?? 0),
+                    'maintenance_id' => (int) $row->maintenance_id,
+                    'id' => ($isRoom ? 'room_' : 'mnt_') . (int) $row->maintenance_id,
+                    'item' => $itemLabel,
+                    'count' => '1',
+                    'date' => $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y'),
+                    'status' => 'Addressed',
+                    'statusClass' => 'addressed',
+                    'location' => $isRoom ? 'Room' : 'Item',
+                    'reason' => (string) ($row->issue_description ?? ''),
+                    'description' => trim((string) ($row->action_taken ?? $row->issue_description ?? '')),
                 ];
             }
         }
