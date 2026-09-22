@@ -71,34 +71,33 @@
           </article>
         </section>
 
-        <section class="history-category-row" aria-label="History category">
-          <p class="history-category-label">Category</p>
-          <div class="history-tab-group" role="tablist">
-            <button class="history-category-btn is-active" type="button" role="tab" data-history-category="all" aria-pressed="true">All</button>
-            <button class="history-category-btn" type="button" role="tab" data-history-category="lending" aria-pressed="false">Lending</button>
-            <button class="history-category-btn" type="button" role="tab" data-history-category="damaged" aria-pressed="false">Damaged</button>
+        <section class="history-toolbar" aria-label="History filters">
+          <div class="history-toolbar-group history-category-row">
+            <span class="history-category-label" id="history-category-label">Category</span>
+            <div class="history-tab-group" role="tablist" aria-labelledby="history-category-label">
+              <button class="history-category-btn is-active" type="button" role="tab" data-history-category="all" aria-pressed="true">All</button>
+              <button class="history-category-btn" type="button" role="tab" data-history-category="lending" aria-pressed="false">Lending</button>
+              <button class="history-category-btn" type="button" role="tab" data-history-category="damaged" aria-pressed="false">Damaged</button>
+            </div>
           </div>
-        </section>
 
-        <section class="history-tools-row">
-          <div class="history-tools-filters">
-            <label class="history-field" for="history-sort">
-              Sort by
-              <select id="history-sort">
-                <option value="latest" selected>Latest</option>
-                <option value="oldest">Oldest</option>
-              </select>
-            </label>
-            <label class="history-field" for="history-date-from">
-              From
-              <input id="history-date-from" type="date" />
-            </label>
-            <label class="history-field" for="history-date-to">
-              To
-              <input id="history-date-to" type="date" />
-            </label>
-            <button class="history-reset-btn" id="history-filter-reset" type="button">Reset</button>
+          <label class="history-toolbar-group history-field history-sort-field" for="history-sort">
+            <span>Sort by</span>
+            <select id="history-sort">
+              <option value="latest" selected>Latest</option>
+              <option value="oldest">Oldest</option>
+            </select>
+          </label>
+
+          <div class="history-toolbar-group history-date-range">
+            <span class="history-category-label">Date</span>
+            <input id="history-date-from" type="date" aria-label="From date" />
+            <span class="history-date-arrow" aria-hidden="true">→</span>
+            <input id="history-date-to" type="date" aria-label="To date" />
           </div>
+
+          <button class="history-reset-btn" id="history-filter-reset" type="button">Reset</button>
+
           <div class="history-head-actions">
             <button class="history-print-btn" id="history-print-btn" type="button">
               <i class="bi bi-printer-fill"></i> Print File
