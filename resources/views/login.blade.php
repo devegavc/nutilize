@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   
   <link rel="icon" type="image/png" href="/img/nutilize_favicon.png" />
-<title>NUtilize | Admin Login</title>
+<title>NUtilize | Login</title>
 
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" 
@@ -37,16 +37,12 @@
         <img src="/img/nutilize_logo.png" 
              alt="NUTilize Logo" 
              class="brand-logo">
-        <p class="brand-subtitle mt-2 mb-3">
+        <p class="brand-subtitle mt-2 mb-0">
           Campus Resource & Reservation Management System
         </p>
-        <div class="admin-access-indicator" role="status">
-          <span class="admin-access-badge">
-            <i class="bi bi-shield-lock-fill" aria-hidden="true"></i>
-            Administrator Access
-          </span>
-        </div>
-        <h1 class="visually-hidden">Administrator Login</h1>
+        <h1 class="login-heading">
+          Sign in to your <span class="login-heading-admin">Admin</span> account
+        </h1>
       </div>
 
       <form id="loginForm" action="{{ route('login.authenticate') }}" method="POST">
@@ -143,10 +139,13 @@
         </div>
 
         <!-- Submit -->
-        <button type="submit" class="btn btn-login w-100" id="loginSubmitBtn">
+        <button type="submit" class="btn btn-login w-100" id="loginSubmitBtn" aria-label="Sign In">
           <span class="btn-login-content">
-            <i class="bi bi-arrow-repeat login-spinner" aria-hidden="true"></i>
-            <span class="btn-login-text">Login</span>
+            <span class="btn-login-idle">Sign In</span>
+            <span class="btn-login-busy" aria-hidden="true">
+              <span class="login-spinner"></span>
+              Signing in...
+            </span>
           </span>
         </button>
 
@@ -168,7 +167,6 @@
       const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
       const forgotPasswordHelp = document.getElementById('forgot-password-help');
       const submitButton = document.getElementById('loginSubmitBtn');
-      const submitButtonText = submitButton ? submitButton.querySelector('.btn-login-text') : null;
       let isSubmitting = false;
 
       function readStoredIdentifier() {
@@ -206,14 +204,14 @@
       }
 
       function setLoginLoading(isLoading) {
-        if (!submitButton || !submitButtonText) {
+        if (!submitButton) {
           return;
         }
 
         submitButton.disabled = isLoading;
         submitButton.classList.toggle('is-loading', isLoading);
         submitButton.setAttribute('aria-busy', isLoading ? 'true' : 'false');
-        submitButtonText.textContent = isLoading ? 'Logging in...' : 'Login';
+        submitButton.setAttribute('aria-label', isLoading ? 'Signing in' : 'Sign In');
       }
 
       if (rememberMe && identifierInput) {

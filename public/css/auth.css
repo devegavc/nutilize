@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap");
 
 :root {
   --primary: #FDFAF6;
@@ -60,43 +60,30 @@ body {
   color: var(--secondary);
   font-size: 1.05rem;
   font-weight: 800;
+  line-height: 1.35;
   margin: 0;
 }
 
-.admin-access-indicator {
-  display: flex;
-  justify-content: center;
-  margin: 0;
-}
-
-.admin-access-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.4rem 0.95rem;
-  border-radius: 999px;
-  background: rgba(50, 65, 140, 0.08);
-  border: 1px solid rgba(50, 65, 140, 0.16);
-  box-shadow: inset 0 0 0 1px rgba(251, 209, 23, 0.18);
+.login-heading {
+  margin: 0.9rem 0 0;
   color: var(--secondary);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 1.02rem;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
-.admin-access-badge i {
+.login-heading-admin {
+  font-weight: 700;
   color: var(--secondary-deep);
-  font-size: 0.95rem;
 }
 
 .login-options {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem 1rem;
+  gap: 0.5rem 1rem;
   flex-wrap: wrap;
-  margin-bottom: 1.15rem;
+  margin-bottom: 1.25rem;
 }
 
 .login-remember {
@@ -240,6 +227,12 @@ body {
 .form-control:focus {
   border-color: #8da0e0;
   box-shadow: 0 0 0 0.25rem rgba(80, 101, 184, 0.22);
+}
+
+.login-card .input-group:focus-within .input-group-text,
+.login-card .input-group:focus-within .form-control,
+.login-card .input-group:focus-within .btn-password-toggle {
+  border-color: #8da0e0;
 }
 
 .btn-password-toggle {
@@ -401,28 +394,43 @@ body {
 }
 
 .btn-login-content {
+  display: grid;
+  place-items: center;
+  min-height: 1.4rem;
+}
+
+.btn-login-idle,
+.btn-login-busy {
+  grid-area: 1 / 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 1.4rem;
+  white-space: nowrap;
+  transition: opacity 0.18s ease;
 }
 
-.btn-login-text {
-  display: inline-block;
-  min-width: 8.5rem;
-  text-align: center;
+.btn-login-busy {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.btn-login.is-loading .btn-login-idle {
+  opacity: 0;
+}
+
+.btn-login.is-loading .btn-login-busy {
+  opacity: 1;
 }
 
 .login-spinner {
-  display: none;
-  font-size: 1.1rem;
-  line-height: 1;
-  animation: loginSpin 0.8s linear infinite;
-}
-
-.btn-login.is-loading .login-spinner {
-  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: loginSpin 0.7s linear infinite;
 }
 
 .btn-login:hover,
@@ -496,12 +504,14 @@ body {
   .brand-logo {
     max-width: 240px;
   }
-  .admin-access-badge {
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    padding: 0.35rem 0.8rem;
+  .login-heading {
+    font-size: 0.98rem;
   }
   .login-options {
-    align-items: flex-start;
+    row-gap: 0.65rem;
+  }
+  .login-remember .form-check-label,
+  .forgot-password-link {
+    font-size: 0.9rem;
   }
 }
