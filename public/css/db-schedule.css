@@ -1,18 +1,6 @@
 @import url("./dashboard.css");
 
-body {
-  overflow: hidden;
-}
-
-.dashboard-shell {
-  height: calc(100vh - var(--top-header-height) - var(--dashboard-top-gap) - var(--dashboard-bottom-gap));
-  min-height: 0;
-  overflow: hidden;
-}
-
 .workspace-grid {
-  height: calc(100% - 10px);
-  min-height: 0;
   gap: 14px;
 }
 

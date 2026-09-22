@@ -1301,6 +1301,22 @@ body {
 }
 
 @media (min-width: 1101px) {
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .dashboard-shell {
+    height: auto;
+    min-height: calc(100vh - var(--top-header-height) - var(--dashboard-top-gap) - var(--dashboard-bottom-gap));
+    overflow: visible;
+  }
+
+  .workspace-grid {
+    height: auto;
+    align-items: start;
+  }
+
   #navbar-container {
     grid-column: 1;
     grid-row: 1;
@@ -1312,10 +1328,15 @@ body {
     pointer-events: auto;
     align-self: start;
     height: calc(100vh - var(--top-header-height) - var(--dashboard-top-gap) - var(--dashboard-bottom-gap));
+    max-height: calc(100vh - var(--top-header-height) - var(--dashboard-top-gap) - var(--dashboard-bottom-gap));
+    overflow: hidden;
   }
 
   #navbar-container .side-nav {
     height: 100%;
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .workspace-grid > .content-card,
@@ -1336,25 +1357,9 @@ body {
   }
 
   .content-card {
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(56, 71, 156, 0.55) rgba(255, 255, 255, 0.45);
-  }
-
-  .content-card::-webkit-scrollbar {
-    width: 14px;
-  }
-
-  .content-card::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.45);
-    border-radius: 999px;
-  }
-
-  .content-card::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(56, 71, 156, 0.9) 0%, rgba(79, 99, 184, 0.9) 100%);
-    border-radius: 999px;
-    border: 3px solid rgba(255, 255, 255, 0.5);
+    height: auto;
+    max-height: none;
+    overflow: hidden;
   }
 }
 
