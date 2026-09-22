@@ -161,8 +161,12 @@
           </div>
           <input id="profile-avatar-upload" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
           <div class="profile-edit-photo-actions">
-            <button type="button" class="profile-edit-upload-btn" id="profile-edit-upload-btn">Upload Photo</button>
-            <button type="button" class="profile-edit-delete-btn" id="profile-delete-photo-btn" hidden>Delete Photo</button>
+            <button type="button" class="profile-edit-upload-btn" id="profile-edit-upload-btn" title="Upload Photo" aria-label="Upload Photo">
+              <i class="bi bi-camera-fill"></i>
+            </button>
+            <button type="button" class="profile-edit-delete-btn" id="profile-delete-photo-btn" title="Delete Photo" aria-label="Delete Photo" hidden>
+              <i class="bi bi-trash3-fill"></i>
+            </button>
           </div>
         </div>
 
@@ -223,6 +227,28 @@
           <button type="button" class="profile-edit-btn-secondary" id="profile-edit-cancel-btn">Cancel</button>
           <button type="button" class="profile-edit-btn-primary" id="profile-edit-save-btn">Save Profile</button>
         </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="profile-crop-modal" id="profile-crop-modal" aria-hidden="true">
+    <div class="profile-crop-overlay"></div>
+    <article class="profile-crop-card" role="dialog" aria-modal="true" aria-labelledby="profile-crop-title">
+      <h2 id="profile-crop-title">Crop Photo</h2>
+      <div class="profile-crop-layout">
+        <div class="profile-crop-stage" id="profile-crop-stage">
+          <img id="profile-crop-source" alt="" />
+          <div class="profile-crop-guide" aria-hidden="true"></div>
+        </div>
+        <canvas class="profile-crop-preview" id="profile-crop-preview" width="120" height="120" aria-label="Circular profile preview"></canvas>
+      </div>
+      <label class="profile-crop-zoom" for="profile-crop-zoom">
+        <span>Zoom</span>
+        <input id="profile-crop-zoom" type="range" min="1" max="3" step="0.01" value="1" />
+      </label>
+      <div class="profile-crop-actions">
+        <button type="button" class="profile-crop-cancel" id="profile-crop-cancel">Cancel</button>
+        <button type="button" class="profile-crop-apply" id="profile-crop-apply">Apply Crop</button>
       </div>
     </article>
   </section>

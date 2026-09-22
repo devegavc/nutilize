@@ -906,6 +906,7 @@ let activeNotificationButton = null;
 let profilePopover = null;
 let activeProfileButton = null;
 let pendingProfileAvatarDataUrl = '';
+let profilePhotoChangePending = false;
 let sidebarToggleButton = null;
 let sidebarBackdrop = null;
 let isToolbarSearchExpanded = false;
@@ -5731,6 +5732,7 @@ function openProfileEditModal() {
     profileModalProgramIdInput.value = selectedProgramId;
   }
 
+  profilePhotoChangePending = false;
   pendingProfileAvatarDataUrl = profileAvatar && profileAvatar.classList.contains('has-image') && profileAvatarImage
     ? profileAvatarImage.src
     : '';
@@ -5760,7 +5762,10 @@ if (profileEditButton && profileEditModal) {
 }
 
 if (profileEditCancelButton) {
-  profileEditCancelButton.addEventListener('click', closeProfileEditModal);
+  profileEditCancelButton.addEventListener('click', () => {
+    restorePersistedProfilePhoto();
+    closeProfileEditModal();
+  });
 }
 
 if (profileEditSaveButton) {
@@ -5859,17 +5864,18 @@ if (profileEditSaveButton) {
         }
       }
 
-      if (profileAvatar && profileAvatarImage) {
+      if (profilePhotoChangePending) {
         if (pendingProfileAvatarDataUrl) {
-          profileAvatarImage.src = pendingProfileAvatarDataUrl;
-          profileAvatar.classList.add('has-image');
+          applyProfilePageAvatar(pendingProfileAvatarDataUrl);
           applyHeaderProfileAvatar(pendingProfileAvatarDataUrl);
           const storedAvatar = await shrinkProfileAvatar(pendingProfileAvatarDataUrl);
           storeProfileAvatar(storedAvatar);
         } else {
-          profileAvatarImage.removeAttribute('src');
-          profileAvatar.classList.remove('has-image');
+          applyProfilePageAvatar('');
+          applyHeaderProfileAvatar('');
+          storeProfileAvatar('');
         }
+        profilePhotoChangePending = false;
       }
 
       closeProfileEditModal();
@@ -5930,18 +5936,7 @@ if (profileAvatarUploadInput && profileEditAvatar && profileEditAvatarImage) {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        return;
-      }
-
-      pendingProfileAvatarDataUrl = reader.result;
-      profileEditAvatarImage.src = reader.result;
-      profileEditAvatar.classList.add('has-image');
-      syncProfileDeletePhotoButton();
-    };
-    reader.readAsDataURL(file);
+    openProfileCropModal(file);
   });
 }
 
@@ -5967,9 +5962,21 @@ function openProfileDeleteModal() {
   profileDeleteModal.setAttribute('aria-hidden', 'false');
 }
 
+function restorePersistedProfilePhoto() {
+  if (!profilePhotoChangePending) {
+    return;
+  }
+
+  const storedAvatar = readStoredProfileAvatar();
+  pendingProfileAvatarDataUrl = storedAvatar;
+  profilePhotoChangePending = false;
+  applyProfilePageAvatar(storedAvatar);
+  applyHeaderProfileAvatar(storedAvatar);
+}
+
 function removeProfilePhoto() {
   pendingProfileAvatarDataUrl = '';
-  storeProfileAvatar('');
+  profilePhotoChangePending = true;
   applyProfilePageAvatar('');
   applyHeaderProfileAvatar('');
 
@@ -5984,6 +5991,230 @@ function removeProfilePhoto() {
 
   syncProfileDeletePhotoButton();
   closeProfileDeleteModal();
+}
+
+const profileCropModal = document.getElementById('profile-crop-modal');
+const profileCropStage = document.getElementById('profile-crop-stage');
+const profileCropSource = document.getElementById('profile-crop-source');
+const profileCropZoom = document.getElementById('profile-crop-zoom');
+const profileCropPreview = document.getElementById('profile-crop-preview');
+const profileCropCancel = document.getElementById('profile-crop-cancel');
+const profileCropApply = document.getElementById('profile-crop-apply');
+let profileCropObjectUrl = '';
+let profileCropNaturalWidth = 0;
+let profileCropNaturalHeight = 0;
+let profileCropScale = 1;
+let profileCropMinScale = 1;
+let profileCropOffsetX = 0;
+let profileCropOffsetY = 0;
+let profileCropDrag = null;
+
+function profileCropStageSize() {
+  return profileCropStage instanceof HTMLElement ? profileCropStage.clientWidth : 280;
+}
+
+function closeProfileCropModal(discardSelection) {
+  if (profileCropModal) {
+    profileCropModal.classList.remove('is-open');
+    profileCropModal.setAttribute('aria-hidden', 'true');
+  }
+
+  if (profileCropSource instanceof HTMLImageElement) {
+    profileCropSource.removeAttribute('src');
+  }
+
+  if (profileCropObjectUrl) {
+    URL.revokeObjectURL(profileCropObjectUrl);
+    profileCropObjectUrl = '';
+  }
+
+  if (discardSelection && profileAvatarUploadInput) {
+    profileAvatarUploadInput.value = '';
+  }
+
+  profileCropDrag = null;
+  if (profileCropStage instanceof HTMLElement) {
+    profileCropStage.classList.remove('is-dragging');
+  }
+}
+
+function drawProfileCropPreview() {
+  if (!(profileCropPreview instanceof HTMLCanvasElement) || !(profileCropSource instanceof HTMLImageElement) || !profileCropNaturalWidth) {
+    return;
+  }
+
+  const context = profileCropPreview.getContext('2d');
+  const stageSize = profileCropStageSize();
+  if (!context || !stageSize) {
+    return;
+  }
+
+  const size = profileCropPreview.width;
+  const ratio = size / stageSize;
+  context.clearRect(0, 0, size, size);
+  context.drawImage(
+    profileCropSource,
+    profileCropOffsetX * ratio,
+    profileCropOffsetY * ratio,
+    profileCropNaturalWidth * profileCropScale * ratio,
+    profileCropNaturalHeight * profileCropScale * ratio
+  );
+}
+
+function layoutProfileCropImage() {
+  if (!(profileCropSource instanceof HTMLImageElement)) {
+    return;
+  }
+
+  profileCropSource.style.width = `${profileCropNaturalWidth * profileCropScale}px`;
+  profileCropSource.style.height = `${profileCropNaturalHeight * profileCropScale}px`;
+  profileCropSource.style.left = `${profileCropOffsetX}px`;
+  profileCropSource.style.top = `${profileCropOffsetY}px`;
+  drawProfileCropPreview();
+}
+
+function clampProfileCropOffset() {
+  const stageSize = profileCropStageSize();
+  const renderedWidth = profileCropNaturalWidth * profileCropScale;
+  const renderedHeight = profileCropNaturalHeight * profileCropScale;
+  profileCropOffsetX = Math.min(0, Math.max(stageSize - renderedWidth, profileCropOffsetX));
+  profileCropOffsetY = Math.min(0, Math.max(stageSize - renderedHeight, profileCropOffsetY));
+}
+
+function setProfileCropZoom(multiplier) {
+  const stageSize = profileCropStageSize();
+  const previousScale = profileCropScale || profileCropMinScale;
+  const nextScale = profileCropMinScale * multiplier;
+  const center = stageSize / 2;
+  profileCropOffsetX = center - ((center - profileCropOffsetX) * nextScale / previousScale);
+  profileCropOffsetY = center - ((center - profileCropOffsetY) * nextScale / previousScale);
+  profileCropScale = nextScale;
+  clampProfileCropOffset();
+  layoutProfileCropImage();
+}
+
+function resetProfileCropPlacement() {
+  const stageSize = profileCropStageSize();
+  profileCropMinScale = Math.max(stageSize / profileCropNaturalWidth, stageSize / profileCropNaturalHeight);
+  profileCropScale = profileCropMinScale;
+  profileCropOffsetX = (stageSize - profileCropNaturalWidth * profileCropScale) / 2;
+  profileCropOffsetY = (stageSize - profileCropNaturalHeight * profileCropScale) / 2;
+  if (profileCropZoom instanceof HTMLInputElement) {
+    profileCropZoom.value = '1';
+  }
+  layoutProfileCropImage();
+}
+
+function openProfileCropModal(file) {
+  if (!profileCropModal || !(profileCropSource instanceof HTMLImageElement) || !(file instanceof File)) {
+    return;
+  }
+
+  if (profileCropObjectUrl) {
+    URL.revokeObjectURL(profileCropObjectUrl);
+  }
+
+  profileCropModal.classList.add('is-open');
+  profileCropModal.setAttribute('aria-hidden', 'false');
+  profileCropObjectUrl = URL.createObjectURL(file);
+  profileCropSource.onload = () => {
+    profileCropNaturalWidth = profileCropSource.naturalWidth;
+    profileCropNaturalHeight = profileCropSource.naturalHeight;
+    requestAnimationFrame(() => resetProfileCropPlacement());
+  };
+  profileCropSource.src = profileCropObjectUrl;
+}
+
+function applyProfileCrop() {
+  if (!(profileCropSource instanceof HTMLImageElement) || !profileCropNaturalWidth) {
+    return;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 480;
+  canvas.height = 480;
+  const context = canvas.getContext('2d');
+  const stageSize = profileCropStageSize();
+  if (!context || !stageSize) {
+    return;
+  }
+
+  const ratio = 480 / stageSize;
+  context.drawImage(
+    profileCropSource,
+    profileCropOffsetX * ratio,
+    profileCropOffsetY * ratio,
+    profileCropNaturalWidth * profileCropScale * ratio,
+    profileCropNaturalHeight * profileCropScale * ratio
+  );
+
+  pendingProfileAvatarDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  profilePhotoChangePending = true;
+
+  if (profileEditAvatar && profileEditAvatarImage) {
+    profileEditAvatarImage.src = pendingProfileAvatarDataUrl;
+    profileEditAvatar.classList.add('has-image');
+  }
+
+  syncProfileDeletePhotoButton();
+  closeProfileCropModal(true);
+}
+
+if (profileCropZoom instanceof HTMLInputElement) {
+  profileCropZoom.addEventListener('input', () => {
+    setProfileCropZoom(Number(profileCropZoom.value) || 1);
+  });
+}
+
+if (profileCropStage instanceof HTMLElement) {
+  profileCropStage.addEventListener('pointerdown', (event) => {
+    if (!(event instanceof PointerEvent)) {
+      return;
+    }
+
+    profileCropDrag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: profileCropOffsetX,
+      originY: profileCropOffsetY,
+    };
+    profileCropStage.classList.add('is-dragging');
+    profileCropStage.setPointerCapture(event.pointerId);
+  });
+
+  profileCropStage.addEventListener('pointermove', (event) => {
+    if (!profileCropDrag || event.pointerId !== profileCropDrag.pointerId) {
+      return;
+    }
+
+    profileCropOffsetX = profileCropDrag.originX + (event.clientX - profileCropDrag.startX);
+    profileCropOffsetY = profileCropDrag.originY + (event.clientY - profileCropDrag.startY);
+    clampProfileCropOffset();
+    layoutProfileCropImage();
+  });
+
+  const endProfileCropDrag = (event) => {
+    if (!profileCropDrag || event.pointerId !== profileCropDrag.pointerId) {
+      return;
+    }
+
+    profileCropDrag = null;
+    profileCropStage.classList.remove('is-dragging');
+  };
+
+  profileCropStage.addEventListener('pointerup', endProfileCropDrag);
+  profileCropStage.addEventListener('pointercancel', endProfileCropDrag);
+}
+
+if (profileCropCancel instanceof HTMLButtonElement) {
+  profileCropCancel.addEventListener('click', () => {
+    closeProfileCropModal(true);
+  });
+}
+
+if (profileCropApply instanceof HTMLButtonElement) {
+  profileCropApply.addEventListener('click', applyProfileCrop);
 }
 
 if (profileDeletePhotoButton) {
@@ -8185,6 +8416,10 @@ document.addEventListener('keydown', (event) => {
 
   if (event.key === 'Escape' && profilePopover) {
     closeProfilePopover();
+  }
+
+  if (event.key === 'Escape' && profileCropModal && profileCropModal.classList.contains('is-open')) {
+    closeProfileCropModal(true);
   }
 
   if (event.key === 'Escape' && profileDeleteModal && profileDeleteModal.classList.contains('is-open')) {
