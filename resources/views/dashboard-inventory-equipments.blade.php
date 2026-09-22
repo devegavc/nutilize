@@ -7,7 +7,7 @@
 <meta name="csrf-token" content="{{ csrf_token() }}" />  <title>NUtilize | Inventory Equipment</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
 </head>
 <body>
   <script>
@@ -69,12 +69,12 @@
           </div>
 
           <div class="facilities-action-group">
-            <button class="facilities-add-category-btn" id="equipment-add-category-btn" type="button">Add Category</button>
-            <button class="facilities-add-btn" id="equipment-add-btn" type="button">Add Equipment</button>
+            <button class="facilities-add-category-btn" id="equipment-add-category-btn" type="button">Manage Category</button>
+            <button class="facilities-add-btn" id="equipment-add-btn" type="button">Manage Equipment</button>
           </div>
         </section>
 
-        <section class="inventory-grid facilities-grid">
+        <section class="inventory-grid facilities-grid equipment-grid">
           <div class="table-wrap">
             <table class="inventory-table equipment-inventory-table">
               <thead>

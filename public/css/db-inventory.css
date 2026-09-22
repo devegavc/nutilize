@@ -655,6 +655,24 @@
   color: #4b567f;
 }
 
+.equipment-filter-row .facilities-add-category-btn,
+.equipment-filter-row .facilities-add-btn {
+  white-space: nowrap;
+}
+
+.facilities-content-card .equipment-grid {
+  margin: 0 8px 16px;
+}
+
+.facilities-content-card .equipment-grid .table-wrap {
+  padding: 0 0 12px;
+  width: 100%;
+}
+
+.facilities-content-card .equipment-grid .equipment-inventory-table {
+  width: 100%;
+}
+
 .facilities-grid .users-table th:nth-child(1),
 .facilities-grid .users-table td:nth-child(1) {
   width: 12%;
