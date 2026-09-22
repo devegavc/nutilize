@@ -137,13 +137,10 @@
       <div class="facilities-modal-body">
         <h2 id="equipment-modal-title">Add Item</h2>
 
-        <label class="facilities-field-label" for="equipment-unit-code-single">Unit Code <span class="field-optional">(optional)</span></label>
-        <input id="equipment-unit-code-single" class="facilities-input" type="text" placeholder="Leave blank to auto-generate e.g. #TMP-0007-U001" maxlength="64" />
-
-        <div id="equipment-unit-codes-multi-wrap" hidden>
-          <label class="facilities-field-label" for="equipment-unit-codes-multi">Unit Codes <span class="field-optional">(optional)</span></label>
-          <textarea id="equipment-unit-codes-multi" class="facilities-input facilities-textarea" rows="4" placeholder="One code per line, or leave blank to auto-generate temporary codes"></textarea>
-          <small id="equipment-unit-codes-hint" class="facilities-input-note">Enter your own codes (one per physical unit), or leave blank and the system will create temporary codes like #TMP-0007-U001. You can replace them later when official asset IDs are ready.</small>
+        <div class="equipment-unit-code-block">
+          <label class="facilities-field-label" id="equipment-unit-codes-label" for="equipment-unit-code-0">Unit Code</label>
+          <div id="equipment-unit-code-fields" class="equipment-unit-code-fields"></div>
+          <small id="equipment-unit-codes-hint" class="facilities-input-note">Leave blank to auto-generate a temporary code like #TMP-0007-U001.</small>
         </div>
 
         <button type="button" class="facilities-action-btn cancel equipment-generate-codes-btn" id="equipment-generate-unit-codes-btn">Preview temporary codes</button>

@@ -26,6 +26,8 @@ const facilitiesUploadButton = document.getElementById('facility-upload-btn');
 const facilitiesUploadName = document.getElementById('facility-upload-name');
 const equipmentEditModal = document.getElementById('equipment-edit-modal');
 const equipmentItemNameInput = document.getElementById('equipment-item-name');
+const equipmentUnitCodeFields = document.getElementById('equipment-unit-code-fields');
+const equipmentUnitCodesLabel = document.getElementById('equipment-unit-codes-label');
 const equipmentUnitCodeSingleInput = document.getElementById('equipment-unit-code-single');
 const equipmentUnitCodesMultiInput = document.getElementById('equipment-unit-codes-multi');
 const equipmentUnitCodesMultiWrap = document.getElementById('equipment-unit-codes-multi-wrap');
@@ -4115,25 +4117,63 @@ function parseEquipmentUnitCodesFromDataset(row) {
   }
 }
 
-function syncEquipmentUnitCodesUi() {
-  const totalCount = Number.parseInt(equipmentTotalCountInput?.value || '1', 10);
-  const useMulti = Number.isInteger(totalCount) && totalCount > 1;
-  const singleLabel = document.querySelector('label[for="equipment-unit-code-single"]');
+function getRequestedEquipmentUnitCount() {
+  const totalCount = Number.parseInt(equipmentTotalCountInput?.value || '0', 10);
 
-  if (singleLabel instanceof HTMLElement) {
-    singleLabel.hidden = useMulti;
+  if (!Number.isInteger(totalCount) || totalCount < 0) {
+    return 0;
   }
 
-  if (equipmentUnitCodeSingleInput) {
-    equipmentUnitCodeSingleInput.hidden = useMulti;
+  return totalCount;
+}
+
+function isGeneratedTemporaryUnitCode(code) {
+  return /^#TMP-\d+-U\d+$/i.test(String(code || '').trim());
+}
+
+function getEquipmentUnitCodeInputs() {
+  if (!equipmentUnitCodeFields) {
+    return [];
   }
 
-  if (equipmentUnitCodesMultiWrap) {
-    equipmentUnitCodesMultiWrap.hidden = !useMulti;
+  return Array.from(equipmentUnitCodeFields.querySelectorAll('.equipment-unit-code-field'));
+}
+
+function getEquipmentUnitCodeValues() {
+  if (equipmentUnitCodeFields) {
+    return getEquipmentUnitCodeInputs().map((input) => input.value.trim());
   }
 
-  if (equipmentUnitCodesHint && Number.isInteger(totalCount) && totalCount > 1) {
-    equipmentUnitCodesHint.textContent = `Optional: enter up to ${totalCount} custom codes (one per line). Blank lines are filled with temporary codes like #TMP-0007-U001 on save.`;
+  const totalCount = getRequestedEquipmentUnitCount();
+
+  if (totalCount <= 1) {
+    const singleCode = equipmentUnitCodeSingleInput ? equipmentUnitCodeSingleInput.value.trim() : '';
+    return singleCode ? [singleCode] : [];
+  }
+
+  const raw = equipmentUnitCodesMultiInput ? equipmentUnitCodesMultiInput.value : '';
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+}
+
+function updateEquipmentUnitCodesLabel(totalCount) {
+  if (equipmentUnitCodesLabel instanceof HTMLElement) {
+    equipmentUnitCodesLabel.hidden = totalCount <= 0;
+    equipmentUnitCodesLabel.textContent = totalCount === 1 ? 'Unit Code' : 'Unit Codes';
+
+    if (totalCount === 1) {
+      equipmentUnitCodesLabel.setAttribute('for', 'equipment-unit-code-0');
+    } else {
+      equipmentUnitCodesLabel.removeAttribute('for');
+    }
+  }
+
+  if (equipmentUnitCodesHint) {
+    equipmentUnitCodesHint.hidden = totalCount <= 0;
+    equipmentUnitCodesHint.textContent = totalCount === 1
+      ? 'Leave blank to auto-generate a temporary code like #TMP-0007-U001.'
+      : 'Enter a code for each unit, or leave blank to auto-generate temporary codes like #TMP-0007-U001.';
   }
 }
 
@@ -4150,15 +4190,120 @@ function buildPreviewTemporaryUnitCodes(totalCount) {
   return Array.from({ length: parsedTotal }, (_, index) => `#TMP-${paddedId}-U${String(index + 1).padStart(3, '0')}`);
 }
 
-function previewTemporaryEquipmentUnitCodes() {
-  const totalCount = Number.parseInt(equipmentTotalCountInput?.value || '0', 10);
+function buildResolvedEquipmentUnitCodes(totalCount, preferredValues, fillGenerated) {
+  const previewCodes = buildPreviewTemporaryUnitCodes(totalCount);
+  const values = Array.isArray(preferredValues) ? preferredValues : [];
+  const resolved = [];
 
-  if (!Number.isInteger(totalCount) || totalCount <= 0) {
+  for (let index = 0; index < totalCount; index += 1) {
+    const current = String(values[index] || '').trim();
+
+    if (fillGenerated && (!current || isGeneratedTemporaryUnitCode(current))) {
+      resolved.push(previewCodes[index] || '');
+      continue;
+    }
+
+    resolved.push(current);
+  }
+
+  return resolved;
+}
+
+function renderEquipmentUnitCodeFields(totalCount, preferredValues, options = {}) {
+  const fillGenerated = options.fillGenerated !== false;
+  updateEquipmentUnitCodesLabel(totalCount);
+
+  if (!equipmentUnitCodeFields) {
+    return;
+  }
+
+  equipmentUnitCodeFields.innerHTML = '';
+
+  if (totalCount <= 0) {
+    return;
+  }
+
+  const resolved = buildResolvedEquipmentUnitCodes(totalCount, preferredValues, fillGenerated);
+  const previewCodes = buildPreviewTemporaryUnitCodes(totalCount);
+  const fragment = document.createDocumentFragment();
+
+  resolved.forEach((value, index) => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = `equipment-unit-code-${index}`;
+    input.className = 'facilities-input equipment-unit-code-field';
+    input.maxLength = 64;
+    input.value = value;
+    input.placeholder = previewCodes[index] || 'Leave blank to auto-generate';
+    input.setAttribute('aria-label', totalCount === 1 ? 'Unit Code' : `Unit Code ${index + 1}`);
+    input.autocomplete = 'off';
+    fragment.appendChild(input);
+  });
+
+  equipmentUnitCodeFields.appendChild(fragment);
+}
+
+function syncEquipmentUnitCodesUi(options = {}) {
+  const totalCount = getRequestedEquipmentUnitCount();
+  const fillGenerated = options.fillGenerated !== false;
+  const currentValues = getEquipmentUnitCodeValues();
+
+  if (equipmentUnitCodeFields) {
+    const existingCount = getEquipmentUnitCodeInputs().length;
+
+    if (existingCount === totalCount && totalCount > 0 && !options.force) {
+      updateEquipmentUnitCodesLabel(totalCount);
+
+      if (fillGenerated) {
+        const resolved = buildResolvedEquipmentUnitCodes(totalCount, currentValues, true);
+        getEquipmentUnitCodeInputs().forEach((input, index) => {
+          if (!input.value.trim() || isGeneratedTemporaryUnitCode(input.value)) {
+            input.value = resolved[index] || '';
+          }
+        });
+      }
+
+      return;
+    }
+
+    renderEquipmentUnitCodeFields(totalCount, currentValues, { fillGenerated });
+    return;
+  }
+
+  const useMulti = totalCount > 1;
+  const singleLabel = document.querySelector('label[for="equipment-unit-code-single"]');
+
+  if (singleLabel instanceof HTMLElement) {
+    singleLabel.hidden = useMulti;
+  }
+
+  if (equipmentUnitCodeSingleInput) {
+    equipmentUnitCodeSingleInput.hidden = useMulti;
+  }
+
+  if (equipmentUnitCodesMultiWrap) {
+    equipmentUnitCodesMultiWrap.hidden = !useMulti;
+  }
+
+  if (equipmentUnitCodesHint && totalCount > 1) {
+    equipmentUnitCodesHint.textContent = `Enter up to ${totalCount} custom codes (one per line). Blank lines are filled with temporary codes like #TMP-0007-U001 on save.`;
+  }
+}
+
+function previewTemporaryEquipmentUnitCodes() {
+  const totalCount = getRequestedEquipmentUnitCount();
+
+  if (totalCount <= 0) {
     showAppNotice('Set Total Count first before previewing temporary codes.');
     return;
   }
 
   const previewCodes = buildPreviewTemporaryUnitCodes(totalCount);
+
+  if (equipmentUnitCodeFields) {
+    renderEquipmentUnitCodeFields(totalCount, previewCodes, { fillGenerated: false });
+    return;
+  }
 
   if (totalCount <= 1) {
     if (equipmentUnitCodeSingleInput) {
@@ -4173,27 +4318,19 @@ function previewTemporaryEquipmentUnitCodes() {
 }
 
 function collectEquipmentUnitCodes() {
-  const totalCount = Number.parseInt(equipmentTotalCountInput?.value || '0', 10);
+  const totalCount = getRequestedEquipmentUnitCount();
 
-  if (!Number.isInteger(totalCount) || totalCount <= 0) {
+  if (totalCount <= 0) {
     return [];
   }
 
-  if (totalCount <= 1) {
-    const singleCode = equipmentUnitCodeSingleInput ? equipmentUnitCodeSingleInput.value.trim() : '';
-    return singleCode ? [singleCode] : [];
+  const values = getEquipmentUnitCodeValues();
+
+  while (values.length < totalCount) {
+    values.push('');
   }
 
-  const raw = equipmentUnitCodesMultiInput ? equipmentUnitCodesMultiInput.value : '';
-  const lines = raw
-    .split(/\r?\n/)
-    .map((line) => line.trim());
-
-  while (lines.length < totalCount) {
-    lines.push('');
-  }
-
-  return lines.slice(0, totalCount);
+  return values.slice(0, totalCount);
 }
 
 function equipmentSaveSuccessMessage(item) {
@@ -4209,7 +4346,12 @@ function equipmentSaveSuccessMessage(item) {
 
 function setEquipmentUnitCodesInForm(unitCodes) {
   const codes = Array.isArray(unitCodes) ? unitCodes : [];
-  const totalCount = Number.parseInt(equipmentTotalCountInput?.value || String(Math.max(codes.length, 1)), 10);
+  const totalCount = getRequestedEquipmentUnitCount() || Math.max(codes.length, 1);
+
+  if (equipmentUnitCodeFields) {
+    renderEquipmentUnitCodeFields(totalCount, codes, { fillGenerated: true });
+    return;
+  }
 
   syncEquipmentUnitCodesUi();
 
@@ -4324,8 +4466,6 @@ function openEquipmentAddModal() {
     equipmentUnitCodesMultiInput.value = '';
   }
 
-  syncEquipmentUnitCodesUi();
-
   if (equipmentItemNameInput) {
     equipmentItemNameInput.value = '';
   }
@@ -4338,7 +4478,7 @@ function openEquipmentAddModal() {
     equipmentTotalCountInput.value = '1';
   }
 
-  syncEquipmentUnitCodesUi();
+  renderEquipmentUnitCodeFields(1, [], { fillGenerated: true });
 
   if (equipmentInUseInput) {
     equipmentInUseInput.value = '0';
@@ -6533,7 +6673,8 @@ if (equipmentAddButton && equipmentEditModal) {
 }
 
 if (equipmentTotalCountInput) {
-  equipmentTotalCountInput.addEventListener('input', syncEquipmentUnitCodesUi);
+  equipmentTotalCountInput.addEventListener('input', () => syncEquipmentUnitCodesUi());
+  equipmentTotalCountInput.addEventListener('change', () => syncEquipmentUnitCodesUi());
 }
 
 if (equipmentGenerateUnitCodesButton) {
@@ -6894,7 +7035,7 @@ if (equipmentSaveButton) {
       return;
     }
 
-    syncEquipmentUnitCodesUi();
+    syncEquipmentUnitCodesUi({ fillGenerated: false });
 
     const unitCodes = collectEquipmentUnitCodes();
     const itemName = equipmentItemNameInput.value.trim();
@@ -6922,6 +7063,12 @@ if (equipmentSaveButton) {
 
     if (parsedInUse > parsedTotalCount) {
       showAppNotice('In Use cannot be greater than Total Count.');
+      return;
+    }
+
+    const filledUnitCodes = unitCodes.filter(Boolean);
+    if (parsedTotalCount > 0 && filledUnitCodes.length > 0 && filledUnitCodes.length < parsedTotalCount) {
+      showAppNotice('Please provide a unit code for each unit.');
       return;
     }
 

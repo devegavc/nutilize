@@ -1678,6 +1678,21 @@
   line-height: 1.4;
 }
 
+.equipment-unit-code-block {
+  margin-bottom: 0;
+}
+
+.equipment-unit-code-fields {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.equipment-unit-code-fields .facilities-input,
+.equipment-form-modal-card .equipment-unit-code-fields .facilities-input {
+  margin-bottom: 0;
+}
+
 .equipment-form-preview-btn {
   border: 0;
   background: transparent;
