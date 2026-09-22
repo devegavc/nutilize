@@ -44,7 +44,7 @@
     }
   </style>
 </head>
-<body>
+<body class="manage-users-page">
   <script>
     window.authUser = {
       id: {{ auth()->user()->user_id ?? 'null' }},
@@ -171,7 +171,7 @@
         </section>
 
         <p class="users-policy-note">
-          Students and faculties stay active for {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks from activation. When that window ends they become inactive. Activating an account resets the timer to zero and starts a new {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }}-week period. PF admins can activate or deactivate accounts at any time.
+          Student and faculty accounts remain active for {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks from activation. Once the period ends, accounts become inactive. Activating an account resets the timer and starts a new {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }}-week period. PC admins can activate or deactivate accounts at any time.
         </p>
 
         <section class="users-tools-bar" aria-label="User table filters">
