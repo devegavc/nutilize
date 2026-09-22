@@ -59,25 +59,24 @@ Route::get('/health/db', function () {
 })->name('health.db');
 
 Route::middleware('auth')->group(function () {
-    Route::patch('/dashboard/profile', [ProfileController::class, 'update'])->name('dashboard.profile.update');
-    Route::get('/dashboard/office/home', [OfficeRequestController::class, 'index'])->name('office.home');
-    Route::get('/dashboard/office/requests', fn () => redirect()->route('office.home'))->name('office.requests');
-    Route::get('/dashboard/office/requests/snapshot', [OfficeRequestController::class, 'queueSnapshot'])->name('office.requests.snapshot');
-    Route::get('/dashboard/office/items', [OfficeItemController::class, 'index'])->name('office.items');
-    Route::post('/dashboard/office/items', [OfficeItemController::class, 'store'])->name('office.items.store');
-    Route::patch('/dashboard/office/items/{itemId}', [OfficeItemController::class, 'update'])->name('office.items.update');
-    Route::delete('/dashboard/office/items/{itemId}', [OfficeItemController::class, 'destroy'])->name('office.items.destroy');
-    Route::get('/dashboard/office/items/maintenance', [OfficeItemController::class, 'maintenance'])->name('office.items.maintenance');
-    Route::patch('/dashboard/office/items/maintenance/units/{unitId}', [OfficeItemController::class, 'updateMaintenanceUnit'])->name('office.items.maintenance.units.update');
-    Route::patch('/dashboard/office/items/maintenance/reports/{reportId}', [OfficeItemController::class, 'dismissMaintenanceReport'])->name('office.items.maintenance.reports.dismiss');
-    Route::get('/dashboard/office/history', [OfficeArchiveController::class, 'index'])->name('office.history');
-    Route::get('/dashboard/office/users', [OfficeProgramUserController::class, 'index'])->name('office.users');
-    Route::post('/dashboard/office/users', [OfficeProgramUserController::class, 'store'])->name('office.users.store');
-    Route::patch('/dashboard/office/users/{userId}', [OfficeProgramUserController::class, 'update'])->name('office.users.update');
-    Route::delete('/dashboard/office/users/{userId}', [OfficeProgramUserController::class, 'destroy'])->name('office.users.destroy');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('dashboard.profile.update');
+    Route::get('/office/home', [OfficeRequestController::class, 'index'])->name('office.home');
+    Route::get('/office/requests', fn () => redirect()->route('office.home'))->name('office.requests');
+    Route::get('/office/requests/snapshot', [OfficeRequestController::class, 'queueSnapshot'])->name('office.requests.snapshot');
+    Route::get('/office/items', [OfficeItemController::class, 'index'])->name('office.items');
+    Route::post('/office/items', [OfficeItemController::class, 'store'])->name('office.items.store');
+    Route::patch('/office/items/{itemId}', [OfficeItemController::class, 'update'])->name('office.items.update');
+    Route::delete('/office/items/{itemId}', [OfficeItemController::class, 'destroy'])->name('office.items.destroy');
+    Route::get('/office/items/maintenance', [OfficeItemController::class, 'maintenance'])->name('office.items.maintenance');
+    Route::patch('/office/items/maintenance/units/{unitId}', [OfficeItemController::class, 'updateMaintenanceUnit'])->name('office.items.maintenance.units.update');
+    Route::patch('/office/items/maintenance/reports/{reportId}', [OfficeItemController::class, 'dismissMaintenanceReport'])->name('office.items.maintenance.reports.dismiss');
+    Route::get('/office/history', [OfficeArchiveController::class, 'index'])->name('office.history');
+    Route::get('/office/users', [OfficeProgramUserController::class, 'index'])->name('office.users');
+    Route::post('/office/users', [OfficeProgramUserController::class, 'store'])->name('office.users.store');
+    Route::patch('/office/users/{userId}', [OfficeProgramUserController::class, 'update'])->name('office.users.update');
+    Route::delete('/office/users/{userId}', [OfficeProgramUserController::class, 'destroy'])->name('office.users.destroy');
 
-    Route::prefix('dashboard')->group(function () {
-        Route::middleware('pf-admin')->group(function () {
+    Route::middleware('pf-admin')->group(function () {
             Route::get('/home', [DashboardHomeController::class, 'index'])->name('dashboard.home');
             Route::get('/inventory', [DashboardInventoryController::class, 'index'])->name('dashboard.inventory');
             Route::get('/inventory/analytics', [DashboardInventoryController::class, 'analytics'])->name('dashboard.inventory.analytics');
@@ -132,5 +131,17 @@ Route::middleware('auth')->group(function () {
         Route::patch('/request/{reservationId}/final-return', [ApprovalController::class, 'finalReturnReservation'])->name('request.final.return');
         Route::patch('/request/{reservationId}/final-damaged', [ApprovalController::class, 'finalDamagedReservation'])->name('request.final.damaged');
         Route::patch('/request/{reservationId}/cancel', [ApprovalController::class, 'cancelReservation'])->name('request.cancel');
-    });
 });
+
+Route::redirect('/dashboard', '/home', 308);
+
+Route::any('/dashboard/{legacyPath}', function (string $legacyPath) {
+    $target = '/'.ltrim((string) $legacyPath, '/');
+    if ($target === '/') {
+        $target = '/home';
+    }
+
+    $query = request()->getQueryString();
+
+    return redirect($target.($query ? '?'.$query : ''), 308);
+})->where('legacyPath', '.*');

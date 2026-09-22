@@ -235,7 +235,7 @@ Cache::tags(['inventory'])->flush()
 1. **Test Current Implementation**
    - Browse to dashboard home (watch load time)
    - Check inventory page (should be fast now)
-   - Monitor `/dashboard/inventory/analytics`
+   - Monitor `/inventory/analytics`
 
 2. **Update Remaining Controllers**
    - Apply same pattern to DashboardRequestController

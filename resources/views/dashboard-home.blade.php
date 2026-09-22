@@ -127,7 +127,7 @@
               </div>
               <ul class="tasks-list">
                 <li>
-                  <a class="task-link" href="{{ $tasks['pending_final_url'] ?? '/dashboard/request' }}">
+                  <a class="task-link" href="{{ $tasks['pending_final_url'] ?? '/request' }}">
                     <span class="task-icon"><i class="bi bi-inboxes-fill"></i></span>
                     <span class="task-copy">
                       <strong>Pending Final Approvals</strong>
@@ -137,7 +137,7 @@
                   </a>
                 </li>
                 <li>
-                  <a class="task-link" href="{{ $tasks['review_damaged_url'] ?? '/dashboard/maintenance?tab=damaged' }}">
+                  <a class="task-link" href="{{ $tasks['review_damaged_url'] ?? '/maintenance?tab=damaged' }}">
                     <span class="task-icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
                     <span class="task-copy">
                       <strong>Review Damaged Items</strong>
@@ -147,7 +147,7 @@
                   </a>
                 </li>
                 <li>
-                  <a class="task-link" href="{{ $tasks['need_repair_url'] ?? '/dashboard/maintenance?tab=maintenance' }}">
+                  <a class="task-link" href="{{ $tasks['need_repair_url'] ?? '/maintenance?tab=maintenance' }}">
                     <span class="task-icon"><i class="bi bi-tools"></i></span>
                     <span class="task-copy">
                       <strong>Need Repair</strong>

@@ -25,7 +25,7 @@
     };
     window.dashboardNavComponent = '/components/navbar-office.html';
     window.userStoreEndpoint = '{{ route('office.users.store') }}';
-    window.userEndpointBase = '{{ url('/dashboard/office/users') }}';
+    window.userEndpointBase = '{{ url('/office/users') }}';
   </script>
 
   <header class="top-header">

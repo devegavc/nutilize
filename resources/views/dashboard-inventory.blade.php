@@ -74,7 +74,7 @@
               <h2><i class="bi bi-bar-chart-line-fill"></i> Most Requested Items</h2>
               <p class="inventory-grid-sub">Items with the highest frequency of usage</p>
             </div>
-            <button type="button" onclick="window.location.href='/dashboard/inventory/analytics'">View Insights</button>
+            <button type="button" onclick="window.location.href='/inventory/analytics'">View Insights</button>
           </div>
 
           <div class="table-wrap">

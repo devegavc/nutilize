@@ -54,7 +54,7 @@
       role: '{{ auth()->user()->role ?? 'user' }}'
     };
     window.userStoreEndpoint = '{{ route('dashboard.users.store') }}';
-    window.userEndpointBase = '{{ url('/dashboard/users') }}';
+    window.userEndpointBase = '{{ url('/users') }}';
     window.itemOwnerOfficeId = @json($itemOwnerOfficeId);
   </script>
 

@@ -469,9 +469,9 @@ class DashboardCacheService
             'pending_final_approvals' => $pendingFinalApprovals,
             'review_damaged_items' => $reviewDamagedItems,
             'need_repair' => $needRepair,
-            'pending_final_url' => '/dashboard/request',
-            'review_damaged_url' => '/dashboard/maintenance?tab=damaged',
-            'need_repair_url' => '/dashboard/maintenance?tab=maintenance',
+            'pending_final_url' => '/request',
+            'review_damaged_url' => '/maintenance?tab=damaged',
+            'need_repair_url' => '/maintenance?tab=maintenance',
         ];
     }
 

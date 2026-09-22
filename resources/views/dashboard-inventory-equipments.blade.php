@@ -19,8 +19,8 @@
       role: '{{ auth()->user()->role ?? 'user' }}'
     };
     window.equipmentCategoryCreateEndpoint = '{{ route('dashboard.inventory.equipment-categories.store') }}';
-    window.equipmentCategoryUpdateEndpointBase = '{{ url('/dashboard/inventory/equipment-categories') }}';
-    window.equipmentCategoryDeleteEndpointBase = '{{ url('/dashboard/inventory/equipment-categories') }}';
+    window.equipmentCategoryUpdateEndpointBase = '{{ url('/inventory/equipment-categories') }}';
+    window.equipmentCategoryDeleteEndpointBase = '{{ url('/inventory/equipment-categories') }}';
     window.equipmentCategories = @json($equipmentCategories ?? []);
     window.defaultEquipmentCategory = 'all';
   </script>

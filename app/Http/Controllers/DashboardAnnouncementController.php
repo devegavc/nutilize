@@ -16,7 +16,7 @@ class DashboardAnnouncementController extends Controller
         $user = Auth::user();
 
         if (!$user || !$user->isPhysicalFacilitiesAdmin()) {
-            return redirect('/dashboard/office/home')->with('error', 'Unauthorized access.');
+            return redirect('/office/home')->with('error', 'Unauthorized access.');
         }
 
         return redirect()
@@ -30,7 +30,7 @@ class DashboardAnnouncementController extends Controller
         $user = Auth::user();
 
         if (!$user || !$user->isPhysicalFacilitiesAdmin()) {
-            return redirect('/dashboard/office/home')->with('error', 'Unauthorized access.');
+            return redirect('/office/home')->with('error', 'Unauthorized access.');
         }
 
         if (!Announcement::tableReady()) {
@@ -93,7 +93,7 @@ class DashboardAnnouncementController extends Controller
         $user = Auth::user();
 
         if (!$user || !$user->isPhysicalFacilitiesAdmin()) {
-            return redirect('/dashboard/office/home')->with('error', 'Unauthorized access.');
+            return redirect('/office/home')->with('error', 'Unauthorized access.');
         }
 
         if (!Announcement::tableReady()) {
@@ -155,7 +155,7 @@ class DashboardAnnouncementController extends Controller
         $user = Auth::user();
 
         if (!$user || !$user->isPhysicalFacilitiesAdmin()) {
-            return redirect('/dashboard/office/home')->with('error', 'Unauthorized access.');
+            return redirect('/office/home')->with('error', 'Unauthorized access.');
         }
 
         if (!Announcement::tableReady()) {

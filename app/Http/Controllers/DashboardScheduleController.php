@@ -16,7 +16,7 @@ class DashboardScheduleController extends Controller
         $user = Auth::user();
 
         if (!$user || !$user->isPhysicalFacilitiesAdmin()) {
-            return redirect('/dashboard/home')->with('error', 'Unauthorized access.');
+            return redirect('/home')->with('error', 'Unauthorized access.');
         }
 
         $selectedMonth = $this->resolveMonth($request->query('month'));

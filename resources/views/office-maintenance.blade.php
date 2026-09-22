@@ -33,8 +33,8 @@
       is_item_owner: @json(auth()->user()?->isItemOwnerAdmin() ?? false)
     };
     window.dashboardNavComponent = '/components/navbar-office.html';
-    window.maintenanceUnitsEndpointBase = '/dashboard/office/items/maintenance/units';
-    window.maintenanceReportsEndpointBase = '/dashboard/office/items/maintenance/reports';
+    window.maintenanceUnitsEndpointBase = '/office/items/maintenance/units';
+    window.maintenanceReportsEndpointBase = '/office/items/maintenance/reports';
     window.maintenanceRowsByTab = @json($maintenanceRowsByTab ?? ['maintenance' => [], 'damaged' => [], 'reported' => []]);
   </script>
 

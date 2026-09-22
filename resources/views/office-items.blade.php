@@ -33,7 +33,7 @@
       is_item_owner: @json(auth()->user()?->isItemOwnerAdmin() ?? false)
     };
     window.dashboardNavComponent = '/components/navbar-office.html';
-    window.equipmentEndpointBase = '/dashboard/office/items';
+    window.equipmentEndpointBase = '/office/items';
     window.equipmentCategories = @json($equipmentCategories ?? []);
     window.defaultEquipmentCategory = 'all';
   </script>

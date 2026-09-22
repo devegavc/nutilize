@@ -43,11 +43,11 @@ class DashboardRequestController extends Controller
         $user = Auth::user();
 
         if (!$user || !$user->isOfficeApprover()) {
-            return redirect('/dashboard/home')->with('error', 'Unauthorized access.');
+            return redirect('/home')->with('error', 'Unauthorized access.');
         }
 
         // Never run the heavy workflow sync on first paint — Hostinger times out.
-        // Opt-in only: /dashboard/request?sync=1
+        // Opt-in only: /request?sync=1
         return view('dashboard-request', $this->buildRequestPageViewData($user, request()->boolean('sync')));
     }
 

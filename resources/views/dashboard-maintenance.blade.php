@@ -192,9 +192,9 @@
 
   <script>
     window.maintenanceRowsByTab = @json($maintenanceRowsByTab ?? ['maintenance' => [], 'damaged' => [], 'reported' => []]);
-    window.maintenanceUnitsEndpointBase = '{{ url('/dashboard/maintenance/units') }}';
-    window.maintenanceRoomsEndpointBase = '{{ url('/dashboard/maintenance/rooms') }}';
-    window.maintenanceReportsEndpointBase = '{{ url('/dashboard/maintenance/reports') }}';
+    window.maintenanceUnitsEndpointBase = '{{ url('/maintenance/units') }}';
+    window.maintenanceRoomsEndpointBase = '{{ url('/maintenance/rooms') }}';
+    window.maintenanceReportsEndpointBase = '{{ url('/maintenance/reports') }}';
   </script>
   <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>

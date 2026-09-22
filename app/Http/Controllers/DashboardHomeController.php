@@ -14,7 +14,7 @@ class DashboardHomeController extends Controller
         $user = Auth::user();
 
         if (!$user || !$user->isPhysicalFacilitiesAdmin()) {
-            return redirect('/dashboard/office/home')->with('error', 'Unauthorized access.');
+            return redirect('/office/home')->with('error', 'Unauthorized access.');
         }
 
         $data = DashboardCacheService::getDashboardData(

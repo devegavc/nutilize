@@ -693,7 +693,7 @@
       const compareYearSelect = document.getElementById('analytics-compare-year');
 
       const buildAnalyticsUrl = (monthKey, compareKey) => {
-        const baseUrl = window.analyticsMonthBaseUrl || '/dashboard/inventory/analytics';
+        const baseUrl = window.analyticsMonthBaseUrl || '/inventory/analytics';
         const params = new URLSearchParams({ month: monthKey });
 
         if (compareKey && compareKey !== monthKey) {

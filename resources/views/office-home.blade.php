@@ -207,7 +207,7 @@
       };
 
       const resolveReservationDetailsUrl = (reservationId) => {
-        const template = window.reservationDetailsUrlTemplate || '/dashboard/reservation/__RESERVATION_ID__/details';
+        const template = window.reservationDetailsUrlTemplate || '/reservation/__RESERVATION_ID__/details';
         const resolved = template.replace('__RESERVATION_ID__', String(reservationId));
 
         try {
@@ -642,7 +642,7 @@
         try {
           const snapshotBaseUrl = (typeof window.officeQueueSnapshotUrl === 'string' && window.officeQueueSnapshotUrl)
             ? window.officeQueueSnapshotUrl
-            : '/dashboard/office/requests/snapshot';
+            : '/office/requests/snapshot';
 
           const snapshotUrl = new URL(snapshotBaseUrl, window.location.origin);
           const pageFromQuery = new URLSearchParams(window.location.search).get('page');

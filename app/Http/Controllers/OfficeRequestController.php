@@ -42,7 +42,7 @@ class OfficeRequestController extends Controller
         $user = Auth::user();
 
         if (!$user || !$user->isOfficeApprover()) {
-            return redirect('/dashboard/home')->with('error', 'Unauthorized access.');
+            return redirect('/home')->with('error', 'Unauthorized access.');
         }
 
         return view('office-home', $this->buildOfficeHomeData($user));

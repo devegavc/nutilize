@@ -162,19 +162,19 @@ const toolbarSearchWrap = searchInput ? searchInput.closest('.search-wrap') : nu
 const equipmentEndpointBase =
   (typeof window.equipmentEndpointBase === 'string' && window.equipmentEndpointBase.trim())
     ? window.equipmentEndpointBase.trim().replace(/\/$/, '')
-    : '/dashboard/inventory/equipments';
+    : '/inventory/equipments';
 const maintenanceUnitsEndpointBase =
   (typeof window.maintenanceUnitsEndpointBase === 'string' && window.maintenanceUnitsEndpointBase.trim())
     ? window.maintenanceUnitsEndpointBase.trim().replace(/\/$/, '')
-    : '/dashboard/maintenance/units';
+    : '/maintenance/units';
 const maintenanceRoomsEndpointBase =
   (typeof window.maintenanceRoomsEndpointBase === 'string' && window.maintenanceRoomsEndpointBase.trim())
     ? window.maintenanceRoomsEndpointBase.trim().replace(/\/$/, '')
-    : '/dashboard/maintenance/rooms';
+    : '/maintenance/rooms';
 const maintenanceReportsEndpointBase =
   (typeof window.maintenanceReportsEndpointBase === 'string' && window.maintenanceReportsEndpointBase.trim())
     ? window.maintenanceReportsEndpointBase.trim().replace(/\/$/, '')
-    : '/dashboard/maintenance/reports';
+    : '/maintenance/reports';
 const equipmentCategoryCreateEndpoint =
   (typeof window.equipmentCategoryCreateEndpoint === 'string' && window.equipmentCategoryCreateEndpoint.trim())
     ? window.equipmentCategoryCreateEndpoint.trim().replace(/\/$/, '')
@@ -223,9 +223,9 @@ function hideNavigationProgressBar() {
 function isInsightsDashboardUrl(href) {
   try {
     const url = new URL(href, window.location.href);
-    return url.pathname.toLowerCase().includes('/dashboard/inventory/analytics');
+    return url.pathname.toLowerCase().includes('/inventory/analytics');
   } catch (error) {
-    return String(href || '').toLowerCase().includes('/dashboard/inventory/analytics');
+    return String(href || '').toLowerCase().includes('/inventory/analytics');
   }
 }
 
@@ -233,43 +233,45 @@ function getDashboardSkeletonType(href) {
   try {
     const path = new URL(href, window.location.href).pathname.toLowerCase();
 
-    if (path.includes('/inventory/analytics')) {
+    const matchesRoute = (route) => path === route || path.startsWith(`${route}/`);
+
+    if (matchesRoute('/inventory/analytics')) {
       return 'insights';
     }
 
-    if (path.includes('/inventory/facilities')) {
+    if (matchesRoute('/inventory/facilities')) {
       return 'facilities';
     }
 
-    if (path.includes('/inventory/equipments') || (path.includes('/office/items') && !path.includes('maintenance'))) {
+    if (matchesRoute('/inventory/equipments') || (path.includes('/office/items') && !path.includes('maintenance'))) {
       return 'equipment';
     }
 
-    if (path.includes('/inventory')) {
+    if (matchesRoute('/inventory')) {
       return 'inventory';
     }
 
-    if (path.includes('/schedule')) {
+    if (matchesRoute('/schedule')) {
       return 'schedule';
     }
 
-    if (path.includes('/request')) {
+    if (matchesRoute('/request')) {
       return 'requests';
     }
 
-    if (path.includes('/users')) {
+    if (matchesRoute('/users')) {
       return 'users';
     }
 
-    if (path.includes('/history')) {
+    if (matchesRoute('/history')) {
       return 'history';
     }
 
-    if (path.includes('/maintenance')) {
+    if (matchesRoute('/maintenance')) {
       return 'maintenance';
     }
 
-    if (path.includes('/home') || path.includes('/office')) {
+    if (matchesRoute('/home') || path.includes('/office')) {
       return 'home';
     }
 
@@ -958,7 +960,7 @@ async function fetchNotificationUnreadCount() {
   }
 
   try {
-    const response = await fetch('/dashboard/notifications/unread-count', {
+    const response = await fetch('/notifications/unread-count', {
       method: 'GET',
       headers: {
         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
@@ -998,7 +1000,7 @@ async function fetchNotifications({ sync = false, force = false } = {}) {
       params.set('force', '1');
     }
     const query = params.toString();
-    const url = `/dashboard/notifications${query ? `?${query}` : ''}`;
+    const url = `/notifications${query ? `?${query}` : ''}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -1161,7 +1163,7 @@ function markNotificationsReadForReservation(reservationId) {
 
   return Promise.all(toMark.map(async (notificationId) => {
     try {
-      await fetch(`/dashboard/notification/${notificationId}/read`, {
+      await fetch(`/notification/${notificationId}/read`, {
         method: 'PATCH',
         headers: {
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
@@ -1322,7 +1324,7 @@ function showQuickReportDetailsModal(report) {
         </div>
 
         <footer class="quick-report-details-footer">
-          <a class="quick-report-footer-link" href="/dashboard/maintenance">Open Item Maintenance</a>
+          <a class="quick-report-footer-link" href="/maintenance">Open Item Maintenance</a>
         </footer>
       </article>
     </div>
@@ -2370,7 +2372,7 @@ function getScheduleDateLabel(day) {
 function getScheduleMonthBaseUrl() {
   return (typeof window.scheduleMonthBaseUrl === 'string' && window.scheduleMonthBaseUrl)
     ? window.scheduleMonthBaseUrl
-    : '/dashboard/schedule';
+    : '/schedule';
 }
 
 function getFilteredScheduleRequestsForDay(day) {
@@ -2920,7 +2922,7 @@ async function refreshRequestListPreservingTab(explicitUrl) {
 
   const refreshUrl = (typeof window.requestListRefreshUrl === 'string' && window.requestListRefreshUrl)
     ? window.requestListRefreshUrl
-    : '/dashboard/request/list';
+    : '/request/list';
   let refreshRequestUrl = refreshUrl;
 
   if (typeof explicitUrl === 'string' && explicitUrl.trim() !== '') {
@@ -3142,7 +3144,7 @@ async function submitRequestDecision(item, button, status) {
   }
 
   try {
-    const response = await fetch(`/dashboard/approval/${approvalId}/${action}`, {
+    const response = await fetch(`/approval/${approvalId}/${action}`, {
       method: 'PATCH',
       headers: {
         'X-CSRF-TOKEN': csrfToken,
@@ -3229,7 +3231,7 @@ async function submitFinalRequestDecision(item, button, status) {
     let finalStatus = 0;
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
-      response = await fetch(`/dashboard/request/${reservationId}/${action}`, {
+      response = await fetch(`/request/${reservationId}/${action}`, {
         method: 'PATCH',
         headers: {
           'X-CSRF-TOKEN': csrfToken,
@@ -3342,7 +3344,7 @@ async function submitReturnDecision(item, button, status) {
     let finalStatus = 0;
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
-      response = await fetch(`/dashboard/request/${reservationId}/final-${action}`, {
+      response = await fetch(`/request/${reservationId}/final-${action}`, {
         method: 'PATCH',
         headers: {
           'X-CSRF-TOKEN': csrfToken,
@@ -4885,41 +4887,41 @@ function openEquipmentAddModal() {
 
 function setActiveNavByPage() {
   const path = window.location.pathname.toLowerCase();
-  const isProfilePage = path.includes('/dashboard/profile');
-  const navTarget = path.includes('/dashboard/office/requests')
+  const isProfilePage = path.includes('/profile');
+  const navTarget = path.includes('/office/requests')
     ? 'requests'
-    : path.includes('/dashboard/office/items/maintenance')
+    : path.includes('/office/items/maintenance')
     ? 'manage-maintenance'
-    : path.includes('/dashboard/office/items')
+    : path.includes('/office/items')
     ? 'manage-items'
-    : path.includes('/dashboard/office/users')
+    : path.includes('/office/users')
     ? 'users'
-    : path.includes('/dashboard/office/history')
+    : path.includes('/office/history')
     ? 'history'
-    : path.includes('/dashboard/messages')
+    : path.includes('/messages')
     ? ''
-    : path.includes('/dashboard/profile')
+    : path.includes('/profile')
       ? ''
-      : path.includes('/dashboard/inventory')
+      : path.includes('/inventory')
         ? 'inventory'
-        : path.includes('/dashboard/maintenance')
+        : path.includes('/maintenance')
           ? 'maintenance'
-          : path.includes('/dashboard/history')
+          : path.includes('/history')
             ? 'history'
-            : path.includes('/dashboard/schedule')
+            : path.includes('/schedule')
               ? 'schedule'
-              : path.includes('/dashboard/request')
+              : path.includes('/request')
                 ? 'requests'
-                : path.includes('/dashboard/users')
+                : path.includes('/users')
                   ? 'users'
                   : 'home';
   const navItems = document.querySelectorAll('.nav-item[data-nav]');
   const subNavItems = document.querySelectorAll('.nav-subitem[data-subnav]');
-  const subTarget = path.includes('/dashboard/inventory/facilities')
+  const subTarget = path.includes('/inventory/facilities')
     ? 'facilities'
-    : path.includes('/dashboard/inventory/equipments')
+    : path.includes('/inventory/equipments')
       ? 'equipments'
-      : path.includes('/dashboard/inventory/analytics')
+      : path.includes('/inventory/analytics')
         ? 'analytics'
         : '';
 
@@ -5111,7 +5113,7 @@ async function loadNavbar() {
 
 if (inventoryShortcut) {
   inventoryShortcut.addEventListener('click', () => {
-    window.location.href = '/dashboard/inventory';
+    window.location.href = '/inventory';
   });
 }
 
@@ -5223,12 +5225,12 @@ function buildMessagesPopover() {
 
     closeMessagesPopover();
 
-    if (window.location.pathname.includes('/dashboard/messages')) {
+    if (window.location.pathname.includes('/messages')) {
       setActiveMessageContact(messageName);
       return;
     }
 
-    window.location.href = `/dashboard/messages?contact=${encodeURIComponent(messageName)}`;
+    window.location.href = `/messages?contact=${encodeURIComponent(messageName)}`;
   });
 
   return panel;
@@ -5338,7 +5340,7 @@ function buildProfilePopover() {
 
     if (action === 'account') {
       closeProfilePopover();
-      window.location.href = '/dashboard/profile';
+      window.location.href = '/profile';
       return;
     }
 
@@ -5435,7 +5437,7 @@ async function buildNotificationsPopover() {
     showReservationDetailsLoadingModal(notification.name || 'Opening request');
 
     try {
-      const response = await fetch(`/dashboard/reservation/${relatedId}/details`, {
+      const response = await fetch(`/reservation/${relatedId}/details`, {
         method: 'GET',
         headers: {
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
@@ -5462,7 +5464,7 @@ async function buildNotificationsPopover() {
     }
 
     try {
-      const response = await fetch(`/dashboard/notification/${notificationId}/read`, {
+      const response = await fetch(`/notification/${notificationId}/read`, {
         method: 'PATCH',
         headers: {
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
@@ -5773,7 +5775,7 @@ if (profileEditSaveButton) {
     const token = document.querySelector('meta[name="csrf-token"]');
     const updateUrl = window.authUser && window.authUser.profile_update_url
       ? window.authUser.profile_update_url
-      : '/dashboard/profile';
+      : '/profile';
 
     const payload = {
       first_name: profileModalFirstNameInput ? profileModalFirstNameInput.value.trim() : '',
@@ -7647,7 +7649,7 @@ if (scheduleMonthSelect && scheduleYearSelect) {
 
     const baseUrl = (typeof window.scheduleMonthBaseUrl === 'string' && window.scheduleMonthBaseUrl)
       ? window.scheduleMonthBaseUrl
-      : '/dashboard/schedule';
+      : '/schedule';
 
     window.location.href = `${baseUrl}?month=${encodeURIComponent(monthKey)}`;
   };
@@ -7934,8 +7936,8 @@ if (facilitiesSaveButton) {
     try {
       const isEditing = Boolean(activeEditingRow && activeEditingRow.dataset.facilityId);
       const endpoint = isEditing
-        ? `/dashboard/inventory/facilities/${encodeURIComponent(activeEditingRow.dataset.facilityId)}`
-        : '/dashboard/inventory/facilities';
+        ? `/inventory/facilities/${encodeURIComponent(activeEditingRow.dataset.facilityId)}`
+        : '/inventory/facilities';
       const requestBody = {
         item_name: itemName,
         category,
@@ -8508,7 +8510,7 @@ function initInsightsShortcutButton() {
 
   button.removeAttribute('onclick');
   button.addEventListener('click', () => {
-    navigateWithInsightsSkeleton('/dashboard/inventory/analytics');
+    navigateWithInsightsSkeleton('/inventory/analytics');
   });
 }
 
