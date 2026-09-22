@@ -63,6 +63,127 @@ body {
   margin: 0;
 }
 
+.admin-access-indicator {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+}
+
+.admin-access-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.95rem;
+  border-radius: 999px;
+  background: rgba(50, 65, 140, 0.08);
+  border: 1px solid rgba(50, 65, 140, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(251, 209, 23, 0.18);
+  color: var(--secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-access-badge i {
+  color: var(--secondary-deep);
+  font-size: 0.95rem;
+}
+
+.login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.15rem;
+}
+
+.login-remember {
+  display: flex;
+  align-items: center;
+  min-height: 1.5rem;
+  margin: 0;
+  padding: 0;
+}
+
+.login-remember .form-check-input {
+  float: none;
+  width: 1.1em;
+  height: 1.1em;
+  margin: 0;
+  border-color: #9aa8d8;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.login-remember .form-check-input:checked {
+  background-color: var(--secondary);
+  border-color: var(--secondary);
+}
+
+.login-remember .form-check-input:focus {
+  border-color: #8da0e0;
+  box-shadow: 0 0 0 0.25rem rgba(80, 101, 184, 0.22);
+}
+
+.login-remember .form-check-input:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
+}
+
+.login-remember .form-check-label {
+  margin-left: 0.45rem;
+  color: var(--secondary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+.forgot-password-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--secondary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.forgot-password-link:hover,
+.forgot-password-link:focus {
+  text-decoration: underline;
+}
+
+.forgot-password-link:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.forgot-password-help {
+  margin: -0.35rem 0 1.15rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgba(50, 65, 140, 0.14);
+  border-radius: 10px;
+  background: rgba(50, 65, 140, 0.06);
+  color: var(--secondary);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.forgot-password-help:focus {
+  outline: none;
+}
+
+.forgot-password-help:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
+}
+
 .login-card {
   position: relative;
   background: linear-gradient(165deg, #ffffff 0%, #f4f7ff 100%);
@@ -272,10 +393,36 @@ body {
   color: #ffffff;
   font-size: 1.15rem;
   font-weight: 600;
+  min-height: 3.35rem;
   padding: 0.85rem;
   border-radius: 10px;
   box-shadow: 0 10px 20px rgba(50, 65, 140, 0.3);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease, opacity 0.18s ease;
+}
+
+.btn-login-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 1.4rem;
+}
+
+.btn-login-text {
+  display: inline-block;
+  min-width: 8.5rem;
+  text-align: center;
+}
+
+.login-spinner {
+  display: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  animation: loginSpin 0.8s linear infinite;
+}
+
+.btn-login.is-loading .login-spinner {
+  display: inline-block;
 }
 
 .btn-login:hover,
@@ -284,6 +431,31 @@ body {
   transform: translateY(-2px);
   filter: saturate(1.08);
   box-shadow: 0 14px 24px rgba(50, 65, 140, 0.36);
+}
+
+.btn-login:focus-visible {
+  outline: 3px solid var(--third);
+  outline-offset: 3px;
+}
+
+.btn-login:disabled,
+.btn-login.is-loading,
+.btn-login:disabled:hover,
+.btn-login:disabled:focus,
+.btn-login.is-loading:hover,
+.btn-login.is-loading:focus {
+  color: #ffffff;
+  opacity: 0.88;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+  box-shadow: 0 10px 20px rgba(50, 65, 140, 0.3);
+}
+
+@keyframes loginSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .page-content a {
@@ -323,5 +495,13 @@ body {
   }
   .brand-logo {
     max-width: 240px;
+  }
+  .admin-access-badge {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    padding: 0.35rem 0.8rem;
+  }
+  .login-options {
+    align-items: flex-start;
   }
 }

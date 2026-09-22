@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   
   <link rel="icon" type="image/png" href="/img/nutilize_favicon.png" />
-<title>NUtilize | Login</title>
+<title>NUtilize | Admin Login</title>
 
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" 
@@ -37,12 +37,19 @@
         <img src="/img/nutilize_logo.png" 
              alt="NUTilize Logo" 
              class="brand-logo">
-        <p class="brand-subtitle mt-2 mb-5">
+        <p class="brand-subtitle mt-2 mb-3">
           Campus Resource & Reservation Management System
         </p>
+        <div class="admin-access-indicator" role="status">
+          <span class="admin-access-badge">
+            <i class="bi bi-shield-lock-fill" aria-hidden="true"></i>
+            Administrator Access
+          </span>
+        </div>
+        <h1 class="visually-hidden">Administrator Login</h1>
       </div>
 
-      <form action="{{ route('login.authenticate') }}" method="POST">
+      <form id="loginForm" action="{{ route('login.authenticate') }}" method="POST">
         @csrf
 
         @if (session('status'))
@@ -61,32 +68,39 @@
           </div>
         @endif
 
-        <!-- Username -->
+        <!-- Email or Username -->
         <div class="mb-3">
+          <label class="visually-hidden" for="loginIdentifier">Email or username</label>
           <div class="input-group input-group-lg">
             <span class="input-group-text">
-              <i class="bi bi-person"></i>
+              <i class="bi bi-person" aria-hidden="true"></i>
             </span>
             <input type="text" 
+                   id="loginIdentifier"
                    name="username"
                    class="form-control" 
-                   placeholder="Enter your username"
+                   placeholder="Enter your email or username"
                    value="{{ old('username') }}"
+                   autocomplete="username"
+                   spellcheck="false"
+                   autocapitalize="none"
                    required>
           </div>
         </div>
 
         <!-- Password -->
-        <div class="mb-4">
+        <div class="mb-3">
+          <label class="visually-hidden" for="loginPassword">Password</label>
           <div class="input-group input-group-lg">
             <span class="input-group-text">
-              <i class="bi bi-lock"></i>
+              <i class="bi bi-lock" aria-hidden="true"></i>
             </span>
             <input type="password" 
                    id="loginPassword"
                    name="password"
                    class="form-control" 
                    placeholder="Enter your password"
+                   autocomplete="current-password"
                    required>
             <button type="button"
                     class="btn btn-password-toggle"
@@ -94,14 +108,46 @@
                     aria-label="Show password"
                     aria-controls="loginPassword"
                     aria-pressed="false">
-              <i class="bi bi-eye"></i>
+              <i class="bi bi-eye" aria-hidden="true"></i>
             </button>
           </div>
         </div>
 
+        <div class="login-options">
+          <div class="form-check login-remember">
+            <input class="form-check-input"
+                   type="checkbox"
+                   id="rememberMe">
+            <label class="form-check-label" for="rememberMe">
+              Remember me
+            </label>
+          </div>
+
+          <button type="button"
+                  class="forgot-password-link"
+                  id="forgotPasswordBtn"
+                  aria-expanded="false"
+                  aria-controls="forgot-password-help">
+            Forgot Password?
+          </button>
+        </div>
+
+        <div id="forgot-password-help"
+             class="forgot-password-help"
+             role="region"
+             aria-live="polite"
+             aria-labelledby="forgotPasswordBtn"
+             tabindex="-1"
+             hidden>
+          Password reset is handled by Physical Facilities. Please contact an administrator for assistance.
+        </div>
+
         <!-- Submit -->
-        <button type="submit" class="btn btn-login w-100">
-          Login
+        <button type="submit" class="btn btn-login w-100" id="loginSubmitBtn">
+          <span class="btn-login-content">
+            <i class="bi bi-arrow-repeat login-spinner" aria-hidden="true"></i>
+            <span class="btn-login-text">Login</span>
+          </span>
         </button>
 
       </form>
@@ -111,25 +157,134 @@
 
   <script>
     (function () {
+      const REMEMBER_FLAG_KEY = 'nutilize.adminLogin.rememberMe';
+      const REMEMBER_IDENTIFIER_KEY = 'nutilize.adminLogin.identifier';
+
+      const form = document.getElementById('loginForm');
+      const identifierInput = document.getElementById('loginIdentifier');
       const passwordInput = document.getElementById('loginPassword');
       const toggleButton = document.getElementById('toggleLoginPassword');
+      const rememberMe = document.getElementById('rememberMe');
+      const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+      const forgotPasswordHelp = document.getElementById('forgot-password-help');
+      const submitButton = document.getElementById('loginSubmitBtn');
+      const submitButtonText = submitButton ? submitButton.querySelector('.btn-login-text') : null;
+      let isSubmitting = false;
 
-      if (!passwordInput || !toggleButton) {
-        return;
+      function readStoredIdentifier() {
+        try {
+          return window.localStorage.getItem(REMEMBER_IDENTIFIER_KEY) || '';
+        } catch (error) {
+          return '';
+        }
       }
 
-      const toggleIcon = toggleButton.querySelector('i');
+      function readRememberPreference() {
+        try {
+          return window.localStorage.getItem(REMEMBER_FLAG_KEY) === '1';
+        } catch (error) {
+          return false;
+        }
+      }
 
-      toggleButton.addEventListener('click', function () {
-        const isPassword = passwordInput.type === 'password';
+      function persistRememberedIdentifier(identifier) {
+        try {
+          window.localStorage.setItem(REMEMBER_FLAG_KEY, '1');
+          window.localStorage.setItem(REMEMBER_IDENTIFIER_KEY, identifier);
+        } catch (error) {
+          // Ignore storage failures; session auth is unchanged.
+        }
+      }
 
-        passwordInput.type = isPassword ? 'text' : 'password';
-        toggleButton.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
-        toggleButton.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+      function clearRememberedIdentifier() {
+        try {
+          window.localStorage.removeItem(REMEMBER_FLAG_KEY);
+          window.localStorage.removeItem(REMEMBER_IDENTIFIER_KEY);
+        } catch (error) {
+          // Ignore storage failures; session auth is unchanged.
+        }
+      }
 
-        if (toggleIcon) {
-          toggleIcon.classList.toggle('bi-eye', !isPassword);
-          toggleIcon.classList.toggle('bi-eye-slash', isPassword);
+      function setLoginLoading(isLoading) {
+        if (!submitButton || !submitButtonText) {
+          return;
+        }
+
+        submitButton.disabled = isLoading;
+        submitButton.classList.toggle('is-loading', isLoading);
+        submitButton.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+        submitButtonText.textContent = isLoading ? 'Logging in...' : 'Login';
+      }
+
+      if (rememberMe && identifierInput) {
+        const shouldRemember = readRememberPreference();
+        rememberMe.checked = shouldRemember;
+
+        if (shouldRemember && !identifierInput.value) {
+          identifierInput.value = readStoredIdentifier();
+        }
+      }
+
+      if (toggleButton && passwordInput) {
+        const toggleIcon = toggleButton.querySelector('i');
+
+        toggleButton.addEventListener('click', function () {
+          const isPassword = passwordInput.type === 'password';
+
+          passwordInput.type = isPassword ? 'text' : 'password';
+          toggleButton.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
+          toggleButton.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+
+          if (toggleIcon) {
+            toggleIcon.classList.toggle('bi-eye', !isPassword);
+            toggleIcon.classList.toggle('bi-eye-slash', isPassword);
+          }
+        });
+      }
+
+      if (forgotPasswordBtn && forgotPasswordHelp) {
+        forgotPasswordBtn.addEventListener('click', function () {
+          const isOpen = !forgotPasswordHelp.hasAttribute('hidden');
+
+          if (isOpen) {
+            forgotPasswordHelp.setAttribute('hidden', '');
+            forgotPasswordBtn.setAttribute('aria-expanded', 'false');
+            forgotPasswordBtn.focus();
+            return;
+          }
+
+          forgotPasswordHelp.removeAttribute('hidden');
+          forgotPasswordBtn.setAttribute('aria-expanded', 'true');
+          forgotPasswordHelp.focus();
+        });
+      }
+
+      if (form && submitButton) {
+        form.addEventListener('submit', function (event) {
+          if (isSubmitting) {
+            event.preventDefault();
+            return;
+          }
+
+          if (rememberMe && identifierInput) {
+            const identifier = identifierInput.value.trim();
+
+            if (rememberMe.checked && identifier) {
+              persistRememberedIdentifier(identifier);
+            } else {
+              clearRememberedIdentifier();
+            }
+          }
+
+          isSubmitting = true;
+          setLoginLoading(true);
+        });
+      }
+
+      window.addEventListener('pageshow', function (event) {
+        if (event.persisted) {
+          isSubmitting = false;
+          setLoginLoading(false);
         }
       });
     })();
