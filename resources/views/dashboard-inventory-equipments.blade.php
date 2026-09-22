@@ -183,22 +183,6 @@
             </div>
           </div>
         </section>
-
-        <section class="equipment-form-section">
-          <h3 class="equipment-form-section-title">Item Image</h3>
-          <label class="facilities-field-label" for="equipment-upload-input">Upload Item</label>
-          <button type="button" class="equipment-form-upload-trigger" id="equipment-upload-btn">
-            <i class="bi bi-upload" aria-hidden="true"></i>
-            <span id="equipment-upload-name">No file selected</span>
-          </button>
-          <small class="facilities-upload-hint">JPG, PNG, up to 5MB</small>
-          <input id="equipment-upload-input" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
-        </section>
-
-        <section class="equipment-form-section">
-          <label class="equipment-form-section-title" for="equipment-description">Description</label>
-          <textarea id="equipment-description" class="facilities-input facilities-textarea" placeholder="Description"></textarea>
-        </section>
       </div>
 
       <footer class="equipment-form-modal-footer">
