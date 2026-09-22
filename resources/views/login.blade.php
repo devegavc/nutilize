@@ -17,9 +17,9 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
   <!-- Custom styles -->
-  <link rel="stylesheet" href="/css/auth.css">
+  <link rel="stylesheet" href="/css/auth.css?v=login-4">
 </head>
-<body>
+<body class="login-page">
 
   <!-- Top header bar -->
   <header class="top-header">
@@ -33,123 +33,119 @@
 
     <!-- Login card -->
     <div class="login-card mx-auto">
-      <div class="brand-area text-center">
-        <img src="/img/nutilize_logo.png" 
-             alt="NUTilize Logo" 
-             class="brand-logo">
-        <p class="brand-subtitle mt-2 mb-0">
-          Campus Resource & Reservation Management System
-        </p>
-        <h1 class="login-heading">
-          Sign in to your <span class="login-heading-admin">Admin</span> account
-        </h1>
-      </div>
-
-      <form id="loginForm" action="{{ route('login.authenticate') }}" method="POST">
-        @csrf
-
-        @if (session('status'))
-          <div class="alert alert-success" role="alert">
-            {{ session('status') }}
-          </div>
-        @endif
-
-        @if ($errors->any())
-          <div class="alert alert-danger" role="alert">
-            <ul class="mb-0">
-              @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-              @endforeach
-            </ul>
-          </div>
-        @endif
-
-        <!-- Email or Username -->
-        <div class="mb-3">
-          <label class="visually-hidden" for="loginIdentifier">Email or username</label>
-          <div class="input-group input-group-lg">
-            <span class="input-group-text">
-              <i class="bi bi-person" aria-hidden="true"></i>
-            </span>
-            <input type="text" 
-                   id="loginIdentifier"
-                   name="username"
-                   class="form-control" 
-                   placeholder="Enter your email or username"
-                   value="{{ old('username') }}"
-                   autocomplete="username"
-                   spellcheck="false"
-                   autocapitalize="none"
-                   required>
-          </div>
+      <div class="login-card-inner">
+        <div class="brand-area text-center">
+          <img src="/img/nutilize_logo.png" 
+               alt="NUTilize Logo" 
+               class="brand-logo">
+          <p class="brand-subtitle">
+            Campus Resource & Reservation Management System
+          </p>
+          <h1 class="login-heading">
+            Sign in to your <span class="login-heading-admin">Admin</span> account
+          </h1>
         </div>
 
-        <!-- Password -->
-        <div class="mb-3">
-          <label class="visually-hidden" for="loginPassword">Password</label>
-          <div class="input-group input-group-lg">
-            <span class="input-group-text">
-              <i class="bi bi-lock" aria-hidden="true"></i>
-            </span>
-            <input type="password" 
-                   id="loginPassword"
-                   name="password"
-                   class="form-control" 
-                   placeholder="Enter your password"
-                   autocomplete="current-password"
-                   required>
-            <button type="button"
-                    class="btn btn-password-toggle"
-                    id="toggleLoginPassword"
-                    aria-label="Show password"
-                    aria-controls="loginPassword"
-                    aria-pressed="false">
-              <i class="bi bi-eye" aria-hidden="true"></i>
-            </button>
-          </div>
-        </div>
+        <form id="loginForm" class="login-form" action="{{ route('login.authenticate') }}" method="POST">
+          @csrf
 
-        <div class="login-options">
-          <div class="form-check login-remember">
-            <input class="form-check-input"
-                   type="checkbox"
-                   id="rememberMe">
-            <label class="form-check-label" for="rememberMe">
-              Remember me
+          @if (session('status'))
+            <div class="alert alert-success" role="alert">
+              {{ session('status') }}
+            </div>
+          @endif
+
+          @if ($errors->any())
+            <div class="alert alert-danger" role="alert">
+              <ul class="mb-0">
+                @foreach ($errors->all() as $error)
+                  <li>{{ $error }}</li>
+                @endforeach
+              </ul>
+            </div>
+          @endif
+
+          <!-- Email or Username -->
+          <div class="login-field">
+            <label class="visually-hidden" for="loginIdentifier">Email or username</label>
+            <div class="input-group">
+              <span class="input-group-text">
+                <i class="bi bi-person" aria-hidden="true"></i>
+              </span>
+              <input type="text" 
+                     id="loginIdentifier"
+                     name="username"
+                     class="form-control" 
+                     placeholder="Enter your email or username"
+                     value="{{ old('username') }}"
+                     autocomplete="username"
+                     spellcheck="false"
+                     autocapitalize="none"
+                     required>
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div class="login-field">
+            <label class="visually-hidden" for="loginPassword">Password</label>
+            <div class="input-group">
+              <span class="input-group-text">
+                <i class="bi bi-lock" aria-hidden="true"></i>
+              </span>
+              <input type="password" 
+                     id="loginPassword"
+                     name="password"
+                     class="form-control" 
+                     placeholder="Enter your password"
+                     autocomplete="current-password"
+                     required>
+              <button type="button"
+                      class="btn btn-password-toggle"
+                      id="toggleLoginPassword"
+                      aria-label="Show password"
+                      aria-controls="loginPassword"
+                      aria-pressed="false">
+                <i class="bi bi-eye" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="login-options">
+            <label class="login-remember" for="rememberMe">
+              <input class="login-remember-input"
+                     type="checkbox"
+                     id="rememberMe">
+              <span>Remember me</span>
             </label>
+
+            <a href="#forgot-password-help"
+               class="forgot-password-link"
+               id="forgotPasswordBtn"
+               aria-expanded="false"
+               aria-controls="forgot-password-help">
+              Forgot Password?
+            </a>
           </div>
 
-          <button type="button"
-                  class="forgot-password-link"
-                  id="forgotPasswordBtn"
-                  aria-expanded="false"
-                  aria-controls="forgot-password-help">
-            Forgot Password?
-          </button>
-        </div>
+          <div id="forgot-password-help"
+               class="forgot-password-help"
+               role="region"
+               aria-live="polite"
+               aria-labelledby="forgotPasswordBtn"
+               tabindex="-1"
+               hidden>
+            Password reset is handled by Physical Facilities. Please contact an administrator for assistance.
+          </div>
 
-        <div id="forgot-password-help"
-             class="forgot-password-help"
-             role="region"
-             aria-live="polite"
-             aria-labelledby="forgotPasswordBtn"
-             tabindex="-1"
-             hidden>
-          Password reset is handled by Physical Facilities. Please contact an administrator for assistance.
-        </div>
-
-        <!-- Submit -->
-        <button type="submit" class="btn btn-login w-100" id="loginSubmitBtn" aria-label="Sign In">
-          <span class="btn-login-content">
-            <span class="btn-login-idle">Sign In</span>
-            <span class="btn-login-busy" aria-hidden="true">
-              <span class="login-spinner"></span>
-              Signing in...
+          <!-- Submit -->
+          <button type="submit" class="btn btn-login w-100" id="loginSubmitBtn">
+            <span class="btn-login-content">
+              <span class="login-spinner" aria-hidden="true"></span>
+              <span class="btn-login-text">Sign In</span>
             </span>
-          </span>
-        </button>
-
-      </form>
+          </button>
+        </form>
+      </div>
     </div>
 
   </div>
@@ -167,6 +163,7 @@
       const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
       const forgotPasswordHelp = document.getElementById('forgot-password-help');
       const submitButton = document.getElementById('loginSubmitBtn');
+      const submitButtonText = submitButton ? submitButton.querySelector('.btn-login-text') : null;
       let isSubmitting = false;
 
       function readStoredIdentifier() {
@@ -204,14 +201,14 @@
       }
 
       function setLoginLoading(isLoading) {
-        if (!submitButton) {
+        if (!submitButton || !submitButtonText) {
           return;
         }
 
         submitButton.disabled = isLoading;
         submitButton.classList.toggle('is-loading', isLoading);
         submitButton.setAttribute('aria-busy', isLoading ? 'true' : 'false');
-        submitButton.setAttribute('aria-label', isLoading ? 'Signing in' : 'Sign In');
+        submitButtonText.textContent = isLoading ? 'Signing in...' : 'Sign In';
       }
 
       if (rememberMe && identifierInput) {
@@ -241,7 +238,9 @@
       }
 
       if (forgotPasswordBtn && forgotPasswordHelp) {
-        forgotPasswordBtn.addEventListener('click', function () {
+        forgotPasswordBtn.addEventListener('click', function (event) {
+          event.preventDefault();
+
           const isOpen = !forgotPasswordHelp.hasAttribute('hidden');
 
           if (isOpen) {
@@ -253,7 +252,6 @@
 
           forgotPasswordHelp.removeAttribute('hidden');
           forgotPasswordBtn.setAttribute('aria-expanded', 'true');
-          forgotPasswordHelp.focus();
         });
       }
 

@@ -64,113 +64,6 @@ body {
   margin: 0;
 }
 
-.login-heading {
-  margin: 0.9rem 0 0;
-  color: var(--secondary);
-  font-size: 1.02rem;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-.login-heading-admin {
-  font-weight: 700;
-  color: var(--secondary-deep);
-}
-
-.login-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 1.25rem;
-}
-
-.login-remember {
-  display: flex;
-  align-items: center;
-  min-height: 1.5rem;
-  margin: 0;
-  padding: 0;
-}
-
-.login-remember .form-check-input {
-  float: none;
-  width: 1.1em;
-  height: 1.1em;
-  margin: 0;
-  border-color: #9aa8d8;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.login-remember .form-check-input:checked {
-  background-color: var(--secondary);
-  border-color: var(--secondary);
-}
-
-.login-remember .form-check-input:focus {
-  border-color: #8da0e0;
-  box-shadow: 0 0 0 0.25rem rgba(80, 101, 184, 0.22);
-}
-
-.login-remember .form-check-input:focus-visible {
-  outline: 2px solid var(--secondary);
-  outline-offset: 2px;
-}
-
-.login-remember .form-check-label {
-  margin-left: 0.45rem;
-  color: var(--secondary);
-  font-size: 0.95rem;
-  font-weight: 500;
-  cursor: pointer;
-  user-select: none;
-}
-
-.forgot-password-link {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--secondary);
-  font-size: 0.95rem;
-  font-weight: 700;
-  line-height: 1.5;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.forgot-password-link:hover,
-.forgot-password-link:focus {
-  text-decoration: underline;
-}
-
-.forgot-password-link:focus-visible {
-  outline: 2px solid var(--secondary);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-
-.forgot-password-help {
-  margin: -0.35rem 0 1.15rem;
-  padding: 0.8rem 0.95rem;
-  border: 1px solid rgba(50, 65, 140, 0.14);
-  border-radius: 10px;
-  background: rgba(50, 65, 140, 0.06);
-  color: var(--secondary);
-  font-size: 0.88rem;
-  line-height: 1.45;
-}
-
-.forgot-password-help:focus {
-  outline: none;
-}
-
-.forgot-password-help:focus-visible {
-  outline: 2px solid var(--secondary);
-  outline-offset: 2px;
-}
-
 .login-card {
   position: relative;
   background: linear-gradient(165deg, #ffffff 0%, #f4f7ff 100%);
@@ -394,43 +287,31 @@ body {
 }
 
 .btn-login-content {
-  display: grid;
-  place-items: center;
-  min-height: 1.4rem;
-}
-
-.btn-login-idle,
-.btn-login-busy {
-  grid-area: 1 / 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  min-height: 1.4rem;
+  min-width: 10.5rem;
+}
+
+.btn-login-text {
   white-space: nowrap;
-  transition: opacity 0.18s ease;
-}
-
-.btn-login-busy {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.btn-login.is-loading .btn-login-idle {
-  opacity: 0;
-}
-
-.btn-login.is-loading .btn-login-busy {
-  opacity: 1;
 }
 
 .login-spinner {
-  width: 1rem;
-  height: 1rem;
+  display: none;
+  width: 0.9rem;
+  height: 0.9rem;
   flex-shrink: 0;
   border: 2px solid rgba(255, 255, 255, 0.35);
   border-top-color: #ffffff;
   border-radius: 50%;
-  animation: loginSpin 0.7s linear infinite;
+  animation: loginSpin 0.65s linear infinite;
+}
+
+.btn-login.is-loading .login-spinner {
+  display: inline-block;
 }
 
 .btn-login:hover,
@@ -504,14 +385,238 @@ body {
   .brand-logo {
     max-width: 240px;
   }
-  .login-heading {
-    font-size: 0.98rem;
+}
+
+/* Login page layout corrections — scoped so register stays unchanged */
+.login-page .login-card {
+  padding: 2.25rem 2rem 2.1rem;
+}
+
+.login-page .login-card-inner {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+}
+
+.login-page .brand-area {
+  margin-bottom: 1.15rem;
+}
+
+.login-page .brand-logo {
+  display: block;
+  max-width: 168px;
+  margin: 0 auto 0.55rem;
+}
+
+.login-page .brand-subtitle {
+  margin: 0 0 0.7rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.login-page h1.login-heading {
+  margin: 0;
+  padding: 0;
+  color: var(--secondary);
+  font-size: 1.12rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.login-page .login-heading-admin {
+  font-weight: 700;
+  color: var(--secondary-deep);
+}
+
+.login-page .login-field {
+  margin-bottom: 0.7rem;
+}
+
+.login-page .input-group-text {
+  width: 2.55rem;
+  min-width: 2.55rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.login-page .form-control {
+  padding: 0.68rem 0.85rem;
+  font-size: 0.95rem;
+}
+
+.login-page .form-control::placeholder {
+  font-size: 0.95rem;
+}
+
+.login-page .btn-password-toggle {
+  min-width: 2.6rem;
+  padding: 0 0.55rem;
+}
+
+.login-page .login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0.15rem 0 1.05rem;
+}
+
+.login-page .login-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  color: var(--secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.login-page .login-remember-input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0;
+  flex-shrink: 0;
+  border: 1.5px solid #9aa8d8;
+  border-radius: 0.25rem;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.login-page .login-remember-input:checked {
+  background-color: var(--secondary);
+  border-color: var(--secondary);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.login-page .login-remember-input:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 0.25rem rgba(80, 101, 184, 0.22);
+}
+
+.login-page a.forgot-password-link {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-block;
+  margin: 0 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--secondary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: right;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.login-page a.forgot-password-link:hover,
+.login-page a.forgot-password-link:focus {
+  color: var(--secondary-deep);
+  background: none;
+  text-decoration: underline;
+}
+
+.login-page a.forgot-password-link:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.login-page .forgot-password-help {
+  margin: -0.35rem 0 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(50, 65, 140, 0.14);
+  border-radius: 10px;
+  background: rgba(50, 65, 140, 0.06);
+  color: var(--secondary);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.login-page .forgot-password-help:focus {
+  outline: none;
+}
+
+.login-page .btn-login {
+  min-height: 3.1rem;
+  padding: 0.75rem 1rem;
+  font-size: 1.05rem;
+}
+
+.login-page .btn-login-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 10.25rem;
+}
+
+.login-page .login-spinner {
+  display: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: loginSpin 0.65s linear infinite;
+}
+
+.login-page .btn-login.is-loading .login-spinner {
+  display: inline-block;
+}
+
+@media (max-width: 576px) {
+  .login-page .login-card {
+    padding: 1.75rem 1.25rem 1.6rem;
   }
-  .login-options {
-    row-gap: 0.65rem;
+
+  .login-page .brand-logo {
+    max-width: 148px;
   }
-  .login-remember .form-check-label,
-  .forgot-password-link {
-    font-size: 0.9rem;
+
+  .login-page .brand-subtitle {
+    font-size: 0.86rem;
+  }
+
+  .login-page h1.login-heading {
+    font-size: 1.02rem;
+    white-space: normal;
+  }
+
+  .login-page .login-options {
+    gap: 0.5rem 0.75rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .login-page .login-options {
+    flex-wrap: wrap;
+  }
+
+  .login-page a.forgot-password-link {
+    margin-left: 0;
   }
 }
