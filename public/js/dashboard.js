@@ -5589,10 +5589,22 @@ function storeProfileAvatar(dataUrl) {
   try {
     if (dataUrl) {
       localStorage.setItem(profileAvatarStorageKey(), dataUrl);
+      return;
     }
+
+    localStorage.removeItem(profileAvatarStorageKey());
   } catch (error) {
     return;
   }
+}
+
+function syncProfileDeletePhotoButton() {
+  const deleteButton = document.getElementById('profile-delete-photo-btn');
+  if (!(deleteButton instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  deleteButton.hidden = !pendingProfileAvatarDataUrl;
 }
 
 function shrinkProfileAvatar(dataUrl) {
@@ -5657,7 +5669,13 @@ function applyHeaderProfileAvatar(dataUrl) {
 }
 
 function applyProfilePageAvatar(dataUrl) {
-  if (!profileAvatar || !profileAvatarImage || !dataUrl) {
+  if (!profileAvatar || !profileAvatarImage) {
+    return;
+  }
+
+  if (!dataUrl) {
+    profileAvatarImage.removeAttribute('src');
+    profileAvatar.classList.remove('has-image');
     return;
   }
 
@@ -5730,6 +5748,8 @@ function openProfileEditModal() {
   if (profileAvatarUploadInput) {
     profileAvatarUploadInput.value = '';
   }
+
+  syncProfileDeletePhotoButton();
 
   profileEditModal.classList.add('is-open');
   profileEditModal.setAttribute('aria-hidden', 'false');
@@ -5919,17 +5939,66 @@ if (profileAvatarUploadInput && profileEditAvatar && profileEditAvatarImage) {
       pendingProfileAvatarDataUrl = reader.result;
       profileEditAvatarImage.src = reader.result;
       profileEditAvatar.classList.add('has-image');
+      syncProfileDeletePhotoButton();
     };
     reader.readAsDataURL(file);
   });
 }
 
-if (profileEditModal) {
-  profileEditModal.addEventListener('click', (event) => {
-    const target = event.target;
+const profileDeletePhotoButton = document.getElementById('profile-delete-photo-btn');
+const profileDeleteModal = document.getElementById('profile-delete-modal');
+const profileDeleteConfirmButton = document.getElementById('profile-delete-confirm');
 
-    if (target instanceof HTMLElement && target.dataset.closeProfileModal === 'true') {
-      closeProfileEditModal();
+function closeProfileDeleteModal() {
+  if (!profileDeleteModal) {
+    return;
+  }
+
+  profileDeleteModal.classList.remove('is-open');
+  profileDeleteModal.setAttribute('aria-hidden', 'true');
+}
+
+function openProfileDeleteModal() {
+  if (!profileDeleteModal || !pendingProfileAvatarDataUrl) {
+    return;
+  }
+
+  profileDeleteModal.classList.add('is-open');
+  profileDeleteModal.setAttribute('aria-hidden', 'false');
+}
+
+function removeProfilePhoto() {
+  pendingProfileAvatarDataUrl = '';
+  storeProfileAvatar('');
+  applyProfilePageAvatar('');
+  applyHeaderProfileAvatar('');
+
+  if (profileEditAvatar && profileEditAvatarImage) {
+    profileEditAvatarImage.removeAttribute('src');
+    profileEditAvatar.classList.remove('has-image');
+  }
+
+  if (profileAvatarUploadInput) {
+    profileAvatarUploadInput.value = '';
+  }
+
+  syncProfileDeletePhotoButton();
+  closeProfileDeleteModal();
+}
+
+if (profileDeletePhotoButton) {
+  profileDeletePhotoButton.addEventListener('click', openProfileDeleteModal);
+}
+
+if (profileDeleteConfirmButton) {
+  profileDeleteConfirmButton.addEventListener('click', removeProfilePhoto);
+}
+
+if (profileDeleteModal) {
+  profileDeleteModal.addEventListener('click', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.dataset.closeProfileDelete === 'true') {
+      closeProfileDeleteModal();
     }
   });
 }
@@ -8118,8 +8187,8 @@ document.addEventListener('keydown', (event) => {
     closeProfilePopover();
   }
 
-  if (event.key === 'Escape' && profileEditModal && profileEditModal.classList.contains('is-open')) {
-    closeProfileEditModal();
+  if (event.key === 'Escape' && profileDeleteModal && profileDeleteModal.classList.contains('is-open')) {
+    closeProfileDeleteModal();
   }
 
   if (event.key === 'Escape' && notificationPopover) {

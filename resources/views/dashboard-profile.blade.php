@@ -147,13 +147,10 @@
   </main>
 
   <section class="profile-edit-modal" id="profile-edit-modal" aria-hidden="true">
-    <div class="profile-edit-overlay" data-close-profile-modal="true"></div>
+    <div class="profile-edit-overlay"></div>
     <article class="profile-edit-card" role="dialog" aria-modal="true" aria-labelledby="profile-edit-title">
       <header class="profile-edit-header">
         <h2 id="profile-edit-title">Edit Personal Information</h2>
-        <button type="button" class="profile-edit-close" data-close-profile-modal="true" aria-label="Close">
-          <i class="bi bi-x-lg"></i>
-        </button>
       </header>
       <div class="profile-edit-body">
 
@@ -163,7 +160,10 @@
             <i class="bi bi-person-fill profile-edit-avatar-icon"></i>
           </div>
           <input id="profile-avatar-upload" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
-          <button type="button" class="profile-edit-upload-btn" id="profile-edit-upload-btn">Upload Photo</button>
+          <div class="profile-edit-photo-actions">
+            <button type="button" class="profile-edit-upload-btn" id="profile-edit-upload-btn">Upload Photo</button>
+            <button type="button" class="profile-edit-delete-btn" id="profile-delete-photo-btn" hidden>Delete Photo</button>
+          </div>
         </div>
 
         <div class="profile-edit-main-grid">
@@ -223,6 +223,18 @@
           <button type="button" class="profile-edit-btn-secondary" id="profile-edit-cancel-btn">Cancel</button>
           <button type="button" class="profile-edit-btn-primary" id="profile-edit-save-btn">Save Profile</button>
         </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="profile-delete-modal" id="profile-delete-modal" aria-hidden="true">
+    <div class="profile-delete-overlay" data-close-profile-delete="true"></div>
+    <article class="profile-delete-card" role="dialog" aria-modal="true" aria-labelledby="profile-delete-title">
+      <h2 id="profile-delete-title">Delete Profile Photo?</h2>
+      <p>Are you sure you want to remove your profile photo? This action cannot be undone.</p>
+      <div class="profile-delete-actions">
+        <button type="button" class="profile-delete-cancel" id="profile-delete-cancel" data-close-profile-delete="true">Cancel</button>
+        <button type="button" class="profile-delete-confirm" id="profile-delete-confirm">Delete Photo</button>
       </div>
     </article>
   </section>
