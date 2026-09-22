@@ -78,7 +78,7 @@
     </section>
   </main>
 
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
 </html>
 

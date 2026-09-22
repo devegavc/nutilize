@@ -169,7 +169,7 @@
       reject: '{{ route('approval.reject', ['approvalId' => '__APPROVAL_ID__']) }}'
     };
   </script>
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
   <script>
     (function () {
       const buttons = document.querySelectorAll('.office-queue-action-btn');
