@@ -5738,6 +5738,15 @@ if (profileEditSaveButton) {
         }
       }
 
+      const profileDisplayName = document.getElementById('profile-display-name');
+      if (profileDisplayName) {
+        const headerName = [firstName, middleInitial, lastName, user.suffix || payload.suffix || '']
+          .map((part) => String(part || '').trim())
+          .filter(Boolean)
+          .join(' ');
+        profileDisplayName.textContent = headerName || fullName || 'User';
+      }
+
       if (profileAvatar && profileAvatarImage) {
         if (pendingProfileAvatarDataUrl) {
           profileAvatarImage.src = pendingProfileAvatarDataUrl;

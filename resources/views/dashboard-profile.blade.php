@@ -9,7 +9,7 @@
   <title>NUtilize | Profile</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-profile.css" />
+  <link rel="stylesheet" href="/css/db-profile.css?v={{ filemtime(public_path('css/db-profile.css')) }}" />
 </head>
 <body>
   @php
@@ -25,6 +25,16 @@
     }
 
     $middleInitial = $authUser->middle_initial ?? '';
+    $suffix = trim((string) ($authUser->suffix ?? ''));
+    $displayName = trim(implode(' ', array_filter([
+        $firstName,
+        $middleInitial !== '' ? $middleInitial : '',
+        $lastName,
+        $suffix,
+    ], fn ($part) => $part !== '')));
+    if ($displayName === '') {
+        $displayName = $fullName !== '' ? $fullName : 'User';
+    }
     $shouldSelectProgram = method_exists($authUser, 'shouldSelectProgram') && $authUser->shouldSelectProgram();
     $programName = $authUser->academicProgram?->name ?? 'Not Set';
 
@@ -76,55 +86,74 @@
 
       <section class="content-card profile-content-card">
         <section class="profile-top-card">
-          <div>
+          <div class="profile-header-identity">
+            <div class="profile-avatar" id="profile-avatar" aria-hidden="true">
+              <img id="profile-avatar-image" class="profile-avatar-image" alt="Profile avatar" />
+              <i class="bi bi-person-fill profile-avatar-icon"></i>
+            </div>
+            <p class="profile-header-name" id="profile-display-name">{{ $displayName }}</p>
+          </div>
+
+          <div class="profile-header-copy">
             <h1>Profile</h1>
             <p>Manage your administrator account</p>
           </div>
+
           <button class="profile-edit-btn" type="button">Edit Profile</button>
         </section>
 
         <section class="profile-grid">
           <article class="profile-card">
             <h2>Personal Information</h2>
-            <div class="profile-personal-body">
-              <div class="profile-avatar" id="profile-avatar" aria-hidden="true">
-                <img id="profile-avatar-image" class="profile-avatar-image" alt="Profile avatar" />
-                <i class="bi bi-person-fill profile-avatar-icon"></i>
-              </div>
-
-              <div class="profile-fields">
+            <div class="profile-fields">
+              <div class="profile-info-row">
                 <label for="profile-first-name">First Name</label>
-                <input id="profile-first-name" type="text" value="{{ $firstName !== '' ? $firstName : 'Not Set' }}" readonly />
-
-                <label for="profile-middle-name">Middle Initial</label>
-                <input id="profile-middle-name" type="text" value="{{ $middleInitial !== '' ? $middleInitial : 'Not Set' }}" readonly />
-
-                <label for="profile-last-name">Last Name</label>
-                <input id="profile-last-name" type="text" value="{{ $lastName !== '' ? $lastName : 'Not Set' }}" readonly />
-
-                <label for="profile-suffix">Suffix</label>
-                <input id="profile-suffix" type="text" value="{{ $authUser->suffix ?? 'Not Set' }}" readonly />
-
-                @if ($shouldSelectProgram)
-                  <label for="profile-program">Program</label>
-                  <input id="profile-program" type="text" value="{{ $programName }}" readonly />
-                @endif
+                <input id="profile-first-name" type="text" value="{{ $firstName !== '' ? $firstName : 'Not Set' }}" readonly tabindex="-1" />
               </div>
+
+              <div class="profile-info-row">
+                <label for="profile-middle-name">Middle Initial</label>
+                <input id="profile-middle-name" type="text" value="{{ $middleInitial !== '' ? $middleInitial : 'Not Set' }}" readonly tabindex="-1" />
+              </div>
+
+              <div class="profile-info-row">
+                <label for="profile-last-name">Last Name</label>
+                <input id="profile-last-name" type="text" value="{{ $lastName !== '' ? $lastName : 'Not Set' }}" readonly tabindex="-1" />
+              </div>
+
+              <div class="profile-info-row">
+                <label for="profile-suffix">Suffix</label>
+                <input id="profile-suffix" type="text" value="{{ $authUser->suffix ?? 'Not Set' }}" readonly tabindex="-1" />
+              </div>
+
+              @if ($shouldSelectProgram)
+                <div class="profile-info-row">
+                  <label for="profile-program">Program</label>
+                  <input id="profile-program" type="text" value="{{ $programName }}" readonly tabindex="-1" />
+                </div>
+              @endif
             </div>
           </article>
 
           <article class="profile-card">
-            <h3 class="profile-admin-head">Administrator Information</h3>
-            <div class="profile-admin-grid">
-              <label for="profile-admin-id">Admin ID</label>
-              <label for="profile-email">Email</label>
-              <input id="profile-admin-id" type="text" value="{{ $authUser->user_id ?? '' }}" readonly />
-              <input id="profile-email" type="text" value="{{ $authUser->email ?? '' }}" readonly />
-
-              <label for="profile-contact">Contact Number</label>
-              <label for="profile-phone">Phone Number</label>
-              <input id="profile-contact" type="text" value="{{ $authUser->contact_number ?? 'Not Set' }}" readonly />
-              <input id="profile-phone" type="text" value="{{ $authUser->phone_number ?? 'Not Set' }}" readonly />
+            <h2>Administrator Information</h2>
+            <div class="profile-fields">
+              <div class="profile-info-row">
+                <label for="profile-admin-id">Admin ID</label>
+                <input id="profile-admin-id" type="text" value="{{ $authUser->user_id ?? '' }}" readonly tabindex="-1" />
+              </div>
+              <div class="profile-info-row">
+                <label for="profile-email">Email</label>
+                <input id="profile-email" type="text" value="{{ $authUser->email ?? '' }}" readonly tabindex="-1" />
+              </div>
+              <div class="profile-info-row">
+                <label for="profile-contact">Contact Number</label>
+                <input id="profile-contact" type="text" value="{{ $authUser->contact_number ?? 'Not Set' }}" readonly tabindex="-1" />
+              </div>
+              <div class="profile-info-row">
+                <label for="profile-phone">Phone Number</label>
+                <input id="profile-phone" type="text" value="{{ $authUser->phone_number ?? 'Not Set' }}" readonly tabindex="-1" />
+              </div>
             </div>
           </article>
         </section>
@@ -135,9 +164,13 @@
   <section class="profile-edit-modal" id="profile-edit-modal" aria-hidden="true">
     <div class="profile-edit-overlay" data-close-profile-modal="true"></div>
     <article class="profile-edit-card" role="dialog" aria-modal="true" aria-labelledby="profile-edit-title">
-      <div class="profile-edit-top"></div>
-      <div class="profile-edit-body">
+      <header class="profile-edit-header">
         <h2 id="profile-edit-title">Edit Personal Information</h2>
+        <button type="button" class="profile-edit-close" data-close-profile-modal="true" aria-label="Close">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </header>
+      <div class="profile-edit-body">
 
         <div class="profile-edit-avatar-wrap">
           <div class="profile-edit-avatar" id="profile-edit-avatar" role="button" tabindex="0" aria-label="Upload profile picture">
