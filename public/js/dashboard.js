@@ -9,7 +9,7 @@ const workloadProgress = document.getElementById('workload-progress');
 const workloadLabel = document.getElementById('workload-label');
 const inventoryShortcut = document.getElementById('inventory-shortcut');
 const navbarContainer = document.getElementById('navbar-container');
-const facilitiesTabs = document.querySelectorAll('.facilities-tab');
+const facilitiesTabs = document.querySelectorAll('.facilities-tab-group[aria-label="Inventory category"] .facilities-tab');
 const facilitiesInlineSearchInput = document.querySelector('.facilities-inline-search input');
 const facilitiesEditModal = document.getElementById('facilities-edit-modal');
 const facilitiesItemNameInput = document.getElementById('facility-item-name');
@@ -887,7 +887,7 @@ function showAppConfirm(message, options = {}) {
 
 window.showAppConfirm = showAppConfirm;
 
-let activeFacilitiesTab = 'rooms';
+let activeFacilitiesTab = 'all';
 let activeEquipmentTab = 'all';
 let activeHistoryTab = 'latest';
 let activeMaintenanceTab = 'maintenance';
@@ -3156,6 +3156,61 @@ function syncFacilityRowFurniture(row, facility) {
   }
 }
 
+function isNumericFacilityNameCategory(category) {
+  return category === 'rooms' || category === 'lab';
+}
+
+function getFacilityNamePlaceholder(category) {
+  if (category === 'lab') {
+    return 'Lab Number';
+  }
+
+  if (category === 'others') {
+    return 'Facility Name';
+  }
+
+  if (category === 'rooms') {
+    return 'Room Number';
+  }
+
+  return 'Room/Facility Name';
+}
+
+function sanitizeFacilityItemName(value, category) {
+  const raw = String(value || '');
+
+  if (isNumericFacilityNameCategory(category)) {
+    return raw.replace(/\D/g, '');
+  }
+
+  return raw;
+}
+
+function syncFacilityNameInputMode() {
+  if (!facilitiesItemNameInput) {
+    return;
+  }
+
+  const category = facilitiesCategoryInput ? facilitiesCategoryInput.value.trim() : '';
+  const numeric = isNumericFacilityNameCategory(category);
+
+  facilitiesItemNameInput.placeholder = getFacilityNamePlaceholder(category);
+  facilitiesItemNameInput.setAttribute('inputmode', numeric ? 'numeric' : 'text');
+  facilitiesItemNameInput.setAttribute('spellcheck', numeric ? 'false' : 'true');
+
+  if (numeric) {
+    facilitiesItemNameInput.setAttribute('pattern', '[0-9]*');
+  } else {
+    facilitiesItemNameInput.removeAttribute('pattern');
+  }
+
+  const sanitized = sanitizeFacilityItemName(facilitiesItemNameInput.value, category);
+
+  if (sanitized !== facilitiesItemNameInput.value) {
+    facilitiesItemNameInput.value = sanitized;
+  }
+}
+
 function openFacilitiesEditModal(row) {
   if (!facilitiesEditModal) {
     return;
@@ -3197,6 +3252,8 @@ function openFacilitiesEditModal(row) {
   if (facilitiesSaveButton) {
     facilitiesSaveButton.textContent = 'Save Room/Facility';
   }
+
+  syncFacilityNameInputMode();
 
   // #region agent log
   fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a53051'},body:JSON.stringify({sessionId:'a53051',runId:'post-fix',hypothesisId:'C',location:'dashboard.js:openFacilitiesEditModal',message:'Opened edit modal with furniture fields',data:{facilityId:row.dataset.facilityId || null,tableType:row.dataset.facilityTableType || '',chairQuantity:row.dataset.facilityChairQuantity || '',selectValue:facilitiesTableTypeInput ? facilitiesTableTypeInput.value : null,inputValue:facilitiesChairQuantityInput ? facilitiesChairQuantityInput.value : null},timestamp:Date.now()})}).catch(()=>{});
@@ -3247,6 +3304,8 @@ function openFacilitiesAddModal() {
     facilitiesSaveButton.textContent = 'Add Room/Facility';
   }
 
+  syncFacilityNameInputMode();
+
   facilitiesEditModal.classList.add('is-open');
   facilitiesEditModal.setAttribute('aria-hidden', 'false');
 }
@@ -3275,9 +3334,14 @@ function applyFacilitiesFilters() {
   const inlineTerm = facilitiesInlineSearchInput ? facilitiesInlineSearchInput.value.trim().toLowerCase() : '';
 
   rows.forEach((row) => {
+    if (row.querySelector('td[colspan]')) {
+      row.style.display = '';
+      return;
+    }
+
     const rowCategory = getFacilitiesRowCategory(row);
     const rowText = row.textContent.toLowerCase();
-    const matchesTab = rowCategory === activeFacilitiesTab;
+    const matchesTab = activeFacilitiesTab === 'all' || rowCategory === activeFacilitiesTab;
     const matchesTopSearch = !topTerm || rowText.includes(topTerm);
     const matchesInlineSearch = !inlineTerm || rowText.includes(inlineTerm);
 
@@ -6434,7 +6498,7 @@ if (facilitiesTableBody && facilitiesTabs.length) {
 
   facilitiesTabs.forEach((tabButton) => {
     tabButton.addEventListener('click', () => {
-      activeFacilitiesTab = tabButton.dataset.tab || 'rooms';
+      activeFacilitiesTab = tabButton.dataset.tab || 'all';
 
       facilitiesTabs.forEach((button) => {
         button.classList.toggle('active', button === tabButton);
@@ -6897,6 +6961,28 @@ if (requestTabs.length) {
   setRequestTabMode(defaultActiveTab instanceof HTMLElement ? defaultActiveTab.dataset.requestTab || 'final' : 'final');
 }
 
+if (facilitiesCategoryInput) {
+  facilitiesCategoryInput.addEventListener('change', syncFacilityNameInputMode);
+}
+
+if (facilitiesItemNameInput) {
+  facilitiesItemNameInput.addEventListener('beforeinput', (event) => {
+    const category = facilitiesCategoryInput ? facilitiesCategoryInput.value.trim() : '';
+
+    if (!isNumericFacilityNameCategory(category)) {
+      return;
+    }
+
+    if (event.inputType === 'insertText' && typeof event.data === 'string' && /\D/.test(event.data)) {
+      event.preventDefault();
+    }
+  });
+
+  facilitiesItemNameInput.addEventListener('input', () => {
+    syncFacilityNameInputMode();
+  });
+}
+
 if (facilitiesCancelButton) {
   facilitiesCancelButton.addEventListener('click', closeFacilitiesEditModal);
 }
@@ -6912,13 +6998,27 @@ if (facilitiesSaveButton) {
       return;
     }
 
-    const itemName = facilitiesItemNameInput.value.trim();
     const category = facilitiesCategoryInput.value.trim();
+    const itemName = sanitizeFacilityItemName(facilitiesItemNameInput.value, category).trim();
     const tableType = facilitiesTableTypeInput ? facilitiesTableTypeInput.value.trim() : '';
     const chairQuantity = facilitiesChairQuantityInput ? facilitiesChairQuantityInput.value.trim() : '';
 
-    if (!itemName || !category) {
-      showAppNotice('Please complete Facility Name and Room Type.');
+    if (facilitiesItemNameInput.value !== itemName) {
+      facilitiesItemNameInput.value = itemName;
+    }
+
+    if (!category) {
+      showAppNotice('Please complete Room Type.');
+      return;
+    }
+
+    if (!itemName) {
+      showAppNotice('Please enter a Room/Facility Name.');
+      return;
+    }
+
+    if (isNumericFacilityNameCategory(category) && !/^\d+$/.test(itemName)) {
+      showAppNotice('Please enter numbers only for Rooms and Lab.');
       return;
     }
 

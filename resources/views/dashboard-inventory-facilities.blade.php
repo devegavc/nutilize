@@ -44,7 +44,8 @@
 
         <section class="facilities-filter-row">
           <div class="facilities-tab-group" role="tablist" aria-label="Inventory category">
-            <button class="facilities-tab active" type="button" data-tab="rooms">Rooms</button>
+            <button class="facilities-tab active" type="button" data-tab="all">All</button>
+            <button class="facilities-tab" type="button" data-tab="rooms">Rooms</button>
             <button class="facilities-tab" type="button" data-tab="lab">Lab</button>
             <button class="facilities-tab" type="button" data-tab="others">Others</button>
           </div>
@@ -59,7 +60,7 @@
           </div>
         </section>
 
-        <section class="inventory-grid facilities-grid">
+        <section class="inventory-grid facilities-grid facilities-page-grid">
           <div class="table-wrap">
             <table class="inventory-table facilities-inventory-table">
               <thead>
@@ -111,7 +112,7 @@
       <div class="facilities-modal-body equipment-form-modal-body">
         <section class="equipment-form-section">
           <label class="facilities-field-label" for="facility-item-name">Room/Facility Name</label>
-          <input id="facility-item-name" class="facilities-input" type="text" placeholder="Room Number" />
+          <input id="facility-item-name" class="facilities-input" type="text" placeholder="Room/Facility Name" autocomplete="off" />
 
           <label class="facilities-field-label" for="facility-category">Room Type</label>
           <select id="facility-category" class="facilities-input facilities-select">
@@ -136,21 +137,6 @@
               <input id="facility-chair-quantity" class="facilities-input" type="number" min="0" max="9999" step="1" placeholder="0" />
             </div>
           </div>
-        </section>
-
-        <section class="equipment-form-section">
-          <label class="facilities-field-label" for="facility-upload-input">Upload Room/Facility</label>
-          <button type="button" class="equipment-form-upload-trigger" id="facility-upload-btn">
-            <i class="bi bi-upload" aria-hidden="true"></i>
-            <span id="facility-upload-name">No file selected</span>
-          </button>
-          <small class="facilities-upload-hint">JPG, PNG, up to 5MB</small>
-          <input id="facility-upload-input" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
-        </section>
-
-        <section class="equipment-form-section">
-          <label class="equipment-form-section-title" for="facility-description">Description</label>
-          <textarea id="facility-description" class="facilities-input facilities-textarea" placeholder="Description"></textarea>
         </section>
       </div>
 
