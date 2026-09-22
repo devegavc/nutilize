@@ -6,10 +6,10 @@
   
   <link rel="icon" type="image/png" href="/img/nutilize_favicon.png" />
 <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <title>NUtilize | Inventory Insights</title>
+  <title>NUtilize | Analytics</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="page-insights">
@@ -45,7 +45,7 @@
       <section class="content-card analytics-content-card">
         <div class="dashboard-page-header-top insights-header-top">
           <div class="insights-header-copy">
-            <h1 class="section-title">INSIGHTS DASHBOARD</h1>
+            <h1 class="section-title">ANALYTICS</h1>
           </div>
 
           @php
@@ -419,77 +419,72 @@
           </div>
         </section>
 
-        {{-- Demand context: busiest days + top borrowers in one card --}}
+        {{-- Demand context: busiest days + top borrowers --}}
         <section class="insight-activity-section">
-          <article class="insight-panel insight-activity-card">
-            <div class="insight-activity-head">
-              <div>
-                <h3 class="insight-card-title">Borrowing Activity</h3>
-                <p class="insight-panel-hint">Busiest days and the people driving demand in {{ $monthLabel }}</p>
-              </div>
-            </div>
+          <div class="insight-activity-grid">
+            <article class="insight-panel insight-activity-card">
+              <h3 class="insight-card-title">Busiest Booking Days</h3>
+              <p class="insight-panel-hint">Days with the most approved bookings in {{ $monthLabel }}</p>
 
-            <div class="insight-activity-grid">
-              <div class="insight-activity-col">
-                <h4 class="insight-subhead">Busiest booking days</h4>
-                @if (count($peakPeriods['weekdays']) > 0)
-                  <ul class="weekday-list">
-                    @foreach ($peakPeriods['weekdays'] as $day)
-                      <li>
-                        <span class="weekday-label">{{ $day['label'] }}</span>
-                        <span class="weekday-bar">
-                          <span class="weekday-fill" style="width: {{ $day['percent'] }}%"></span>
-                        </span>
-                        <span class="weekday-count">{{ $day['count'] }}</span>
-                      </li>
-                    @endforeach
-                  </ul>
-                @else
-                  <p class="insight-empty-inline">Not enough booking history yet.</p>
-                @endif
+              @if (count($peakPeriods['weekdays']) > 0)
+                <ul class="weekday-list">
+                  @foreach ($peakPeriods['weekdays'] as $day)
+                    <li>
+                      <span class="weekday-label">{{ $day['label'] }}</span>
+                      <span class="weekday-bar">
+                        <span class="weekday-fill" style="width: {{ $day['percent'] }}%"></span>
+                      </span>
+                      <span class="weekday-count">{{ $day['count'] }}</span>
+                    </li>
+                  @endforeach
+                </ul>
+              @else
+                <p class="insight-empty-inline">Not enough booking history yet.</p>
+              @endif
 
-                @if (count($peakPeriods['busiest_dates']) > 0)
-                  <h4 class="insight-subhead">Heaviest activity dates</h4>
-                  <ul class="busy-date-list">
-                    @foreach ($peakPeriods['busiest_dates'] as $date)
-                      <li>
-                        <span>{{ $date['date'] }}</span>
-                        <strong>{{ $date['count'] }} booking{{ $date['count'] === 1 ? '' : 's' }}</strong>
-                      </li>
-                    @endforeach
-                  </ul>
-                @endif
-              </div>
+              @if (count($peakPeriods['busiest_dates']) > 0)
+                <h4 class="insight-subhead">Heaviest activity dates</h4>
+                <ul class="busy-date-list">
+                  @foreach ($peakPeriods['busiest_dates'] as $date)
+                    <li>
+                      <span>{{ $date['date'] }}</span>
+                      <strong>{{ $date['count'] }} booking{{ $date['count'] === 1 ? '' : 's' }}</strong>
+                    </li>
+                  @endforeach
+                </ul>
+              @endif
+            </article>
 
-              <div class="insight-activity-col">
-                <h4 class="insight-subhead">Top borrowers</h4>
-                @if (count($topBorrowers ?? []) > 0)
-                  <ul class="top-borrower-list">
-                    @foreach ($topBorrowers as $index => $borrower)
-                      <li class="top-borrower-row">
-                        <span class="top-borrower-rank">{{ $index + 1 }}</span>
-                        <div class="top-borrower-main">
-                          <div class="top-borrower-name-row">
-                            <span class="top-borrower-name">{{ $borrower['name'] }}</span>
-                            <strong class="top-borrower-units">{{ number_format($borrower['units_borrowed']) }} units</strong>
-                          </div>
-                          <div class="top-borrower-meta">
-                            <span>{{ $borrower['booking_count'] }} booking{{ $borrower['booking_count'] === 1 ? '' : 's' }}</span>
-                            <span class="top-borrower-item">Most used: {{ $borrower['top_item'] }}</span>
-                          </div>
-                          <div class="top-borrower-bar" aria-hidden="true">
-                            <span class="top-borrower-fill" style="width: {{ $borrower['usage_percent'] }}%"></span>
-                          </div>
+            <article class="insight-panel insight-activity-card">
+              <h3 class="insight-card-title">Top Borrowers</h3>
+              <p class="insight-panel-hint">People driving demand in {{ $monthLabel }}</p>
+
+              @if (count($topBorrowers ?? []) > 0)
+                <ul class="top-borrower-list">
+                  @foreach ($topBorrowers as $index => $borrower)
+                    <li class="top-borrower-row">
+                      <span class="top-borrower-rank">{{ $index + 1 }}</span>
+                      <div class="top-borrower-main">
+                        <div class="top-borrower-name-row">
+                          <span class="top-borrower-name">{{ $borrower['name'] }}</span>
+                          <strong class="top-borrower-units">{{ number_format($borrower['units_borrowed']) }} units</strong>
                         </div>
-                      </li>
-                    @endforeach
-                  </ul>
-                @else
-                  <p class="insight-empty-inline">No borrower activity in this month yet.</p>
-                @endif
-              </div>
-            </div>
-          </article>
+                        <div class="top-borrower-meta">
+                          <span>{{ $borrower['booking_count'] }} booking{{ $borrower['booking_count'] === 1 ? '' : 's' }}</span>
+                          <span class="top-borrower-item">Most used: {{ $borrower['top_item'] }}</span>
+                        </div>
+                        <div class="top-borrower-bar" aria-hidden="true">
+                          <span class="top-borrower-fill" style="width: {{ $borrower['usage_percent'] }}%"></span>
+                        </div>
+                      </div>
+                    </li>
+                  @endforeach
+                </ul>
+              @else
+                <p class="insight-empty-inline">No borrower activity in this month yet.</p>
+              @endif
+            </article>
+          </div>
         </section>
 
         {{-- Cost-saving and reliability signals --}}

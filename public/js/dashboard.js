@@ -382,7 +382,7 @@ function showPageLoadingSkeleton(type = 'default') {
 
   skeleton.dataset.skeleton = skeletonType;
   skeleton.setAttribute('aria-busy', 'true');
-  skeleton.setAttribute('aria-label', skeletonType === 'insights' ? 'Loading insights dashboard' : 'Loading page');
+  skeleton.setAttribute('aria-label', skeletonType === 'insights' ? 'Loading analytics' : 'Loading page');
 
   if (skeletonType === 'insights') {
     skeleton.className = 'nutilize-page-skeleton insights-loading-skeleton';

@@ -5985,3 +5985,158 @@ body.page-insights .compact-table {
     min-height: 200px;
   }
 }
+
+/* Analytics page: typography, equal activity cards, medium layout */
+body.page-insights .insights-header-top .section-title {
+  font-size: clamp(1.45rem, 1.2rem + 0.5vw, 1.75rem);
+}
+
+body.page-insights .insight-card-title,
+body.page-insights .insight-head h2,
+body.page-insights .analytics-grid-head h2 {
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #1b2b6a;
+}
+
+body.page-insights .insight-how-it-works h3 {
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+body.page-insights .insight-panel-hint,
+body.page-insights .analytics-grid-head p {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #6b76a3;
+  line-height: 1.4;
+}
+
+body.page-insights .insight-kpi-label,
+body.page-insights .insight-kpi span.insight-kpi-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5a6490;
+}
+
+body.page-insights .insight-kpi strong {
+  font-size: 1.85rem;
+  font-weight: 800;
+}
+
+body.page-insights .insight-charts-row,
+body.page-insights .insight-kpi-strip,
+body.page-insights .insight-how-it-works,
+body.page-insights .analytics-top-row,
+body.page-insights .insight-activity-section,
+body.page-insights .insight-split {
+  padding-top: 16px;
+}
+
+body.page-insights .insight-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+body.page-insights .insight-activity-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 16px;
+}
+
+body.page-insights .insight-activity-card .insight-card-title {
+  margin: 0;
+}
+
+body.page-insights .insight-activity-card .insight-panel-hint {
+  margin: 4px 0 12px;
+}
+
+body.page-insights .insight-activity-card .weekday-list,
+body.page-insights .insight-activity-card .top-borrower-list {
+  flex: 1 1 auto;
+}
+
+body.page-insights .insight-activity-card .insight-subhead {
+  margin: 16px 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #39457f;
+}
+
+body.page-insights .insight-mom-head {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+
+@media (max-width: 1200px) {
+  body.page-insights .insight-charts-row,
+  body.page-insights .insight-kpi-strip,
+  body.page-insights .insight-how-it-works,
+  body.page-insights .insight-section,
+  body.page-insights .analytics-top-row,
+  body.page-insights .insight-activity-section,
+  body.page-insights .insight-split,
+  body.page-insights .insight-filter-banner {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  body.page-insights .insight-section.inventory-grid {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+}
+
+@media (max-width: 1100px) {
+  body.page-insights .insights-header-top {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 16px 14px;
+  }
+
+  body.page-insights .insight-charts-row {
+    grid-template-columns: 1fr;
+  }
+
+  body.page-insights .insight-mom-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.page-insights .insights-compare-picker {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  body.page-insights .insight-kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  body.page-insights .insight-activity-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.page-insights .insight-charts-row,
+  body.page-insights .insight-kpi-strip,
+  body.page-insights .insight-how-it-works,
+  body.page-insights .insight-section,
+  body.page-insights .analytics-top-row,
+  body.page-insights .insight-activity-section,
+  body.page-insights .insight-split,
+  body.page-insights .insight-filter-banner {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}

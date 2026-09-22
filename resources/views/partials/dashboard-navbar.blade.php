@@ -70,7 +70,7 @@
         </a>
         <a class="nav-subitem" data-subnav="analytics" href="/dashboard/inventory/analytics">
           <i class="bi bi-bar-chart-fill"></i>
-          <span>Insights</span>
+          <span>Analytics</span>
         </a>
       </div>
 
