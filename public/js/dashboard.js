@@ -6476,8 +6476,29 @@ if (historyTableBody) {
   const historyDateFrom = document.getElementById('history-date-from');
   const historyDateTo = document.getElementById('history-date-to');
   const historyReset = document.getElementById('history-filter-reset');
+  const historyCopy = document.getElementById('history-copy-btn');
+  const historyCopyModal = document.getElementById('history-copy-modal');
+  const historyCopyCancel = document.getElementById('history-copy-cancel');
   const historyPrint = document.getElementById('history-print-btn');
   const historyEmail = document.getElementById('history-email-btn');
+
+  const openHistoryCopyModal = () => {
+    if (!(historyCopyModal instanceof HTMLElement)) {
+      return;
+    }
+
+    historyCopyModal.classList.add('is-open');
+    historyCopyModal.setAttribute('aria-hidden', 'false');
+  };
+
+  const closeHistoryCopyModal = () => {
+    if (!(historyCopyModal instanceof HTMLElement)) {
+      return;
+    }
+
+    historyCopyModal.classList.remove('is-open');
+    historyCopyModal.setAttribute('aria-hidden', 'true');
+  };
 
   if (historySort instanceof HTMLSelectElement) {
     historySort.addEventListener('change', () => {
@@ -6509,16 +6530,41 @@ if (historyTableBody) {
     });
   }
 
+  if (historyCopy instanceof HTMLButtonElement) {
+    historyCopy.addEventListener('click', openHistoryCopyModal);
+  }
+
+  if (historyCopyCancel instanceof HTMLButtonElement) {
+    historyCopyCancel.addEventListener('click', closeHistoryCopyModal);
+  }
+
+  if (historyCopyModal instanceof HTMLElement) {
+    historyCopyModal.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.dataset.closeHistoryCopy === 'true') {
+        closeHistoryCopyModal();
+      }
+    });
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && historyCopyModal instanceof HTMLElement && historyCopyModal.classList.contains('is-open')) {
+      closeHistoryCopyModal();
+    }
+  });
+
   if (historyPrint instanceof HTMLButtonElement) {
     historyPrint.addEventListener('click', () => {
+      closeHistoryCopyModal();
       applyHistoryFilters();
       window.print();
     });
   }
 
   if (historyEmail instanceof HTMLButtonElement) {
-    historyEmail.addEventListener('click', () => {
-      sendHistoryReport();
+    historyEmail.addEventListener('click', async () => {
+      await sendHistoryReport();
+      closeHistoryCopyModal();
     });
   }
 

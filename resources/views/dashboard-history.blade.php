@@ -99,11 +99,8 @@
           <button class="history-reset-btn" id="history-filter-reset" type="button">Reset</button>
 
           <div class="history-head-actions">
-            <button class="history-print-btn" id="history-print-btn" type="button">
-              <i class="bi bi-printer-fill"></i> Print File
-            </button>
-            <button class="history-email-btn" id="history-email-btn" type="button">
-              <i class="bi bi-envelope-fill"></i> Send to Email
+            <button class="history-copy-btn" id="history-copy-btn" type="button">
+              <i class="bi bi-share"></i> Send a Copy
             </button>
           </div>
         </section>
@@ -135,6 +132,35 @@
       </section>
     </section>
   </main>
+
+  <div class="history-copy-modal" id="history-copy-modal" aria-hidden="true">
+    <div class="history-copy-overlay" data-close-history-copy="true"></div>
+    <article class="history-copy-card" role="dialog" aria-modal="true" aria-labelledby="history-copy-title">
+      <header class="history-copy-head">
+        <h2 id="history-copy-title">Send a Copy</h2>
+        <p>Choose how you want to export this history report.</p>
+      </header>
+      <div class="history-copy-options">
+        <button class="history-copy-option" id="history-print-btn" type="button">
+          <span class="history-copy-option-icon"><i class="bi bi-printer-fill"></i></span>
+          <span class="history-copy-option-copy">
+            <strong>Print File</strong>
+            <span>Print the currently filtered history records.</span>
+          </span>
+        </button>
+        <button class="history-copy-option" id="history-email-btn" type="button">
+          <span class="history-copy-option-icon"><i class="bi bi-envelope-fill"></i></span>
+          <span class="history-copy-option-copy">
+            <strong>Send to Email</strong>
+            <span>Send the currently filtered history records to an email address.</span>
+          </span>
+        </button>
+      </div>
+      <footer class="history-copy-foot">
+        <button class="history-copy-cancel" id="history-copy-cancel" type="button">Cancel</button>
+      </footer>
+    </article>
+  </div>
 
   <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
