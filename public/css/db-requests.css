@@ -1054,3 +1054,19 @@
     gap: 8px;
   }
 }
+
+.request-item:not(.is-selected) > .request-progress-block,
+.request-item:not(.is-selected) > .request-resource-col,
+.request-item:not(.is-selected) > .request-remarks,
+.request-item:not(.is-selected) .request-block-title,
+.request-item:not(.is-selected) .request-current-stage,
+.request-item:not(.is-selected) .status-timeline,
+.request-item:not(.is-selected) .request-event-row,
+.request-item:not(.is-selected) .request-meta-row,
+.request-item:not(.is-selected) .request-email {
+  display: none !important;
+}
+
+.request-item:not(.is-selected) .status-dots {
+  display: inline-flex !important;
+}
