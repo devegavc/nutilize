@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Reservation;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class DashboardHistoryController extends Controller
 {
@@ -20,6 +22,56 @@ class DashboardHistoryController extends Controller
 
     public function index()
     {
+        $historyRows = $this->loadHistoryRows();
+
+        return view('dashboard-history', [
+            'historyRows' => $historyRows,
+            'historyCounts' => $this->historyCounts($historyRows),
+        ]);
+    }
+
+    public function sendReport(Request $request)
+    {
+        $email = trim((string) ($request->user()?->email ?? ''));
+        if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send history report. Please try again.',
+            ], 422);
+        }
+
+        $category = $this->normalizeCategory($request->input('category'));
+        $sort = $this->normalizeSort($request->input('sort'));
+        $from = $this->normalizeDate($request->input('from'));
+        $to = $this->normalizeDate($request->input('to'));
+
+        $rows = $this->filterHistoryRows($this->loadHistoryRows(), $category, $sort, $from, $to);
+        $subject = $this->reportTitle($category, $from, $to);
+
+        try {
+            Mail::html(
+                $this->reportHtml($rows, $subject),
+                function ($message) use ($email, $subject) {
+                    $message->to($email)->subject($subject);
+                }
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send history report. Please try again.',
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'History report sent successfully.',
+        ]);
+    }
+
+    private function loadHistoryRows(): array
+    {
         $reservations = Reservation::query()
             ->with(['user', 'approvals'])
             ->where(function ($query) {
@@ -32,9 +84,13 @@ class DashboardHistoryController extends Controller
             ->get();
 
         $reservationIds = $reservations->pluck('reservation_id')->map(fn ($id) => (int) $id)->all();
-        $resourceMap = $this->buildResourceMap($reservationIds);
 
-        $latestRows = $reservations->map(function (Reservation $reservation) use ($resourceMap) {
+        return $this->mapHistoryRows($reservations, $this->buildResourceMap($reservationIds));
+    }
+
+    private function mapHistoryRows($reservations, array $resourceMap): array
+    {
+        return $reservations->map(function (Reservation $reservation) use ($resourceMap) {
             $status = strtolower((string) $reservation->overall_status);
             $statusLabel = match (true) {
                 $status === 'returned' => 'Returned',
@@ -55,23 +111,121 @@ class DashboardHistoryController extends Controller
                 'item' => $resourceMap[(int) $reservation->reservation_id] ?? 'No resource details',
                 'status' => $statusLabel,
                 'raw_status' => $status,
+                'category' => $status === 'damaged' ? 'damaged' : 'lending',
+                'filter_date' => $endDate->format('Y-m-d'),
                 'sort_ts' => $endDate->timestamp,
             ];
-        })->sortByDesc('sort_ts')->values()->map(function (array $row) {
-            unset($row['sort_ts']);
+        })->sortByDesc('sort_ts')->values()->all();
+    }
 
-            return $row;
-        })->all();
+    private function historyCounts(array $rows): array
+    {
+        $damaged = count(array_filter($rows, fn (array $row) => ($row['category'] ?? '') === 'damaged'));
 
-        $historyRowsByTab = [
-            'latest' => $latestRows,
-            'oldest' => array_values(array_reverse($latestRows)),
-            'damaged' => array_values(array_filter($latestRows, fn (array $row) => ($row['raw_status'] ?? '') === 'damaged')),
+        return [
+            'all' => count($rows),
+            'lending' => count($rows) - $damaged,
+            'damaged' => $damaged,
         ];
+    }
 
-        return view('dashboard-history', [
-            'historyRowsByTab' => $historyRowsByTab,
-        ]);
+    private function filterHistoryRows(array $rows, string $category, string $sort, ?string $from, ?string $to): array
+    {
+        $filtered = array_values(array_filter($rows, function (array $row) use ($category, $from, $to) {
+            if ($category !== 'all' && ($row['category'] ?? 'lending') !== $category) {
+                return false;
+            }
+
+            $date = (string) ($row['filter_date'] ?? '');
+            if (($from || $to) && $date === '') {
+                return false;
+            }
+
+            if ($from && $date < $from) {
+                return false;
+            }
+
+            if ($to && $date > $to) {
+                return false;
+            }
+
+            if ($from && $to && $from > $to) {
+                return false;
+            }
+
+            return true;
+        }));
+
+        usort($filtered, function (array $left, array $right) use ($sort) {
+            $comparison = ((int) ($left['sort_ts'] ?? 0)) <=> ((int) ($right['sort_ts'] ?? 0));
+
+            return $sort === 'oldest' ? $comparison : -$comparison;
+        });
+
+        return $filtered;
+    }
+
+    private function normalizeCategory(mixed $value): string
+    {
+        $category = strtolower(trim((string) $value));
+
+        return in_array($category, ['lending', 'damaged'], true) ? $category : 'all';
+    }
+
+    private function normalizeSort(mixed $value): string
+    {
+        return strtolower(trim((string) $value)) === 'oldest' ? 'oldest' : 'latest';
+    }
+
+    private function normalizeDate(mixed $value): ?string
+    {
+        $date = trim((string) $value);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('Y-m-d', $date)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function reportTitle(string $category, ?string $from, ?string $to): string
+    {
+        $title = $category === 'damaged' ? 'Damaged History' : 'Lending History';
+        if (!$from && !$to) {
+            return $title;
+        }
+
+        $fromLabel = $from ? Carbon::createFromFormat('Y-m-d', $from)->format('F j, Y') : 'the beginning';
+        $toLabel = $to ? Carbon::createFromFormat('Y-m-d', $to)->format('F j, Y') : 'today';
+
+        return $title . ' — ' . $fromLabel . ' to ' . $toLabel;
+    }
+
+    private function reportHtml(array $rows, string $title): string
+    {
+        $body = '';
+        foreach ($rows as $row) {
+            $body .= '<tr>'
+                . '<td>' . e($row['id'] ?? '') . '</td>'
+                . '<td>' . e($row['user'] ?? '') . '</td>'
+                . '<td>' . e($row['date'] ?? '') . '</td>'
+                . '<td>' . e($row['item'] ?? '') . '</td>'
+                . '<td>' . e($row['status'] ?? '') . '</td>'
+                . '</tr>';
+        }
+
+        if ($body === '') {
+            $body = '<tr><td colspan="5">No history records found.</td></tr>';
+        }
+
+        return '<h1>' . e($title) . '</h1>'
+            . '<p>' . count($rows) . ' record' . (count($rows) === 1 ? '' : 's') . '</p>'
+            . '<table border="1" cellpadding="6" cellspacing="0">'
+            . '<thead><tr><th>Lending ID</th><th>User Name</th><th>Date</th><th>Item Borrowed</th><th>Item Status</th></tr></thead>'
+            . '<tbody>' . $body . '</tbody></table>';
     }
 
     private function resolveActivityStartDate(Reservation $reservation): Carbon

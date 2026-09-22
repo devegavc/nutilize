@@ -9,7 +9,7 @@
   <title>NUtilize | History</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
 </head>
 <body>
   <script>
@@ -20,7 +20,8 @@
       full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
       role: '{{ auth()->user()->role ?? 'user' }}'
     };
-    window.historyRowsByTab = @json($historyRowsByTab ?? ['latest' => [], 'oldest' => [], 'damaged' => []]);
+    window.historyRows = @json($historyRows ?? []);
+    window.historyEmailEndpoint = @json(route('dashboard.history.email'));
   </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
@@ -44,28 +45,56 @@
 
       <section class="content-card history-content-card">
         <h1 class="section-title">LENDING HISTORY</h1>
+        <p class="history-print-range" id="history-print-range" hidden></p>
 
-        <section class="history-head-row">
-          <div>
-            <p><i class="bi bi-clock-history"></i> Lending Details</p>
-          </div>
+        <section class="stats-grid inventory-stats-grid history-summary-grid" aria-label="History summary">
+          <button class="stat-card inventory-stat-card history-summary-card is-active" type="button" data-history-category="all" aria-pressed="true">
+            <span class="stat-icon"><i class="bi bi-clock-history"></i></span>
+            <div>
+              <p class="stat-number">{{ $historyCounts['all'] ?? 0 }}</p>
+              <p class="stat-label">All</p>
+            </div>
+          </button>
+          <button class="stat-card inventory-stat-card history-summary-card" type="button" data-history-category="lending" aria-pressed="false">
+            <span class="stat-icon"><i class="bi bi-box-seam"></i></span>
+            <div>
+              <p class="stat-number">{{ $historyCounts['lending'] ?? 0 }}</p>
+              <p class="stat-label">Lending</p>
+            </div>
+          </button>
+          <button class="stat-card inventory-stat-card history-summary-card" type="button" data-history-category="damaged" aria-pressed="false">
+            <span class="stat-icon"><i class="bi bi-exclamation-triangle"></i></span>
+            <div>
+              <p class="stat-number">{{ $historyCounts['damaged'] ?? 0 }}</p>
+              <p class="stat-label">Damaged</p>
+            </div>
+          </button>
         </section>
 
-        <section class="history-filter-row">
-          <div class="history-tab-group">
-            <button class="history-tab active" type="button" data-history-tab="latest">Latest</button>
-            <button class="history-tab" type="button" data-history-tab="oldest">Oldest</button>
-            <button class="history-tab" type="button" data-history-tab="damaged">Damaged</button>
+        <section class="history-tools-row">
+          <div class="history-tools-filters">
+            <label class="history-field" for="history-sort">
+              Sort by
+              <select id="history-sort">
+                <option value="latest" selected>Latest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </label>
+            <label class="history-field" for="history-date-from">
+              From
+              <input id="history-date-from" type="date" />
+            </label>
+            <label class="history-field" for="history-date-to">
+              To
+              <input id="history-date-to" type="date" />
+            </label>
+            <button class="history-reset-btn" id="history-filter-reset" type="button">Reset</button>
           </div>
           <div class="history-head-actions">
-            <button class="history-print-btn" type="button" onclick="window.print()">
+            <button class="history-print-btn" id="history-print-btn" type="button">
               <i class="bi bi-printer-fill"></i> Print File
             </button>
-            <button
-              class="history-email-btn"
-              type="button"
-              onclick="window.location.href='mailto:?subject=NU-TILIZE%20Lending%20History&body=Please%20review%20the%20latest%20lending%20history%20report.'"
-            >
+            <button class="history-email-btn" id="history-email-btn" type="button">
               <i class="bi bi-envelope-fill"></i> Send to Email
             </button>
           </div>
@@ -99,7 +128,7 @@
     </section>
   </main>
 
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
 </html>
 

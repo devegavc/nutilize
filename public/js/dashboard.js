@@ -889,7 +889,8 @@ window.showAppConfirm = showAppConfirm;
 
 let activeFacilitiesTab = 'all';
 let activeEquipmentTab = 'all';
-let activeHistoryTab = 'latest';
+let activeHistoryCategory = 'all';
+let activeHistorySort = 'latest';
 let activeMaintenanceTab = 'maintenance';
 let activeEditingRow = null;
 let activeEquipmentEditingRow = null;
@@ -1755,24 +1756,171 @@ const fallbackHistoryRowsByTab = {
   ],
 };
 
-const historyRowsByTab = (window.historyRowsByTab && typeof window.historyRowsByTab === 'object')
-  ? {
-    latest: Array.isArray(window.historyRowsByTab.latest) ? window.historyRowsByTab.latest : [],
-    oldest: Array.isArray(window.historyRowsByTab.oldest) ? window.historyRowsByTab.oldest : [],
-    damaged: Array.isArray(window.historyRowsByTab.damaged) ? window.historyRowsByTab.damaged : [],
+function escapeHistoryText(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function getHistoryRecords() {
+  if (Array.isArray(window.historyRows)) {
+    return window.historyRows;
   }
-  : fallbackHistoryRowsByTab;
+
+  if (window.historyRowsByTab && Array.isArray(window.historyRowsByTab.latest)) {
+    return window.historyRowsByTab.latest;
+  }
+
+  return fallbackHistoryRowsByTab.latest.concat(fallbackHistoryRowsByTab.damaged);
+}
+
+function historyRecordCategory(row) {
+  if (row && (row.category === 'lending' || row.category === 'damaged')) {
+    return row.category;
+  }
+
+  return String(row?.raw_status || row?.status || '').toLowerCase() === 'damaged' ? 'damaged' : 'lending';
+}
+
+function historyRecordDate(row) {
+  const explicit = String(row?.filter_date || '');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(explicit)) {
+    return explicit;
+  }
+
+  const displayed = String(row?.date || '');
+  const match = displayed.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s*$/);
+  if (!match) {
+    return '';
+  }
+
+  const month = match[1].padStart(2, '0');
+  const day = match[2].padStart(2, '0');
+
+  return `${match[3]}-${month}-${day}`;
+}
+
+function formatHistoryDateLabel(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return '';
+  }
+
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+
+  return date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function historyReportTitle(from, to) {
+  const title = activeHistoryCategory === 'damaged' ? 'Damaged History' : 'Lending History';
+  const fromLabel = formatHistoryDateLabel(from);
+  const toLabel = formatHistoryDateLabel(to);
+
+  if (fromLabel && toLabel) {
+    return `${title} — ${fromLabel} to ${toLabel}`;
+  }
+
+  if (fromLabel) {
+    return `${title} — From ${fromLabel}`;
+  }
+
+  if (toLabel) {
+    return `${title} — Through ${toLabel}`;
+  }
+
+  return title;
+}
+
+function syncHistoryPrintHeader(from, to) {
+  const printRange = document.getElementById('history-print-range');
+  if (!(printRange instanceof HTMLElement)) {
+    return;
+  }
+
+  if (!from && !to) {
+    printRange.hidden = true;
+    printRange.textContent = '';
+    return;
+  }
+
+  printRange.hidden = false;
+  printRange.textContent = historyReportTitle(from, to);
+}
+
+function getVisibleHistoryRows() {
+  const fromInput = document.getElementById('history-date-from');
+  const toInput = document.getElementById('history-date-to');
+  const from = fromInput instanceof HTMLInputElement ? fromInput.value : '';
+  const to = toInput instanceof HTMLInputElement ? toInput.value : '';
+  const term = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  const filtered = getHistoryRecords().filter((row) => {
+    if (activeHistoryCategory !== 'all' && historyRecordCategory(row) !== activeHistoryCategory) {
+      return false;
+    }
+
+    const date = historyRecordDate(row);
+    if ((from || to) && !date) {
+      return false;
+    }
+
+    if (from && to && from > to) {
+      return false;
+    }
+
+    if (from && date < from) {
+      return false;
+    }
+
+    if (to && date > to) {
+      return false;
+    }
+
+    if (term) {
+      const haystack = `${row.id || ''} ${row.user || ''} ${row.date || ''} ${row.item || ''} ${row.status || ''}`.toLowerCase();
+      if (!haystack.includes(term)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  filtered.sort((left, right) => {
+    const leftTime = Number(left.sort_ts) || Date.parse(historyRecordDate(left)) || 0;
+    const rightTime = Number(right.sort_ts) || Date.parse(historyRecordDate(right)) || 0;
+    const comparison = leftTime - rightTime;
+
+    return activeHistorySort === 'oldest' ? comparison : -comparison;
+  });
+
+  return filtered;
+}
 
 function applyHistoryFilters() {
   if (!historyTableBody) {
     return;
   }
 
-  const rows = historyRowsByTab[activeHistoryTab] || historyRowsByTab.latest;
-  const term = searchInput ? searchInput.value.trim().toLowerCase() : '';
-  const filteredRows = term
-    ? rows.filter((row) => Object.values(row).join(' ').toLowerCase().includes(term))
-    : rows;
+  const fromInput = document.getElementById('history-date-from');
+  const toInput = document.getElementById('history-date-to');
+  const from = fromInput instanceof HTMLInputElement ? fromInput.value : '';
+  const to = toInput instanceof HTMLInputElement ? toInput.value : '';
+  const filteredRows = getVisibleHistoryRows();
+
+  syncHistoryPrintHeader(from, to);
+
+  document.querySelectorAll('[data-history-category]').forEach((card) => {
+    const isActive = card.dataset.historyCategory === activeHistoryCategory;
+    card.classList.toggle('is-active', isActive);
+    card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
 
   if (!filteredRows.length) {
     historyTableBody.removeAttribute('aria-busy');
@@ -1797,20 +1945,76 @@ function applyHistoryFilters() {
             : '';
 
       const statusMarkup = statusBadgeClass
-        ? `<span class="maintenance-status ${statusBadgeClass}">${row.status}</span>`
-        : row.status;
+        ? `<span class="maintenance-status ${statusBadgeClass}">${escapeHistoryText(row.status)}</span>`
+        : escapeHistoryText(row.status);
 
       return `
       <tr>
-        <td>${row.id}</td>
-        <td>${row.user}</td>
-        <td>${row.date}</td>
-        <td>${row.item}</td>
+        <td>${escapeHistoryText(row.id)}</td>
+        <td>${escapeHistoryText(row.user)}</td>
+        <td>${escapeHistoryText(row.date)}</td>
+        <td>${escapeHistoryText(row.item)}</td>
         <td>${statusMarkup}</td>
       </tr>
     `;
     })
     .join('');
+}
+
+async function sendHistoryReport() {
+  const button = document.getElementById('history-email-btn');
+  if (!(button instanceof HTMLButtonElement) || button.dataset.sending === '1') {
+    return;
+  }
+
+  const endpoint = typeof window.historyEmailEndpoint === 'string' ? window.historyEmailEndpoint : '';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  const fromInput = document.getElementById('history-date-from');
+  const toInput = document.getElementById('history-date-to');
+
+  if (!endpoint || !csrfToken) {
+    showAppNotice('Failed to send history report. Please try again.');
+    return;
+  }
+
+  const originalMarkup = button.innerHTML;
+  button.dataset.sending = '1';
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  button.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending...';
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-CSRF-TOKEN': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({
+        category: activeHistoryCategory,
+        sort: activeHistorySort,
+        from: fromInput instanceof HTMLInputElement ? fromInput.value : '',
+        to: toInput instanceof HTMLInputElement ? toInput.value : '',
+      }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+      showAppNotice(data.message || 'Failed to send history report. Please try again.');
+      return;
+    }
+
+    showAppNotice(data.message || 'History report sent successfully.');
+  } catch (error) {
+    showAppNotice('Failed to send history report. Please try again.');
+  } finally {
+    button.dataset.sending = '0';
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+    button.innerHTML = originalMarkup;
+  }
 }
 
 function getMaintenanceTable() {
@@ -6243,7 +6447,7 @@ if (searchInput && (reportTableBody || inventoryTableBody || historyTableBody ||
       return;
     }
 
-    if (historyTableBody && historyTabs.length) {
+    if (historyTableBody) {
       applyHistoryFilters();
       return;
     }
@@ -6259,18 +6463,64 @@ if (searchInput && (reportTableBody || inventoryTableBody || historyTableBody ||
   });
 }
 
-if (historyTableBody && historyTabs.length) {
-  historyTabs.forEach((tabButton) => {
-    tabButton.addEventListener('click', () => {
-      activeHistoryTab = tabButton.dataset.historyTab || 'latest';
-
-      historyTabs.forEach((button) => {
-        button.classList.toggle('active', button === tabButton);
-      });
-
+if (historyTableBody) {
+  document.querySelectorAll('[data-history-category]').forEach((card) => {
+    card.addEventListener('click', () => {
+      const category = card.dataset.historyCategory || 'all';
+      activeHistoryCategory = category === 'lending' || category === 'damaged' ? category : 'all';
       applyHistoryFilters();
     });
   });
+
+  const historySort = document.getElementById('history-sort');
+  const historyDateFrom = document.getElementById('history-date-from');
+  const historyDateTo = document.getElementById('history-date-to');
+  const historyReset = document.getElementById('history-filter-reset');
+  const historyPrint = document.getElementById('history-print-btn');
+  const historyEmail = document.getElementById('history-email-btn');
+
+  if (historySort instanceof HTMLSelectElement) {
+    historySort.addEventListener('change', () => {
+      activeHistorySort = historySort.value === 'oldest' ? 'oldest' : 'latest';
+      applyHistoryFilters();
+    });
+  }
+
+  [historyDateFrom, historyDateTo].forEach((input) => {
+    if (input instanceof HTMLInputElement) {
+      input.addEventListener('change', applyHistoryFilters);
+    }
+  });
+
+  if (historyReset instanceof HTMLButtonElement) {
+    historyReset.addEventListener('click', () => {
+      activeHistoryCategory = 'all';
+      activeHistorySort = 'latest';
+      if (historySort instanceof HTMLSelectElement) {
+        historySort.value = 'latest';
+      }
+      if (historyDateFrom instanceof HTMLInputElement) {
+        historyDateFrom.value = '';
+      }
+      if (historyDateTo instanceof HTMLInputElement) {
+        historyDateTo.value = '';
+      }
+      applyHistoryFilters();
+    });
+  }
+
+  if (historyPrint instanceof HTMLButtonElement) {
+    historyPrint.addEventListener('click', () => {
+      applyHistoryFilters();
+      window.print();
+    });
+  }
+
+  if (historyEmail instanceof HTMLButtonElement) {
+    historyEmail.addEventListener('click', () => {
+      sendHistoryReport();
+    });
+  }
 
   applyHistoryFilters();
 }

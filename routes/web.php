@@ -109,6 +109,7 @@ Route::middleware('auth')->group(function () {
         });
 
         Route::get('/history', [DashboardHistoryController::class, 'index'])->name('dashboard.history');
+        Route::post('/history/email', [DashboardHistoryController::class, 'sendReport'])->name('dashboard.history.email');
         Route::get('/profile', [ProfileController::class, 'show'])->name('dashboard.profile');
         Route::get('/request', [DashboardRequestController::class, 'index'])->name('dashboard.request');
         Route::get('/request/list', [DashboardRequestController::class, 'requestList'])->name('dashboard.request.list');
