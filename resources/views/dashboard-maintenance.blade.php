@@ -45,27 +45,17 @@
         <h1 class="section-title">MAINTENANCE DASHBOARD</h1>
 
         <section class="maintenance-filter-row">
-          <div class="maintenance-toolbar-group">
-            <span class="history-category-label" id="maintenance-category-label">Category</span>
-            <div class="maintenance-tab-group pf-maintenance-tabs" role="tablist" aria-labelledby="maintenance-category-label">
-              <button class="maintenance-tab is-active active" type="button" role="tab" data-maintenance-tab="all" aria-pressed="true">All</button>
-              <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="maintenance" aria-pressed="false">Maintenance</button>
-              <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="damaged" aria-pressed="false">Damaged</button>
-              <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="reported" aria-pressed="false">Reported</button>
-              <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="addressed" aria-pressed="false">Addressed</button>
-            </div>
+          <div class="maintenance-tab-group pf-maintenance-tabs" role="tablist" aria-label="Maintenance status">
+            <button class="maintenance-tab is-active active" type="button" role="tab" data-maintenance-tab="all" aria-pressed="true">All</button>
+            <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="maintenance" aria-pressed="false">Maintenance</button>
+            <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="damaged" aria-pressed="false">Damaged</button>
+            <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="reported" aria-pressed="false">Reported</button>
+            <button class="maintenance-tab" type="button" role="tab" data-maintenance-tab="addressed" aria-pressed="false">Addressed</button>
           </div>
 
           <div class="maintenance-head-actions">
-            <button class="maintenance-print-btn" type="button" onclick="window.print()">
-              <i class="bi bi-printer-fill"></i> Print File
-            </button>
-            <button
-              class="maintenance-email-btn"
-              type="button"
-              onclick="window.location.href='mailto:?subject=NUtilize%20Maintenance%20Report&body=Please%20review%20the%20attached%20maintenance%20and%20damage%20report.'"
-            >
-              <i class="bi bi-envelope-fill"></i> Send to Email
+            <button class="history-copy-btn" id="maintenance-copy-btn" type="button">
+              <i class="bi bi-share"></i> Send a Copy
             </button>
           </div>
         </section>
@@ -172,6 +162,33 @@
       </div>
     </article>
   </section>
+
+  <div class="history-copy-modal" id="maintenance-copy-modal" aria-hidden="true">
+    <div class="history-copy-overlay" data-close-maintenance-copy="true"></div>
+    <article class="history-copy-card maintenance-copy-card" role="dialog" aria-modal="true" aria-labelledby="maintenance-copy-title">
+      <header class="history-copy-head">
+        <h2 id="maintenance-copy-title">Send a Copy</h2>
+        <p>Choose how you want to receive the current maintenance report.</p>
+      </header>
+      <div class="history-copy-options">
+        <button class="history-copy-option" id="maintenance-copy-print" type="button">
+          <span class="history-copy-option-icon"><i class="bi bi-printer-fill"></i></span>
+          <span class="history-copy-option-copy">
+            <strong>Print File</strong>
+          </span>
+        </button>
+        <button class="history-copy-option" id="maintenance-copy-email" type="button">
+          <span class="history-copy-option-icon"><i class="bi bi-envelope-fill"></i></span>
+          <span class="history-copy-option-copy">
+            <strong>Send to Email</strong>
+          </span>
+        </button>
+      </div>
+      <footer class="history-copy-foot">
+        <button class="history-copy-cancel" id="maintenance-copy-cancel" type="button">Cancel</button>
+      </footer>
+    </article>
+  </div>
 
   <script>
     window.maintenanceRowsByTab = @json($maintenanceRowsByTab ?? ['maintenance' => [], 'damaged' => [], 'reported' => []]);

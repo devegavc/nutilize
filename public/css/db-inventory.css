@@ -4439,12 +4439,14 @@ body.insight-filtering .insight-kpi:not(.is-active) {
   padding-top: 14px;
 }
 
-.pf-maintenance-page .maintenance-toolbar-group {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  min-width: 0;
+.pf-maintenance-page .maintenance-head-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.maintenance-copy-card .history-copy-head h2 {
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .pf-maintenance-page .pf-maintenance-tabs {
@@ -5105,6 +5107,7 @@ body.insight-filtering .insight-kpi:not(.is-active) {
   #navbar-container,
   .history-head-actions,
   .history-copy-modal,
+  .maintenance-copy-modal,
   .maintenance-head-actions,
   .history-filter-row,
   .history-summary-grid,

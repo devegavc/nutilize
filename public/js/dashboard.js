@@ -6668,6 +6668,57 @@ if (historyTableBody) {
   applyHistoryFilters();
 }
 
+const maintenanceCopyButton = document.getElementById('maintenance-copy-btn');
+const maintenanceCopyModal = document.getElementById('maintenance-copy-modal');
+
+if (maintenanceCopyButton instanceof HTMLButtonElement && maintenanceCopyModal instanceof HTMLElement) {
+  const openMaintenanceCopyModal = () => {
+    maintenanceCopyModal.classList.add('is-open');
+    maintenanceCopyModal.setAttribute('aria-hidden', 'false');
+  };
+
+  const closeMaintenanceCopyModal = () => {
+    maintenanceCopyModal.classList.remove('is-open');
+    maintenanceCopyModal.setAttribute('aria-hidden', 'true');
+  };
+
+  maintenanceCopyButton.addEventListener('click', openMaintenanceCopyModal);
+
+  const maintenanceCopyCancel = document.getElementById('maintenance-copy-cancel');
+  if (maintenanceCopyCancel instanceof HTMLButtonElement) {
+    maintenanceCopyCancel.addEventListener('click', closeMaintenanceCopyModal);
+  }
+
+  maintenanceCopyModal.addEventListener('click', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.dataset.closeMaintenanceCopy === 'true') {
+      closeMaintenanceCopyModal();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && maintenanceCopyModal.classList.contains('is-open')) {
+      closeMaintenanceCopyModal();
+    }
+  });
+
+  const maintenanceCopyPrint = document.getElementById('maintenance-copy-print');
+  if (maintenanceCopyPrint instanceof HTMLButtonElement) {
+    maintenanceCopyPrint.addEventListener('click', () => {
+      closeMaintenanceCopyModal();
+      window.print();
+    });
+  }
+
+  const maintenanceCopyEmail = document.getElementById('maintenance-copy-email');
+  if (maintenanceCopyEmail instanceof HTMLButtonElement) {
+    maintenanceCopyEmail.addEventListener('click', () => {
+      closeMaintenanceCopyModal();
+      window.location.href = 'mailto:?subject=NUtilize%20Maintenance%20Report&body=Please%20review%20the%20attached%20maintenance%20and%20damage%20report.';
+    });
+  }
+}
+
 if (maintenanceTableBody && maintenanceTabs.length) {
   maintenanceTabs.forEach((tabButton) => {
     tabButton.addEventListener('click', () => {
