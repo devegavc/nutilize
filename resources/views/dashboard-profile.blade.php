@@ -25,16 +25,6 @@
     }
 
     $middleInitial = $authUser->middle_initial ?? '';
-    $suffix = trim((string) ($authUser->suffix ?? ''));
-    $displayName = trim(implode(' ', array_filter([
-        $firstName,
-        $middleInitial !== '' ? $middleInitial : '',
-        $lastName,
-        $suffix,
-    ], fn ($part) => $part !== '')));
-    if ($displayName === '') {
-        $displayName = $fullName !== '' ? $fullName : 'User';
-    }
     $shouldSelectProgram = method_exists($authUser, 'shouldSelectProgram') && $authUser->shouldSelectProgram();
     $programName = $authUser->academicProgram?->name ?? 'Not Set';
 
@@ -85,21 +75,16 @@
       @include('partials.dashboard-navbar')
 
       <section class="content-card profile-content-card">
-        <section class="profile-top-card">
-          <div class="profile-header-identity">
-            <div class="profile-avatar" id="profile-avatar" aria-hidden="true">
-              <img id="profile-avatar-image" class="profile-avatar-image" alt="Profile avatar" />
-              <i class="bi bi-person-fill profile-avatar-icon"></i>
-            </div>
-            <p class="profile-header-name" id="profile-display-name">{{ $displayName }}</p>
-          </div>
-
-          <div class="profile-header-copy">
-            <h1>Profile</h1>
-            <p>Manage your administrator account</p>
-          </div>
-
+        <header class="profile-page-header">
+          <h1 class="section-title">Profile</h1>
           <button class="profile-edit-btn" type="button">Edit Profile</button>
+        </header>
+
+        <section class="profile-photo-card" aria-label="Profile photo">
+          <div class="profile-avatar" id="profile-avatar" aria-hidden="true">
+            <img id="profile-avatar-image" class="profile-avatar-image" alt="Profile avatar" />
+            <i class="bi bi-person-fill profile-avatar-icon"></i>
+          </div>
         </section>
 
         <section class="profile-grid">
@@ -242,7 +227,7 @@
     </article>
   </section>
 
-  <script src="/js/dashboard.js"></script>
+  <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
 </html>
 

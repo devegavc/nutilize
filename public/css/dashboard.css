@@ -468,6 +468,22 @@ body {
   color: #f4b70a;
 }
 
+.profile-btn .profile-btn-photo {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: none;
+}
+
+.profile-btn.has-photo .profile-btn-photo {
+  display: block;
+}
+
+.profile-btn.has-photo > i {
+  display: none;
+}
+
 .profile-popover {
   position: fixed;
   min-width: 220px;
