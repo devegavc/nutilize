@@ -392,28 +392,6 @@
   color: #1c2c6d;
 }
 
-.request-content-card.pending-mode .request-item.pending-only .status-dots {
-  display: none;
-}
-
-.request-content-card.pending-mode .request-item.pending-only .request-progress-block {
-  display: block;
-}
-
-.request-content-card.pending-mode .request-item.pending-only .request-progress-block .request-block-title {
-  display: block;
-}
-
-.request-content-card.pending-mode .request-item.pending-only .status-timeline {
-  display: grid;
-  grid-template-columns: repeat(var(--timeline-steps), minmax(0, 1fr));
-  position: static;
-  margin: 0;
-  width: 100%;
-  max-width: 940px;
-  transform: none;
-}
-
 .request-owner,
 .request-email,
 .request-phone {
@@ -1029,8 +1007,7 @@
     scrollbar-width: thin;
   }
 
-  .request-item.is-selected .status-timeline,
-  .request-content-card.pending-mode .request-item.pending-only .status-timeline {
+  .request-item.is-selected .status-timeline {
     grid-template-columns: repeat(var(--timeline-steps), minmax(68px, 1fr));
   }
 
