@@ -1190,6 +1190,22 @@ function escapeReservationDetailsHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function highlightReportedItemNames(escapedDescription) {
+  return String(escapedDescription || '').replace(
+    /(Reported items?:\s*)(.+)/gi,
+    (_, label, items) => {
+      const highlightedItems = items
+        .split(/\s*,\s*/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .map((item) => `<span class="quick-report-item-name">${item}</span>`)
+        .join(', ');
+
+      return highlightedItems ? `${label}${highlightedItems}` : `${label}${items}`;
+    }
+  );
+}
+
 function closeQuickReportDetailsModal() {
   document.querySelectorAll('.quick-report-details-modal').forEach((modal) => modal.remove());
 }
@@ -1212,7 +1228,9 @@ function showQuickReportDetailsModal(report) {
   const statusLabel = escapeReservationDetailsHtml(report.status_label || 'Pending');
   const statusClass = String(report.status_class || 'pending').toLowerCase().replace(/[^a-z0-9_-]/g, '-');
   const reportedAt = escapeReservationDetailsHtml(report.reported_at || 'N/A');
-  const description = escapeReservationDetailsHtml(report.description || 'No additional description provided.');
+  const description = highlightReportedItemNames(
+    escapeReservationDetailsHtml(report.description || 'No additional description provided.')
+  );
   const activityName = escapeReservationDetailsHtml(report.activity_name || '—');
   const reservationCode = escapeReservationDetailsHtml(report.reservation_code || '—');
   const imageUrl = String(report.image_url || '').trim();

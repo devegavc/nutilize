@@ -103,7 +103,7 @@ body:has(.home-dashboard-card) .home-dashboard-card {
 }
 
 .quick-view-header {
-  background: linear-gradient(90deg, #a3221c 0%, #c2473f 100%);
+  background: linear-gradient(90deg, #f0ab06 0%, #f6c141 100%);
   color: var(--white);
   font-weight: 700;
   padding: 12px 18px;
@@ -111,10 +111,6 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.quick-view-header i {
-  color: #ffffff;
 }
 
 .quick-view .table-wrap {
@@ -468,6 +464,11 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   color: #1f2937;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.quick-report-item-name {
+  color: #a3221c;
+  font-weight: 600;
 }
 
 .quick-report-details-footer {
