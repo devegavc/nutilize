@@ -63,7 +63,6 @@
                 <i class="bi bi-chevron-left"></i>
               </button>
               <div class="schedule-month-heading">
-                <p class="schedule-calendar-kicker">Monthly schedule</p>
                 <h1>
                   <button
                     class="calendar-month-title"
@@ -113,7 +112,7 @@
 
               <div class="schedule-legend" aria-label="Calendar legend">
                 <span class="schedule-legend-item">
-                  <span class="schedule-legend-chip is-reservation" aria-hidden="true">3</span>
+                  <span class="schedule-legend-chip is-reservation" aria-hidden="true"></span>
                   Bookings
                 </span>
                 <span class="schedule-legend-item">
@@ -182,7 +181,7 @@
                 <span>Selected Date Details</span>
               </div>
               <div class="schedule-inline-date-summary">
-                <div class="schedule-inline-date-heading" id="schedule-inline-date">Select a highlighted date to see approved requests and details below.</div>
+                <div class="schedule-inline-date-heading" id="schedule-inline-date"></div>
                 <div class="schedule-inline-date-stats" id="schedule-inline-date-stats" hidden>
                   <span class="schedule-inline-date-stat" id="schedule-inline-stat-reservations">0 Reservations</span>
                   <span class="schedule-inline-date-stat" id="schedule-inline-stat-resources">0 Resources</span>
@@ -190,7 +189,10 @@
                 </div>
               </div>
               <div class="schedule-inline-request-list" id="schedule-inline-request-body">
-                <div class="schedule-inline-empty">No date selected yet.</div>
+                <div class="schedule-inline-empty">
+                  <i class="bi bi-calendar3" aria-hidden="true"></i>
+                  <span>No date selected yet.</span>
+                </div>
               </div>
             </div>
 

@@ -2342,8 +2342,7 @@ function openScheduleInlineDetails(day) {
     scheduleInlineRequestBody.innerHTML = `
       <div class="schedule-inline-empty">
         <i class="bi bi-calendar-x" aria-hidden="true"></i>
-        <strong>No reservations</strong>
-        <span>Nothing fully approved for this date.</span>
+        <span>No reservations for this date.</span>
       </div>
     `;
 
@@ -2366,8 +2365,6 @@ function openScheduleInlineDetails(day) {
     .map((request, index) => {
       const code = escapeReservationDetailsHtml(request.reservation_code || '-');
       const requester = escapeReservationDetailsHtml(request.requester_name || 'Unknown requester');
-      const activity = escapeReservationDetailsHtml(request.activity_name || 'Activity');
-      const resources = escapeReservationDetailsHtml(request.resource_summary || 'No resources');
       const status = escapeReservationDetailsHtml(request.status_label || 'Approved');
       const activeClass = index === 0 ? ' is-active' : '';
 
@@ -2378,8 +2375,6 @@ function openScheduleInlineDetails(day) {
             <span class="schedule-inline-request-status">${status}</span>
           </div>
           <div class="schedule-inline-request-requester" title="${requester}">${requester}</div>
-          <div class="schedule-inline-request-activity">${activity}</div>
-          <div class="schedule-inline-request-resources">${resources}</div>
         </button>
       `;
     })
