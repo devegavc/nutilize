@@ -169,16 +169,16 @@
   align-items: center;
   gap: 12px;
   padding: 10px 18px 8px;
-  background: linear-gradient(90deg, var(--blue-deep) 0%, var(--blue) 100%);
-  color: var(--white);
+  background: linear-gradient(90deg, #f4b70a 0%, #f6c53a 100%);
+  color: var(--blue-deep);
 }
 
 .inventory-dashboard-card .most-requested-section .inventory-grid-head h2 {
-  color: var(--white);
+  color: var(--blue-deep);
 }
 
 .inventory-dashboard-card .most-requested-section .inventory-grid-head h2 i {
-  color: var(--yellow);
+  color: var(--blue-deep);
 }
 
 .inventory-dashboard-card .most-requested-section .inventory-grid-head-copy {
@@ -187,21 +187,21 @@
 
 .inventory-dashboard-card .most-requested-section .inventory-grid-sub {
   margin: 2px 0 0 2rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: #2f3f88;
   font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.3;
 }
 
 .inventory-dashboard-card .most-requested-section .inventory-grid-head button {
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--white);
+  border: 1px solid var(--blue-deep);
+  background: rgba(36, 50, 116, 0.1);
+  color: var(--blue-deep);
 }
 
 .inventory-dashboard-card .most-requested-section .inventory-grid-head button:hover {
-  background: rgba(255, 255, 255, 0.24);
-  color: var(--white);
+  background: rgba(36, 50, 116, 0.18);
+  color: var(--blue-deep);
 }
 
 .inventory-dashboard-card .most-requested-section .table-wrap {
