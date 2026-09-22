@@ -9,7 +9,7 @@
   <title>NUtilize | Requests</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-requests.css" />
+  <link rel="stylesheet" href="/css/db-requests.css?v={{ filemtime(public_path('css/db-requests.css')) }}" />
 </head>
 <body>
   <script>
@@ -51,7 +51,7 @@
           <div class="request-tabs" role="tablist" aria-label="Request status">
             <button class="request-tab active" type="button" data-request-tab="final">Final Approval</button>
             <button class="request-tab" type="button" data-request-tab="return">Waiting Return</button>
-            <button class="request-tab" type="button" data-request-tab="rejected">Rejected</button>
+            <button class="request-tab" type="button" data-request-tab="rejected">Returned for Revision</button>
             <button class="request-tab" type="button" data-request-tab="pending">Pending</button>
           </div>
           <div class="request-date-row">

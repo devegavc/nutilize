@@ -127,6 +127,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
+  row-gap: 10px;
   align-items: start;
   cursor: pointer;
   position: relative;
@@ -140,14 +141,24 @@
 }
 
 .request-item.is-selected {
-  grid-template-columns: minmax(0, 1fr) 46%;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.92fr);
+  column-gap: 24px;
+  row-gap: 14px;
+  align-items: stretch;
   border-color: #aebce9;
   box-shadow: 0 16px 24px rgba(28, 41, 96, 0.23);
-  padding-top: 136px;
 }
 
 .request-main-col {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.request-item > .request-row-title {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
 }
 
 .request-row-title {
@@ -157,6 +168,32 @@
   flex-wrap: wrap;
   font-size: 1.02rem;
   margin-bottom: 8px;
+}
+
+.request-block-title {
+  display: none;
+  margin: 0 0 8px;
+  color: #18285f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.request-item.is-selected .request-block-title {
+  display: block;
+}
+
+.request-progress-block {
+  display: none;
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #d2d9ef;
+}
+
+.request-item.is-selected .request-progress-block {
+  display: block;
 }
 
 .request-row-title strong {
@@ -251,12 +288,11 @@
 .request-item.is-selected .status-timeline {
   display: grid;
   grid-template-columns: repeat(var(--timeline-steps), minmax(88px, 1fr));
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(98%, 940px);
-  z-index: 2;
+  position: static;
+  transform: none;
+  width: 100%;
+  max-width: 940px;
+  margin: 0 auto;
   gap: 4px;
 }
 
@@ -347,7 +383,7 @@
 }
 
 .request-current-stage {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   color: #4b5677;
   font-size: 0.88rem;
 }
@@ -360,24 +396,72 @@
   display: none;
 }
 
+.request-content-card.pending-mode .request-item.pending-only .request-progress-block {
+  display: block;
+}
+
+.request-content-card.pending-mode .request-item.pending-only .request-progress-block .request-block-title {
+  display: block;
+}
+
 .request-content-card.pending-mode .request-item.pending-only .status-timeline {
   display: grid;
   grid-template-columns: repeat(var(--timeline-steps), minmax(0, 1fr));
-  position: relative;
-  margin: 10px 0 4px;
+  position: static;
+  margin: 0;
   width: 100%;
+  max-width: 940px;
   transform: none;
-  left: auto;
-  top: auto;
-  z-index: 1;
 }
 
 .request-owner,
+.request-email,
 .request-phone {
   margin: 0;
   color: #6e789b;
   font-size: 0.95rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.request-email {
+  display: none;
+}
+
+.request-item.is-selected .request-email {
+  display: block;
+}
+
+.request-remarks {
+  display: none;
+  grid-column: 1 / -1;
+  border: 1px solid #f0d79a;
+  border-left: 4px solid #f4b70a;
+  border-radius: 10px;
+  background: #fffaec;
+  padding: 12px 16px;
+}
+
+.request-item.is-selected .request-remarks {
+  display: block;
+}
+
+.request-remarks-title {
+  display: block;
+  margin: 0 0 6px;
+  color: #8a5a06;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.request-remarks-text {
+  margin: 0;
+  color: #31417b;
+  font-size: 0.94rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .request-event-row {
@@ -415,10 +499,12 @@
 .request-resource-col {
   display: none;
   border-left: 1px solid #d2d9ef;
-  padding-left: 14px;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
-  gap: 8px 14px;
+  padding-left: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-content: start;
   align-items: start;
+  min-width: 0;
 }
 
 .request-item.is-selected .request-resource-col {
@@ -428,39 +514,41 @@
 .request-resource-col h3 {
   margin: 0;
   grid-column: 1 / -1;
-  color: #18285f;
-  font-size: 1rem;
 }
 
 .resource-grid {
   display: grid;
-  grid-column: 1;
-  grid-template-columns: repeat(2, minmax(110px, 1fr));
-  gap: 6px 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px 18px;
   color: #5d688d;
   font-size: 0.92rem;
   min-width: 0;
 }
 
 .resource-grid span {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 6px;
+  min-width: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .resource-grid i {
   color: #1e2f73;
+  flex-shrink: 0;
+  line-height: 1.35;
 }
 
 .request-action-stack {
   display: none;
-  grid-column: 2;
+  grid-column: 1 / -1;
   flex-direction: column;
   gap: 8px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: 86px;
   justify-content: center;
   justify-self: stretch;
 }
@@ -540,12 +628,11 @@
 
 .request-decision {
   display: none;
-  grid-column: 2;
+  grid-column: 1 / -1;
   text-align: center;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: 86px;
   gap: 6px;
   padding: 0 4px;
   box-sizing: border-box;
@@ -865,6 +952,21 @@
   display: none;
 }
 
+@media (max-width: 1440px) {
+  .request-item.is-selected {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.85fr);
+    column-gap: 18px;
+  }
+
+  .request-resource-col {
+    padding-left: 16px;
+  }
+
+  .resource-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
 @media (max-width: 1100px) {
   .request-head {
     padding: 12px 16px 8px;
@@ -879,16 +981,17 @@
   }
 
   .request-item,
-  .request-item.detailed {
-    grid-template-columns: 1fr;
+  .request-item.detailed,
+  .request-item.is-selected {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .request-resource-col {
     border-left: 0;
     border-top: 1px solid #d2d9ef;
     padding-left: 0;
-    padding-top: 10px;
-    grid-template-columns: 1fr;
+    padding-top: 12px;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .request-action-stack,
@@ -919,6 +1022,34 @@
 
   .request-item {
     padding: 12px;
+  }
+
+  .request-progress-block {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .request-item.is-selected .status-timeline,
+  .request-content-card.pending-mode .request-item.pending-only .status-timeline {
+    grid-template-columns: repeat(var(--timeline-steps), minmax(68px, 1fr));
+  }
+
+  .status-step-node {
+    width: 36px;
+    height: 36px;
+    border-width: 3px;
+  }
+
+  .status-step:not(:last-child)::after {
+    top: 18px;
+  }
+
+  .status-step-label {
+    font-size: 0.72rem;
+  }
+
+  .request-remarks {
+    padding: 10px 12px;
   }
 
   .request-head h1 {

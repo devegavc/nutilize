@@ -2475,14 +2475,16 @@ function applyScheduleCategory(category) {
   }
 }
 
-function applyRequestDecision(item, status) {
+function applyRequestDecision(item, status, options = {}) {
   const decisionName = item.querySelector('.request-decision-name');
   const decisionText = item.querySelector('.request-decision-text');
   const decisionBadge = item.querySelector('.request-decision-badge');
   const requesterName = item.dataset.requester || 'Mr. Minesis';
   const isApproved = status === 'approved';
+  const badgeLabel = options.badgeLabel || (isApproved ? 'Approved' : 'Returned for Revision');
+  const outcomeText = options.outcomeText || badgeLabel.toLowerCase();
   const possessive = requesterName.toLowerCase().endsWith('s') ? `${requesterName}'` : `${requesterName}'s`;
-  const decisionSentence = `${possessive} request has been ${isApproved ? 'approved' : 'rejected'}`;
+  const decisionSentence = `${possessive} request has been ${outcomeText}`;
 
   item.classList.remove('is-approved', 'is-rejected');
   item.classList.add(isApproved ? 'is-approved' : 'is-rejected');
@@ -2496,7 +2498,7 @@ function applyRequestDecision(item, status) {
   }
 
   if (decisionBadge) {
-    decisionBadge.textContent = isApproved ? 'Approved' : 'Rejected';
+    decisionBadge.textContent = badgeLabel;
   }
 }
 
@@ -2575,9 +2577,9 @@ function getRequestDecisionConfirmConfig(status) {
       };
     case 'rejected':
       return {
-        title: 'Confirm Rejection',
-        message: 'Are you sure you want to reject this reservation request? This action cannot be undone.',
-        confirmText: 'Reject',
+        title: 'Confirm Return for Revision',
+        message: 'Are you sure you want to return this reservation request for revision? This action cannot be undone.',
+        confirmText: 'Return for Revision',
         variant: 'danger',
       };
     case 'returned':
@@ -2857,7 +2859,7 @@ async function submitRequestDecision(item, button, status) {
 
     applyRequestDecision(item, status);
     showRequestDecisionToast(
-      status === 'approved' ? 'Request approved successfully.' : 'Request rejected successfully.',
+      status === 'approved' ? 'Request approved successfully.' : 'Request returned for revision.',
       status,
     );
 
@@ -2969,7 +2971,7 @@ async function submitFinalRequestDecision(item, button, status) {
 
     applyRequestDecision(item, status);
     showRequestDecisionToast(
-      status === 'approved' ? 'Request approved successfully.' : 'Request rejected successfully.',
+      status === 'approved' ? 'Request approved successfully.' : 'Request returned for revision.',
       status,
     );
 
@@ -3072,7 +3074,11 @@ async function submitReturnDecision(item, button, status) {
       }
     }
 
-    applyRequestDecision(item, status === 'returned' ? 'approved' : 'rejected');
+    applyRequestDecision(
+      item,
+      status === 'returned' ? 'approved' : 'rejected',
+      status === 'returned' ? { badgeLabel: 'Returned' } : { badgeLabel: 'Damaged' },
+    );
     showRequestDecisionToast(
       status === 'returned' ? 'Request marked as returned.' : 'Request marked as damaged.',
       status === 'returned' ? 'approved' : 'rejected',
