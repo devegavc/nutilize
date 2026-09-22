@@ -48,27 +48,36 @@
         <p class="history-print-range" id="history-print-range" hidden></p>
 
         <section class="stats-grid inventory-stats-grid history-summary-grid" aria-label="History summary">
-          <button class="stat-card inventory-stat-card history-summary-card is-active" type="button" data-history-category="all" aria-pressed="true">
+          <article class="stat-card inventory-stat-card history-summary-card">
             <span class="stat-icon"><i class="bi bi-clock-history"></i></span>
             <div>
               <p class="stat-number">{{ $historyCounts['all'] ?? 0 }}</p>
               <p class="stat-label">All</p>
             </div>
-          </button>
-          <button class="stat-card inventory-stat-card history-summary-card" type="button" data-history-category="lending" aria-pressed="false">
+          </article>
+          <article class="stat-card inventory-stat-card history-summary-card">
             <span class="stat-icon"><i class="bi bi-box-seam"></i></span>
             <div>
               <p class="stat-number">{{ $historyCounts['lending'] ?? 0 }}</p>
               <p class="stat-label">Lending</p>
             </div>
-          </button>
-          <button class="stat-card inventory-stat-card history-summary-card" type="button" data-history-category="damaged" aria-pressed="false">
+          </article>
+          <article class="stat-card inventory-stat-card history-summary-card">
             <span class="stat-icon"><i class="bi bi-exclamation-triangle"></i></span>
             <div>
               <p class="stat-number">{{ $historyCounts['damaged'] ?? 0 }}</p>
               <p class="stat-label">Damaged</p>
             </div>
-          </button>
+          </article>
+        </section>
+
+        <section class="history-category-row" aria-label="History category">
+          <p class="history-category-label">Category</p>
+          <div class="history-tab-group" role="tablist">
+            <button class="history-category-btn is-active" type="button" role="tab" data-history-category="all" aria-pressed="true">All</button>
+            <button class="history-category-btn" type="button" role="tab" data-history-category="lending" aria-pressed="false">Lending</button>
+            <button class="history-category-btn" type="button" role="tab" data-history-category="damaged" aria-pressed="false">Damaged</button>
+          </div>
         </section>
 
         <section class="history-tools-row">
