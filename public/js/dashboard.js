@@ -4885,56 +4885,82 @@ function openEquipmentAddModal() {
   equipmentEditModal.setAttribute('aria-hidden', 'false');
 }
 
+function normalizeNavPath(pathname) {
+  const path = String(pathname || '/').toLowerCase();
+  if (path.length > 1 && path.endsWith('/')) {
+    return path.slice(0, -1);
+  }
+
+  return path || '/';
+}
+
+function navPathIs(path, route) {
+  return path === route || path.startsWith(`${route}/`);
+}
+
 function setActiveNavByPage() {
-  const path = window.location.pathname.toLowerCase();
-  const isProfilePage = path.includes('/profile');
-  const navTarget = path.includes('/office/requests')
-    ? 'requests'
-    : path.includes('/office/items/maintenance')
-    ? 'manage-maintenance'
-    : path.includes('/office/items')
-    ? 'manage-items'
-    : path.includes('/office/users')
-    ? 'users'
-    : path.includes('/office/history')
-    ? 'history'
-    : path.includes('/messages')
-    ? ''
-    : path.includes('/profile')
-      ? ''
-      : path.includes('/inventory')
-        ? 'inventory'
-        : path.includes('/maintenance')
-          ? 'maintenance'
-          : path.includes('/history')
-            ? 'history'
-            : path.includes('/schedule')
-              ? 'schedule'
-              : path.includes('/request')
-                ? 'requests'
-                : path.includes('/users')
-                  ? 'users'
-                  : 'home';
+  const path = normalizeNavPath(window.location.pathname);
+  const isProfilePage = navPathIs(path, '/profile');
+  let navTarget = '';
+
+  if (navPathIs(path, '/office/requests')) {
+    navTarget = 'requests';
+  } else if (navPathIs(path, '/office/items/maintenance')) {
+    navTarget = 'manage-maintenance';
+  } else if (navPathIs(path, '/office/items')) {
+    navTarget = 'manage-items';
+  } else if (navPathIs(path, '/office/users')) {
+    navTarget = 'users';
+  } else if (navPathIs(path, '/office/history')) {
+    navTarget = 'history';
+  } else if (path === '/office/home') {
+    navTarget = 'home';
+  } else if (navPathIs(path, '/messages') || isProfilePage) {
+    navTarget = '';
+  } else if (path === '/inventory' || path.startsWith('/inventory/')) {
+    navTarget = 'inventory';
+  } else if (path === '/maintenance') {
+    navTarget = 'maintenance';
+  } else if (path === '/history') {
+    navTarget = 'history';
+  } else if (path === '/schedule') {
+    navTarget = 'schedule';
+  } else if (path === '/requests' || path === '/request' || path.startsWith('/request/')) {
+    navTarget = 'requests';
+  } else if (path === '/users') {
+    navTarget = 'users';
+  } else if (path === '/home') {
+    navTarget = 'home';
+  }
+
   const navItems = document.querySelectorAll('.nav-item[data-nav]');
   const subNavItems = document.querySelectorAll('.nav-subitem[data-subnav]');
-  const subTarget = path.includes('/inventory/facilities')
-    ? 'facilities'
-    : path.includes('/inventory/equipments')
-      ? 'equipments'
-      : path.includes('/inventory/analytics')
-        ? 'analytics'
-        : '';
+  const inventoryOpen = navTarget === 'inventory';
+  let subTarget = '';
+
+  if (inventoryOpen && (path === '/inventory/facilities' || path.startsWith('/inventory/facilities/'))) {
+    subTarget = 'facilities';
+  } else if (inventoryOpen && (path === '/inventory/equipment' || path === '/inventory/equipments' || path.startsWith('/inventory/equipments/'))) {
+    subTarget = 'equipments';
+  } else if (inventoryOpen && (path === '/inventory/analytics' || path.startsWith('/inventory/analytics/'))) {
+    subTarget = 'analytics';
+  }
 
   navItems.forEach((item) => {
-    item.classList.toggle('active', item.dataset.nav === navTarget);
+    const isActive = item.dataset.nav === navTarget;
+    item.classList.toggle('active', isActive);
 
     if (item.dataset.nav === 'inventory') {
-      item.classList.toggle('sub-active', subTarget !== '');
+      item.classList.remove('sub-active');
     }
   });
 
   subNavItems.forEach((item) => {
     item.classList.toggle('active', item.dataset.subnav === subTarget);
+  });
+
+  document.querySelectorAll('.nav-submenu').forEach((submenu) => {
+    submenu.classList.toggle('is-open', inventoryOpen);
   });
 
   if (toolbarProfileButtons.length) {

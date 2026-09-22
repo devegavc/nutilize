@@ -602,7 +602,8 @@ body {
   gap: 2px;
 }
 
-.nav-item[data-nav="inventory"].active + .nav-submenu {
+.nav-item[data-nav="inventory"].active + .nav-submenu,
+.nav-submenu.is-open {
   display: flex;
 }
 
