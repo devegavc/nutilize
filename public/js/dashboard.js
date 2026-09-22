@@ -5623,18 +5623,36 @@ function applyHeaderProfileAvatar(dataUrl) {
     if (!(image instanceof HTMLImageElement)) {
       image = document.createElement('img');
       image.className = 'profile-btn-photo';
-      image.alt = '';
+      image.alt = 'Profile';
       button.appendChild(image);
     }
 
+    const icon = button.querySelector('i');
+    button.style.overflow = 'hidden';
+
     if (dataUrl) {
       image.src = dataUrl;
+      image.style.position = 'absolute';
+      image.style.inset = '0';
+      image.style.width = '100%';
+      image.style.height = '100%';
+      image.style.objectFit = 'cover';
+      image.style.borderRadius = '50%';
+      image.style.display = 'block';
+      image.style.pointerEvents = 'none';
       button.classList.add('has-photo');
+      if (icon instanceof HTMLElement) {
+        icon.style.display = 'none';
+      }
       return;
     }
 
     image.removeAttribute('src');
+    image.style.display = 'none';
     button.classList.remove('has-photo');
+    if (icon instanceof HTMLElement) {
+      icon.style.display = '';
+    }
   });
 }
 
