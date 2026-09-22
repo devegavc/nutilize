@@ -9,7 +9,7 @@
   <title>NUtilize | Inventory</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
 </head>
 <body>
   <script>
@@ -68,32 +68,35 @@
           </article>
         </section>
 
-        <section class="inventory-grid">
+        <section class="inventory-grid most-requested-section">
           <div class="inventory-grid-head">
-            <h2><i class="bi bi-bar-chart-line-fill"></i> Most Requested Items</h2>
+            <div class="inventory-grid-head-copy">
+              <h2><i class="bi bi-bar-chart-line-fill"></i> Most Requested Items</h2>
+              <p class="inventory-grid-sub">Items with the highest frequency of usage</p>
+            </div>
             <button type="button" onclick="window.location.href='/dashboard/inventory/analytics'">View Insights</button>
           </div>
 
           <div class="table-wrap">
-            <table class="inventory-table">
+            <table class="inventory-table most-requested-table">
               <thead>
                 <tr>
-                  <th>Asset ID</th>
-                  <th>Item Name</th>
-                  <th>Owner</th>
-                  <th>Category</th>
-                  <th>Frequency Usage</th>
+                  <th class="col-asset-id">Asset ID</th>
+                  <th class="col-item-name">Item Name</th>
+                  <th class="col-owner">Owner</th>
+                  <th class="col-category">Category</th>
+                  <th class="col-freq">Frequency Usage</th>
                 </tr>
               </thead>
               <tbody id="inventory-table-body">
                 @forelse ($mostRequestedItems as $item)
                   <tr>
-                    <td>{{ $item['asset_id'] }}</td>
-                    <td>{{ $item['item_name'] }}</td>
-                    <td>{{ $item['owner'] ?? $item['location'] ?? '—' }}</td>
-                    <td>{{ $item['category'] }}</td>
-                    <td>
-                      <span class="freq-bar">
+                    <td class="col-asset-id">{{ $item['asset_id'] }}</td>
+                    <td class="col-item-name">{{ $item['item_name'] }}</td>
+                    <td class="col-owner">{{ $item['owner'] ?? $item['location'] ?? '—' }}</td>
+                    <td class="col-category">{{ $item['category'] }}</td>
+                    <td class="col-freq">
+                      <span class="freq-bar" aria-hidden="true">
                         <span style="width:{{ $item['usage_percent'] }}%"></span>
                       </span>
                     </td>
