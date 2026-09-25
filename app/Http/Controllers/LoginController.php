@@ -7,10 +7,13 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 
 class LoginController extends Controller
 {
+    private const LOGIN_MAX_ATTEMPTS = 5;
+
+    private const LOGIN_DECAY_SECONDS = 900;
+
     public function authenticate(Request $request): RedirectResponse
     {
         $credentials = $request->validate([
@@ -18,11 +21,9 @@ class LoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $throttleKey = 'login|'.Str::lower($credentials['username']);
+        $throttleKeys = $this->loginThrottleKeys($request);
 
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-            $seconds = RateLimiter::availableIn($throttleKey);
-
+        if ($seconds = $this->loginLockSeconds($throttleKeys)) {
             return back()
                 ->withErrors([
                     'username' => 'Too many login attempts.',
@@ -33,14 +34,18 @@ class LoginController extends Controller
         }
 
         if (!Auth::attempt($credentials)) {
-            RateLimiter::hit($throttleKey, 900);
+            foreach ($throttleKeys as $throttleKey) {
+                RateLimiter::hit($throttleKey, self::LOGIN_DECAY_SECONDS);
+            }
 
             return back()->withErrors([
                 'username' => 'Invalid username or password.',
             ])->onlyInput('username');
         }
 
-        RateLimiter::clear($throttleKey);
+        foreach ($throttleKeys as $throttleKey) {
+            RateLimiter::clear($throttleKey);
+        }
         $request->session()->regenerate();
         $user = $request->user();
 
@@ -75,6 +80,32 @@ class LoginController extends Controller
         }
 
         return redirect()->route('dashboard.home');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function loginThrottleKeys(Request $request): array
+    {
+        return [
+            'login|browser|'.$request->session()->getId(),
+        ];
+    }
+
+    /**
+     * @param  list<string>  $throttleKeys
+     */
+    private function loginLockSeconds(array $throttleKeys): int
+    {
+        $seconds = 0;
+
+        foreach ($throttleKeys as $throttleKey) {
+            if (RateLimiter::tooManyAttempts($throttleKey, self::LOGIN_MAX_ATTEMPTS)) {
+                $seconds = max($seconds, RateLimiter::availableIn($throttleKey));
+            }
+        }
+
+        return $seconds;
     }
 
     public static function formatLockDuration(int $seconds): string
