@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -44,6 +45,11 @@ return new class extends Migration
             $table->boolean('maintenance_status')->default(false);
             $table->boolean('availability_status')->default(true);
             $table->date('date_reserved')->nullable();
+            $table->unsignedSmallInteger('room_capacity')->nullable();
+            $table->text('room_type')->nullable();
+            $table->integer('room_chair_quantity')->nullable();
+            $table->text('room_table_type')->nullable();
+            $table->integer('room_table_count')->nullable();
             $table->timestamps();
         });
 
@@ -95,6 +101,10 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id');
             $table->string('activity_name', 255);
             $table->string('overall_status', 255)->nullable();
+            $table->timestamp('Date_of_Activity')->nullable();
+            $table->timestamp('Start_of_activity')->nullable();
+            $table->timestamp('End_of_Activity')->nullable();
+            $table->text('proof_of_consent_url')->nullable();
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->nullable();
 
@@ -108,6 +118,9 @@ return new class extends Migration
             $table->unsignedBigInteger('office_id');
             $table->string('status', 255);
             $table->date('approved_at')->nullable();
+            $table->boolean('follow_up_requested')->default(false);
+            $table->timestamp('follow_up_requested_at')->nullable();
+            $table->unsignedBigInteger('follow_up_requested_by')->nullable();
             $table->timestamps();
 
             $table->foreign('reservation_id')->references('reservation_id')->on('reservations')->onDelete('cascade');
@@ -150,17 +163,98 @@ return new class extends Migration
             $table->unsignedBigInteger('room_id')->nullable();
             $table->unsignedBigInteger('item_id')->nullable();
             $table->string('report_info', 255);
+            $table->text('description')->nullable();
+            $table->text('proof_image_url')->nullable();
+            $table->text('status')->nullable()->default('pending');
+            $table->unsignedBigInteger('reservation_id')->nullable();
             $table->timestamp('generated_at')->useCurrent();
             $table->timestamps();
 
             $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
             $table->foreign('room_id')->references('room_id')->on('rooms')->nullOnDelete();
             $table->foreign('item_id')->references('item_id')->on('items')->nullOnDelete();
+            $table->foreign('reservation_id')->references('reservation_id')->on('reservations');
         });
+
+        Schema::create('report_targets', function (Blueprint $table) {
+            $table->id('target_id');
+            $table->unsignedBigInteger('report_id');
+            $table->unsignedBigInteger('item_id')->nullable();
+            $table->unsignedBigInteger('room_id')->nullable();
+            $table->text('target_type');
+
+            $table->foreign('report_id', 'rt_report_id_fk')->references('report_id')->on('reports')->cascadeOnDelete();
+        });
+
+        Schema::create('reservation_issues', function (Blueprint $table) {
+            $table->id('issue_id');
+            $table->unsignedBigInteger('reservation_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->text('reported_by')->nullable();
+            $table->text('description')->nullable();
+            $table->text('image_name')->nullable();
+            $table->text('image_base64')->nullable();
+            $table->text('status')->nullable()->default('Pending');
+            $table->timestampTz('created_at')->nullable()->useCurrent();
+            $table->text('image_url')->nullable();
+        });
+
+        Schema::create('email_otps', function (Blueprint $table) {
+            $table->id();
+            $table->text('email');
+            $table->text('code');
+            $table->timestampTz('expires_at');
+            $table->timestampTz('created_at')->nullable()->useCurrent();
+
+            $table->index('email', 'email_otps_email_idx');
+        });
+
+        DB::unprepared(<<<'SQL'
+CREATE VIEW v_reservation_details_public AS
+SELECT detail_id, reservation_id, reservation_rooms_id, reservation_items_id, quantity
+FROM reservation_details;
+
+CREATE VIEW v_reservation_items_public AS
+SELECT reservation_items_id, item_id
+FROM reservation_items;
+
+CREATE VIEW v_reservation_rooms_public AS
+SELECT reservation_rooms_id, room_id
+FROM reservation_rooms;
+
+CREATE VIEW v_reservations_public AS
+SELECT reservation_id, "Start_of_activity", "End_of_Activity", overall_status, "Date_of_Activity"
+FROM reservations;
+
+CREATE VIEW v_reservation_items_details AS
+SELECT rd.detail_id, rd.quantity, ri.item_id, r.overall_status, r."Start_of_activity", r."End_of_Activity"
+FROM reservation_details rd
+JOIN reservation_items ri ON rd.reservation_items_id = ri.reservation_items_id
+JOIN reservations r ON rd.reservation_id = r.reservation_id
+WHERE rd.reservation_items_id IS NOT NULL;
+
+CREATE VIEW v_reservation_rooms_details AS
+SELECT rd.detail_id, rd.reservation_rooms_id, rr.room_id, r.overall_status, r."Start_of_activity", r."End_of_Activity"
+FROM reservation_details rd
+JOIN reservation_rooms rr ON rd.reservation_rooms_id = rr.reservation_rooms_id
+JOIN reservations r ON rd.reservation_id = r.reservation_id
+WHERE rd.reservation_rooms_id IS NOT NULL;
+SQL);
     }
 
     public function down(): void
     {
+        DB::unprepared(<<<'SQL'
+DROP VIEW IF EXISTS v_reservation_rooms_details;
+DROP VIEW IF EXISTS v_reservation_items_details;
+DROP VIEW IF EXISTS v_reservations_public;
+DROP VIEW IF EXISTS v_reservation_rooms_public;
+DROP VIEW IF EXISTS v_reservation_items_public;
+DROP VIEW IF EXISTS v_reservation_details_public;
+SQL);
+        Schema::dropIfExists('email_otps');
+        Schema::dropIfExists('reservation_issues');
+        Schema::dropIfExists('report_targets');
         Schema::dropIfExists('reports');
         Schema::dropIfExists('maintenance');
         Schema::dropIfExists('reservation_details');

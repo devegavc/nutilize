@@ -37,8 +37,7 @@ return new class extends Migration
             ['schedule_imports', 'user_id', 'schedule_imports_user_id_idx'],
             ['schedule_import_details', 'import_id', 'schedule_import_details_import_id_idx'],
             ['schedule_import_details', 'reservation_id', 'schedule_import_details_reservation_id_idx'],
-            // Created outside migrations; see 2026_08_09_000023 for the tables that only
-            // exist in Supabase. Listed here too so a fresh install is covered in one pass.
+            // Columns and table are defined in the original reservation-system migration.
             ['report_targets', 'report_id', 'report_targets_report_id_idx'],
             ['reports', 'reservation_id', 'reports_reservation_id_idx'],
         ];

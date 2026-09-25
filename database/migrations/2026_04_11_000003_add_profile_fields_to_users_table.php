@@ -12,13 +12,14 @@ return new class extends Migration
             $table->string('suffix', 50)->nullable();
             $table->string('contact_number', 50)->nullable();
             $table->string('phone_number', 50)->nullable();
+            $table->text('affiliation')->nullable();
         });
     }
 
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['suffix', 'contact_number', 'phone_number']);
+            $table->dropColumn(['suffix', 'contact_number', 'phone_number', 'affiliation']);
         });
     }
 };

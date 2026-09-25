@@ -6,6 +6,8 @@ use App\Services\UserAccountStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 
 class LoginController extends Controller
 {
@@ -16,12 +18,25 @@ class LoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
+        $throttleKey = 'login|'.Str::lower($credentials['username']);
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+
+            return back()->withErrors([
+                'username' => 'Too many login attempts. Please try again in '.$seconds.' seconds.',
+            ])->onlyInput('username');
+        }
+
         if (!Auth::attempt($credentials)) {
+            RateLimiter::hit($throttleKey, 900);
+
             return back()->withErrors([
                 'username' => 'Invalid username or password.',
             ])->onlyInput('username');
         }
 
+        RateLimiter::clear($throttleKey);
         $request->session()->regenerate();
         $user = $request->user();
 

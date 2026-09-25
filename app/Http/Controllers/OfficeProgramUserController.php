@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
 class OfficeProgramUserController extends Controller
@@ -39,7 +40,7 @@ class OfficeProgramUserController extends Controller
         $data = $request->validate([
             'username' => ['required', 'string', 'max:50', 'unique:users,username'],
             'email' => ['required', 'email', 'max:100', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols()],
             'full_name' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -68,7 +69,7 @@ class OfficeProgramUserController extends Controller
         $data = $request->validate([
             'username' => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($user->user_id, 'user_id')],
             'email' => ['required', 'email', 'max:100', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', 'string', Password::min(8)->mixedCase()->numbers()->symbols()],
             'full_name' => ['nullable', 'string', 'max:255'],
         ]);
 

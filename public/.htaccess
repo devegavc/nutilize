@@ -40,6 +40,9 @@
     <FilesMatch "\.(?i:jpg|jpeg|webp|png|gif|ico|woff2)$">
         Header set Cache-Control "public, max-age=31536000, immutable"
     </FilesMatch>
+    <FilesMatch "\.(?i:css|js|jpg|jpeg|webp|png|gif|ico|woff2|svg)$">
+        Header set X-Content-Type-Options "nosniff"
+    </FilesMatch>
     <FilesMatch "\.(?i:css|js)$">
         Header set Cache-Control "public, max-age=2592000"
     </FilesMatch>

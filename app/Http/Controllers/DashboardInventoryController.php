@@ -337,25 +337,6 @@ class DashboardInventoryController extends Controller
                 ];
             });
 
-        // #region agent log
-        $sampleRoom = $roomRows->first();
-        file_put_contents(base_path('debug-a53051.log'), json_encode([
-            'sessionId' => 'a53051',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'C',
-            'location' => 'DashboardInventoryController.php:facilities',
-            'message' => 'Facilities list includes furniture columns',
-            'data' => [
-                'hasTableTypeColumn' => Schema::hasColumn('rooms', 'room_table_type'),
-                'hasChairQtyColumn' => Schema::hasColumn('rooms', 'room_chair_quantity'),
-                'rowCount' => $roomRows->count(),
-                'sampleTableType' => is_array($sampleRoom) ? ($sampleRoom['table_type'] ?? null) : null,
-                'sampleChairQuantity' => is_array($sampleRoom) ? ($sampleRoom['chair_quantity'] ?? null) : null,
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
-        // #endregion
-
         return view('dashboard-inventory-facilities', [
             'facilityRows' => $roomRows,
             'facilityTableTypes' => $this->facilityTableTypeOptions(),
@@ -398,23 +379,6 @@ class DashboardInventoryController extends Controller
         if (Schema::hasColumn('rooms', 'room_table_count')) {
             $insertPayload['room_table_count'] = max(0, (int) ($template->room_table_count ?? 0));
         }
-
-        // #region agent log
-        file_put_contents(base_path('debug-a53051.log'), json_encode([
-            'sessionId' => 'a53051',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'B',
-            'location' => 'DashboardInventoryController.php:storeFacility',
-            'message' => 'Storing facility furniture fields',
-            'data' => [
-                'requestTableType' => $request->input('table_type'),
-                'requestChairQuantity' => $request->input('chair_quantity'),
-                'persistedTableType' => $insertPayload['room_table_type'] ?? null,
-                'persistedChairQuantity' => $insertPayload['room_chair_quantity'] ?? null,
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
-        // #endregion
 
         $roomId = DB::table('rooms')->insertGetId($insertPayload, 'room_id');
 
@@ -459,25 +423,6 @@ class DashboardInventoryController extends Controller
         if (Schema::hasColumn('rooms', 'room_chair_quantity')) {
             $updatePayload['room_chair_quantity'] = $chairQuantity;
         }
-
-        // #region agent log
-        file_put_contents(base_path('debug-a53051.log'), json_encode([
-            'sessionId' => 'a53051',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'B',
-            'location' => 'DashboardInventoryController.php:updateFacility',
-            'message' => 'Updating facility furniture fields',
-            'data' => [
-                'roomId' => $roomId,
-                'requestKeys' => array_keys($request->all()),
-                'requestTableType' => $request->input('table_type'),
-                'requestChairQuantity' => $request->input('chair_quantity'),
-                'persistedTableType' => $updatePayload['room_table_type'] ?? null,
-                'persistedChairQuantity' => $updatePayload['room_chair_quantity'] ?? null,
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
-        // #endregion
 
         DB::table('rooms')
             ->where('room_id', $roomId)
@@ -1923,15 +1868,24 @@ class DashboardInventoryController extends Controller
 
     public function proxyProofImage(string $filename)
     {
+        $user = Auth::user();
+        if (!$user || (!$user->isOfficeApprover() && !$user->isPhysicalFacilitiesAdmin())) {
+            abort(403);
+        }
+
         $serviceKey = env('SUPABASE_SERVICE_ROLE_KEY', '');
-        $supabaseUrl = env('SUPABASE_URL', 'https://uszlgigsuseomkwmqwan.supabase.co');
+        $supabaseUrl = env('SUPABASE_URL', 'https://thusglwobmzxlwjwrefv.supabase.co');
 
         if (empty($serviceKey)) {
             abort(503, 'Storage proxy not configured.');
         }
 
-        // Only allow safe filenames (alphanumeric, dash, underscore, dot)
-        if (!preg_match('/^[\w\-\.]+$/', $filename)) {
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if (
+            str_contains($filename, '..')
+            || !in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)
+            || !preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]{0,180}\z/', $filename)
+        ) {
             abort(400, 'Invalid filename.');
         }
 
@@ -1939,16 +1893,29 @@ class DashboardInventoryController extends Controller
 
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $serviceKey,
+        ])->withOptions([
+            'allow_redirects' => false,
         ])->get($url);
 
         if (!$response->successful()) {
             abort(404, 'Image not found.');
         }
 
-        $contentType = $response->header('Content-Type') ?? 'image/jpeg';
+        $contentType = strtolower(trim(explode(';', (string) $response->header('Content-Type'))[0]));
+        $allowedTypes = [
+            'image/jpeg' => 'image/jpeg',
+            'image/png' => 'image/png',
+            'image/gif' => 'image/gif',
+            'image/webp' => 'image/webp',
+        ];
+
+        if (!isset($allowedTypes[$contentType])) {
+            abort(404, 'Image not found.');
+        }
 
         return response($response->body(), 200)
-            ->header('Content-Type', $contentType)
+            ->header('Content-Type', $allowedTypes[$contentType])
+            ->header('X-Content-Type-Options', 'nosniff')
             ->header('Cache-Control', 'private, max-age=3600');
     }
 }
