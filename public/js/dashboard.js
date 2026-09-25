@@ -3560,10 +3560,6 @@ function openFacilitiesEditModal(row) {
 
   syncFacilityNameInputMode();
 
-  // #region agent log
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a53051'},body:JSON.stringify({sessionId:'a53051',runId:'post-fix',hypothesisId:'C',location:'dashboard.js:openFacilitiesEditModal',message:'Opened edit modal with furniture fields',data:{facilityId:row.dataset.facilityId || null,tableType:row.dataset.facilityTableType || '',chairQuantity:row.dataset.facilityChairQuantity || '',selectValue:facilitiesTableTypeInput ? facilitiesTableTypeInput.value : null,inputValue:facilitiesChairQuantityInput ? facilitiesChairQuantityInput.value : null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
   facilitiesEditModal.classList.add('is-open');
   facilitiesEditModal.setAttribute('aria-hidden', 'false');
 }
@@ -7431,12 +7427,6 @@ if (facilitiesTableBody && facilitiesTabs.length) {
   }
 
   applyFacilitiesFilters();
-
-  // #region agent log
-  const facilitiesLayoutTable = document.querySelector('.facilities-inventory-table');
-  const facilitiesLayoutHeads = facilitiesLayoutTable ? Array.from(facilitiesLayoutTable.querySelectorAll('thead th')) : [];
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a53051'},body:JSON.stringify({sessionId:'a53051',runId:'layout-fix-5',hypothesisId:'A',location:'dashboard.js:facilitiesLayout',message:'Facilities table column layout',data:{pageClass:document.body.className,hasToolbar:Boolean(document.querySelector('.facilities-toolbar')),hasBanner:Boolean(document.querySelector('.facilities-content-card > .section-title')),columnCount:facilitiesLayoutHeads.length,headers:facilitiesLayoutHeads.map((th)=>th.textContent.trim()),widths:facilitiesLayoutHeads.map((th)=>Math.round(th.getBoundingClientRect().width)),paddings:facilitiesLayoutHeads.map((th)=>window.getComputedStyle(th).padding),tableWidth:facilitiesLayoutTable?Math.round(facilitiesLayoutTable.getBoundingClientRect().width):0},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 }
 
 if (facilitiesAddButton && facilitiesEditModal) {
@@ -7970,10 +7960,6 @@ if (facilitiesSaveButton) {
         table_type: tableType,
         chair_quantity: parsedChairQuantity,
       };
-
-      // #region agent log
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a53051'},body:JSON.stringify({sessionId:'a53051',runId:'post-fix',hypothesisId:'A',location:'dashboard.js:facilitiesSave',message:'Saving facility furniture fields',data:{isEditing,endpoint,tableType:requestBody.table_type,chairQuantity:requestBody.chair_quantity},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
 
       const response = await fetch(endpoint, {
         method: isEditing ? 'PATCH' : 'POST',
