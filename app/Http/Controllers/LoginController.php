@@ -12,7 +12,7 @@ class LoginController extends Controller
 {
     private const LOGIN_MAX_ATTEMPTS = 5;
 
-    private const LOGIN_DECAY_SECONDS = 900;
+    private const LOGIN_DECAY_SECONDS = 300;
 
     public function authenticate(Request $request): RedirectResponse
     {
