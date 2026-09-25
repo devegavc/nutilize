@@ -56,11 +56,18 @@
           @endif
 
           @if ($errors->any())
-            <div class="alert alert-danger" role="alert">
+            @php($loginLockSeconds = (int) session('login_lock_seconds', 0))
+            <div class="alert alert-danger" role="alert" @if ($loginLockSeconds > 0) data-lock-seconds="{{ $loginLockSeconds }}" @endif>
               <ul class="mb-0">
-                @foreach ($errors->all() as $error)
-                  <li>{{ $error }}</li>
-                @endforeach
+                @if ($loginLockSeconds > 0)
+                  <li id="loginLockMessage">
+                    Too many login attempts. Please try again in <span id="loginLockCountdown">{{ session('login_lock_label') }}</span>.
+                  </li>
+                @else
+                  @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                  @endforeach
+                @endif
               </ul>
             </div>
           @endif
@@ -275,6 +282,44 @@
           isSubmitting = true;
           setLoginLoading(true);
         });
+      }
+
+      const lockAlert = document.querySelector('[data-lock-seconds]');
+      const lockMessage = document.getElementById('loginLockMessage');
+      const lockCountdown = document.getElementById('loginLockCountdown');
+
+      function formatLockDuration(totalSeconds) {
+        const seconds = Math.max(0, totalSeconds);
+        const minutes = Math.floor(seconds / 60);
+        const remainder = seconds % 60;
+        const parts = [];
+
+        if (minutes > 0) {
+          parts.push(minutes + (minutes === 1 ? ' minute' : ' minutes'));
+        }
+
+        if (remainder > 0 || minutes === 0) {
+          parts.push(remainder + (remainder === 1 ? ' second' : ' seconds'));
+        }
+
+        return parts.join(' ');
+      }
+
+      if (lockAlert && lockMessage && lockCountdown) {
+        let remaining = Number.parseInt(lockAlert.getAttribute('data-lock-seconds') || '0', 10);
+
+        const renderLockCountdown = () => {
+          if (remaining <= 0) {
+            lockMessage.textContent = 'You can try signing in again.';
+            return;
+          }
+
+          lockCountdown.textContent = formatLockDuration(remaining);
+          remaining -= 1;
+          window.setTimeout(renderLockCountdown, 1000);
+        };
+
+        renderLockCountdown();
       }
 
       window.addEventListener('pageshow', function (event) {

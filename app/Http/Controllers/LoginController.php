@@ -23,9 +23,13 @@ class LoginController extends Controller
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
 
-            return back()->withErrors([
-                'username' => 'Too many login attempts. Please try again in '.$seconds.' seconds.',
-            ])->onlyInput('username');
+            return back()
+                ->withErrors([
+                    'username' => 'Too many login attempts.',
+                ])
+                ->with('login_lock_seconds', $seconds)
+                ->with('login_lock_label', self::formatLockDuration($seconds))
+                ->onlyInput('username');
         }
 
         if (!Auth::attempt($credentials)) {
@@ -71,6 +75,24 @@ class LoginController extends Controller
         }
 
         return redirect()->route('dashboard.home');
+    }
+
+    public static function formatLockDuration(int $seconds): string
+    {
+        $seconds = max(0, $seconds);
+        $minutes = intdiv($seconds, 60);
+        $remainder = $seconds % 60;
+        $parts = [];
+
+        if ($minutes > 0) {
+            $parts[] = $minutes.' '.($minutes === 1 ? 'minute' : 'minutes');
+        }
+
+        if ($remainder > 0 || $minutes === 0) {
+            $parts[] = $remainder.' '.($remainder === 1 ? 'second' : 'seconds');
+        }
+
+        return implode(' ', $parts);
     }
 
     public function logout(Request $request): RedirectResponse
