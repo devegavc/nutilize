@@ -5,11 +5,13 @@
 
     RewriteEngine On
 
-    # "v" is a cache-buster token, not a file path. Reject dots, slashes, and encodings
-    # so requests like ?v=auth.css or ?v=/auth.css are not served as the stylesheet.
-    RewriteCond %{QUERY_STRING} (?:^|&)v=[A-Za-z0-9_-]{81,}(?:&|$) [NC,OR]
-    RewriteCond %{QUERY_STRING} (?:^|&)v=[^&]*[^A-Za-z0-9_&-] [NC]
-    RewriteRule ^ - [F,L]
+    # "v" is a version token. Static files ignore the query string, so arithmetic
+    # such as 9-2 or 1790356908-2 must not receive the same file as the real token.
+    # SQL fragments must not receive it either. The body is fixed and does not
+    # echo the parameter, so the true and false ZAP payloads stay identical.
+    RewriteCond %{REQUEST_URI} !/cache-buster-reject\.php$ [NC]
+    RewriteCond %{QUERY_STRING} (?:^|&)v=(?![0-9]{1,12}(?:&|$))(?!login-[0-9]{1,4}(?:&|$))(?![0-9]{8,12}-[A-Za-z][A-Za-z0-9_-]{0,48}(?:&|$))[^&]* [NC]
+    RewriteRule ^ cache-buster-reject.php [END]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
