@@ -2123,6 +2123,16 @@ button.is-action-loading {
   box-sizing: border-box;
 }
 
+.office-queue-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.office-queue-settled {
+  color: #6a728f;
+}
+
 button.is-action-loading:hover {
   transform: none;
   filter: none;

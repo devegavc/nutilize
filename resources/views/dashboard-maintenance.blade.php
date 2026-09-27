@@ -126,7 +126,7 @@
         </div>
       </div>
 
-      <div class="maintenance-eval-proof" id="maintenance-eval-proof-wrap" style="display:none">
+      <div class="maintenance-eval-proof" id="maintenance-eval-proof-wrap">
         <div class="maintenance-eval-proof-head">
           <span class="maintenance-eval-proof-label">Attached proof</span>
           <a id="maintenance-eval-proof-link" class="maintenance-eval-proof-open" href="#" target="_blank" rel="noopener noreferrer">Open full image</a>

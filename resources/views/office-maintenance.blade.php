@@ -9,7 +9,7 @@
   <title>NUtilize | Item Maintenance</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
   <style>
     .office-maintenance-subtitle {
       margin: 10px 22px 0;
@@ -129,7 +129,7 @@
         <span id="maintenance-eval-description">-</span>
       </div>
 
-      <div class="maintenance-eval-proof" id="maintenance-eval-proof-wrap" style="display:none">
+      <div class="maintenance-eval-proof" id="maintenance-eval-proof-wrap">
         <div class="maintenance-eval-proof-head">
           <span class="maintenance-eval-proof-label">Attached proof</span>
           <a id="maintenance-eval-proof-link" class="maintenance-eval-proof-open" href="#" target="_blank" rel="noopener noreferrer">Open full image</a>

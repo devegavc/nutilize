@@ -8,8 +8,8 @@
   <title>NUtilize | Program Users</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
-  <link rel="stylesheet" href="/css/office.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
+  <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}" />
 </head>
 <body>
   <script>
@@ -271,7 +271,7 @@
                       <td class="table-actions-cell">
                         <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
                         @if($currentUserId !== $user->user_id)
-                          <form method="POST" action="{{ route('office.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" onsubmit="return confirm('Delete this faculty account?');">
+                          <form method="POST" action="{{ route('office.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" data-confirm="Delete this faculty account?">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="table-delete-btn">Delete</button>
@@ -319,7 +319,7 @@
                       <td class="table-actions-cell">
                         <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
                         @if($currentUserId !== $user->user_id)
-                          <form method="POST" action="{{ route('office.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" onsubmit="return confirm('Delete this student account?');">
+                          <form method="POST" action="{{ route('office.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" data-confirm="Delete this student account?">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="table-delete-btn">Delete</button>

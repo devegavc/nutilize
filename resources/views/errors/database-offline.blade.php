@@ -97,7 +97,12 @@
             </ul>
         </div>
 
-        <button class="retry-button" onclick="location.reload()">Retry</button>
+        <button class="retry-button" type="button" id="retry-button">Retry</button>
+        <script>
+            document.getElementById('retry-button').addEventListener('click', function () {
+                window.location.reload();
+            });
+        </script>
     </div>
 </body>
 </html>

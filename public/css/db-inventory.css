@@ -5277,7 +5277,12 @@ body.insight-filtering .insight-kpi:not(.is-active) {
 .inventory-confirm-modal {
   position: fixed;
   inset: 0;
-  z-index: 2200;
+  z-index: 5000;
+  display: none;
+}
+
+#maintenance-eval-proof-wrap,
+#item-owner-office-note {
   display: none;
 }
 

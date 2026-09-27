@@ -433,6 +433,43 @@ window.showPageLoadingSkeleton = showPageLoadingSkeleton;
 window.navigateWithInsightsSkeleton = navigateWithInsightsSkeleton;
 window.navigateWithPageSkeleton = navigateWithPageSkeleton;
 
+function cspNonce() {
+  const meta = document.querySelector('meta[name="csp-nonce"]');
+  return meta ? meta.getAttribute('content') || '' : '';
+}
+
+function stampCspStyle(style) {
+  const nonce = cspNonce();
+  if (nonce) {
+    style.setAttribute('nonce', nonce);
+  }
+  return style;
+}
+
+function applyCspPresentation() {
+  document.querySelectorAll('[data-bar-width]').forEach((el) => {
+    const value = Number(el.getAttribute('data-bar-width'));
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      return;
+    }
+    el.style.width = `${value}%`;
+  });
+
+  document.querySelectorAll('[data-swatch]').forEach((el) => {
+    const color = el.getAttribute('data-swatch') || '';
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+      el.style.backgroundColor = color;
+    }
+  });
+
+  document.querySelectorAll('[data-timeline-steps]').forEach((el) => {
+    const steps = Number(el.getAttribute('data-timeline-steps'));
+    if (Number.isInteger(steps) && steps > 0 && steps < 100) {
+      el.style.setProperty('--timeline-steps', String(steps));
+    }
+  });
+}
+
 function showAppNotice(message, options = {}) {
   const {
     title = 'Notice',
@@ -449,6 +486,7 @@ function showAppNotice(message, options = {}) {
     if (!document.getElementById(styleId)) {
       const style = document.createElement('style');
       style.id = styleId;
+      stampCspStyle(style);
       style.textContent = `
         .app-notice-modal {
           position: fixed;
@@ -700,6 +738,7 @@ function showAppConfirm(message, options = {}) {
     if (!document.getElementById('app-confirm-style')) {
       const style = document.createElement('style');
       style.id = 'app-confirm-style';
+      stampCspStyle(style);
       style.textContent = `
         .app-confirm-modal {
           position: fixed !important;
@@ -2291,7 +2330,7 @@ function openMaintenanceEvalModal(row) {
   const proofFallback = document.getElementById('maintenance-eval-proof-fallback');
   if (proofWrap && proofImg && proofLink) {
     if (proofImage) {
-      proofWrap.style.display = '';
+      proofWrap.style.display = 'flex';
       if (proofFallback) {
         proofFallback.hidden = true;
       }
@@ -2814,6 +2853,7 @@ function showRequestDecisionToast(message, status) {
   if (!document.getElementById('request-action-toast-style')) {
     const style = document.createElement('style');
     style.id = 'request-action-toast-style';
+    stampCspStyle(style);
     style.textContent = `
       .request-action-toast {
         position: fixed;
@@ -8504,6 +8544,9 @@ document.addEventListener('visibilitychange', () => {
 });
 
 const initializeDashboard = () => {
+  applyCspPresentation();
+  bindConfirmSubmits();
+  bindNavUrlButtons();
   // Load navbar without blocking other dashboard initialization.
   loadNavbar().catch((error) => console.error('Unable to initialize navbar:', error));
   initOfficeQuickDateControl();
@@ -8513,16 +8556,42 @@ const initializeDashboard = () => {
   initInsightsShortcutButton();
 };
 
+function bindConfirmSubmits() {
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) {
+      return;
+    }
+    const message = form.getAttribute('data-confirm');
+    if (!message) {
+      return;
+    }
+    if (!window.confirm(message)) {
+      event.preventDefault();
+    }
+  });
+}
+
+function bindNavUrlButtons() {
+  document.querySelectorAll('[data-nav-url]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const url = button.getAttribute('data-nav-url');
+      if (url) {
+        window.location.href = url;
+      }
+    });
+  });
+}
+
 function initInsightsShortcutButton() {
-  const button = document.querySelector('button[onclick*="inventory/analytics"]');
+  const button = document.querySelector('[data-insights-href]');
 
   if (!(button instanceof HTMLButtonElement)) {
     return;
   }
 
-  button.removeAttribute('onclick');
   button.addEventListener('click', () => {
-    navigateWithInsightsSkeleton('/inventory/analytics');
+    navigateWithInsightsSkeleton(button.getAttribute('data-insights-href') || '/inventory/analytics');
   });
 }
 

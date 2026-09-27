@@ -35,7 +35,7 @@
 
     <section class="request-progress-block">
       <h3 class="request-block-title">Approval progress</h3>
-      <div class="status-timeline" style="--timeline-steps: {{ max(count($requestData['workflow_steps']), 1) }};" aria-hidden="true">
+      <div class="status-timeline" data-timeline-steps="{{ max(count($requestData['workflow_steps']), 1) }}" aria-hidden="true">
         @foreach($requestData['workflow_steps'] as $step)
           <div class="status-step {{ $step['dot_class'] }}">
             <span class="status-step-node">

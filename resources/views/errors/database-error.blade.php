@@ -69,7 +69,12 @@
             {{ $message ?? 'A database error occurred. Please try again later.' }}
         </p>
 
-        <button class="retry-button" onclick="location.reload()">Try Again</button>
+        <button class="retry-button" type="button" id="retry-button">Try Again</button>
+        <script>
+            document.getElementById('retry-button').addEventListener('click', function () {
+                window.location.reload();
+            });
+        </script>
     </div>
 </body>
 </html>

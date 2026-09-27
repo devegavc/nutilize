@@ -54,4 +54,26 @@
     <FilesMatch "\.(?i:css|js)$">
         Header set Cache-Control "public, max-age=2592000"
     </FilesMatch>
+
+    # Clickjacking protection on every response, including the public landing page.
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Drop Access-Control-Allow-Origin: * on public images. Same-origin font
+    # preloads opt into CORS, so reflect only this site when the browser sends it.
+    Header always unset Access-Control-Allow-Origin
+    Header always set Access-Control-Allow-Origin "%{NUTILIZE_CORS_ORIGIN}e" env=NUTILIZE_CORS_ORIGIN
+    Header always append Vary "Origin" env=NUTILIZE_CORS_ORIGIN
+
+    # Replace a hosting-panel CSP when PHP published CSP_POLICY for this request.
+    Header always set Content-Security-Policy "%{CSP_POLICY}e" env=CSP_POLICY
+
+    # Static files do not run the app. Define every directive ZAP treats as
+    # having no fallback, and do not allow wildcard sources.
+    <FilesMatch "\.(?i:xml|txt|jpg|jpeg|png|gif|webp|ico|svg|css|js|map|woff2?|ttf|eot)$">
+        Header always set Content-Security-Policy "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; connect-src 'none'; frame-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; manifest-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" env=!CSP_POLICY
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_setenvif.c>
+    SetEnvIf Origin "^https://(www\.)?nutilize\.tech$" NUTILIZE_CORS_ORIGIN=$0
 </IfModule>

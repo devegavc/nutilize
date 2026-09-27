@@ -9,8 +9,8 @@
   <title>NUtilize | Office Requests</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/dashboard.css" />
-  <link rel="stylesheet" href="/css/office.css" />
+  <link rel="stylesheet" href="/css/dashboard.css?v={{ filemtime(public_path('css/dashboard.css')) }}" />
+  <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}" />
 </head>
 <body>
   <script>
@@ -112,7 +112,7 @@
                     <td><span class="badge {{ $badgeClass }}">{{ $badgeText }}</span></td>
                     <td>
                       @if(is_null($request->approved_at) && $status === 'pending')
-                        <div style="display:flex; gap:8px; justify-content:center;">
+                        <div class="office-queue-actions">
                           <button
                             type="button"
                             class="office-queue-action-btn office-queue-approve"
@@ -127,7 +127,7 @@
                           >Reject</button>
                         </div>
                       @else
-                        <span style="color:#6a728f;">-</span>
+                        <span class="office-queue-settled">-</span>
                       @endif
                     </td>
                   </tr>

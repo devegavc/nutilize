@@ -9,7 +9,7 @@
   <title>NUtilize | Manage Items</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
   <style>
     .office-items-subtitle {
       margin: 10px 22px 0;
@@ -114,7 +114,7 @@
     </section>
   </main>
 
-  <div class="inventory-confirm-modal" id="inventory-confirm-modal" aria-hidden="true" style="z-index: 5000;">
+  <div class="inventory-confirm-modal" id="inventory-confirm-modal" aria-hidden="true">
     <div class="inventory-confirm-overlay" data-close-inventory-confirm="true"></div>
     <article class="inventory-confirm-card" role="dialog" aria-modal="true" aria-labelledby="inventory-confirm-title">
       <header class="inventory-confirm-head">

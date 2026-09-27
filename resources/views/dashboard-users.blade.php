@@ -393,7 +393,7 @@
                 <option value="{{ $office->office_id }}">{{ $office->department_name }}</option>
               @endforeach
             </select>
-            <small class="facilities-input-note" id="item-owner-office-note" style="display:none;">
+            <small class="facilities-input-note" id="item-owner-office-note">
               Item owners are automatically assigned to the Item Owner office and can manage their own equipment inventory.
             </small>
           </section>
