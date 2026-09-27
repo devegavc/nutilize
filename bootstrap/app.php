@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'pf-admin' => EnsurePhysicalFacilitiesAdmin::class,
         ]);
 
+        $middleware->web(prepend: [
+            \App\Http\Middleware\RejectUnsafeQueryValues::class,
+        ]);
+
         $middleware->web(append: [
             \App\Http\Middleware\HandleDatabaseErrors::class,
             \App\Http\Middleware\SecurityHeaders::class,

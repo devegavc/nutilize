@@ -5,6 +5,12 @@
 
     RewriteEngine On
 
+    # "v" is a cache-buster token, not a file path. Reject dots, slashes, and encodings
+    # so requests like ?v=auth.css or ?v=/auth.css are not served as the stylesheet.
+    RewriteCond %{QUERY_STRING} (?:^|&)v=[A-Za-z0-9_-]{81,}(?:&|$) [NC,OR]
+    RewriteCond %{QUERY_STRING} (?:^|&)v=[^&]*[^A-Za-z0-9_&-] [NC]
+    RewriteRule ^ - [F,L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
