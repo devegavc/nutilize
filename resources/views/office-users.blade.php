@@ -14,13 +14,13 @@
 <body class="office-app">
   <script>
     window.authUser = {
-      id: {{ auth()->user()->user_id ?? 'null' }},
-      username: '{{ auth()->user()->username ?? 'User' }}',
-      email: '{{ auth()->user()->email ?? '' }}',
-      full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
-      role: '{{ auth()->user()->role ?? 'user' }}',
-      office_name: '{{ auth()->user()?->office?->department_name ?? 'Office' }}',
-      office_short_code: '{{ auth()->user()?->office?->short_code ?? '' }}',
+      id: @json(auth()->user()->user_id),
+      username: @json(auth()->user()->username ?? 'User'),
+      email: @json(auth()->user()->email ?? ''),
+      full_name: @json(auth()->user()->full_name ?? auth()->user()->username ?? 'User'),
+      role: @json(auth()->user()->role ?? 'user'),
+      office_name: @json(auth()->user()?->office?->department_name ?? 'Office'),
+      office_short_code: @json(auth()->user()?->office?->short_code ?? ''),
       is_item_owner: @json(auth()->user()?->isItemOwnerAdmin() ?? false)
     };
     window.dashboardNavComponent = '/components/navbar-office.html';
@@ -271,7 +271,7 @@
                       <td class="table-actions-cell">
                         <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
                         @if($currentUserId !== $user->user_id)
-                          <form method="POST" action="{{ route('office.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" onsubmit="return confirm('Delete this faculty account?');">
+                          <form method="POST" action="{{ route('office.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" data-confirm="Delete this faculty account?">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="table-delete-btn">Delete</button>
@@ -319,7 +319,7 @@
                       <td class="table-actions-cell">
                         <button class="table-edit-btn user-edit-btn" type="button">Edit</button>
                         @if($currentUserId !== $user->user_id)
-                          <form method="POST" action="{{ route('office.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" onsubmit="return confirm('Delete this student account?');">
+                          <form method="POST" action="{{ route('office.users.destroy', ['userId' => $user->user_id]) }}" class="inline-action-form" data-confirm="Delete this student account?">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="table-delete-btn">Delete</button>

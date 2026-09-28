@@ -5,8 +5,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * `reports` and `report_targets` were created directly against Supabase rather than
- * through a migration, so their foreign keys were never given covering indexes.
+ * Covering indexes for report foreign keys. The columns are created in the
+ * original reservation-system migration; this only adds the indexes.
  */
 return new class extends Migration
 {
@@ -28,13 +28,17 @@ return new class extends Migration
                 continue;
             }
 
-            try {
-                Schema::table($table, function ($blueprint) use ($column, $indexName) {
-                    $blueprint->index([$column], $indexName);
-                });
-            } catch (\Throwable) {
-                // Index already exists.
+            $alreadyExists = DB::selectOne(
+                'select 1 as present from pg_indexes where schemaname = current_schema() and indexname = ?',
+                [$indexName]
+            );
+            if ($alreadyExists) {
+                continue;
             }
+
+            Schema::table($table, function ($blueprint) use ($column, $indexName) {
+                $blueprint->index([$column], $indexName);
+            });
         }
     }
 

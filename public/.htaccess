@@ -5,6 +5,14 @@
 
     RewriteEngine On
 
+    # "v" is a version token. Static files ignore the query string, so arithmetic
+    # such as 9-2 or 1790356908-2 must not receive the same file as the real token.
+    # SQL fragments must not receive it either. The body is fixed and does not
+    # echo the parameter, so the true and false ZAP payloads stay identical.
+    RewriteCond %{REQUEST_URI} !/cache-buster-reject\.php$ [NC]
+    RewriteCond %{QUERY_STRING} (?:^|&)v=(?![0-9]{1,12}(?:&|$))(?!login-[0-9]{1,4}(?:&|$))(?![0-9]{8,12}-[A-Za-z][A-Za-z0-9_-]{0,48}(?:&|$))[^&]* [NC]
+    RewriteRule ^ cache-buster-reject.php [END]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
@@ -40,7 +48,32 @@
     <FilesMatch "\.(?i:jpg|jpeg|webp|png|gif|ico|woff2)$">
         Header set Cache-Control "public, max-age=31536000, immutable"
     </FilesMatch>
+    <FilesMatch "\.(?i:css|js|jpg|jpeg|webp|png|gif|ico|woff2|svg)$">
+        Header set X-Content-Type-Options "nosniff"
+    </FilesMatch>
     <FilesMatch "\.(?i:css|js)$">
         Header set Cache-Control "public, max-age=2592000"
     </FilesMatch>
+
+    # Clickjacking protection on every response, including the public landing page.
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Drop Access-Control-Allow-Origin: * on public images. Same-origin font
+    # preloads opt into CORS, so reflect only this site when the browser sends it.
+    Header always unset Access-Control-Allow-Origin
+    Header always set Access-Control-Allow-Origin "%{NUTILIZE_CORS_ORIGIN}e" env=NUTILIZE_CORS_ORIGIN
+    Header always append Vary "Origin" env=NUTILIZE_CORS_ORIGIN
+
+    # Replace a hosting-panel CSP when PHP published CSP_POLICY for this request.
+    Header always set Content-Security-Policy "%{CSP_POLICY}e" env=CSP_POLICY
+
+    # Static files do not run the app. Define every directive ZAP treats as
+    # having no fallback, and do not allow wildcard sources.
+    <FilesMatch "\.(?i:xml|txt|jpg|jpeg|png|gif|webp|ico|svg|css|js|map|woff2?|ttf|eot)$">
+        Header always set Content-Security-Policy "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; connect-src 'none'; frame-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; manifest-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" env=!CSP_POLICY
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_setenvif.c>
+    SetEnvIf Origin "^https://(www\.)?nutilize\.tech$" NUTILIZE_CORS_ORIGIN=$0
 </IfModule>

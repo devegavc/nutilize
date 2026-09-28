@@ -242,7 +242,7 @@ class ApprovalController extends Controller
             report($throwable);
 
             return response()->json([
-                'error' => $throwable->getMessage() ?: 'Unable to approve request.',
+                'error' => 'Unable to approve request.',
             ], 500);
         }
     }
@@ -318,7 +318,7 @@ class ApprovalController extends Controller
             report($throwable);
 
             return response()->json([
-                'error' => $throwable->getMessage() ?: 'Unable to reject request.',
+                'error' => 'Unable to reject request.',
             ], 500);
         }
     }
@@ -524,7 +524,7 @@ class ApprovalController extends Controller
             report($throwable);
 
             return response()->json([
-                'error' => $throwable->getMessage(),
+                'error' => 'Unable to update this request.',
             ], 500);
         }
     }
@@ -608,7 +608,7 @@ class ApprovalController extends Controller
             report($throwable);
 
             return response()->json([
-                'error' => $throwable->getMessage() ?: 'Unable to cancel request.',
+                'error' => 'Unable to cancel request.',
             ], 500);
         }
     }
@@ -2619,6 +2619,27 @@ class ApprovalController extends Controller
             ->all();
     }
 
+    private function userCanViewReservation(\App\Models\User $user, int $reservationId, ?Reservation $reservation = null): bool
+    {
+        if ($user->isPhysicalFacilitiesAdmin()) {
+            return true;
+        }
+
+        if ($reservation && (int) $reservation->user_id === (int) $user->user_id) {
+            return true;
+        }
+
+        $officeId = (int) ($user->office_id ?? 0);
+        if ($officeId <= 0) {
+            return false;
+        }
+
+        return ReservationApproval::query()
+            ->where('reservation_id', $reservationId)
+            ->where('office_id', $officeId)
+            ->exists();
+    }
+
     public function getReservationDetails($reservationId)
     {
         $user = Auth::user();
@@ -2631,6 +2652,13 @@ class ApprovalController extends Controller
         }
 
         $reservation = Reservation::with(['user'])->findOrFail($reservationId);
+
+        if (!$this->userCanViewReservation($user, (int) $reservationId, $reservation)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to view this reservation.',
+            ], 403);
+        }
 
         $requester = $reservation->user;
         $eventAt = $reservation->Start_of_activity

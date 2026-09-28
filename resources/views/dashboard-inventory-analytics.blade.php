@@ -15,11 +15,11 @@
 <body class="page-insights">
   <script>
     window.authUser = {
-      id: {{ auth()->user()->user_id ?? 'null' }},
-      username: '{{ auth()->user()->username ?? 'User' }}',
-      email: '{{ auth()->user()->email ?? '' }}',
-      full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
-      role: '{{ auth()->user()->role ?? 'user' }}'
+      id: @json(auth()->user()->user_id),
+      username: @json(auth()->user()->username ?? 'User'),
+      email: @json(auth()->user()->email ?? ''),
+      full_name: @json(auth()->user()->full_name ?? auth()->user()->username ?? 'User'),
+      role: @json(auth()->user()->role ?? 'user')
     };
   </script>
   <header class="top-header">
@@ -284,7 +284,7 @@
                   @foreach ($shareRows as $index => $item)
                     @php $swatch = $sharePalette[$index % count($sharePalette)]; @endphp
                     <li class="borrowed-share-row">
-                      <span class="borrowed-share-swatch" style="background: {{ $swatch }}" aria-hidden="true"></span>
+                      <span class="borrowed-share-swatch" data-swatch="{{ $swatch }}" aria-hidden="true"></span>
                       <div class="borrowed-share-copy">
                         <span class="borrowed-share-name" title="{{ $item['item_name'] }}">{{ $item['item_name'] }}</span>
                         <span class="borrowed-share-meta">{{ number_format($item['share_percent'] ?? 0, 1) }}% of borrowed units</span>
@@ -360,7 +360,7 @@
                       <span class="analytics-category-count">{{ number_format($demandQty) }}</span>
                     </div>
                     <div class="analytics-category-bar" aria-hidden="true">
-                      <span class="analytics-category-fill" style="width: {{ $barPercent }}%"></span>
+                      <span class="analytics-category-fill" data-bar-width="{{ $barPercent }}"></span>
                     </div>
                     <div class="analytics-category-meta">
                       <span>{{ $sharePercent }}% of borrowed units</span>
@@ -432,7 +432,7 @@
                     <li>
                       <span class="weekday-label">{{ $day['label'] }}</span>
                       <span class="weekday-bar">
-                        <span class="weekday-fill" style="width: {{ $day['percent'] }}%"></span>
+                        <span class="weekday-fill" data-bar-width="{{ $day['percent'] }}"></span>
                       </span>
                       <span class="weekday-count">{{ $day['count'] }}</span>
                     </li>
@@ -474,7 +474,7 @@
                           <span class="top-borrower-item">Most used: {{ $borrower['top_item'] }}</span>
                         </div>
                         <div class="top-borrower-bar" aria-hidden="true">
-                          <span class="top-borrower-fill" style="width: {{ $borrower['usage_percent'] }}%"></span>
+                          <span class="top-borrower-fill" data-bar-width="{{ $borrower['usage_percent'] }}"></span>
                         </div>
                       </div>
                     </li>

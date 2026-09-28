@@ -14,11 +14,11 @@
 <body>
   <script>
     window.authUser = {
-      id: {{ auth()->user()->user_id ?? 'null' }},
-      username: '{{ auth()->user()->username ?? 'User' }}',
-      email: '{{ auth()->user()->email ?? '' }}',
-      full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
-      role: '{{ auth()->user()->role ?? 'user' }}'
+      id: @json(auth()->user()->user_id),
+      username: @json(auth()->user()->username ?? 'User'),
+      email: @json(auth()->user()->email ?? ''),
+      full_name: @json(auth()->user()->full_name ?? auth()->user()->username ?? 'User'),
+      role: @json(auth()->user()->role ?? 'user')
     };
     window.scheduleCalendarData = @json($scheduleCalendarData);
     window.scheduleMonthBaseUrl = '{{ route('dashboard.schedule') }}';
@@ -59,7 +59,7 @@
             <div class="schedule-calendar-accent" aria-hidden="true"></div>
 
             <header class="schedule-month-row">
-              <button class="month-nav-btn" type="button" aria-label="Previous month" onclick="window.location.href='{{ $previousMonthUrl }}'">
+              <button class="month-nav-btn" type="button" aria-label="Previous month" data-nav-url="{{ $previousMonthUrl }}">
                 <i class="bi bi-chevron-left"></i>
               </button>
               <div class="schedule-month-heading">
@@ -99,7 +99,7 @@
                   </div>
                 </div>
               </div>
-              <button class="month-nav-btn" type="button" aria-label="Next month" onclick="window.location.href='{{ $nextMonthUrl }}'">
+              <button class="month-nav-btn" type="button" aria-label="Next month" data-nav-url="{{ $nextMonthUrl }}">
                 <i class="bi bi-chevron-right"></i>
               </button>
             </header>

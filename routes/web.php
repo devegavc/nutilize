@@ -105,10 +105,9 @@ Route::middleware('auth')->group(function () {
             Route::patch('/users/{userId}', [DashboardUserController::class, 'update'])->name('dashboard.users.update');
             Route::patch('/users/{userId}/status', [DashboardUserController::class, 'toggleStatus'])->name('dashboard.users.toggle-status');
             Route::delete('/users/{userId}', [DashboardUserController::class, 'destroy'])->name('dashboard.users.destroy');
+            Route::get('/history', [DashboardHistoryController::class, 'index'])->name('dashboard.history');
+            Route::post('/history/email', [DashboardHistoryController::class, 'sendReport'])->name('dashboard.history.email');
         });
-
-        Route::get('/history', [DashboardHistoryController::class, 'index'])->name('dashboard.history');
-        Route::post('/history/email', [DashboardHistoryController::class, 'sendReport'])->name('dashboard.history.email');
         Route::get('/profile', [ProfileController::class, 'show'])->name('dashboard.profile');
         Route::get('/request', [DashboardRequestController::class, 'index'])->name('dashboard.request');
         Route::get('/request/list', [DashboardRequestController::class, 'requestList'])->name('dashboard.request.list');
@@ -135,13 +134,21 @@ Route::middleware('auth')->group(function () {
 
 Route::redirect('/dashboard', '/home', 308);
 
-Route::any('/dashboard/{legacyPath}', function (string $legacyPath) {
-    $target = '/'.ltrim((string) $legacyPath, '/');
-    if ($target === '/') {
-        $target = '/home';
+Route::get('/dashboard/{legacyPath}', function (string $legacyPath) {
+    $target = '/'.ltrim($legacyPath, '/');
+
+    if (
+        !preg_match('#\A/[A-Za-z0-9][A-Za-z0-9/_-]{0,200}\z#', $target)
+        || str_contains($target, '//')
+        || str_contains($target, '..')
+    ) {
+        return redirect()->route('dashboard.home');
     }
 
     $query = request()->getQueryString();
+    if (!is_string($query) || !preg_match('/\A[A-Za-z0-9._~%=&+-]*\z/', $query)) {
+        $query = '';
+    }
 
-    return redirect($target.($query ? '?'.$query : ''), 308);
-})->where('legacyPath', '.*');
+    return redirect($target.($query !== '' ? '?'.$query : ''), 308);
+})->where('legacyPath', '[A-Za-z0-9/_-]+');

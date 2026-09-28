@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
 
 class RegisterController extends Controller
@@ -23,6 +24,20 @@ class RegisterController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $registerKey = 'register|'.$request->ip();
+
+        if (RateLimiter::tooManyAttempts($registerKey, 15)) {
+            $seconds = RateLimiter::availableIn($registerKey);
+
+            return back()
+                ->withErrors([
+                    'username' => 'Too many registration attempts. Please try again in '.$seconds.' seconds.',
+                ])
+                ->withInput($request->except('password', 'password_confirmation'));
+        }
+
+        RateLimiter::hit($registerKey, 60);
+
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
             'middle_initial' => ['nullable', 'string', 'size:1', 'alpha'],

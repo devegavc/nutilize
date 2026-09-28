@@ -15,12 +15,12 @@
 <body class="office-app">
   <script>
     window.authUser = {
-      id: {{ auth()->user()->user_id ?? 'null' }},
-      username: '{{ auth()->user()->username ?? 'User' }}',
-      email: '{{ auth()->user()->email ?? '' }}',
-      full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
-      role: '{{ auth()->user()->role ?? 'user' }}',
-      office_name: '{{ auth()->user()?->office?->department_name ?? 'Office' }}'
+      id: @json(auth()->user()->user_id),
+      username: @json(auth()->user()->username ?? 'User'),
+      email: @json(auth()->user()->email ?? ''),
+      full_name: @json(auth()->user()->full_name ?? auth()->user()->username ?? 'User'),
+      role: @json(auth()->user()->role ?? 'user'),
+      office_name: @json(auth()->user()?->office?->department_name ?? 'Office')
     };
     window.dashboardNavComponent = '/components/navbar-office.html';
   </script>
@@ -112,7 +112,7 @@
                     <td><span class="badge {{ $badgeClass }}">{{ $badgeText }}</span></td>
                     <td>
                       @if(is_null($request->approved_at) && $status === 'pending')
-                        <div style="display:flex; gap:8px; justify-content:center;">
+                        <div class="office-queue-actions">
                           <button
                             type="button"
                             class="office-queue-action-btn office-queue-approve"
@@ -127,7 +127,7 @@
                           >Reject</button>
                         </div>
                       @else
-                        <span style="color:#6a728f;">-</span>
+                        <span class="office-queue-settled">-</span>
                       @endif
                     </td>
                   </tr>

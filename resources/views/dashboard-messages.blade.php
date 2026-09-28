@@ -14,11 +14,11 @@
 <body>
   <script>
     window.authUser = {
-      id: {{ auth()->user()->user_id ?? 'null' }},
-      username: '{{ auth()->user()->username ?? 'User' }}',
-      email: '{{ auth()->user()->email ?? '' }}',
-      full_name: '{{ auth()->user()->full_name ?? auth()->user()->username ?? 'User' }}',
-      role: '{{ auth()->user()->role ?? 'user' }}'
+      id: @json(auth()->user()->user_id),
+      username: @json(auth()->user()->username ?? 'User'),
+      email: @json(auth()->user()->email ?? ''),
+      full_name: @json(auth()->user()->full_name ?? auth()->user()->username ?? 'User'),
+      role: @json(auth()->user()->role ?? 'user')
     };
   </script>
   <header class="top-header">
