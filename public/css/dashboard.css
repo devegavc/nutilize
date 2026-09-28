@@ -2133,3 +2133,107 @@ button.is-action-loading:hover {
     transform: rotate(360deg);
   }
 }
+
+/*
+ * Office roles (Program Chair, Item Owner, General Education, DO, SDAO, Security).
+ * Match the PFO desktop contract: the sidebar stays sticky in the viewport,
+ * the page scrolls with the wheel, and only a container that has a real
+ * height limit scrolls internally.
+ */
+body.office-app {
+  overflow-y: auto;
+}
+
+body.office-app .dashboard-shell,
+body.office-app .workspace-grid {
+  height: auto;
+  overflow: visible;
+}
+
+body.office-app .dashboard-shell {
+  min-height: calc(100vh - var(--top-header-height) - var(--dashboard-top-gap) - var(--dashboard-bottom-gap));
+}
+
+body.office-app .workspace-grid {
+  align-items: start;
+  min-height: 0;
+}
+
+body.office-app .workspace-grid > .content-card,
+body.office-app .office-requests-card,
+body.office-app .workspace-grid > .office-requests-card,
+body.office-app .office-archive-card,
+body.office-app .office-home-card,
+body.office-app .office-users-card,
+body.office-app .office-users-card.user-management-card {
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  overflow: visible;
+}
+
+body.office-app .office-request-history-card {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+body.office-app .office-request-history-wrap,
+body.office-app .office-archive-wrap {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.office-app .office-users-card .table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.office-app .facilities-grid,
+body.office-app .maintenance-grid {
+  flex: 0 0 auto;
+  height: auto;
+}
+
+body.office-app .facilities-grid .table-wrap,
+body.office-app .maintenance-grid .table-wrap {
+  flex: 0 0 auto;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 1101px) {
+  body.office-app {
+    overflow-x: clip;
+    overflow-y: auto;
+  }
+
+  body.office-app #navbar-container {
+    position: sticky;
+    top: calc(var(--top-header-height) + var(--dashboard-top-gap));
+    align-self: start;
+    height: calc(100vh - var(--top-header-height) - var(--dashboard-top-gap) - var(--dashboard-bottom-gap));
+    max-height: calc(100vh - var(--top-header-height) - var(--dashboard-top-gap) - var(--dashboard-bottom-gap));
+    overflow: hidden;
+    z-index: 4;
+  }
+
+  body.office-app #navbar-container .side-nav {
+    height: 100%;
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

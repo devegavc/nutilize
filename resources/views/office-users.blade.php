@@ -8,10 +8,10 @@
   <title>NUtilize | Program Users</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
-  <link rel="stylesheet" href="/css/office.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
+  <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}" />
 </head>
-<body>
+<body class="office-app">
   <script>
     window.authUser = {
       id: {{ auth()->user()->user_id ?? 'null' }},

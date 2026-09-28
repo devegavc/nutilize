@@ -9,7 +9,7 @@
   <title>NUtilize | Item Maintenance</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-  <link rel="stylesheet" href="/css/db-inventory.css" />
+  <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
   <style>
     .office-maintenance-subtitle {
       margin: 10px 22px 0;
@@ -20,7 +20,7 @@
     }
   </style>
 </head>
-<body>
+<body class="office-app">
   <script>
     window.authUser = {
       id: {{ auth()->user()->user_id ?? 'null' }},
