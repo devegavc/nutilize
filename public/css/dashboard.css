@@ -2218,6 +2218,18 @@ body.office-app .office-archive-history-card {
   overflow: hidden;
 }
 
+/* The request dashboard card shares the sidebar's row height.
+   Its title, summary tiles, and queue stay content-sized. */
+body.office-app .workspace-grid > .content-card.office-requests-card {
+  align-self: stretch;
+  height: 100%;
+  max-height: 100%;
+}
+
+body.office-app .office-request-history-card {
+  flex: 0 1 auto;
+}
+
 body.office-app .office-request-history-wrap,
 body.office-app .office-archive-wrap,
 body.office-app .content-card > .inventory-grid > .table-wrap {
