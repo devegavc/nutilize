@@ -68,53 +68,47 @@
           </article>
         </section>
 
-        <section class="inventory-grid most-requested-section{{ count($mostRequestedItems) === 0 ? ' is-empty' : '' }}">
+        <section class="inventory-grid most-requested-section">
           <div class="inventory-grid-head">
             <div class="inventory-grid-head-copy">
               <h2><i class="bi bi-bar-chart-line-fill"></i> Most Requested Items</h2>
               <p class="inventory-grid-sub">Items with the highest frequency of usage</p>
             </div>
-            <button type="button" class="most-requested-insights-btn" data-insights-href="/inventory/analytics">View Insights</button>
+            <button type="button" data-insights-href="/inventory/analytics">View Insights</button>
           </div>
 
-          @if (count($mostRequestedItems) > 0)
-            <div class="table-wrap">
-              <table class="inventory-table most-requested-table">
-                <thead>
+          <div class="table-wrap">
+            <table class="inventory-table most-requested-table">
+              <thead>
+                <tr>
+                  <th class="col-asset-id">Asset ID</th>
+                  <th class="col-item-name">Item Name</th>
+                  <th class="col-owner">Owner</th>
+                  <th class="col-category">Category</th>
+                  <th class="col-freq">Frequency Usage</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-table-body">
+                @forelse ($mostRequestedItems as $item)
                   <tr>
-                    <th class="col-asset-id" scope="col">Asset ID</th>
-                    <th class="col-item-name" scope="col">Item Name</th>
-                    <th class="col-owner" scope="col">Owner</th>
-                    <th class="col-category" scope="col">Category</th>
-                    <th class="col-freq" scope="col">Frequency Usage</th>
+                    <td class="col-asset-id">{{ $item['asset_id'] }}</td>
+                    <td class="col-item-name">{{ $item['item_name'] }}</td>
+                    <td class="col-owner">{{ $item['owner'] ?? $item['location'] ?? '—' }}</td>
+                    <td class="col-category">{{ $item['category'] }}</td>
+                    <td class="col-freq">
+                      <span class="freq-bar" aria-hidden="true">
+                        <span data-bar-width="{{ $item['usage_percent'] }}"></span>
+                      </span>
+                    </td>
                   </tr>
-                </thead>
-                <tbody id="inventory-table-body">
-                  @foreach ($mostRequestedItems as $item)
-                    <tr>
-                      <td class="col-asset-id">{{ $item['asset_id'] }}</td>
-                      <td class="col-item-name">{{ $item['item_name'] }}</td>
-                      <td class="col-owner">{{ $item['owner'] ?? $item['location'] ?? '—' }}</td>
-                      <td class="col-category">{{ $item['category'] }}</td>
-                      <td class="col-freq">
-                        <span class="freq-bar" aria-hidden="true">
-                          <span data-bar-width="{{ $item['usage_percent'] }}"></span>
-                        </span>
-                      </td>
-                    </tr>
-                  @endforeach
-                </tbody>
-              </table>
-            </div>
-          @else
-            <div class="most-requested-empty" role="status">
-              <span class="most-requested-empty-icon" aria-hidden="true">
-                <i class="bi bi-clipboard-data"></i>
-              </span>
-              <p class="most-requested-empty-title">No Request Data Yet</p>
-              <p class="most-requested-empty-text">Most requested items will appear here once inventory requests are recorded.</p>
-            </div>
-          @endif
+                @empty
+                  <tr>
+                    <td colspan="5">No item request data yet.</td>
+                  </tr>
+                @endforelse
+              </tbody>
+            </table>
+          </div>
         </section>
       </section>
     </section>
