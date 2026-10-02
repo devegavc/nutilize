@@ -23,7 +23,7 @@ class DashboardCacheService
     {
         $cacheKey = "dashboard.data.v7.user.{$userId}.office.{$officeId}";
 
-        return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
+        $data = Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
             return [
                 'stats' => self::getStats(),
                 'quickReports' => self::getQuickReports(4),
@@ -32,6 +32,12 @@ class DashboardCacheService
                 'dailyHighlights' => self::getDailyHighlights(),
             ];
         });
+
+        // #region agent log
+        @file_put_contents(base_path('debug-3877d0.log'), json_encode(['sessionId'=>'3877d0','hypothesisId'=>'D','location'=>'DashboardCacheService.php:getDashboardData','message'=>'home dashboard payload','data'=>['cacheKey'=>$cacheKey,'tasks'=>$data['tasks'] ?? null,'quickReportCount'=>is_array($data['quickReports'] ?? null) ? count($data['quickReports']) : 0,'quickReportSources'=>array_values(array_unique(array_map(static fn ($row) => (string) ($row['source'] ?? ''), is_array($data['quickReports'] ?? null) ? $data['quickReports'] : [])))],'timestamp'=>(int) round(microtime(true) * 1000),'runId'=>'pre-fix'])."\n", FILE_APPEND);
+        // #endregion
+
+        return $data;
     }
 
     /**

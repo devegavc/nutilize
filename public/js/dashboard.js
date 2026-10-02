@@ -2177,6 +2177,10 @@ function applyMaintenanceFilters() {
     return matchesTopSearch && matchesInlineSearch;
   });
 
+  // #region agent log
+  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3877d0'},body:JSON.stringify({sessionId:'3877d0',hypothesisId:'E',location:'dashboard.js:applyMaintenanceFilters',message:'rendered maintenance rows',data:{activeTab:activeMaintenanceTab,sourceRows:rows.length,filteredRows:filteredRows.length,topTerm:topTerm,inlineTerm:inlineTerm,tabCounts:{maintenance:(maintenanceRowsByTab.maintenance||[]).length,damaged:(maintenanceRowsByTab.damaged||[]).length,reported:(maintenanceRowsByTab.reported||[]).length,addressed:(maintenanceRowsByTab.addressed||[]).length}},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});
+  // #endregion
+
   if (!filteredRows.length) {
     maintenanceTableBody.removeAttribute('aria-busy');
     maintenanceTableBody.innerHTML = `

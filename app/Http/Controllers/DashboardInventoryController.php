@@ -453,6 +453,12 @@ class DashboardInventoryController extends Controller
             'addressed' => [],
         ];
 
+        // #region agent log
+        $agentMaintLog = static function (string $hypothesisId, string $message, array $data): void {
+            @file_put_contents(base_path('debug-3877d0.log'), json_encode(['sessionId'=>'3877d0','hypothesisId'=>$hypothesisId,'location'=>'DashboardInventoryController.php:maintenance','message'=>$message,'data'=>$data,'timestamp'=>(int) round(microtime(true) * 1000),'runId'=>'pre-fix'])."\n", FILE_APPEND);
+        };
+        // #endregion
+
         if (!Schema::hasTable('item_units')) {
             return view('dashboard-maintenance', [
                 'maintenanceRowsByTab' => $rowsByTab,
@@ -490,6 +496,15 @@ class DashboardInventoryController extends Controller
         $unitsNeedingAttention = $unitQuery
             ->orderByDesc('item_units.updated_at')
             ->get();
+
+        // #region agent log
+        $agentMaintLog('A', 'unit query result', [
+            'pfOwnerIds' => $pfOwnerIds,
+            'hasItemUnits' => true,
+            'unitCount' => $unitsNeedingAttention->count(),
+            'statuses' => $unitsNeedingAttention->pluck('status')->countBy()->all(),
+        ]);
+        // #endregion
 
         foreach ($unitsNeedingAttention as $unit) {
             $category = $this->normalizeCategory((string) ($unit->category ?? $unit->category_key ?? $unit->category_display ?? 'multimedia'));
@@ -543,6 +558,15 @@ class DashboardInventoryController extends Controller
             }
 
             $issueRows = $issueQuery->limit(100)->get();
+
+            // #region agent log
+            $agentMaintLog('B', 'open reservation issues', [
+                'hasReservationIssues' => true,
+                'issueCount' => $issueRows->count(),
+                'statuses' => $issueRows->pluck('status')->countBy()->all(),
+                'reportsTableSkipped' => Schema::hasTable('reports'),
+            ]);
+            // #endregion
 
             foreach ($issueRows as $issue) {
                 $description = trim((string) ($issue->description ?? ''));
@@ -857,6 +881,17 @@ class DashboardInventoryController extends Controller
                 ];
             }
         }
+
+        // #region agent log
+        $agentMaintLog('A', 'maintenance page rows', [
+            'maintenance' => count($rowsByTab['maintenance']),
+            'damaged' => count($rowsByTab['damaged']),
+            'reported' => count($rowsByTab['reported']),
+            'addressed' => count($rowsByTab['addressed']),
+            'hasMaintenanceTable' => Schema::hasTable('maintenance'),
+            'hasRooms' => Schema::hasTable('rooms'),
+        ]);
+        // #endregion
 
         return view('dashboard-maintenance', [
             'maintenanceRowsByTab' => $rowsByTab,

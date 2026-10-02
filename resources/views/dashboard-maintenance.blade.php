@@ -192,6 +192,10 @@
 
   <script>
     window.maintenanceRowsByTab = @json($maintenanceRowsByTab ?? ['maintenance' => [], 'damaged' => [], 'reported' => []]);
+    // #region agent log
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3877d0'},body:JSON.stringify({sessionId:'3877d0',hypothesisId:'C',location:'dashboard-maintenance.blade.php:payload',message:'maintenance payload in browser',data:{tab:new URLSearchParams(location.search).get('tab'),maintenance:(window.maintenanceRowsByTab.maintenance||[]).length,damaged:(window.maintenanceRowsByTab.damaged||[]).length,reported:(window.maintenanceRowsByTab.reported||[]).length,addressed:(window.maintenanceRowsByTab.addressed||[]).length},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});
+    window.addEventListener('error',function(event){fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3877d0'},body:JSON.stringify({sessionId:'3877d0',hypothesisId:'C',location:'dashboard-maintenance.blade.php:error',message:'page script error',data:{error:String(event.message||''),source:String(event.filename||''),line:event.lineno||0},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});});
+    // #endregion
     window.maintenanceUnitsEndpointBase = '{{ url('/maintenance/units') }}';
     window.maintenanceRoomsEndpointBase = '{{ url('/maintenance/rooms') }}';
     window.maintenanceReportsEndpointBase = '{{ url('/maintenance/reports') }}';
