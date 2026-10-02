@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\InventoryInput;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -41,6 +42,10 @@ class RejectUnsafeQueryValues
 
         if ($loginResponse = $this->rejectSqlShapedLogin($request)) {
             return $loginResponse;
+        }
+
+        if ($inventoryResponse = $this->rejectSqlShapedInventory($request)) {
+            return $inventoryResponse;
         }
 
         return $next($request);
@@ -102,15 +107,52 @@ class RejectUnsafeQueryValues
         return null;
     }
 
+    private function rejectSqlShapedInventory(Request $request): ?Response
+    {
+        if (!$request->isMethod('POST') && !$request->isMethod('PATCH')) {
+            return null;
+        }
+
+        $isEquipment = $request->is('inventory/equipments', 'inventory/equipments/*', 'office/items', 'office/items/*');
+        $isFacility = $request->is('inventory/facilities', 'inventory/facilities/*');
+
+        if (!$isEquipment && !$isFacility) {
+            return null;
+        }
+
+        if ($request->exists('item_name') && !InventoryInput::label($request->input('item_name'))) {
+            // #region agent log
+            $this->agentLog('C', 'rejected inventory item_name', ['route' => $request->path()]);
+            // #endregion
+            return $this->reject();
+        }
+
+        if ($isEquipment && $request->exists('in_use') && !InventoryInput::count($request->input('in_use'))) {
+            // #region agent log
+            $this->agentLog('D', 'rejected inventory in_use', ['route' => $request->path()]);
+            // #endregion
+            return $this->reject();
+        }
+
+        if ($isFacility && $request->exists('table_type') && !InventoryInput::tableType($request->input('table_type'))) {
+            // #region agent log
+            $this->agentLog('B', 'rejected inventory table_type', ['route' => $request->path()]);
+            // #endregion
+            return $this->reject();
+        }
+
+        return null;
+    }
+
     private function containsSqlBoolean(string $value): bool
     {
         return preg_match(self::SQL_BOOLEAN, $value) === 1;
     }
 
-    private function agentLog(string $hypothesisId, string $message): void
+    private function agentLog(string $hypothesisId, string $message, array $data = []): void
     {
         // #region agent log
-        @file_put_contents(base_path('debug-a9d1a3.log'), json_encode(['sessionId'=>'a9d1a3','hypothesisId'=>$hypothesisId,'location'=>'RejectUnsafeQueryValues.php','message'=>$message,'data'=>['branch'=>$message],'timestamp'=>(int) round(microtime(true)*1000),'runId'=>'recheck'])."\n", FILE_APPEND);
+        @file_put_contents(base_path('debug-afd7f1.log'), json_encode(['sessionId'=>'afd7f1','hypothesisId'=>$hypothesisId,'location'=>'RejectUnsafeQueryValues.php','message'=>$message,'data'=>$data === [] ? ['branch'=>$message] : $data,'timestamp'=>(int) round(microtime(true)*1000),'runId'=>'post-fix'])."\n", FILE_APPEND);
         // #endregion
     }
 

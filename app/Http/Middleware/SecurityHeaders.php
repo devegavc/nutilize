@@ -21,6 +21,9 @@ class SecurityHeaders
 
         $policy = $this->contentSecurityPolicy($nonce);
         $response->headers->set('Content-Security-Policy', $policy);
+        // #region agent log
+        @file_put_contents(base_path('debug-afd7f1.log'), json_encode(['sessionId'=>'afd7f1','hypothesisId'=>'E','location'=>'SecurityHeaders.php','message'=>'csp policy set','data'=>['hasFrameAncestors'=>str_contains($policy, "frame-ancestors 'self'"),'hasFormAction'=>str_contains($policy, "form-action 'self'"),'hasUnsafeInline'=>str_contains($policy, 'unsafe-inline'),'hasWildcard'=>str_contains($policy, ' *')],'timestamp'=>(int) round(microtime(true)*1000),'runId'=>'post-fix'])."\n", FILE_APPEND);
+        // #endregion
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');

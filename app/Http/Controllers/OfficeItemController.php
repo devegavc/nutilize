@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminActivityService;
+use App\Support\InventoryInput;
 use App\Services\ItemOwnerService;
 use App\Services\ItemUnitService;
 use Illuminate\Http\JsonResponse;
@@ -97,10 +98,10 @@ class OfficeItemController extends Controller
         $validated = $request->validate([
             'unit_codes' => ['nullable', 'array'],
             'unit_codes.*' => ['nullable', 'string', 'max:64'],
-            'item_name' => ['required', 'string', 'max:255'],
+            'item_name' => InventoryInput::itemNameRules(),
             'category' => ['required', 'string', Rule::in($categoryKeys)],
-            'total_count' => ['required', 'integer', 'min:0'],
-            'in_use' => ['required', 'integer', 'min:0'],
+            'total_count' => ['required', 'integer', 'min:0', 'max:999999'],
+            'in_use' => InventoryInput::countRules(),
             'status' => ['required', 'in:good,maintenance,damaged'],
         ]);
 
@@ -199,10 +200,10 @@ class OfficeItemController extends Controller
         $validated = $request->validate([
             'unit_codes' => ['nullable', 'array'],
             'unit_codes.*' => ['nullable', 'string', 'max:64'],
-            'item_name' => ['required', 'string', 'max:255'],
+            'item_name' => InventoryInput::itemNameRules(),
             'category' => ['required', 'string', Rule::in($categoryKeys)],
-            'total_count' => ['required', 'integer', 'min:0'],
-            'in_use' => ['required', 'integer', 'min:0'],
+            'total_count' => ['required', 'integer', 'min:0', 'max:999999'],
+            'in_use' => InventoryInput::countRules(),
             'status' => ['required', 'in:good,maintenance,damaged'],
         ]);
 

@@ -58,17 +58,32 @@
     # Clickjacking protection on every response, including the public landing page.
     Header always set X-Frame-Options "SAMEORIGIN"
 
-    # Drop Access-Control-Allow-Origin: * on public images. Same-origin font
-    # preloads opt into CORS, so reflect only this site when the browser sends it.
+    # Hostinger sets Access-Control-Allow-Origin: * on the onsuccess header table.
+    # "always unset" does not clear that table, so unset both. Same-origin font
+    # preloads send Origin; reflect only this site when that happens.
+    Header unset Access-Control-Allow-Origin
     Header always unset Access-Control-Allow-Origin
+    Header unset Access-Control-Allow-Methods
+    Header always unset Access-Control-Allow-Methods
+    Header unset Access-Control-Allow-Headers
+    Header always unset Access-Control-Allow-Headers
+    # Replace a hosting-panel "*" on both header tables. Scanners treat "*" as
+    # the finding. Same-origin font preloads still receive this site's origin.
+    Header set Access-Control-Allow-Origin "%{NUTILIZE_CORS_ORIGIN}e" env=NUTILIZE_CORS_ORIGIN
     Header always set Access-Control-Allow-Origin "%{NUTILIZE_CORS_ORIGIN}e" env=NUTILIZE_CORS_ORIGIN
+    Header set Access-Control-Allow-Origin "https://nutilize.tech" env=!NUTILIZE_CORS_ORIGIN
+    Header always set Access-Control-Allow-Origin "https://nutilize.tech" env=!NUTILIZE_CORS_ORIGIN
+    Header append Vary "Origin" env=NUTILIZE_CORS_ORIGIN
     Header always append Vary "Origin" env=NUTILIZE_CORS_ORIGIN
 
-    # Replace a hosting-panel CSP when PHP published CSP_POLICY for this request.
+    # hPanel's always-table policy is only "upgrade-insecure-requests", which hides
+    # the per-request nonce policy. Drop that table. Do not unset the onsuccess
+    # table: that is where PHP publishes Content-Security-Policy.
+    Header always unset Content-Security-Policy
     Header always set Content-Security-Policy "%{CSP_POLICY}e" env=CSP_POLICY
 
-    # Static files do not run the app. Define every directive ZAP treats as
-    # having no fallback, and do not allow wildcard sources.
+    # Static files do not run the app. Define every directive that has no
+    # fallback, with no wildcard sources and no unsafe-inline.
     <FilesMatch "\.(?i:xml|txt|jpg|jpeg|png|gif|webp|ico|svg|css|js|map|woff2?|ttf|eot)$">
         Header always set Content-Security-Policy "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; connect-src 'none'; frame-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; manifest-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" env=!CSP_POLICY
     </FilesMatch>
