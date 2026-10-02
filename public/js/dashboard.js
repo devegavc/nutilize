@@ -7192,6 +7192,19 @@ if (maintenanceCopyButton instanceof HTMLButtonElement && maintenanceCopyModal i
 }
 
 if (maintenanceTableBody && maintenanceTabs.length) {
+  const requestedMaintenanceTab = new URLSearchParams(window.location.search).get('tab');
+  if (requestedMaintenanceTab && Array.from(maintenanceTabs).some((button) => button.dataset.maintenanceTab === requestedMaintenanceTab)) {
+    activeMaintenanceTab = requestedMaintenanceTab;
+    maintenanceTabs.forEach((button) => {
+      const isSelected = button.dataset.maintenanceTab === requestedMaintenanceTab;
+      button.classList.toggle('active', isSelected);
+      button.classList.toggle('is-active', isSelected);
+      if (button.hasAttribute('aria-pressed')) {
+        button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      }
+    });
+  }
+
   maintenanceTabs.forEach((tabButton) => {
     tabButton.addEventListener('click', () => {
       activeMaintenanceTab = tabButton.dataset.maintenanceTab || 'all';

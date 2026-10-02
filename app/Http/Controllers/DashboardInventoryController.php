@@ -476,12 +476,9 @@ class DashboardInventoryController extends Controller
                 'item_units.created_at as unit_created_at',
                 'items.item_name',
             ])
-            ->whereIn('item_units.status', ['maintenance', 'damaged']);
+            ->whereIn(DB::raw("LOWER(TRIM(COALESCE(item_units.status, '')))"), ['maintenance', 'damaged']);
 
         $pfOwnerIds = ItemOwnerService::physicalFacilitiesOwnerIds();
-        if ($pfOwnerIds !== []) {
-            $unitQuery->whereIn('items.owner_id', $pfOwnerIds);
-        }
 
         if (Schema::hasColumn('items', 'category')) {
             $unitQuery->addSelect('items.category');

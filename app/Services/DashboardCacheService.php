@@ -21,7 +21,7 @@ class DashboardCacheService
      */
     public static function getDashboardData(int $userId, int $officeId): array
     {
-        $cacheKey = "dashboard.data.v7.user.{$userId}.office.{$officeId}";
+        $cacheKey = "dashboard.data.v8.user.{$userId}.office.{$officeId}";
 
         $data = Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
             return [
@@ -439,14 +439,10 @@ class DashboardCacheService
         $needRepair = 0;
 
         if (
-            $pfOwnerIds !== []
-            && self::hasTable('item_units')
+            self::hasTable('item_units')
             && self::hasColumn('item_units', 'status')
-            && self::hasTable('items')
         ) {
             $unitCounts = DB::table('item_units as units')
-                ->join('items as items', 'items.item_id', '=', 'units.item_id')
-                ->whereIn('items.owner_id', $pfOwnerIds)
                 ->whereIn(DB::raw("LOWER(TRIM(COALESCE(units.status, '')))"), ['damaged', 'maintenance'])
                 ->selectRaw("SUM(CASE WHEN LOWER(TRIM(COALESCE(units.status, ''))) = 'damaged' THEN 1 ELSE 0 END) as damaged_total")
                 ->selectRaw("SUM(CASE WHEN LOWER(TRIM(COALESCE(units.status, ''))) = 'maintenance' THEN 1 ELSE 0 END) as maintenance_total")
