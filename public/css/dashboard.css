@@ -2143,3 +2143,149 @@ button.is-action-loading:hover {
     transform: rotate(360deg);
   }
 }
+
+/*
+ * Office roles (Program Chair, Item Owner, General Education, DO, SDAO, Security).
+ * The header and sidebar stay in the viewport. The document does not scroll.
+ * A content card is only as tall as its content, and is capped at the space
+ * beside the sidebar. When that cap is hit, the list inside the card scrolls.
+ */
+html:has(body.office-app) {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.office-app {
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: calc(var(--top-header-height) + var(--dashboard-top-gap)) var(--dashboard-page-padding) var(--dashboard-bottom-gap);
+}
+
+body.office-app .dashboard-shell {
+  flex: 1 1 auto;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body.office-app .workspace-grid {
+  height: calc(100% - 10px);
+  min-height: 0;
+  overflow: hidden;
+  align-items: stretch;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+body.office-app .workspace-grid > .content-card {
+  align-self: start;
+  height: auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+body.office-app .office-requests-card,
+body.office-app .workspace-grid > .office-requests-card,
+body.office-app .office-archive-card,
+body.office-app .office-home-card,
+body.office-app .office-users-card,
+body.office-app .office-users-card.user-management-card,
+body.office-app .facilities-content-card,
+body.office-app .maintenance-content-card {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  height: auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+body.office-app .office-request-history-card,
+body.office-app .office-archive-history-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The request dashboard card shares the sidebar's row height.
+   Its title, summary tiles, and queue stay content-sized. */
+body.office-app .workspace-grid > .content-card.office-requests-card {
+  align-self: stretch;
+  height: 100%;
+  max-height: 100%;
+}
+
+body.office-app .office-request-history-card {
+  flex: 0 1 auto;
+}
+
+body.office-app .office-request-history-wrap,
+body.office-app .office-archive-wrap,
+body.office-app .content-card > .inventory-grid > .table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.office-app .content-card > .inventory-grid {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body.office-app .facilities-grid,
+body.office-app .maintenance-grid {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+@media (min-width: 1101px) {
+  body.office-app #navbar-container {
+    position: relative;
+    top: auto;
+    align-self: stretch;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    z-index: 4;
+  }
+
+  body.office-app #navbar-container .side-nav {
+    height: 100%;
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 1100px) {
+  body.office-app {
+    padding: calc(var(--top-header-height) + var(--dashboard-top-gap)) 12px 12px;
+  }
+
+  body.office-app .dashboard-shell {
+    height: auto;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+  }
+}

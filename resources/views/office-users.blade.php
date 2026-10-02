@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
   <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}" />
 </head>
-<body>
+<body class="office-app">
   <script>
     window.authUser = {
       id: @json(auth()->user()->user_id),

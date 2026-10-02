@@ -20,7 +20,7 @@
     }
   </style>
 </head>
-<body>
+<body class="office-app">
   <script>
     window.authUser = {
       id: @json(auth()->user()->user_id),

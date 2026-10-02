@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}-outsider-status" />
 </head>
-<body>
+<body class="office-app">
   <script>
     window.authUser = {
       id: @json(auth()->user()->user_id),

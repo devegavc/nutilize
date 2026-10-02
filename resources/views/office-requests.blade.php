@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/css/dashboard.css?v={{ filemtime(public_path('css/dashboard.css')) }}" />
   <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}" />
 </head>
-<body>
+<body class="office-app">
   <script>
     window.authUser = {
       id: @json(auth()->user()->user_id),
