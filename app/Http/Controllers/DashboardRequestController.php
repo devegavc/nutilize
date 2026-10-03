@@ -43,6 +43,12 @@ class DashboardRequestController extends Controller
         $user = Auth::user();
 
         if (!$user || !$user->isOfficeApprover()) {
+            // #region agent log
+            try {
+                file_put_contents(base_path('debug-b44aea.log'), json_encode(['sessionId' => 'b44aea', 'hypothesisId' => 'D', 'location' => 'DashboardRequestController.php:index', 'message' => 'request page blocked', 'data' => ['hasUser' => (bool) $user, 'officeId' => (int) ($user->office_id ?? 0), 'role' => (string) ($user->role ?? '')], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
+            } catch (\Throwable $e) {
+            }
+            // #endregion
             return redirect('/home')->with('error', 'Unauthorized access.');
         }
 
@@ -103,6 +109,14 @@ class DashboardRequestController extends Controller
         $reservations = $reservationsQuery
             ->simplePaginate(20)
             ->withQueryString();
+
+        // #region agent log
+        try {
+            $ids = $reservations->getCollection()->pluck('reservation_id')->map(fn ($id) => (int) $id)->all();
+            file_put_contents(base_path('debug-b44aea.log'), json_encode(['sessionId' => 'b44aea', 'hypothesisId' => 'A', 'location' => 'DashboardRequestController.php:buildRequestPageViewData', 'message' => 'request page ids', 'data' => ['isPfAdmin' => (bool) $isPfAdmin, 'officeId' => (int) ($user->office_id ?? 0), 'role' => (string) ($user->role ?? ''), 'returnedIds' => $ids, 'includesNew' => array_values(array_intersect($ids, [288, 289, 310]))], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
+        } catch (\Throwable $e) {
+        }
+        // #endregion
 
         $reservationIds = $reservations->getCollection()->pluck('reservation_id')->map(fn ($id) => (int) $id)->all();
 
