@@ -60,12 +60,6 @@ class ApprovalController extends Controller
         $user = Auth::user();
         
         if (!$user->isOfficeApprover()) {
-            // #region agent log
-            try {
-                file_put_contents(base_path('debug-b44aea.log'), json_encode(['sessionId' => 'b44aea', 'hypothesisId' => 'D', 'location' => 'ApprovalController.php:index', 'message' => 'approval page blocked', 'data' => ['officeId' => (int) ($user->office_id ?? 0), 'role' => (string) ($user->role ?? '')], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
-            } catch (\Throwable $e) {
-            }
-            // #endregion
             return redirect('/home')->with('error', 'Unauthorized access.');
         }
 
@@ -103,13 +97,6 @@ class ApprovalController extends Controller
             ->with(['reservation.user', 'reservation.approvals', 'reservation.details'])
             ->orderByDesc('created_at')
             ->paginate(10);
-
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-b44aea.log'), json_encode(['sessionId' => 'b44aea', 'hypothesisId' => 'B', 'location' => 'ApprovalController.php:index', 'message' => 'approval queue', 'data' => ['officeId' => (int) ($user->office_id ?? 0), 'role' => (string) ($user->role ?? ''), 'isPf' => (bool) $user->isPhysicalFacilitiesAdmin(), 'actionableCount' => count($actionableReservationIds), 'actionableHasNew' => array_values(array_intersect($actionableReservationIds, [288, 289, 310])), 'pendingTotal' => $pendingApprovals->total()], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
-        } catch (\Throwable $e) {
-        }
-        // #endregion
 
         $returnApprovals = ReservationApproval::where('office_id', $user->office_id)
             ->where('status', 'approved')

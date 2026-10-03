@@ -8,8 +8,10 @@ use App\Services\AdminActivityService;
 use App\Services\ItemOwnerService;
 use App\Services\UserAccountStatusService;
 use App\Services\UserNameService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
@@ -18,14 +20,32 @@ class DashboardUserController extends Controller
 {
     public function index()
     {
-        UserAccountStatusService::applyInactivityPolicy();
+        $this->applyInactivityPolicySafely();
 
-        $users = User::with(['office', 'academicProgram.office'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $relations = ['office'];
+        if (Schema::hasTable('academic_programs') && Schema::hasColumn('users', 'program_id')) {
+            $relations[] = 'academicProgram.office';
+        }
+
+        $orderColumn = Schema::hasColumn('users', 'created_at') ? 'created_at' : 'user_id';
+
+        try {
+            $users = User::with($relations)
+                ->orderBy($orderColumn, 'desc')
+                ->get();
+        } catch (QueryException $e) {
+            $this->logUsersDb('A', 'user list eager load failed', $e);
+            $users = User::query()->orderBy($orderColumn, 'desc')->get();
+        }
 
         $offices = Office::orderBy('department_name', 'asc')->get();
-        $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
+
+        try {
+            $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
+        } catch (QueryException $e) {
+            $this->logUsersDb('C', 'item owner office lookup failed', $e);
+            $itemOwnerOfficeId = null;
+        }
 
         return view('dashboard-users', [
             'users' => $users,
@@ -205,6 +225,43 @@ class DashboardUserController extends Controller
         }
 
         return redirect()->route('dashboard.users')->with('success', $message);
+    }
+
+    private function applyInactivityPolicySafely(): void
+    {
+        if (!Schema::hasColumn('users', 'is_active')) {
+            // #region agent log
+            $this->logUsersDb('B', 'skipped inactivity, is_active missing');
+            // #endregion
+            return;
+        }
+
+        try {
+            UserAccountStatusService::applyInactivityPolicy();
+        } catch (QueryException $e) {
+            $this->logUsersDb('B', 'inactivity policy failed', $e);
+        }
+    }
+
+    private function logUsersDb(string $hypothesisId, string $message, ?\Throwable $e = null): void
+    {
+        // #region agent log
+        $summary = '';
+        if ($e) {
+            $summary = strtok($e->getMessage(), "\n") ?: '';
+            $summary = preg_replace('/\b[\w.+-]+@[\w.-]+\b/', '[email]', $summary) ?? $summary;
+            $summary = substr($summary, 0, 240);
+        }
+        @file_put_contents(base_path('debug-afd7f1.log'), json_encode([
+            'sessionId' => 'afd7f1',
+            'runId' => 'users-fix',
+            'hypothesisId' => $hypothesisId,
+            'location' => 'DashboardUserController.php',
+            'message' => $message,
+            'data' => ['summary' => $summary],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ]) . "\n", FILE_APPEND);
+        // #endregion
     }
 
     /**

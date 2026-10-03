@@ -23,16 +23,10 @@ class RejectUnsafeQueryValues
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->query->has('v') && !$this->isAllowedCacheBuster($request->query('v'))) {
-            // #region agent log
-            $this->agentLog('B', 'rejected cache-buster');
-            // #endregion
             return $this->reject();
         }
 
         if ($request->query->has('force') && !$this->isAllowedForceFlag($request->query('force'))) {
-            // #region agent log
-            $this->agentLog('D', 'rejected force flag');
-            // #endregion
             return $this->reject();
         }
 
@@ -72,9 +66,6 @@ class RejectUnsafeQueryValues
             : $request->query->get('_token');
 
         if (!is_string($token) || preg_match('/^[A-Za-z0-9]{1,255}$/', $token) !== 1) {
-            // #region agent log
-            $this->agentLog('E', 'rejected csrf token shape');
-            // #endregion
             return $this->reject();
         }
 
@@ -91,16 +82,10 @@ class RejectUnsafeQueryValues
         $password = $request->request->get('password');
 
         if (!is_string($username) || ($username !== '' && preg_match(self::LOGIN_IDENTIFIER, $username) !== 1)) {
-            // #region agent log
-            $this->agentLog('C', 'rejected login username');
-            // #endregion
             return $this->reject();
         }
 
         if (!is_string($password) || strlen($password) > 255 || $this->containsSqlBoolean($password)) {
-            // #region agent log
-            $this->agentLog('C', 'rejected login password');
-            // #endregion
             return $this->reject();
         }
 
@@ -121,23 +106,14 @@ class RejectUnsafeQueryValues
         }
 
         if ($request->exists('item_name') && !InventoryInput::label($request->input('item_name'))) {
-            // #region agent log
-            $this->agentLog('C', 'rejected inventory item_name', ['route' => $request->path()]);
-            // #endregion
             return $this->reject();
         }
 
         if ($isEquipment && $request->exists('in_use') && !InventoryInput::count($request->input('in_use'))) {
-            // #region agent log
-            $this->agentLog('D', 'rejected inventory in_use', ['route' => $request->path()]);
-            // #endregion
             return $this->reject();
         }
 
         if ($isFacility && $request->exists('table_type') && !InventoryInput::tableType($request->input('table_type'))) {
-            // #region agent log
-            $this->agentLog('B', 'rejected inventory table_type', ['route' => $request->path()]);
-            // #endregion
             return $this->reject();
         }
 
@@ -147,13 +123,6 @@ class RejectUnsafeQueryValues
     private function containsSqlBoolean(string $value): bool
     {
         return preg_match(self::SQL_BOOLEAN, $value) === 1;
-    }
-
-    private function agentLog(string $hypothesisId, string $message, array $data = []): void
-    {
-        // #region agent log
-        @file_put_contents(base_path('debug-afd7f1.log'), json_encode(['sessionId'=>'afd7f1','hypothesisId'=>$hypothesisId,'location'=>'RejectUnsafeQueryValues.php','message'=>$message,'data'=>$data === [] ? ['branch'=>$message] : $data,'timestamp'=>(int) round(microtime(true)*1000),'runId'=>'post-fix'])."\n", FILE_APPEND);
-        // #endregion
     }
 
     private function reject(): Response
