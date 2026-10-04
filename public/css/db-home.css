@@ -1500,6 +1500,28 @@ body:has(.home-dashboard-card) .home-dashboard-card {
     padding-right: 20px;
   }
 
+  .middle-grid {
+    gap: 18px;
+    padding-bottom: 0;
+  }
+
+  .home-right-stack {
+    gap: 18px;
+  }
+
+  .tasks-panel {
+    min-height: 0;
+  }
+
+  .home-extra-grid {
+    padding-top: 18px;
+  }
+
+  .home-announcement-btn {
+    width: 100%;
+    margin: 0;
+  }
+
   .inventory-btn {
     min-height: 58px;
   }
@@ -1507,7 +1529,42 @@ body:has(.home-dashboard-card) .home-dashboard-card {
 
 @media (max-width: 700px) {
   .home-dashboard-card .stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 16px 12px 8px;
+  }
+
+  .middle-grid,
+  .home-extra-grid {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .home-dashboard-card .stat-card {
+    min-width: 0;
+    min-height: 0;
+    padding: 12px 10px;
+    gap: 8px;
+  }
+
+  .home-dashboard-card .stat-card > div {
+    min-width: 0;
+  }
+
+  .home-dashboard-card .stat-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.15rem;
+  }
+
+  .home-dashboard-card .stat-number {
+    font-size: 1.4rem;
+  }
+
+  .home-dashboard-card .stat-label {
+    font-size: 0.8rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
   }
 
   .upcoming-card li {

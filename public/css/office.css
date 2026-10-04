@@ -295,7 +295,14 @@
 		font-size: 1.1rem;
 	}
 
-	.office-stats-grid,
+	.office-stats-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.office-stat-card {
+		min-width: 0;
+	}
+
 	.office-bottom-grid {
 		grid-template-columns: 1fr;
 	}
@@ -2025,7 +2032,32 @@ select.office-history-filter-control option {
 
 @media (max-width: 760px) {
 	.office-request-summary-grid {
-		grid-template-columns: 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px;
+		padding-left: 12px;
+		padding-right: 12px;
+	}
+
+	.office-request-summary-tile {
+		min-width: 0;
+		min-height: 0;
+		padding: 12px 10px;
+		gap: 8px;
+	}
+
+	.office-request-summary-tile > div {
+		min-width: 0;
+	}
+
+	.office-request-summary-icon {
+		width: 42px;
+		height: 42px;
+		font-size: 1.2rem;
+		flex-shrink: 0;
+	}
+
+	.office-request-summary-label {
+		overflow-wrap: anywhere;
 	}
 
 	.office-archive-overview {
@@ -2365,7 +2397,7 @@ select.office-history-filter-control option {
 
 @media (max-width: 1100px) {
 	.office-request-summary-grid {
-		grid-template-columns: repeat(2, 1fr);
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
 	.office-archive-overview {
