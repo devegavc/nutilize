@@ -12,7 +12,7 @@
   <link rel="preload" href="/fonts/poppins-800.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="/fonts/poppins-400.woff2" as="font" type="font/woff2" crossorigin />
 
-  <link rel="stylesheet" href="/css/landing.css?v=7" />
+  <link rel="stylesheet" href="/css/landing.css?v=10" />
 </head>
 <body>
   <header class="top-header">
@@ -31,7 +31,19 @@
         </picture>
       </a>
 
-      <nav class="top-nav" aria-label="Primary">
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+        aria-label="Open menu"
+      >
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+
+      <nav class="top-nav" id="primary-nav" aria-label="Primary">
         <a href="#home" class="nav-link">Home</a>
         <a href="#facilities" class="nav-link">Facilities</a>
         <a href="#about" class="nav-link">About</a>
@@ -194,14 +206,57 @@
   </section>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      const headerOffset = 88; // should match CSS scroll-margin-top / header height
-      const navLinks = Array.from(document.querySelectorAll('.top-nav .nav-link'));
+      const header = document.querySelector('.top-header');
+      const navToggle = document.querySelector('.nav-toggle');
+      const primaryNav = document.getElementById('primary-nav');
+
+      function headerOffset() {
+        return (header ? header.offsetHeight : 76) + 8;
+      }
+
+      function setMenuOpen(isOpen) {
+        if (!header || !navToggle) {
+          return;
+        }
+
+        header.classList.toggle('is-menu-open', isOpen);
+        navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        navToggle.setAttribute('aria-label', isOpen ? 'Close menu' : 'Open menu');
+      }
+
+      if (navToggle) {
+        navToggle.addEventListener('click', function () {
+          setMenuOpen(!header.classList.contains('is-menu-open'));
+        });
+      }
+
+      if (primaryNav) {
+        primaryNav.addEventListener('click', function (event) {
+          if (event.target.closest('a')) {
+            setMenuOpen(false);
+          }
+        });
+      }
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+          setMenuOpen(false);
+        }
+      });
+
+      window.addEventListener('resize', function () {
+        if (window.innerWidth > 820) {
+          setMenuOpen(false);
+        }
+      });
+
+      const navLinks = Array.from(document.querySelectorAll('.top-nav .nav-link, .top-nav .login-btn'));
       const hashLinks = navLinks.filter(l => l.getAttribute('href') && l.getAttribute('href').startsWith('#'));
 
       const sections = hashLinks.map(l => document.querySelector(l.getAttribute('href'))).filter(Boolean);
 
       function setActiveLink() {
-        const fromTop = window.scrollY + headerOffset + 2;
+        const fromTop = window.scrollY + headerOffset() + 2;
         let current = sections[0] || null;
         for (let i = 0; i < sections.length; i++) {
           const sec = sections[i];
@@ -221,7 +276,8 @@
           e.preventDefault();
           const target = document.querySelector(this.getAttribute('href'));
           if (!target) return;
-          const y = target.getBoundingClientRect().top + window.scrollY - headerOffset;
+          setMenuOpen(false);
+          const y = target.getBoundingClientRect().top + window.scrollY - headerOffset();
           window.scrollTo({ top: y, behavior: 'smooth' });
         });
       });
