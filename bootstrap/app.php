@@ -6,6 +6,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -30,6 +31,16 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (QueryException|\PDOException $e, Request $request) {
+            $driverMessage = $e instanceof QueryException
+                ? ($e->errorInfo[2] ?? $e->getMessage())
+                : $e->getMessage();
+
+            Log::error('Database query failed', [
+                'sqlstate' => $e instanceof QueryException ? ($e->errorInfo[0] ?? $e->getCode()) : $e->getCode(),
+                'message' => $driverMessage,
+                'url' => $request->path(),
+            ]);
+
             $message = $e->getMessage();
 
             $networkErrors = [
@@ -49,8 +60,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 }
             }
 
+            $publicMessage = 'A database error occurred. Please try again later.';
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $publicMessage], 500);
+            }
+
             return response()->view('errors.database-error', [
-                'message' => 'A database error occurred. Please try again later.',
+                'message' => $publicMessage,
             ], 500);
         });
     })->create();

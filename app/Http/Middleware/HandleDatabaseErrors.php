@@ -21,9 +21,14 @@ class HandleDatabaseErrors
             return $next($request);
         } catch (QueryException|PDOException $e) {
             // Log the error
-            \Log::error('Database Connection Error', [
-                'error' => $e->getMessage(),
-                'url' => $request->url(),
+            $driverMessage = $e instanceof QueryException
+                ? ($e->errorInfo[2] ?? $e->getMessage())
+                : $e->getMessage();
+
+            \Log::error('Database query failed', [
+                'sqlstate' => $e instanceof QueryException ? ($e->errorInfo[0] ?? $e->getCode()) : $e->getCode(),
+                'message' => $driverMessage,
+                'url' => $request->path(),
             ]);
 
             // Check if it's a network/connection error
@@ -33,9 +38,14 @@ class HandleDatabaseErrors
                 ], 503);
             }
 
-            // Other database errors
+            $publicMessage = 'A database error occurred. Please try again later.';
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $publicMessage], 500);
+            }
+
             return response()->view('errors.database-error', [
-                'message' => 'Database error occurred.',
+                'message' => $publicMessage,
             ], 500);
         }
     }

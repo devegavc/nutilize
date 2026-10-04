@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Services\AdminActivityService;
 use App\Services\ProgramChairOfficeResolver;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
 {
@@ -28,6 +30,10 @@ class ProfileController extends Controller
     public function update(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        $request->merge([
+            'email' => trim((string) $request->input('email', '')),
+        ]);
 
         $rules = [
             'first_name' => ['required', 'string', 'max:100'],
@@ -76,7 +82,17 @@ class ProfileController extends Controller
             $user->program_id = (int) $validated['program_id'];
         }
 
-        $user->save();
+        try {
+            $user->save();
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[0] ?? null) === '23505') {
+                throw ValidationException::withMessages([
+                    'email' => 'This email address is already in use.',
+                ]);
+            }
+
+            throw $exception;
+        }
 
         AdminActivityService::log((int) $user->user_id, 'Updated profile', 'Account');
 
