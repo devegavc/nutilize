@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
   <!-- Custom styles -->
-  <link rel="stylesheet" href="/css/auth.css?v=login-4">
+  <link rel="stylesheet" href="/css/auth.css?v=login-6">
 </head>
 <body class="login-page">
 
@@ -41,6 +41,7 @@
           <p class="brand-subtitle">
             Campus Resource & Reservation Management System
           </p>
+          <span class="login-heading-rule" aria-hidden="true"></span>
           <h1 class="login-heading">
             Sign in to your <span class="login-heading-admin">Admin</span> account
           </h1>

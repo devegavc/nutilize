@@ -388,8 +388,46 @@ body {
 }
 
 /* Login page layout corrections — scoped so register stays unchanged */
+body.login-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: #ffffff;
+  background-color: #1c2d78;
+  background-image:
+    linear-gradient(165deg, rgba(16, 28, 86, 0.78) 0%, rgba(36, 58, 148, 0.58) 46%, rgba(14, 24, 72, 0.8) 100%),
+    url("/img/nulipa_front.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.login-page .top-header {
+  display: none;
+}
+
+.login-page .page-content {
+  min-height: 100vh;
+  min-height: 100dvh;
+  height: auto;
+  padding: 1.25rem 1rem;
+}
+
 .login-page .login-card {
   padding: 2.25rem 2rem 2.1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.14) 100%),
+    rgba(12, 24, 72, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 22px 48px rgba(8, 16, 48, 0.34);
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.login-page .login-card::after {
+  content: none;
+  display: none;
 }
 
 .login-page .login-card-inner {
@@ -409,16 +447,25 @@ body {
 }
 
 .login-page .brand-subtitle {
-  margin: 0 0 0.7rem;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
   font-size: 0.92rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.4;
+}
+
+.login-page .login-heading-rule {
+  display: block;
+  width: 4.25rem;
+  height: 1px;
+  margin: 0.75rem auto 0.7rem;
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .login-page h1.login-heading {
   margin: 0;
   padding: 0;
-  color: var(--secondary);
+  color: #ffffff;
   font-size: 1.12rem;
   font-weight: 600;
   line-height: 1.35;
@@ -427,11 +474,16 @@ body {
 
 .login-page .login-heading-admin {
   font-weight: 700;
-  color: var(--secondary-deep);
+  color: #ffffff;
 }
 
 .login-page .login-field {
   margin-bottom: 0.7rem;
+}
+
+.login-page .input-group {
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .login-page .input-group-text {
@@ -442,20 +494,44 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 1rem;
+  color: #243274;
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 .login-page .form-control {
   padding: 0.68rem 0.85rem;
   font-size: 0.95rem;
+  color: #1a2347;
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 .login-page .form-control::placeholder {
+  color: #3e4a6e;
+  opacity: 1;
   font-size: 0.95rem;
+}
+
+.login-page .form-control:focus {
+  color: #1a2347;
+  background: #ffffff;
+  border-color: #8da0e0;
+  box-shadow: none;
 }
 
 .login-page .btn-password-toggle {
   min-width: 2.6rem;
   padding: 0 0.55rem;
+  color: #243274;
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.login-page .btn-password-toggle:hover,
+.login-page .btn-password-toggle:focus {
+  color: #1a2347;
+  background: #ffffff;
 }
 
 .login-page .login-options {
@@ -474,7 +550,7 @@ body {
   gap: 0.45rem;
   margin: 0;
   padding: 0;
-  color: var(--secondary);
+  color: #ffffff;
   font-size: 0.9rem;
   font-weight: 500;
   line-height: 1.2;
@@ -490,9 +566,9 @@ body {
   height: 1.05rem;
   margin: 0;
   flex-shrink: 0;
-  border: 1.5px solid #9aa8d8;
+  border: 1.5px solid rgba(255, 255, 255, 0.8);
   border-radius: 0.25rem;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
   cursor: pointer;
 }
 
@@ -506,9 +582,9 @@ body {
 }
 
 .login-page .login-remember-input:focus-visible {
-  outline: 2px solid var(--secondary);
+  outline: 2px solid #ffffff;
   outline-offset: 2px;
-  box-shadow: 0 0 0 0.25rem rgba(80, 101, 184, 0.22);
+  box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.22);
 }
 
 .login-page a.forgot-password-link {
@@ -520,7 +596,7 @@ body {
   border: 0;
   background: none;
   box-shadow: none;
-  color: var(--secondary);
+  color: #ffffff;
   font-family: inherit;
   font-size: 0.9rem;
   font-weight: 600;
@@ -534,13 +610,13 @@ body {
 
 .login-page a.forgot-password-link:hover,
 .login-page a.forgot-password-link:focus {
-  color: var(--secondary-deep);
+  color: #ffffff;
   background: none;
   text-decoration: underline;
 }
 
 .login-page a.forgot-password-link:focus-visible {
-  outline: 2px solid var(--secondary);
+  outline: 2px solid #ffffff;
   outline-offset: 3px;
   border-radius: 3px;
 }
@@ -548,10 +624,10 @@ body {
 .login-page .forgot-password-help {
   margin: -0.35rem 0 1rem;
   padding: 0.7rem 0.85rem;
-  border: 1px solid rgba(50, 65, 140, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.32);
   border-radius: 10px;
-  background: rgba(50, 65, 140, 0.06);
-  color: var(--secondary);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
   font-size: 0.85rem;
   line-height: 1.45;
 }
@@ -564,6 +640,21 @@ body {
   min-height: 3.1rem;
   padding: 0.75rem 1rem;
   font-size: 1.05rem;
+  background: linear-gradient(135deg, #3d56c8 0%, #5470e0 100%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 12px 24px rgba(6, 12, 40, 0.4);
+}
+
+.login-page .btn-login:hover,
+.login-page .btn-login:focus {
+  background: linear-gradient(135deg, #3148b4 0%, #4562d4 100%);
+  filter: none;
+}
+
+.login-page .alert {
+  border: 0;
+  border-radius: 10px;
+  font-size: 0.85rem;
 }
 
 .login-page .btn-login-content {
@@ -589,8 +680,12 @@ body {
 }
 
 @media (max-width: 576px) {
+  .login-page .page-content {
+    padding: 0.85rem 0.85rem;
+  }
+
   .login-page .login-card {
-    padding: 1.75rem 1.25rem 1.6rem;
+    padding: 1.5rem 1.15rem 1.35rem;
   }
 
   .login-page .brand-logo {
@@ -608,6 +703,27 @@ body {
 
   .login-page .login-options {
     gap: 0.5rem 0.75rem;
+  }
+}
+
+@media (max-height: 740px) {
+  .login-page .page-content {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .login-page .login-card {
+    padding-top: 1.35rem;
+    padding-bottom: 1.2rem;
+  }
+
+  .login-page .brand-area {
+    margin-bottom: 0.8rem;
+  }
+
+  .login-page .login-heading-rule {
+    margin-top: 0.55rem;
+    margin-bottom: 0.5rem;
   }
 }
 
