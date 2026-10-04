@@ -1693,3 +1693,35 @@ body:has(.home-dashboard-card) .home-dashboard-card {
 .announcement-delete-confirm-btn.delete:hover {
   background: #b83232;
 }
+
+@media (max-width: 700px) {
+  .announcements-modal,
+  .quick-report-details-modal,
+  .app-confirm-modal,
+  .announcement-delete-confirm-modal {
+    padding: 10px;
+    overflow-x: hidden;
+  }
+
+  .announcements-modal-card,
+  .quick-report-details-card,
+  .app-confirm-card,
+  .announcement-delete-confirm-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 20px);
+    overflow: auto;
+    box-sizing: border-box;
+  }
+
+  .quick-report-details-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-report-proof-frame img {
+    width: 100%;
+    height: auto;
+    max-height: 240px;
+    object-fit: contain;
+  }
+}

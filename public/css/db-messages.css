@@ -265,3 +265,28 @@
     font-size: 1.35rem;
   }
 }
+
+@media (max-width: 700px) {
+  .messages-content-card,
+  .messages-list-panel,
+  .messages-thread-panel {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .messages-content-card {
+    padding: 12px;
+  }
+
+  .messages-list-panel h1 {
+    font-size: 1.15rem;
+  }
+
+  .message-compose input,
+  .message-compose textarea,
+  .messages-thread-panel input,
+  .messages-thread-panel textarea {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}

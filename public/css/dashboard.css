@@ -2413,3 +2413,57 @@ body.office-app .maintenance-grid {
     padding: 0;
   }
 }
+
+/* Phone layout: fit controls to the screen. Wide tables scroll inside .table-wrap only. */
+@media (max-width: 700px) {
+  .dashboard-shell,
+  .workspace-grid,
+  .content-card,
+  .dashboard-view,
+  .inventory-grid {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .section-title {
+    padding: 12px 14px;
+    font-size: 1.05rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .table-wrap,
+  .inventory-grid .table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .inventory-table th,
+  .inventory-table td {
+    padding: 8px 8px;
+    font-size: 0.78rem;
+  }
+
+  .table-edit-btn,
+  .table-delete-btn,
+  .table-status-btn {
+    white-space: nowrap;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+
+  .content-card input,
+  .content-card select,
+  .content-card textarea,
+  .facilities-modal input,
+  .facilities-modal select,
+  .facilities-modal textarea {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .content-card img {
+    max-width: 100%;
+  }
+}

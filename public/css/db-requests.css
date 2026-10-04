@@ -1053,6 +1053,52 @@
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
+
+  .request-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 100%;
+    gap: 6px;
+  }
+
+  .request-tab {
+    flex: 0 1 auto;
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+
+  .request-progress-block {
+    overflow: visible;
+    max-width: 100%;
+  }
+
+  .request-item.is-selected .status-timeline {
+    grid-template-columns: repeat(var(--timeline-steps), minmax(0, 1fr));
+  }
+
+  .status-step-node {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    aspect-ratio: 1 / 1;
+  }
+
+  .status-step-label {
+    overflow-wrap: anywhere;
+    line-height: 1.15;
+  }
+
+  .request-list-wrap .pagination {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    max-width: 100%;
+  }
 }
 
 .request-item:not(.is-selected) > .request-progress-block,

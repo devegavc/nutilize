@@ -323,8 +323,13 @@
 	}
 
 	.office-table-filters label {
-		width: 100%;
+		width: auto;
+		min-width: 0;
 		justify-content: space-between;
+	}
+
+	.office-history-filters {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }
 
@@ -2084,7 +2089,7 @@ select.office-history-filter-control option {
 
 	.office-history-filters {
 		display: grid;
-		grid-template-columns: 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		padding: 12px;
 	}
 
@@ -2528,4 +2533,73 @@ select.office-history-filter-control option {
 
 .office-users-card .users-table .table-actions-cell .inline-action-form {
 	margin: 0 0 0 6px;
+}
+
+@media (max-width: 700px) {
+	.office-table-header {
+		padding: 10px 12px;
+		gap: 8px;
+	}
+
+	.office-table-header h2 {
+		font-size: 1.05rem;
+	}
+
+	.office-table-filters {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 8px;
+		width: 100%;
+	}
+
+	.office-table-filters label {
+		width: auto;
+		min-width: 0;
+		font-size: 0.78rem;
+	}
+
+	.office-table-filters select {
+		max-width: 100%;
+		min-width: 0;
+	}
+
+	.office-request-history-wrap,
+	.office-archive-wrap,
+	.office-users-card .table-wrap {
+		max-width: 100%;
+		overflow-x: auto;
+	}
+
+	.office-request-modal,
+	.office-reject-feedback-modal {
+		padding: 10px;
+		overflow-x: hidden;
+	}
+
+	.office-request-modal-card {
+		width: calc(100% - 20px);
+		max-width: calc(100vw - 20px);
+		max-height: calc(100dvh - 20px);
+		margin: 10px auto;
+		overflow: auto;
+		box-sizing: border-box;
+	}
+
+	.office-request-primary-actions {
+		flex-wrap: wrap;
+		width: 100%;
+	}
+
+	.office-modal-btn {
+		width: auto;
+		flex: 1 1 auto;
+		white-space: nowrap;
+	}
+}
+
+@media (max-width: 480px) {
+	.office-table-filters,
+	.office-history-filters {
+		grid-template-columns: 1fr;
+	}
 }

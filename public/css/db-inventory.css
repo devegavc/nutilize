@@ -6929,3 +6929,233 @@ body.page-insights .insight-mom-head {
     padding-right: 14px;
   }
 }
+
+/* Phone controls: one row when the labels fit, wrap only when they cannot. */
+@media (max-width: 700px) {
+  .facilities-filter-row {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .facilities-tab-group {
+    flex: 1 1 100%;
+    width: 100%;
+    gap: 6px;
+  }
+
+  .facilities-tab {
+    flex: 1 1 auto;
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .equipment-filter-row {
+    flex-wrap: wrap;
+  }
+
+  .equipment-category-slider {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .equipment-category-slider-btn {
+    display: none !important;
+  }
+
+  .equipment-category-tabs {
+    overflow: visible;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .equipment-category-tabs .facilities-tab {
+    flex: 1 1 auto;
+  }
+
+  .facilities-inline-search.is-expanded,
+  .facilities-inline-search:focus-within {
+    flex: 1 1 140px;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .facilities-action-group {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-left: auto;
+    max-width: 100%;
+  }
+
+  .facilities-add-btn,
+  .facilities-add-category-btn {
+    min-width: 0;
+    margin-left: 0;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .history-toolbar {
+    gap: 10px;
+    padding: 8px 12px 12px;
+  }
+
+  .history-category-row {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .history-toolbar .history-tab-group {
+    display: flex;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 auto;
+    gap: 6px;
+  }
+
+  .history-category-btn {
+    flex: 1 1 auto;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .history-date-range {
+    flex: 1 1 100%;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .history-date-range input[type="date"] {
+    flex: 1 1 8.5rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .history-sort-field,
+  .history-reset-btn,
+  .history-head-actions,
+  .history-copy-btn {
+    max-width: 100%;
+  }
+
+  .history-copy-btn,
+  .history-reset-btn {
+    white-space: nowrap;
+  }
+
+  .maintenance-filter-row,
+  .pf-maintenance-page .maintenance-filter-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .maintenance-tab-group,
+  .pf-maintenance-page .pf-maintenance-tabs {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .maintenance-tab,
+  .pf-maintenance-page .maintenance-tab {
+    flex: 0 1 auto;
+    width: auto;
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 0.75rem;
+  }
+
+  .maintenance-head-actions,
+  .pf-maintenance-page .maintenance-head-actions {
+    margin-left: auto;
+  }
+
+  .user-management-card .users-tools-bar {
+    margin-left: 12px;
+    margin-right: 12px;
+    gap: 8px;
+  }
+
+  .user-management-card .users-search-wrap {
+    flex: 1 1 100%;
+  }
+
+  .user-management-card .users-filter-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+
+  .user-management-card .users-filter-wrap select {
+    width: 100%;
+    max-width: 100%;
+    font-size: 0.78rem;
+  }
+
+  .facilities-grid,
+  .facilities-content-card .equipment-grid,
+  .facilities-content-card .facilities-page-grid {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .user-management-card .users-tools-bar .facilities-add-btn {
+    width: auto;
+    margin-left: auto;
+  }
+
+  .facilities-modal,
+  .history-copy-modal,
+  .maintenance-eval-modal,
+  .maintenance-form-modal,
+  .inventory-confirm-modal {
+    padding: 10px;
+    overflow-x: hidden;
+  }
+
+  .facilities-modal-card,
+  .equipment-category-modal-card,
+  .equipment-form-modal-card,
+  .history-copy-card,
+  .maintenance-form-card,
+  .maintenance-eval-card,
+  .inventory-confirm-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 20px);
+    overflow: auto;
+    box-sizing: border-box;
+  }
+
+  .facilities-modal-body {
+    padding: 14px;
+  }
+
+  .facilities-inline-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .office-items-subtitle {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-management-card .users-filter-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

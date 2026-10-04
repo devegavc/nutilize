@@ -1839,8 +1839,9 @@
   }
 
   .schedule-filter-card {
-    overflow-x: auto;
-    flex-wrap: nowrap;
+    overflow: visible;
+    flex-wrap: wrap;
+    max-width: 100%;
   }
 
   .calendar-month-title {
@@ -2220,5 +2221,32 @@
 
   .calendar-month-title {
     font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .schedule-filter-btn {
+    flex: 1 1 auto;
+    padding: 8px 10px;
+    font-size: 0.75rem;
+  }
+
+  .schedule-inline-table-wrap,
+  .schedule-content-card.has-schedule-details .schedule-inline-table-wrap,
+  .schedule-modal-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .schedule-modal {
+    padding: 10px;
+    overflow-x: hidden;
+  }
+
+  .schedule-modal-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 20px);
+    overflow: auto;
   }
 }
