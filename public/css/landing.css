@@ -893,14 +893,9 @@ body {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    min-height: 56px;
-    padding: 0 14px;
+    min-height: 76px;
+    padding: 0 16px;
     gap: 12px;
-  }
-
-  .brand-logo {
-    width: 108px;
-    height: 36px;
   }
 
   .nav-toggle {
@@ -944,106 +939,92 @@ body {
     height: 40px;
     margin-top: 4px;
   }
+}
 
+@media (max-width: 700px) {
   .hero {
-    min-height: 0;
-    align-items: flex-start;
-    padding-top: 70px;
-    padding-bottom: 12px;
+    padding-top: 96px;
+    min-height: 100vh;
+    align-items: center;
+    background-attachment: scroll;
   }
 
   .hero-content {
-    grid-template-columns: minmax(0, 1fr);
-    width: 100%;
-    padding: 16px 18px 24px;
-    row-gap: 16px;
-    text-align: center;
+    text-align: left;
+    padding-left: 16px;
+    padding-right: 16px;
+    row-gap: 28px;
   }
 
   .hero-copy,
   .hero-lead {
-    width: 100%;
-    max-width: 34rem;
-    margin-left: auto;
-    margin-right: auto;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
   }
 
   .hero-kicker {
-    font-size: 0.72rem;
-    letter-spacing: 0.16em;
+    font-size: 0.92rem;
+    letter-spacing: 0.12em;
   }
 
   .hero-content h1 {
-    font-size: clamp(2rem, 10vw, 2.85rem);
-    line-height: 1.02;
+    font-size: clamp(2.6rem, 6vw, 4.6rem);
+    line-height: 0.98;
   }
 
   .hero-tagline {
-    margin-top: 10px;
-    font-size: clamp(1rem, 4.2vw, 1.28rem);
-    line-height: 1.25;
+    margin-top: 16px;
+    font-size: 1.2rem;
+    line-height: 1.18;
   }
 
   .hero-lead {
-    margin-top: 12px;
-    font-size: 0.92rem;
-    line-height: 1.5;
+    margin-top: 16px;
+    font-size: clamp(0.92rem, 1.4vw, 1.08rem);
+    line-height: 1.55;
   }
 
   .hero-actions {
-    justify-self: center;
-    width: min(100%, 280px);
-    max-width: 280px;
-    margin: 0 auto;
+    justify-self: start;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
   }
 
   .cta-btn {
-    height: 44px;
-    padding: 0 14px;
-    font-size: 0.86rem;
+    height: 46px;
+    padding: 0 18px;
+    font-size: 0.92rem;
   }
 
-  .about {
-    padding: 48px 18px;
-  }
-
-  .about-subtitle {
-    margin-bottom: 22px;
-  }
-
-  .about-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-  }
-
-  .about-card:hover {
-    transform: none;
-  }
-}
-
-@media (max-width: 640px) {
   .facilities {
-    padding: 40px 20px;
+    padding: 56px 16px;
   }
 
   .facilities-subtitle {
-    margin-bottom: 18px;
-    font-size: 0.92rem;
-    padding: 0 4px;
+    margin-bottom: 28px;
   }
 
   .facilities-grid {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     justify-content: center;
-    gap: 16px;
-    width: min(100%, 420px);
-    margin: 4px auto 0;
+    gap: 12px;
+    width: 100%;
+    margin-top: 8px;
   }
 
   .facility-card {
-    width: 100%;
-    max-width: 420px;
-    margin: 0 auto;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    min-width: 0;
+  }
+
+  .facility-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    width: calc(50% - 6px);
+    justify-self: center;
   }
 
   .facility-card:hover {
@@ -1051,33 +1032,84 @@ body {
   }
 
   .facility-image {
-    height: 168px;
+    height: 108px;
   }
 
   .facility-info {
-    padding: 16px 16px 18px;
+    padding: 10px 8px 12px;
+    text-align: center;
   }
 
   .facility-name {
-    font-size: 1.02rem;
-    margin-bottom: 8px;
+    font-size: 0.78rem;
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+    overflow-wrap: break-word;
   }
 
   .facility-description {
-    font-size: 0.88rem;
-    line-height: 1.5;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    overflow-wrap: break-word;
+  }
+
+  .about {
+    padding: 48px 16px;
+  }
+
+  .about-subtitle {
+    margin-bottom: 22px;
+  }
+
+  .about-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .about-card {
+    padding: 16px 10px;
+    border-radius: 16px;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .about-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    width: calc(50% - 6px);
+    justify-self: center;
+  }
+
+  .about-card:hover {
+    transform: none;
+  }
+
+  .about-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+
+  .about-icon .icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .about-card-title {
+    font-size: 0.82rem;
+    margin: 4px 0;
+    overflow-wrap: break-word;
+  }
+
+  .about-card-desc {
+    font-size: 0.72rem;
+    line-height: 1.4;
+    overflow-wrap: break-word;
   }
 }
 
 @media (max-width: 380px) {
   .header-inner {
-    min-height: 52px;
     padding: 0 12px;
-  }
-
-  .brand-logo {
-    width: 96px;
-    height: 32px;
   }
 
   .nav-toggle {
@@ -1085,46 +1117,29 @@ body {
     height: 40px;
   }
 
-  .hero {
-    padding-top: 60px;
-  }
-
-  .hero-content {
-    padding-left: 14px;
-    padding-right: 14px;
-  }
-
-  .hero-kicker {
-    letter-spacing: 0.12em;
-    font-size: 0.68rem;
-  }
-
-  .hero-content h1 {
-    font-size: 1.9rem;
-  }
-
-  .hero-tagline {
-    font-size: 0.98rem;
-  }
-
-  .hero-lead {
-    font-size: 0.86rem;
-  }
-
-  .cta-btn {
-    height: 42px;
-    font-size: 0.8rem;
-  }
-
   .facilities,
   .about,
   .contact {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
-  .facilities-title,
-  .about-title {
-    font-size: 1.45rem;
+  .facilities-grid,
+  .about-grid {
+    gap: 8px;
+  }
+
+  .facility-image {
+    height: 92px;
+  }
+
+  .facility-name,
+  .about-card-title {
+    font-size: 0.7rem;
+  }
+
+  .facility-description,
+  .about-card-desc {
+    font-size: 0.66rem;
   }
 }
