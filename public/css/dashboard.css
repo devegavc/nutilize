@@ -1567,6 +1567,85 @@ body {
   }
 }
 
+@media (max-width: 700px) {
+  body {
+    background: #e6e9f3;
+  }
+
+  .content-card {
+    background: #e4e7f1;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .stat-icon,
+  .office-stat-icon,
+  .office-request-summary-icon,
+  .users-summary-icon {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    aspect-ratio: 1 / 1;
+    align-self: center;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    overflow: hidden;
+    line-height: 1;
+  }
+
+  .stat-icon > i,
+  .office-stat-icon > i,
+  .office-request-summary-icon > i,
+  .users-summary-icon > i {
+    display: block;
+    width: 1em;
+    height: 1em;
+    line-height: 1;
+  }
+
+  .stats-grid,
+  .inventory-stats-grid,
+  .office-stats-grid,
+  .office-request-summary-grid,
+  .users-summary-grid {
+    gap: 10px;
+  }
+
+  .stats-grid > :last-child:nth-child(odd),
+  .inventory-stats-grid > :last-child:nth-child(odd),
+  .office-stats-grid > :last-child:nth-child(odd),
+  .office-request-summary-grid > :last-child:nth-child(odd),
+  .users-summary-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: calc((100% - 10px) / 2);
+    max-width: calc((100% - 10px) / 2);
+  }
+
+  .stat-card,
+  .inventory-stat-card,
+  .office-stat-card,
+  .office-request-summary-tile,
+  .users-summary-card {
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .inventory-grid,
+  .tasks-panel,
+  .quick-view,
+  .extra-card,
+  .home-announcement-btn {
+    border-radius: 16px;
+    overflow: hidden;
+  }
+}
+
 @media (max-width: 480px) {
   .stats-grid,
   .inventory-stats-grid {
@@ -1587,10 +1666,26 @@ body {
   }
 
   .stat-icon {
+    flex: 0 0 40px;
     width: 40px;
     height: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    min-height: 40px;
+    max-height: 40px;
+    aspect-ratio: 1 / 1;
+    align-self: center;
+    border-radius: 50%;
+    overflow: hidden;
     font-size: 1.15rem;
-    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .stat-icon > i {
+    display: block;
+    width: 1em;
+    height: 1em;
+    line-height: 1;
   }
 
   .stat-number {

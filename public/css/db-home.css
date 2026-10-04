@@ -1551,10 +1551,24 @@ body:has(.home-dashboard-card) .home-dashboard-card {
     min-width: 0;
   }
 
+  .home-dashboard-card {
+    background: #e4e7f1;
+  }
+
   .home-dashboard-card .stat-icon {
+    flex: 0 0 40px;
     width: 40px;
     height: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    min-height: 40px;
+    max-height: 40px;
+    aspect-ratio: 1 / 1;
+    align-self: center;
+    border-radius: 50%;
+    overflow: hidden;
     font-size: 1.15rem;
+    line-height: 1;
   }
 
   .home-dashboard-card .stat-number {
