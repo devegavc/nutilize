@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'pf-admin' => EnsurePhysicalFacilitiesAdmin::class,
+            'redirect.authenticated' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         ]);
 
         $middleware->web(prepend: [

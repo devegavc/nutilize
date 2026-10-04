@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\UserAccountStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 
 class LoginController extends Controller
 {
@@ -33,7 +35,9 @@ class LoginController extends Controller
                 ->onlyInput('username');
         }
 
-        if (!Auth::attempt($credentials)) {
+        $remember = $request->boolean('remember') && Schema::hasColumn('users', 'remember_token');
+
+        if (!Auth::attempt($credentials, $remember)) {
             foreach ($throttleKeys as $throttleKey) {
                 RateLimiter::hit($throttleKey, self::LOGIN_DECAY_SECONDS);
             }
@@ -75,6 +79,11 @@ class LoginController extends Controller
             UserAccountStatusService::recordLogin($user);
         }
 
+        return self::redirectAuthenticated($user);
+    }
+
+    public static function redirectAuthenticated(?User $user): RedirectResponse
+    {
         if ($user && (int) $user->user_id === 8) {
             return redirect()->route('office.home');
         }

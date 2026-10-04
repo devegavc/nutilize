@@ -18,22 +18,15 @@ use App\Http\Controllers\RegisterController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
-// Public landing page: skip session/CSRF/cookies so Hostinger does not hit the
-// database just to render a static view (this was ~1.6s of origin TTFB).
+// The landing page must read the session cookie. A public cache, or skipping
+// the session here, makes a new browser tab show the logged-out page.
 Route::view('/', 'index')
     ->name('index')
-    ->withoutMiddleware([
-        \Illuminate\Cookie\Middleware\EncryptCookies::class,
-        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-        \Illuminate\Session\Middleware\StartSession::class,
-        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-        \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
-        \Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
-        \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
-    ])
-    ->middleware('cache.headers:public;max_age=300;etag');
+    ->middleware(['redirect.authenticated', 'cache.headers:private;no_cache']);
 
-Route::view('/login', 'login')->name('login');
+Route::view('/login', 'login')
+    ->name('login')
+    ->middleware('redirect.authenticated');
 Route::post('/login', [LoginController::class, 'authenticate'])->name('login.authenticate');
 
 Route::get('/register', [RegisterController::class, 'create'])->name('register');

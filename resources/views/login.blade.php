@@ -122,6 +122,8 @@
             <label class="login-remember" for="rememberMe">
               <input class="login-remember-input"
                      type="checkbox"
+                     name="remember"
+                     value="1"
                      id="rememberMe">
               <span>Remember me</span>
             </label>
