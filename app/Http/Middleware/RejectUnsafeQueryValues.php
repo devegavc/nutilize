@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\InventoryInput;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,16 +23,10 @@ class RejectUnsafeQueryValues
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->query->has('v') && !$this->isAllowedCacheBuster($request->query('v'))) {
-            // #region agent log
-            $this->agentLog('B', 'rejected cache-buster');
-            // #endregion
             return $this->reject();
         }
 
         if ($request->query->has('force') && !$this->isAllowedForceFlag($request->query('force'))) {
-            // #region agent log
-            $this->agentLog('D', 'rejected force flag');
-            // #endregion
             return $this->reject();
         }
 
@@ -41,6 +36,10 @@ class RejectUnsafeQueryValues
 
         if ($loginResponse = $this->rejectSqlShapedLogin($request)) {
             return $loginResponse;
+        }
+
+        if ($inventoryResponse = $this->rejectSqlShapedInventory($request)) {
+            return $inventoryResponse;
         }
 
         return $next($request);
@@ -67,9 +66,6 @@ class RejectUnsafeQueryValues
             : $request->query->get('_token');
 
         if (!is_string($token) || preg_match('/^[A-Za-z0-9]{1,255}$/', $token) !== 1) {
-            // #region agent log
-            $this->agentLog('E', 'rejected csrf token shape');
-            // #endregion
             return $this->reject();
         }
 
@@ -86,16 +82,38 @@ class RejectUnsafeQueryValues
         $password = $request->request->get('password');
 
         if (!is_string($username) || ($username !== '' && preg_match(self::LOGIN_IDENTIFIER, $username) !== 1)) {
-            // #region agent log
-            $this->agentLog('C', 'rejected login username');
-            // #endregion
             return $this->reject();
         }
 
         if (!is_string($password) || strlen($password) > 255 || $this->containsSqlBoolean($password)) {
-            // #region agent log
-            $this->agentLog('C', 'rejected login password');
-            // #endregion
+            return $this->reject();
+        }
+
+        return null;
+    }
+
+    private function rejectSqlShapedInventory(Request $request): ?Response
+    {
+        if (!$request->isMethod('POST') && !$request->isMethod('PATCH')) {
+            return null;
+        }
+
+        $isEquipment = $request->is('inventory/equipments', 'inventory/equipments/*', 'office/items', 'office/items/*');
+        $isFacility = $request->is('inventory/facilities', 'inventory/facilities/*');
+
+        if (!$isEquipment && !$isFacility) {
+            return null;
+        }
+
+        if ($request->exists('item_name') && !InventoryInput::label($request->input('item_name'))) {
+            return $this->reject();
+        }
+
+        if ($isEquipment && $request->exists('in_use') && !InventoryInput::count($request->input('in_use'))) {
+            return $this->reject();
+        }
+
+        if ($isFacility && $request->exists('table_type') && !InventoryInput::tableType($request->input('table_type'))) {
             return $this->reject();
         }
 
@@ -105,13 +123,6 @@ class RejectUnsafeQueryValues
     private function containsSqlBoolean(string $value): bool
     {
         return preg_match(self::SQL_BOOLEAN, $value) === 1;
-    }
-
-    private function agentLog(string $hypothesisId, string $message): void
-    {
-        // #region agent log
-        @file_put_contents(base_path('debug-a9d1a3.log'), json_encode(['sessionId'=>'a9d1a3','hypothesisId'=>$hypothesisId,'location'=>'RejectUnsafeQueryValues.php','message'=>$message,'data'=>['branch'=>$message],'timestamp'=>(int) round(microtime(true)*1000),'runId'=>'recheck'])."\n", FILE_APPEND);
-        // #endregion
     }
 
     private function reject(): Response

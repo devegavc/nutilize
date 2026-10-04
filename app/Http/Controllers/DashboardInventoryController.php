@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\DashboardInventoryCacheService;
 use App\Services\ItemOwnerService;
 use App\Services\ItemUnitService;
+use App\Support\InventoryInput;
 use App\Support\ItemAsset;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -469,12 +470,9 @@ class DashboardInventoryController extends Controller
                 'item_units.created_at as unit_created_at',
                 'items.item_name',
             ])
-            ->whereIn('item_units.status', ['maintenance', 'damaged']);
+            ->whereIn(DB::raw("LOWER(TRIM(COALESCE(item_units.status, '')))"), ['maintenance', 'damaged']);
 
         $pfOwnerIds = ItemOwnerService::physicalFacilitiesOwnerIds();
-        if ($pfOwnerIds !== []) {
-            $unitQuery->whereIn('items.owner_id', $pfOwnerIds);
-        }
 
         if (Schema::hasColumn('items', 'category')) {
             $unitQuery->addSelect('items.category');
@@ -1310,10 +1308,10 @@ class DashboardInventoryController extends Controller
         $validated = $request->validate([
             'unit_codes' => ['nullable', 'array'],
             'unit_codes.*' => ['nullable', 'string', 'max:64'],
-            'item_name' => ['required', 'string', 'max:255'],
+            'item_name' => InventoryInput::itemNameRules(),
             'category' => ['required', 'string', Rule::in($categoryKeys)],
-            'total_count' => ['required', 'integer', 'min:0'],
-            'in_use' => ['required', 'integer', 'min:0'],
+            'total_count' => ['required', 'integer', 'min:0', 'max:999999'],
+            'in_use' => InventoryInput::countRules(),
             'status' => ['required', 'in:good,maintenance,damaged'],
         ]);
 
@@ -1407,10 +1405,10 @@ class DashboardInventoryController extends Controller
         $validated = $request->validate([
             'unit_codes' => ['nullable', 'array'],
             'unit_codes.*' => ['nullable', 'string', 'max:64'],
-            'item_name' => ['required', 'string', 'max:255'],
+            'item_name' => InventoryInput::itemNameRules(),
             'category' => ['required', 'string', Rule::in($categoryKeys)],
-            'total_count' => ['required', 'integer', 'min:0'],
-            'in_use' => ['required', 'integer', 'min:0'],
+            'total_count' => ['required', 'integer', 'min:0', 'max:999999'],
+            'in_use' => InventoryInput::countRules(),
             'status' => ['required', 'in:good,maintenance,damaged'],
         ]);
 
@@ -1675,9 +1673,9 @@ class DashboardInventoryController extends Controller
     private function validateFacilityPayload(Request $request): array
     {
         return $request->validate([
-            'item_name' => ['required', 'string', 'max:255'],
+            'item_name' => InventoryInput::itemNameRules(),
             'category' => ['required', 'in:rooms,lab,others'],
-            'table_type' => ['required', 'string', 'max:255'],
+            'table_type' => InventoryInput::tableTypeRules(),
             'chair_quantity' => ['required', 'integer', 'min:0', 'max:9999'],
         ]);
     }

@@ -87,7 +87,7 @@ class DashboardRequestController extends Controller
 
         if ($isPfAdmin) {
             $reservationsQuery->where(function ($query) {
-                $query->whereIn(DB::raw("LOWER(COALESCE(overall_status, ''))"), [
+                $query->whereIn(DB::raw("LOWER(TRIM(COALESCE(overall_status, '')))"), [
                     'awaiting_physical_facilities',
                     'approved',
                     'returned',
@@ -95,6 +95,7 @@ class DashboardRequestController extends Controller
                     'rejected',
                     'pending_office_approvals',
                     'pending',
+                    'pending approval',
                 ])->orWhereNull('overall_status')
                     ->orWhere('overall_status', '');
             });
