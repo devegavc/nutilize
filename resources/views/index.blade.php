@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <link rel="icon" type="image/png" href="/img/nutilize_favicon.png" />
-  <title>NUtilize | Home</title>
+  <title>NUtilize</title>
 
   {{-- Preload LCP hero + above-the-fold font (local, no Google round-trip) --}}
   <link rel="preload" as="image" href="/img/nulipa_front.webp" type="image/webp" />
@@ -68,10 +68,6 @@
       />
     </picture>
     <div class="hero-overlay"></div>
-    @php
-      $nutilizeAppUrl = trim((string) config('services.nutilize.play_store_url', ''));
-      $hasNutilizeAppUrl = $nutilizeAppUrl !== '';
-    @endphp
     <section class="hero-content">
       <div class="hero-copy">
         <p class="hero-kicker">Welcome to</p>
@@ -87,16 +83,6 @@
           class="cta-btn cta-btn-secondary"
           target="_blank"
           rel="noopener noreferrer"
-        >
-          <svg class="icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M14.222 9.374c1.037-.61 1.037-2.137 0-2.748L11.528 5.04 8.32 8.115l3.207 3.074 2.695-1.815zm-3.595 2.116L7.583 8.68 1.03 14.73c.201.248.5.396.826.396.137 0 .274-.028.404-.086l8.367-3.55zM1 1.274C.966 1.345.95 1.421.95 1.5v13c0 .079.016.155.05.226l6.633-6.35L1 1.274zm.86-.78 6.722 6.434 3.207-3.075L3.23.59A.996.996 0 0 0 1.86.494z"/></svg>
-          Get the NUtilize App
-        </a>
-      </div>
-    </section>
-  </main>
-            aria-disabled="true"
-            title="NUtilize mobile app listing coming soon"
-          @endif
         >
           <svg class="icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M14.222 9.374c1.037-.61 1.037-2.137 0-2.748L11.528 5.04 8.32 8.115l3.207 3.074 2.695-1.815zm-3.595 2.116L7.583 8.68 1.03 14.73c.201.248.5.396.826.396.137 0 .274-.028.404-.086l8.367-3.55zM1 1.274C.966 1.345.95 1.421.95 1.5v13c0 .079.016.155.05.226l6.633-6.35L1 1.274zm.86-.78 6.722 6.434 3.207-3.075L3.23.59A.996.996 0 0 0 1.86.494z"/></svg>
           Get the NUtilize App
