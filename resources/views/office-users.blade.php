@@ -387,7 +387,9 @@
             <input id="user-email" class="facilities-input" name="email" type="email" placeholder="Email address" required />
           </section>
 
-          <section class="equipment-form-section">
+          <p class="facilities-input-note" id="user-setup-note" hidden>The new user will receive an email with a link to create their own password. You will not choose or see that password.</p>
+
+          <section class="equipment-form-section" id="user-password-section" hidden>
             <label class="facilities-field-label" for="user-password">Password</label>
             <input id="user-password" class="facilities-input" name="password" type="password" placeholder="Password" />
             <small class="facilities-input-note">Leave blank when editing to keep the current password.</small>
@@ -414,6 +416,8 @@
     const userFullNameInput = document.getElementById('user-full-name');
     const userEmailInput = document.getElementById('user-email');
     const userPasswordInput = document.getElementById('user-password');
+    const userPasswordSection = document.getElementById('user-password-section');
+    const userSetupNote = document.getElementById('user-setup-note');
     const usersTableBody = document.getElementById('users-table-body');
     const usersSearchInput = document.getElementById('users-search-input');
     const usersRoleFilter = document.getElementById('users-role-filter');
@@ -442,8 +446,15 @@
       userUsernameInput.value = '';
       userFullNameInput.value = '';
       userEmailInput.value = '';
-      userPasswordInput.required = true;
+      userPasswordInput.required = false;
+      userPasswordInput.disabled = true;
       userPasswordInput.value = '';
+      if (userPasswordSection) {
+        userPasswordSection.hidden = true;
+      }
+      if (userSetupNote) {
+        userSetupNote.hidden = false;
+      }
     };
 
     const populateModal = (row) => {
@@ -455,7 +466,14 @@
       userFullNameInput.value = row.dataset.userFullName || '';
       userEmailInput.value = row.dataset.userEmail;
       userPasswordInput.required = false;
+      userPasswordInput.disabled = false;
       userPasswordInput.value = '';
+      if (userPasswordSection) {
+        userPasswordSection.hidden = false;
+      }
+      if (userSetupNote) {
+        userSetupNote.hidden = true;
+      }
       openUserModal();
     };
 

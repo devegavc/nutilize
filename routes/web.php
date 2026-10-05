@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountSetupController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\DashboardAnnouncementController;
 use App\Http\Controllers\DashboardHomeController;
@@ -33,6 +34,18 @@ Route::get('/register', [RegisterController::class, 'create'])->name('register')
 Route::post('/register', [RegisterController::class, 'store'])->name('register.store');
 
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+Route::get('/account/setup/complete', [AccountSetupController::class, 'complete'])
+    ->middleware(['throttle:20,1', 'cache.headers:private;no_store;no_cache'])
+    ->name('account.setup.complete');
+Route::get('/account/setup/{token}', [AccountSetupController::class, 'create'])
+    ->where('token', '[A-Za-z0-9_-]{43}')
+    ->middleware(['throttle:20,1', 'cache.headers:private;no_store;no_cache'])
+    ->name('account.setup');
+Route::post('/account/setup/{token}', [AccountSetupController::class, 'store'])
+    ->where('token', '[A-Za-z0-9_-]{43}')
+    ->middleware(['throttle:20,1', 'cache.headers:private;no_store;no_cache'])
+    ->name('account.setup.store');
 
 Route::get('/health/db', function () {
     try {

@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AccountSetupDeliveryException;
 use App\Models\Office;
 use App\Models\User;
+use App\Services\AccountSetupService;
 use App\Services\AdminActivityService;
 use App\Services\ItemOwnerService;
 use App\Services\UserAccountStatusService;
 use App\Services\UserNameService;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +21,8 @@ use Illuminate\Validation\ValidationException;
 
 class DashboardUserController extends Controller
 {
+    public function __construct(private AccountSetupService $accountSetup) {}
+
     public function index()
     {
         $this->applyInactivityPolicySafely();
@@ -63,7 +68,6 @@ class DashboardUserController extends Controller
         $data = $request->validate([
             'username' => 'required|string|max:50|unique:users,username',
             'email' => 'required|email|max:100|unique:users,email',
-            'password' => ['required', 'string', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
             'role' => ['required', Rule::in(['user', 'student', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
             'full_name' => 'nullable|string|max:255',
             'office_id' => ['nullable', 'exists:offices,office_id'],
@@ -72,27 +76,41 @@ class DashboardUserController extends Controller
         $data = $this->normalizeRolePayload($data);
         $data = UserNameService::applyToUserData($data);
 
-        $user = User::create([
-            'username' => $data['username'],
-            'email' => $data['email'],
-            'password' => $data['password'],
-            'role' => $data['role'],
-            'full_name' => $data['full_name'] ?? null,
-            'first_name' => $data['first_name'] ?? null,
-            'middle_initial' => $data['middle_initial'] ?? null,
-            'last_name' => $data['last_name'] ?? null,
-            'office_id' => $data['office_id'] ?? null,
-            'is_active' => true,
-            'status_changed_at' => now(),
-        ]);
+        try {
+            $delivery = DB::transaction(function () use ($data) {
+                $user = new User();
+                $user->username = $data['username'];
+                $user->email = $data['email'];
+                $user->password = $this->accountSetup->unknownPassword();
+                $user->role = $data['role'];
+                $user->full_name = $data['full_name'] ?? null;
+                $user->first_name = $data['first_name'] ?? null;
+                $user->middle_initial = $data['middle_initial'] ?? null;
+                $user->last_name = $data['last_name'] ?? null;
+                $user->office_id = $data['office_id'] ?? null;
+                $user->setAttribute('is_active', DB::raw('true'));
+                $user->status_changed_at = now();
+                $user->save();
 
-        ItemOwnerService::syncForUser($user);
+                ItemOwnerService::syncForUser($user);
+
+                $token = $this->accountSetup->issue($user);
+
+                return $this->accountSetup->deliver($user, $token);
+            });
+        } catch (AccountSetupDeliveryException) {
+            return redirect()
+                ->route('dashboard.users')
+                ->with('error', 'Account creation failed because the setup email could not be sent. No account was created.');
+        }
 
         if ($actorId = (int) (Auth::id() ?? 0)) {
             AdminActivityService::log($actorId, 'Added new user', 'Account');
         }
 
-        return redirect()->route('dashboard.users')->with('success', 'User added successfully.');
+        return redirect()
+            ->route('dashboard.users')
+            ->with('success', $this->accountSetup->successMessage($delivery));
     }
 
     public function update(Request $request, int $userId)

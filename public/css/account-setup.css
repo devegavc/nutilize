@@ -1,0 +1,140 @@
+body.account-setup-page {
+  overflow: auto;
+}
+
+body.account-setup-page .page-content {
+  height: auto;
+  min-height: calc(100vh - 66px);
+  justify-content: flex-start;
+  padding: 1.5rem 1rem 2.5rem;
+}
+
+body.account-setup-page .login-card {
+  max-width: 480px;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+body.account-setup-page .login-card::after {
+  content: none;
+}
+
+body.account-setup-page .brand-area {
+  margin-bottom: 1.1rem;
+}
+
+body.account-setup-page .brand-subtitle {
+  margin-top: 0.65rem;
+  font-size: 0.92rem;
+}
+
+body.account-setup-page .setup-heading {
+  margin: 0;
+  color: #243274;
+  font-size: 1.45rem;
+  font-weight: 700;
+}
+
+body.account-setup-page .setup-welcome {
+  margin: 0 0 0.35rem;
+  color: #243274;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+body.account-setup-page .setup-copy {
+  margin: 0 0 1rem;
+  color: #38479c;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+body.account-setup-page .setup-username {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  background: #f4f7ff;
+  border: 1px solid #d6def1;
+  border-radius: 10px;
+}
+
+body.account-setup-page .setup-username-value {
+  margin: 0.15rem 0 0;
+  color: #1f2d70;
+  font-size: 1rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+body.account-setup-page .setup-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #243274;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+body.account-setup-page .setup-username .setup-label {
+  margin-bottom: 0;
+}
+
+body.account-setup-page .login-field {
+  margin-bottom: 0.95rem;
+}
+
+body.account-setup-page .password-helper {
+  display: block;
+  margin-top: 0.65rem;
+}
+
+body.account-setup-page .password-rules li {
+  color: #243274;
+}
+
+body.account-setup-page .setup-confirm-hint {
+  margin: 0.4rem 0 0;
+  color: #38479c;
+  font-size: 0.82rem;
+}
+
+body.account-setup-page .alert {
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+body.account-setup-page a.btn-login,
+body.account-setup-page a.btn-login:hover,
+body.account-setup-page a.btn-login:focus,
+body.account-setup-page a.btn-login:visited {
+  color: #ffffff;
+}
+
+body.account-setup-page .form-control:focus,
+body.account-setup-page .btn-password-toggle:focus-visible,
+body.account-setup-page .btn-login:focus-visible,
+body.account-setup-page a:focus-visible {
+  outline: 3px solid #fbd117;
+  outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  body.account-setup-page .page-content {
+    justify-content: center;
+    padding-top: 2rem;
+  }
+}
+
+@media (max-width: 640px) {
+  body.account-setup-page .login-card {
+    padding: 1.4rem 1rem 1.5rem;
+  }
+
+  body.account-setup-page .setup-heading {
+    font-size: 1.28rem;
+  }
+
+  body.account-setup-page .brand-logo {
+    max-width: 150px;
+  }
+}

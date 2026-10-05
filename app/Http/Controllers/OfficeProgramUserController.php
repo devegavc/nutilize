@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AccountSetupDeliveryException;
 use App\Models\User;
+use App\Services\AccountSetupService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +15,8 @@ use Illuminate\View\View;
 
 class OfficeProgramUserController extends Controller
 {
+    public function __construct(private AccountSetupService $accountSetup) {}
+
     public function index(): View|RedirectResponse
     {
         $chair = $this->programChair();
@@ -40,21 +44,34 @@ class OfficeProgramUserController extends Controller
         $data = $request->validate([
             'username' => ['required', 'string', 'max:50', 'unique:users,username'],
             'email' => ['required', 'email', 'max:100', 'unique:users,email'],
-            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols()],
             'full_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        User::create([
-            'username' => $data['username'],
-            'email' => $data['email'],
-            'password' => $data['password'],
-            'role' => 'user',
-            'full_name' => $data['full_name'] ?? null,
-            'program_id' => (int) ($this->resolveProgramIdsForChair($chair)[0] ?? $chair->program_id),
-            'office_id' => null,
-        ]);
+        try {
+            $delivery = DB::transaction(function () use ($chair, $data) {
+                $user = new User();
+                $user->username = $data['username'];
+                $user->email = $data['email'];
+                $user->password = $this->accountSetup->unknownPassword();
+                $user->role = 'user';
+                $user->full_name = $data['full_name'] ?? null;
+                $user->program_id = (int) ($this->resolveProgramIdsForChair($chair)[0] ?? $chair->program_id);
+                $user->office_id = null;
+                $user->save();
 
-        return redirect()->route('office.users')->with('success', 'Student account created successfully.');
+                $token = $this->accountSetup->issue($user);
+
+                return $this->accountSetup->deliver($user, $token);
+            });
+        } catch (AccountSetupDeliveryException) {
+            return redirect()
+                ->route('office.users')
+                ->with('error', 'Account creation failed because the setup email could not be sent. No account was created.');
+        }
+
+        return redirect()
+            ->route('office.users')
+            ->with('success', $this->accountSetup->successMessage($delivery));
     }
 
     public function update(Request $request, int $userId): RedirectResponse

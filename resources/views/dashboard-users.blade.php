@@ -398,7 +398,9 @@
             </small>
           </section>
 
-          <section class="equipment-form-section">
+          <p class="facilities-input-note" id="user-setup-note" hidden>The new user will receive an email with a link to create their own password. You will not choose or see that password.</p>
+
+          <section class="equipment-form-section" id="user-password-section" hidden>
             <label class="facilities-field-label" for="user-password">Password</label>
             <div class="password-field-wrap">
               <input id="user-password" class="facilities-input" name="password" type="password" placeholder="Password" autocomplete="new-password" />
@@ -482,14 +484,24 @@
       }
     };
 
+    const userPasswordSection = document.getElementById('user-password-section');
+    const userSetupNote = document.getElementById('user-setup-note');
+
     const syncPasswordFields = (isCreate = true) => {
-      userPasswordInput.required = isCreate;
-      userPasswordConfirmInput.required = isCreate;
+      if (userPasswordSection) {
+        userPasswordSection.hidden = isCreate;
+      }
+      if (userSetupNote) {
+        userSetupNote.hidden = !isCreate;
+      }
+
+      userPasswordInput.disabled = isCreate;
+      userPasswordConfirmInput.disabled = isCreate;
+      userPasswordInput.required = false;
+      userPasswordConfirmInput.required = false;
 
       if (userPasswordNote) {
-        userPasswordNote.textContent = isCreate
-          ? 'Enter the password twice to confirm it was typed correctly.'
-          : 'Leave both password fields blank to keep the current password, or enter a new password twice to change it.';
+        userPasswordNote.textContent = 'Leave both password fields blank to keep the current password, or enter a new password twice to change it.';
       }
     };
 
@@ -563,13 +575,11 @@
         const passwordValue = userPasswordInput.value.trim();
         const confirmValue = userPasswordConfirmInput.value.trim();
 
-        if (isCreate && (passwordValue === '' || confirmValue === '')) {
-          event.preventDefault();
-          window.alert('Please enter and confirm the password.');
+        if (isCreate) {
           return;
         }
 
-        if (!isCreate && passwordValue !== '' && confirmValue === '') {
+        if (passwordValue !== '' && confirmValue === '') {
           event.preventDefault();
           window.alert('Please confirm the new password.');
           return;
