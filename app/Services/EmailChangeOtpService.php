@@ -70,6 +70,13 @@ class EmailChangeOtpService
         return $user->refresh();
     }
 
+    private function safeMailReason(\Throwable $exception): string
+    {
+        $detail = preg_replace('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[email]', $exception->getMessage()) ?? '';
+
+        return 'The verification email could not be sent. '.$exception::class.': '.substr($detail, 0, 220);
+    }
+
     private function purpose(int $userId): string
     {
         return 'email_change:'.$userId;
@@ -93,7 +100,7 @@ class EmailChangeOtpService
                 'exception' => $exception::class,
             ]);
 
-            throw new AccountSetupDeliveryException('The verification email could not be sent.');
+            throw new AccountSetupDeliveryException($this->safeMailReason($exception));
         }
     }
 }

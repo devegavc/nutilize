@@ -163,9 +163,14 @@ class ProfileController extends Controller
                     'exception' => $exception::class,
                 ]);
                 // #endregion
+                // #region agent log
+                $debugLog('F', 'ProfileController.php:update', 'email otp mail exception detail', [
+                    'detail' => substr(preg_replace('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[email]', $exception->getMessage()) ?? '', 0, 300),
+                ]);
+                // #endregion
 
                 return response()->json([
-                    'message' => 'Your profile was saved, but the verification email could not be sent. Your email was not changed.',
+                    'message' => 'Your profile was saved, but the verification email could not be sent. Your email was not changed. '.$exception->getMessage(),
                 ], 502);
             }
 
