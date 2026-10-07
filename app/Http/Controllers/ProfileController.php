@@ -170,7 +170,7 @@ class ProfileController extends Controller
                 // #endregion
 
                 return response()->json([
-                    'message' => 'Your profile was saved, but the verification email could not be sent. Your email was not changed. '.$exception->getMessage(),
+                    'message' => 'Your profile was saved, but the mail server rejected the mailbox login, so the verification code was not sent. Your email was not changed.',
                 ], 502);
             }
 
