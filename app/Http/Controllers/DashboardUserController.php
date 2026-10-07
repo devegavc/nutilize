@@ -16,7 +16,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class DashboardUserController extends Controller
@@ -38,8 +37,7 @@ class DashboardUserController extends Controller
             $users = User::with($relations)
                 ->orderBy($orderColumn, 'desc')
                 ->get();
-        } catch (QueryException $e) {
-            $this->logUsersDb('A', 'user list eager load failed', $e);
+        } catch (QueryException) {
             $users = User::query()->orderBy($orderColumn, 'desc')->get();
         }
 
@@ -47,8 +45,7 @@ class DashboardUserController extends Controller
 
         try {
             $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
-        } catch (QueryException $e) {
-            $this->logUsersDb('C', 'item owner office lookup failed', $e);
+        } catch (QueryException) {
             $itemOwnerOfficeId = null;
         }
 
@@ -117,10 +114,6 @@ class DashboardUserController extends Controller
     {
         $user = User::findOrFail($userId);
 
-        if ($request->input('password') === '') {
-            $request->merge(['password' => null]);
-        }
-
         if ($request->input('office_id') === '') {
             $request->merge(['office_id' => null]);
         }
@@ -128,7 +121,6 @@ class DashboardUserController extends Controller
         $data = $request->validate([
             'username' => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($user->user_id, 'user_id')],
             'email' => ['required', 'email', 'max:100', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
-            'password' => ['nullable', 'string', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
             'role' => ['required', Rule::in(['user', 'student', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
             'full_name' => 'nullable|string|max:255',
             'office_id' => ['nullable', 'exists:offices,office_id'],
@@ -136,10 +128,6 @@ class DashboardUserController extends Controller
 
         $data = $this->normalizeRolePayload($data);
         $data = UserNameService::applyToUserData($data);
-
-        if ($request->filled('password')) {
-            $user->password = $data['password'];
-        }
 
         $user->username = $data['username'];
         $user->email = $data['email'];
@@ -248,38 +236,14 @@ class DashboardUserController extends Controller
     private function applyInactivityPolicySafely(): void
     {
         if (!Schema::hasColumn('users', 'is_active')) {
-            // #region agent log
-            $this->logUsersDb('B', 'skipped inactivity, is_active missing');
-            // #endregion
             return;
         }
 
         try {
             UserAccountStatusService::applyInactivityPolicy();
-        } catch (QueryException $e) {
-            $this->logUsersDb('B', 'inactivity policy failed', $e);
+        } catch (QueryException) {
+            // A missing inactivity column should not block the user list.
         }
-    }
-
-    private function logUsersDb(string $hypothesisId, string $message, ?\Throwable $e = null): void
-    {
-        // #region agent log
-        $summary = '';
-        if ($e) {
-            $summary = strtok($e->getMessage(), "\n") ?: '';
-            $summary = preg_replace('/\b[\w.+-]+@[\w.-]+\b/', '[email]', $summary) ?? $summary;
-            $summary = substr($summary, 0, 240);
-        }
-        @file_put_contents(base_path('debug-afd7f1.log'), json_encode([
-            'sessionId' => 'afd7f1',
-            'runId' => 'users-fix',
-            'hypothesisId' => $hypothesisId,
-            'location' => 'DashboardUserController.php',
-            'message' => $message,
-            'data' => ['summary' => $summary],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ]) . "\n", FILE_APPEND);
-        // #endregion
     }
 
     /**

@@ -10,7 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
 class OfficeProgramUserController extends Controller
@@ -79,20 +78,11 @@ class OfficeProgramUserController extends Controller
         $chair = $this->programChair();
         $user = $this->findProgramMember($chair, $userId, $this->resolveProgramIdsForChair($chair));
 
-        if ($request->input('password') === '') {
-            $request->merge(['password' => null]);
-        }
-
         $data = $request->validate([
             'username' => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($user->user_id, 'user_id')],
             'email' => ['required', 'email', 'max:100', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
-            'password' => ['nullable', 'string', Password::min(8)->mixedCase()->numbers()->symbols()],
             'full_name' => ['nullable', 'string', 'max:255'],
         ]);
-
-        if ($request->filled('password')) {
-            $user->password = $data['password'];
-        }
 
         $user->username = $data['username'];
         $user->email = $data['email'];

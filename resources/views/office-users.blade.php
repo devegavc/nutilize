@@ -10,6 +10,11 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
   <link rel="stylesheet" href="/css/office.css?v={{ filemtime(public_path('css/office.css')) }}" />
+  <style>
+    #user-setup-note[hidden] {
+      display: none;
+    }
+  </style>
 </head>
 <body class="office-app">
   <script>
@@ -388,12 +393,6 @@
           </section>
 
           <p class="facilities-input-note" id="user-setup-note" hidden>The new user will receive an email with a link to create their own password. You will not choose or see that password.</p>
-
-          <section class="equipment-form-section" id="user-password-section" hidden>
-            <label class="facilities-field-label" for="user-password">Password</label>
-            <input id="user-password" class="facilities-input" name="password" type="password" placeholder="Password" />
-            <small class="facilities-input-note">Leave blank when editing to keep the current password.</small>
-          </section>
         </div>
 
         <footer class="equipment-form-modal-footer">
@@ -415,8 +414,6 @@
     const userUsernameInput = document.getElementById('user-username');
     const userFullNameInput = document.getElementById('user-full-name');
     const userEmailInput = document.getElementById('user-email');
-    const userPasswordInput = document.getElementById('user-password');
-    const userPasswordSection = document.getElementById('user-password-section');
     const userSetupNote = document.getElementById('user-setup-note');
     const usersTableBody = document.getElementById('users-table-body');
     const usersSearchInput = document.getElementById('users-search-input');
@@ -446,12 +443,6 @@
       userUsernameInput.value = '';
       userFullNameInput.value = '';
       userEmailInput.value = '';
-      userPasswordInput.required = false;
-      userPasswordInput.disabled = true;
-      userPasswordInput.value = '';
-      if (userPasswordSection) {
-        userPasswordSection.hidden = true;
-      }
       if (userSetupNote) {
         userSetupNote.hidden = false;
       }
@@ -465,12 +456,6 @@
       userUsernameInput.value = row.dataset.userUsername;
       userFullNameInput.value = row.dataset.userFullName || '';
       userEmailInput.value = row.dataset.userEmail;
-      userPasswordInput.required = false;
-      userPasswordInput.disabled = false;
-      userPasswordInput.value = '';
-      if (userPasswordSection) {
-        userPasswordSection.hidden = false;
-      }
       if (userSetupNote) {
         userSetupNote.hidden = true;
       }

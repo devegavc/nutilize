@@ -10,37 +10,8 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
   <style>
-    .password-field-wrap {
-      position: relative;
-      margin-bottom: 12px;
-    }
-
-    .password-field-wrap .facilities-input {
-      padding-right: 44px;
-      margin-bottom: 0;
-    }
-
-    .password-toggle-btn {
-      position: absolute;
-      top: 50%;
-      right: 8px;
-      transform: translateY(-50%);
-      border: 0;
-      background: transparent;
-      color: #8a93ad;
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
-
-    .password-toggle-btn:hover,
-    .password-toggle-btn:focus {
-      background: #e8edff;
-      color: #2f3f88;
+    #user-setup-note[hidden] {
+      display: none;
     }
   </style>
 </head>
@@ -399,25 +370,6 @@
           </section>
 
           <p class="facilities-input-note" id="user-setup-note" hidden>The new user will receive an email with a link to create their own password. You will not choose or see that password.</p>
-
-          <section class="equipment-form-section" id="user-password-section" hidden>
-            <label class="facilities-field-label" for="user-password">Password</label>
-            <div class="password-field-wrap">
-              <input id="user-password" class="facilities-input" name="password" type="password" placeholder="Password" autocomplete="new-password" />
-              <button type="button" class="password-toggle-btn" data-password-target="user-password" aria-label="Show password" aria-pressed="false">
-                <i class="bi bi-eye"></i>
-              </button>
-            </div>
-
-            <label class="facilities-field-label" for="user-password-confirmation">Confirm Password</label>
-            <div class="password-field-wrap">
-              <input id="user-password-confirmation" class="facilities-input" name="password_confirmation" type="password" placeholder="Re-enter password" autocomplete="new-password" />
-              <button type="button" class="password-toggle-btn" data-password-target="user-password-confirmation" aria-label="Show confirm password" aria-pressed="false">
-                <i class="bi bi-eye"></i>
-              </button>
-            </div>
-            <small class="facilities-input-note" id="user-password-note">Leave both password fields blank when editing an existing user to keep the current password.</small>
-          </section>
         </div>
 
         <footer class="equipment-form-modal-footer">
@@ -442,9 +394,7 @@
     const userEmailInput = document.getElementById('user-email');
     const userRoleInput = document.getElementById('user-role');
     const userOfficeInput = document.getElementById('user-office');
-    const userPasswordInput = document.getElementById('user-password');
-    const userPasswordConfirmInput = document.getElementById('user-password-confirmation');
-    const userPasswordNote = document.getElementById('user-password-note');
+    const userSetupNote = document.getElementById('user-setup-note');
     const itemOwnerOfficeNote = document.getElementById('item-owner-office-note');
     const itemOwnerOfficeId = window.itemOwnerOfficeId ? String(window.itemOwnerOfficeId) : '';
     const usersTableBody = document.getElementById('users-table-body');
@@ -484,24 +434,9 @@
       }
     };
 
-    const userPasswordSection = document.getElementById('user-password-section');
-    const userSetupNote = document.getElementById('user-setup-note');
-
-    const syncPasswordFields = (isCreate = true) => {
-      if (userPasswordSection) {
-        userPasswordSection.hidden = isCreate;
-      }
+    const syncSetupNote = (isCreate = true) => {
       if (userSetupNote) {
         userSetupNote.hidden = !isCreate;
-      }
-
-      userPasswordInput.disabled = isCreate;
-      userPasswordConfirmInput.disabled = isCreate;
-      userPasswordInput.required = false;
-      userPasswordConfirmInput.required = false;
-
-      if (userPasswordNote) {
-        userPasswordNote.textContent = 'Leave both password fields blank to keep the current password, or enter a new password twice to change it.';
       }
     };
 
@@ -515,11 +450,7 @@
       userEmailInput.value = '';
       userRoleInput.value = presetRole === 'user' ? 'student' : presetRole;
       userOfficeInput.value = presetRole === 'item_owner' ? itemOwnerOfficeId : '';
-      userPasswordInput.value = '';
-      userPasswordConfirmInput.value = '';
-      userPasswordInput.type = 'password';
-      userPasswordConfirmInput.type = 'password';
-      syncPasswordFields(true);
+      syncSetupNote(true);
       syncRoleOfficeFields();
     };
 
@@ -539,11 +470,7 @@
       userEmailInput.value = email;
       userRoleInput.value = role;
       userOfficeInput.value = officeId || '';
-      userPasswordInput.value = '';
-      userPasswordConfirmInput.value = '';
-      userPasswordInput.type = 'password';
-      userPasswordConfirmInput.type = 'password';
-      syncPasswordFields(false);
+      syncSetupNote(false);
       userModalTitle.textContent = role === 'item_owner' ? 'Edit Item Owner' : 'Edit User';
       syncRoleOfficeFields();
       openUserModal();
@@ -568,48 +495,10 @@
     }
 
     if (userForm) {
-      userForm.addEventListener('submit', (event) => {
+      userForm.addEventListener('submit', () => {
         userOfficeInput.disabled = false;
-
-        const isCreate = userFormMethod.value === 'POST';
-        const passwordValue = userPasswordInput.value.trim();
-        const confirmValue = userPasswordConfirmInput.value.trim();
-
-        if (isCreate) {
-          return;
-        }
-
-        if (passwordValue !== '' && confirmValue === '') {
-          event.preventDefault();
-          window.alert('Please confirm the new password.');
-          return;
-        }
-
-        if (passwordValue !== '' && passwordValue !== confirmValue) {
-          event.preventDefault();
-          window.alert('Passwords do not match. Please try again.');
-        }
       });
     }
-
-    document.querySelectorAll('.password-toggle-btn').forEach((button) => {
-      button.addEventListener('click', () => {
-        const targetId = button.getAttribute('data-password-target');
-        const input = targetId ? document.getElementById(targetId) : null;
-        const icon = button.querySelector('i');
-
-        if (!input || !icon) {
-          return;
-        }
-
-        const showPassword = input.type === 'password';
-        input.type = showPassword ? 'text' : 'password';
-        button.setAttribute('aria-pressed', showPassword ? 'true' : 'false');
-        button.setAttribute('aria-label', showPassword ? 'Hide password' : 'Show password');
-        icon.classList.toggle('bi-eye', !showPassword);
-        icon.classList.toggle('bi-eye-slash', showPassword);
-      });
-    });
 
     if (userCancelBtn) {
       userCancelBtn.addEventListener('click', closeUserModal);
