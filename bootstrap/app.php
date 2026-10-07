@@ -30,6 +30,23 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (QueryException|\PDOException $e, Request $request) {
+            // #region agent log
+            file_put_contents(base_path('debug-42c883.log'), json_encode([
+                'sessionId' => '42c883',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'A',
+                'location' => 'bootstrap/app.php:render',
+                'message' => 'database exception rendered as html view',
+                'data' => [
+                    'path' => $request->path(),
+                    'expects_json' => $request->expectsJson(),
+                    'exception' => $e::class,
+                    'sqlstate' => $e instanceof QueryException ? ($e->errorInfo[0] ?? $e->getCode()) : $e->getCode(),
+                    'detail' => substr(preg_replace('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[email]', (string) ($e instanceof QueryException ? ($e->errorInfo[2] ?? $e->getMessage()) : $e->getMessage())), 0, 300),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
+            // #endregion
             $message = $e->getMessage();
 
             $networkErrors = [

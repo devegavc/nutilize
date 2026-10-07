@@ -35,6 +35,26 @@ class ProfileController extends Controller
             'email' => trim((string) $request->input('email', '')),
         ]);
 
+        // #region agent log
+        $debugLog = function (string $hypothesisId, string $location, string $message, array $data = []): void {
+            $line = json_encode([
+                'sessionId' => '42c883',
+                'runId' => 'pre-fix',
+                'hypothesisId' => $hypothesisId,
+                'location' => $location,
+                'message' => $message,
+                'data' => $data,
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES);
+            file_put_contents(base_path('debug-42c883.log'), $line.PHP_EOL, FILE_APPEND);
+        };
+        $debugLog('C', 'ProfileController.php:update', 'profile update reached', [
+            'email_changed' => strcasecmp((string) $request->input('email'), (string) $user->email) !== 0,
+            'expects_json' => $request->expectsJson(),
+            'mailer' => (string) config('mail.default'),
+        ]);
+        // #endregion
+
         $rules = [
             'first_name' => ['required', 'string', 'max:100'],
             'middle_initial' => ['nullable', 'string', 'size:1', 'alpha'],
@@ -56,6 +76,12 @@ class ProfileController extends Controller
         }
 
         $validated = $request->validate($rules);
+
+        // #region agent log
+        $debugLog('B', 'ProfileController.php:update', 'profile validation passed', [
+            'email_changed' => strcasecmp((string) $validated['email'], (string) $user->email) !== 0,
+        ]);
+        // #endregion
 
         $middleInitial = isset($validated['middle_initial']) && $validated['middle_initial'] !== ''
             ? strtoupper($validated['middle_initial']).'.'
@@ -85,6 +111,13 @@ class ProfileController extends Controller
         try {
             $user->save();
         } catch (QueryException $exception) {
+            // #region agent log
+            $debugLog('A', 'ProfileController.php:save', 'profile save query exception', [
+                'sqlstate' => $exception->errorInfo[0] ?? $exception->getCode(),
+                'driver_code' => $exception->errorInfo[1] ?? null,
+                'driver_message' => substr(preg_replace('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[email]', (string) ($exception->errorInfo[2] ?? $exception->getMessage())), 0, 300),
+            ]);
+            // #endregion
             if (($exception->errorInfo[0] ?? null) === '23505') {
                 throw ValidationException::withMessages([
                     'email' => 'This email address is already in use.',
@@ -92,7 +125,22 @@ class ProfileController extends Controller
             }
 
             throw $exception;
+        } catch (\Throwable $exception) {
+            // #region agent log
+            $debugLog('E', 'ProfileController.php:save', 'profile save throwable', [
+                'exception' => $exception::class,
+                'code' => $exception->getCode(),
+                'detail' => substr(preg_replace('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[email]', $exception->getMessage()), 0, 300),
+            ]);
+            // #endregion
+            throw $exception;
         }
+
+        // #region agent log
+        $debugLog('D', 'ProfileController.php:update', 'profile saved without otp', [
+            'saved' => true,
+        ]);
+        // #endregion
 
         AdminActivityService::log((int) $user->user_id, 'Updated profile', 'Account');
 

@@ -5866,7 +5866,16 @@ if (profileEditSaveButton) {
         body: JSON.stringify(payload),
       });
 
-      const result = await response.json();
+      const responseText = await response.text();
+      // #region agent log
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'42c883'},body:JSON.stringify({sessionId:'42c883',runId:'pre-fix',hypothesisId:'A',location:'dashboard.js:profile-save',message:'profile save response',data:{status:response.status,contentType:response.headers.get('content-type')||'',bodyStart:responseText.slice(0,180),emailChanged:Boolean(window.authUser&&profileModalEmailInput&&window.authUser.email!==profileModalEmailInput.value.trim())},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error(parseError instanceof Error ? parseError.message : 'Profile update returned an invalid response.');
+      }
 
       if (!response.ok) {
         const message = result && result.message ? result.message : 'Failed to update profile.';
