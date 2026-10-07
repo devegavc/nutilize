@@ -66,6 +66,9 @@ Route::get('/health/db', function () {
 
 Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('dashboard.profile.update');
+    Route::post('/profile/email/verify', [ProfileController::class, 'verifyEmail'])
+        ->middleware('throttle:8,1')
+        ->name('dashboard.profile.email.verify');
     Route::get('/office/home', [OfficeRequestController::class, 'index'])->name('office.home');
     Route::get('/office/requests', fn () => redirect()->route('office.home'))->name('office.requests');
     Route::get('/office/requests/snapshot', [OfficeRequestController::class, 'queueSnapshot'])->name('office.requests.snapshot');

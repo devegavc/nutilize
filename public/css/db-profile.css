@@ -593,6 +593,34 @@
   box-shadow: 0 0 0 3px rgba(112, 132, 215, 0.2);
 }
 
+.profile-email-otp {
+  margin: 4px 0 16px;
+  padding: 14px;
+  border: 1px solid rgba(56, 71, 156, 0.16);
+  border-radius: 12px;
+  background: #f7f8fd;
+}
+
+.profile-email-otp[hidden] {
+  display: none;
+}
+
+.profile-email-otp-copy {
+  margin: 0 0 10px;
+  color: #1a2347;
+  line-height: 1.45;
+}
+
+.profile-email-otp-code {
+  letter-spacing: 0.28em;
+  font-weight: 700;
+  text-align: center;
+}
+
+.profile-email-otp .profile-edit-btn-primary {
+  margin-top: 4px;
+}
+
 .profile-edit-actions {
   margin-top: 8px;
   display: flex;

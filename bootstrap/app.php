@@ -60,14 +60,26 @@ return Application::configure(basePath: dirname(__DIR__))
 
             foreach ($networkErrors as $error) {
                 if (stripos($message, $error) !== false) {
+                    $offlineMessage = 'Database is temporarily unreachable on this network. Please switch DNS/network or try again.';
+
+                    if ($request->expectsJson()) {
+                        return response()->json(['message' => $offlineMessage], 503);
+                    }
+
                     return response()->view('errors.database-offline', [
-                        'message' => 'Database is temporarily unreachable on this network. Please switch DNS/network or try again.',
+                        'message' => $offlineMessage,
                     ], 503);
                 }
             }
 
+            $publicMessage = 'A database error occurred. Please try again later.';
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $publicMessage], 500);
+            }
+
             return response()->view('errors.database-error', [
-                'message' => 'A database error occurred. Please try again later.',
+                'message' => $publicMessage,
             ], 500);
         });
     })->create();

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AccountSetupDeliveryException;
 use App\Services\AdminActivityService;
+use App\Services\EmailChangeOtpService;
 use App\Services\ProgramChairOfficeResolver;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +29,7 @@ class ProfileController extends Controller
         return view('dashboard-profile', compact('programs', 'activityLogs'));
     }
 
-    public function update(Request $request): JsonResponse
+    public function update(Request $request, EmailChangeOtpService $emailChange): JsonResponse
     {
         $user = $request->user();
 
@@ -93,6 +95,9 @@ class ProfileController extends Controller
             $validated['last_name'] ?? null,
         ])));
 
+        $originalEmail = (string) $user->email;
+        $emailChanged = strcasecmp($originalEmail, (string) $validated['email']) !== 0;
+
         $user->first_name = $validated['first_name'];
         $user->middle_initial = isset($validated['middle_initial']) && $validated['middle_initial'] !== ''
             ? strtoupper($validated['middle_initial'])
@@ -100,7 +105,7 @@ class ProfileController extends Controller
         $user->last_name = $validated['last_name'];
         $user->full_name = $fullName;
         $user->suffix = $validated['suffix'] ?? null;
-        $user->email = $validated['email'];
+        $user->email = $emailChanged ? $originalEmail : $validated['email'];
         $user->contact_number = $validated['contact_number'] ?? null;
         $user->phone_number = $validated['phone_number'] ?? null;
 
@@ -139,6 +144,7 @@ class ProfileController extends Controller
         // #region agent log
         $debugLog('D', 'ProfileController.php:update', 'profile saved without otp', [
             'saved' => true,
+            'email_change_pending' => $emailChanged,
         ]);
         // #endregion
 
@@ -148,22 +154,84 @@ class ProfileController extends Controller
             ProgramChairOfficeResolver::reconcilePendingLegacyPcApprovalsForUser((int) $user->user_id);
         }
 
+        if ($emailChanged) {
+            try {
+                $emailChange->issue($user, (string) $validated['email']);
+            } catch (AccountSetupDeliveryException $exception) {
+                // #region agent log
+                $debugLog('D', 'ProfileController.php:update', 'email otp delivery failed', [
+                    'exception' => $exception::class,
+                ]);
+                // #endregion
+
+                return response()->json([
+                    'message' => 'Your profile was saved, but the verification email could not be sent. Your email was not changed.',
+                ], 502);
+            }
+
+            // #region agent log
+            $debugLog('D', 'ProfileController.php:update', 'email otp issued', [
+                'runId' => 'post-fix',
+                'issued' => true,
+            ]);
+            // #endregion
+
+            return response()->json([
+                'message' => 'We sent a verification code to your new email. Enter that code to confirm the change.',
+                'email_verification_required' => true,
+                'user' => $this->profilePayload($user),
+            ]);
+        }
+
         return response()->json([
             'message' => 'Profile updated successfully.',
-            'user' => [
-                'user_id' => $user->user_id,
-                'username' => $user->username,
-                'first_name' => $user->first_name,
-                'middle_initial' => $user->middle_initial,
-                'last_name' => $user->last_name,
-                'full_name' => $user->full_name,
-                'email' => $user->email,
-                'suffix' => $user->suffix,
-                'contact_number' => $user->contact_number,
-                'phone_number' => $user->phone_number,
-                'program_id' => $user->program_id,
-                'role' => $user->role,
-            ],
+            'user' => $this->profilePayload($user),
         ]);
+    }
+
+    public function verifyEmail(Request $request, EmailChangeOtpService $emailChange): JsonResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'digits:6'],
+        ]);
+
+        $user = $emailChange->confirm($request->user(), $validated['code']);
+
+        // #region agent log
+        file_put_contents(base_path('debug-42c883.log'), json_encode([
+            'sessionId' => '42c883',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'D',
+            'location' => 'ProfileController.php:verifyEmail',
+            'message' => 'email change confirmed',
+            'data' => ['confirmed' => true],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
+        // #endregion
+
+        AdminActivityService::log((int) $user->user_id, 'Confirmed email change', 'Account');
+
+        return response()->json([
+            'message' => 'Your email address has been updated.',
+            'user' => $this->profilePayload($user),
+        ]);
+    }
+
+    private function profilePayload($user): array
+    {
+        return [
+            'user_id' => $user->user_id,
+            'username' => $user->username,
+            'first_name' => $user->first_name,
+            'middle_initial' => $user->middle_initial,
+            'last_name' => $user->last_name,
+            'full_name' => $user->full_name,
+            'email' => $user->email,
+            'suffix' => $user->suffix,
+            'contact_number' => $user->contact_number,
+            'phone_number' => $user->phone_number,
+            'program_id' => $user->program_id,
+            'role' => $user->role,
+        ];
     }
 }

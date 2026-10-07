@@ -5761,11 +5761,28 @@ function closeProfileEditModal() {
 
   profileEditModal.classList.remove('is-open');
   profileEditModal.setAttribute('aria-hidden', 'true');
+  const otpPanel = document.getElementById('profile-email-otp');
+  const otpCode = document.getElementById('profile-email-otp-code');
+  if (otpPanel) {
+    otpPanel.hidden = true;
+  }
+  if (otpCode) {
+    otpCode.value = '';
+  }
 }
 
 function openProfileEditModal() {
   if (!profileEditModal || !profileModalFirstNameInput || !profileModalMiddleNameInput || !profileModalLastNameInput || !profileModalSuffixInput) {
     return;
+  }
+
+  const otpPanelOnOpen = document.getElementById('profile-email-otp');
+  const otpCodeOnOpen = document.getElementById('profile-email-otp-code');
+  if (otpPanelOnOpen) {
+    otpPanelOnOpen.hidden = true;
+  }
+  if (otpCodeOnOpen) {
+    otpCodeOnOpen.value = '';
   }
 
   profileModalFirstNameInput.value = profileFirstNameInput ? profileFirstNameInput.value : '';
@@ -5951,12 +5968,84 @@ if (profileEditSaveButton) {
         profilePhotoChangePending = false;
       }
 
+      if (result.email_verification_required) {
+        const otpPanel = document.getElementById('profile-email-otp');
+        const otpCode = document.getElementById('profile-email-otp-code');
+        if (otpPanel) {
+          otpPanel.hidden = false;
+        }
+        if (otpCode) {
+          otpCode.value = '';
+          otpCode.focus();
+        }
+        showAppNotice(result.message || 'We sent a verification code to your new email.');
+        return;
+      }
+
       closeProfileEditModal();
       showAppNotice(result.message || 'Profile updated successfully.');
     } catch (error) {
       showAppNotice(error instanceof Error ? error.message : 'Failed to update profile.');
     } finally {
       profileEditSaveButton.disabled = false;
+    }
+  });
+}
+
+const profileEmailOtpVerifyButton = document.getElementById('profile-email-otp-verify');
+if (profileEmailOtpVerifyButton) {
+  profileEmailOtpVerifyButton.addEventListener('click', async () => {
+    const token = document.querySelector('meta[name="csrf-token"]');
+    const verifyUrl = window.authUser && window.authUser.profile_email_verify_url
+      ? window.authUser.profile_email_verify_url
+      : '/profile/email/verify';
+    const otpCode = document.getElementById('profile-email-otp-code');
+    const code = otpCode ? otpCode.value.trim() : '';
+
+    try {
+      profileEmailOtpVerifyButton.disabled = true;
+      const response = await fetch(verifyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': token ? token.content : '',
+        },
+        body: JSON.stringify({ code }),
+      });
+      const responseText = await response.text();
+      // #region agent log
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'42c883'},body:JSON.stringify({sessionId:'42c883',runId:'post-fix',hypothesisId:'D',location:'dashboard.js:email-verify',message:'email verify response',data:{status:response.status,contentType:response.headers.get('content-type')||'',bodyStart:responseText.slice(0,180)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error(parseError instanceof Error ? parseError.message : 'Email verification returned an invalid response.');
+      }
+
+      if (!response.ok) {
+        const fieldMessage = result && result.errors && result.errors.code && result.errors.code[0];
+        throw new Error(fieldMessage || (result && result.message) || 'The verification code could not be confirmed.');
+      }
+
+      const confirmedEmail = result.user && result.user.email ? result.user.email : '';
+      if (profileEmailInput && confirmedEmail) {
+        profileEmailInput.value = confirmedEmail;
+      }
+      if (profileModalEmailInput && confirmedEmail) {
+        profileModalEmailInput.value = confirmedEmail;
+      }
+      if (window.authUser && confirmedEmail) {
+        window.authUser.email = confirmedEmail;
+      }
+
+      closeProfileEditModal();
+      showAppNotice(result.message || 'Your email address has been updated.');
+    } catch (error) {
+      showAppNotice(error instanceof Error ? error.message : 'The verification code could not be confirmed.');
+    } finally {
+      profileEmailOtpVerifyButton.disabled = false;
     }
   });
 }

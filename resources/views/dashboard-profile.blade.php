@@ -43,6 +43,7 @@
       'program_id' => $authUser->program_id ?? null,
       'should_select_program' => $shouldSelectProgram,
       'profile_update_url' => route('dashboard.profile.update'),
+      'profile_email_verify_url' => route('dashboard.profile.email.verify'),
     ];
 
     $profileNavComponent = method_exists($authUser, 'isPhysicalFacilitiesAdmin') && $authUser->isPhysicalFacilitiesAdmin()
@@ -214,6 +215,12 @@
 
             <label class="profile-edit-label" for="profile-modal-email">Email</label>
             <input id="profile-modal-email" class="profile-edit-input" type="text" />
+            <div class="profile-email-otp" id="profile-email-otp" hidden>
+              <p class="profile-email-otp-copy">Enter the 6-digit code sent to your new email address.</p>
+              <label class="profile-edit-label" for="profile-email-otp-code">Verification code</label>
+              <input id="profile-email-otp-code" class="profile-edit-input profile-email-otp-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+              <button type="button" class="profile-edit-btn-primary" id="profile-email-otp-verify">Confirm email</button>
+            </div>
 
             <label class="profile-edit-label" for="profile-modal-contact">Contact Number</label>
             <input id="profile-modal-contact" class="profile-edit-input" type="text" />
