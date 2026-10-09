@@ -9,6 +9,7 @@ use App\Models\AccountSetupTokenRedemption;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -178,8 +179,18 @@ class AccountSetupService
 
                 DB::select('select set_config(?, ?, true)', [self::SETUP_SETTING, $token]);
 
+                $authUserId = $this->syncMobileLogin($user, $password);
+
                 $user->password = $password;
+                $user->auth_user_id = $authUserId;
                 $user->save();
+
+                // #region agent log
+                $this->debugLog('D', 'AccountSetupService.php:complete', 'password setup saved auth link', [
+                    'userId' => (int) $user->user_id,
+                    'authLinked' => $authUserId !== '',
+                ]);
+                // #endregion
 
                 AccountSetupTokenRedemption::query()->create([
                     'token_hash' => $this->hashToken($token),
@@ -197,6 +208,94 @@ class AccountSetupService
 
             throw new AccountSetupDeliveryException('save_failed');
         }
+    }
+
+    private function syncMobileLogin(User $user, string $password): string
+    {
+        $base = rtrim((string) config('services.supabase.url'), '/');
+        $key = (string) config('services.supabase.service_role_key');
+        $email = strtolower(trim((string) $user->email));
+
+        if ($base === '' || $key === '' || $email === '') {
+            // #region agent log
+            $this->debugLog('C', 'AccountSetupService.php:syncMobileLogin', 'supabase login settings missing', [
+                'userId' => (int) $user->user_id,
+                'urlSet' => $base !== '',
+                'keySet' => $key !== '',
+            ]);
+            // #endregion
+            throw new AccountSetupDeliveryException('save_failed');
+        }
+
+        $existing = DB::selectOne(
+            'select id::text as id from auth.users where lower(email) = ? limit 1',
+            [$email]
+        );
+        $existingId = is_object($existing) ? (string) ($existing->id ?? '') : '';
+
+        // #region agent log
+        $this->debugLog('A', 'AccountSetupService.php:syncMobileLogin', 'checked mobile login account before save', [
+            'userId' => (int) $user->user_id,
+            'authExists' => $existingId !== '',
+        ]);
+        // #endregion
+
+        $request = Http::withHeaders([
+            'apikey' => $key,
+            'Authorization' => 'Bearer '.$key,
+        ])->acceptJson()->asJson()->timeout(20);
+
+        if ($existingId !== '') {
+            $response = $request->put($base.'/auth/v1/admin/users/'.$existingId, [
+                'password' => $password,
+                'email_confirm' => true,
+            ]);
+            $authUserId = $existingId;
+        } else {
+            $response = $request->post($base.'/auth/v1/admin/users', [
+                'email' => $email,
+                'password' => $password,
+                'email_confirm' => true,
+            ]);
+            $authUserId = (string) $response->json('id');
+        }
+
+        // #region agent log
+        $this->debugLog($response->successful() ? 'B' : 'C', 'AccountSetupService.php:syncMobileLogin', 'supabase login sync response', [
+            'userId' => (int) $user->user_id,
+            'created' => $existingId === '',
+            'status' => $response->status(),
+            'authIdReturned' => $authUserId !== '',
+        ]);
+        // #endregion
+
+        if (!$response->successful() || $authUserId === '') {
+            throw new AccountSetupDeliveryException('save_failed');
+        }
+
+        return $authUserId;
+    }
+
+    private function debugLog(string $hypothesisId, string $location, string $message, array $data): void
+    {
+        // #region agent log
+        try {
+            file_put_contents(
+                base_path('debug-7f632d.log'),
+                json_encode([
+                    'sessionId' => '7f632d',
+                    'runId' => 'post-fix',
+                    'hypothesisId' => $hypothesisId,
+                    'location' => $location,
+                    'message' => $message,
+                    'data' => $data,
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES).PHP_EOL,
+                FILE_APPEND
+            );
+        } catch (\Throwable) {
+        }
+        // #endregion
     }
 
     private function tokenFormatIsValid(string $token): bool
