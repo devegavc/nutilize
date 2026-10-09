@@ -73,26 +73,10 @@ class DashboardUserController extends Controller
         $data = $this->normalizeRolePayload($data);
         $data = UserNameService::applyToUserData($data);
 
-        // #region agent log
-        $email = (string) ($data['email'] ?? '');
-        $at = strrpos($email, '@');
-        file_put_contents(base_path('debug-6ca79f.log'), json_encode([
-            'sessionId' => '6ca79f',
-            'runId' => 'pre-fix',
-            'hypothesisId' => 'C',
-            'location' => 'DashboardUserController.php:store',
-            'message' => 'admin add-user store reached after validation',
-            'data' => [
-                'role' => $data['role'] ?? null,
-                'emailDomain' => $at === false ? 'none' : substr($email, $at + 1),
-                'mailer' => (string) config('mail.default'),
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ]).PHP_EOL, FILE_APPEND);
-        // #endregion
+        $user = null;
 
         try {
-            $delivery = DB::transaction(function () use ($data) {
+            [$user, $token] = DB::transaction(function () use ($data) {
                 $user = new User();
                 $user->username = $data['username'];
                 $user->email = $data['email'];
@@ -111,64 +95,22 @@ class DashboardUserController extends Controller
 
                 $token = $this->accountSetup->issue($user);
 
-                // #region agent log
-                file_put_contents(base_path('debug-6ca79f.log'), json_encode([
-                    'sessionId' => '6ca79f',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'D',
-                    'location' => 'DashboardUserController.php:store',
-                    'message' => 'user saved and setup token issued',
-                    'data' => [
-                        'userId' => (int) $user->user_id,
-                        'tokenLen' => strlen($token),
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ]).PHP_EOL, FILE_APPEND);
-                // #endregion
-
-                return $this->accountSetup->deliver($user, $token);
+                return [$user, $token];
             });
-        } catch (AccountSetupDeliveryException $exception) {
-            // #region agent log
-            file_put_contents(base_path('debug-6ca79f.log'), json_encode([
-                'sessionId' => '6ca79f',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'B',
-                'location' => 'DashboardUserController.php:store',
-                'message' => 'setup delivery exception rolled back create',
-                'data' => ['exceptionClass' => $exception::class],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ]).PHP_EOL, FILE_APPEND);
-            // #endregion
+
+            $delivery = $this->accountSetup->deliver($user, $token);
+        } catch (AccountSetupDeliveryException) {
+            if ($user) {
+                try {
+                    $user->delete();
+                } catch (\Throwable) {
+                }
+            }
+
             return redirect()
                 ->route('dashboard.users')
                 ->with('error', 'Account creation failed because the setup email could not be sent. No account was created.');
-        } catch (\Throwable $exception) {
-            // #region agent log
-            file_put_contents(base_path('debug-6ca79f.log'), json_encode([
-                'sessionId' => '6ca79f',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'D',
-                'location' => 'DashboardUserController.php:store',
-                'message' => 'unexpected exception during add-user',
-                'data' => ['exceptionClass' => $exception::class],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ]).PHP_EOL, FILE_APPEND);
-            // #endregion
-            throw $exception;
         }
-
-        // #region agent log
-        file_put_contents(base_path('debug-6ca79f.log'), json_encode([
-            'sessionId' => '6ca79f',
-            'runId' => 'pre-fix',
-            'hypothesisId' => 'A',
-            'location' => 'DashboardUserController.php:store',
-            'message' => 'add-user completed with delivery result',
-            'data' => ['delivery' => $delivery],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ]).PHP_EOL, FILE_APPEND);
-        // #endregion
 
         if ($actorId = (int) (Auth::id() ?? 0)) {
             AdminActivityService::log($actorId, 'Added new user', 'Account');

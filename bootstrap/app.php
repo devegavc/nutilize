@@ -30,23 +30,6 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (QueryException|\PDOException $e, Request $request) {
-            // #region agent log
-            file_put_contents(base_path('debug-6ca79f.log'), json_encode([
-                'sessionId' => '6ca79f',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'D',
-                'location' => 'bootstrap/app.php:render',
-                'message' => 'query exception rendered as database error page',
-                'data' => [
-                    'path' => $request->path(),
-                    'method' => $request->method(),
-                    'sqlstate' => $e instanceof QueryException ? ($e->errorInfo[0] ?? null) : null,
-                    'driverCode' => $e instanceof QueryException ? ($e->errorInfo[1] ?? null) : null,
-                    'exceptionClass' => $e::class,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ]).PHP_EOL, FILE_APPEND);
-            // #endregion
             $message = $e->getMessage();
 
             $networkErrors = [

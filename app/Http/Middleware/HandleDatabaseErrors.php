@@ -20,23 +20,6 @@ class HandleDatabaseErrors
         try {
             return $next($request);
         } catch (QueryException|PDOException $e) {
-            // #region agent log
-            file_put_contents(base_path('debug-6ca79f.log'), json_encode([
-                'sessionId' => '6ca79f',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'D',
-                'location' => 'HandleDatabaseErrors.php:handle',
-                'message' => 'middleware caught database exception',
-                'data' => [
-                    'path' => $request->path(),
-                    'method' => $request->method(),
-                    'sqlstate' => $e instanceof QueryException ? ($e->errorInfo[0] ?? null) : null,
-                    'driverCode' => $e instanceof QueryException ? ($e->errorInfo[1] ?? null) : null,
-                    'exceptionClass' => $e::class,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ]).PHP_EOL, FILE_APPEND);
-            // #endregion
             // Log the error
             $driverMessage = $e instanceof QueryException
                 ? ($e->errorInfo[2] ?? $e->getMessage())

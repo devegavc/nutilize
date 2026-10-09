@@ -62,25 +62,7 @@ class AccountSetupService
 
     public function deliver(User $user, string $token): string
     {
-        $mailer = (string) config('mail.default');
-
-        // #region agent log
-        file_put_contents(base_path('debug-6ca79f.log'), json_encode([
-            'sessionId' => '6ca79f',
-            'runId' => 'pre-fix',
-            'hypothesisId' => 'A',
-            'location' => 'AccountSetupService.php:deliver',
-            'message' => 'setup email deliver started',
-            'data' => [
-                'userId' => (int) $user->user_id,
-                'mailer' => $mailer,
-                'appUrlHost' => parse_url((string) config('app.url'), PHP_URL_HOST),
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ]).PHP_EOL, FILE_APPEND);
-        // #endregion
-
-        if ($mailer === 'log') {
+        if (config('mail.default') === 'log') {
             Log::info('Account setup email was not delivered to an inbox because the mailer is log. The setup link was omitted from this log.', [
                 'user_id' => $user->user_id,
             ]);
@@ -91,21 +73,6 @@ class AccountSetupService
         try {
             Mail::to($user->email)->send(new AccountSetupMail($user, $token));
         } catch (\Throwable $exception) {
-            // #region agent log
-            file_put_contents(base_path('debug-6ca79f.log'), json_encode([
-                'sessionId' => '6ca79f',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'B',
-                'location' => 'AccountSetupService.php:deliver',
-                'message' => 'setup email send failed',
-                'data' => [
-                    'userId' => (int) $user->user_id,
-                    'mailer' => $mailer,
-                    'exceptionClass' => $exception::class,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ]).PHP_EOL, FILE_APPEND);
-            // #endregion
             Log::warning('Account setup email could not be sent.', [
                 'user_id' => $user->user_id,
                 'exception' => $exception::class,
@@ -113,21 +80,6 @@ class AccountSetupService
 
             throw new AccountSetupDeliveryException('The setup email could not be sent.');
         }
-
-        // #region agent log
-        file_put_contents(base_path('debug-6ca79f.log'), json_encode([
-            'sessionId' => '6ca79f',
-            'runId' => 'pre-fix',
-            'hypothesisId' => 'E',
-            'location' => 'AccountSetupService.php:deliver',
-            'message' => 'setup email send reported success',
-            'data' => [
-                'userId' => (int) $user->user_id,
-                'mailer' => $mailer,
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ]).PHP_EOL, FILE_APPEND);
-        // #endregion
 
         return self::DELIVERY_SENT;
     }

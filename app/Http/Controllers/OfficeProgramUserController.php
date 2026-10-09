@@ -46,8 +46,10 @@ class OfficeProgramUserController extends Controller
             'full_name' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $user = null;
+
         try {
-            $delivery = DB::transaction(function () use ($chair, $data) {
+            [$user, $token] = DB::transaction(function () use ($chair, $data) {
                 $user = new User();
                 $user->username = $data['username'];
                 $user->email = $data['email'];
@@ -60,9 +62,18 @@ class OfficeProgramUserController extends Controller
 
                 $token = $this->accountSetup->issue($user);
 
-                return $this->accountSetup->deliver($user, $token);
+                return [$user, $token];
             });
+
+            $delivery = $this->accountSetup->deliver($user, $token);
         } catch (AccountSetupDeliveryException) {
+            if ($user) {
+                try {
+                    $user->delete();
+                } catch (\Throwable) {
+                }
+            }
+
             return redirect()
                 ->route('office.users')
                 ->with('error', 'Account creation failed because the setup email could not be sent. No account was created.');
