@@ -8,7 +8,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/css/auth.css?v=login-7">
-  <link rel="stylesheet" href="/css/account-setup.css?v=4">
+  <link rel="stylesheet" href="/css/account-setup.css?v=5">
 </head>
 <body class="login-page account-setup-page">
   <header class="top-header"></header>
@@ -89,7 +89,7 @@
                 <div class="password-strength" aria-hidden="true">
                   <div class="password-strength-bar" id="setup-strength-bar"></div>
                 </div>
-                <p class="password-strength-text mb-2" id="setup-strength-text">Password strength: Enter a password</p>
+                <p class="password-strength-text" id="setup-strength-text">Password strength: Enter a password</p>
                 <ul class="password-rules mb-0">
                   <li id="setup-rule-length">At least 8 characters</li>
                   <li id="setup-rule-upper">One uppercase letter</li>
