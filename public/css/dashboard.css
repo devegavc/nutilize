@@ -90,7 +90,6 @@ body {
   width: 100%;
   z-index: 1000;
   box-shadow: 0 10px 20px rgba(15, 24, 66, 0.3);
-  backdrop-filter: blur(6px);
 }
 
 .top-header-inner {
@@ -126,6 +125,8 @@ body {
   height: auto;
   margin-left: 30px;
   margin-right: auto;
+  isolation: isolate;
+  mix-blend-mode: normal;
 }
 
 .toolbar-icon,

@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
   <!-- Custom styles -->
-  <link rel="stylesheet" href="/css/auth.css?v=login-6">
+  <link rel="stylesheet" href="/css/auth.css?v=login-7">
 </head>
 <body class="login-page">
 
@@ -332,6 +332,63 @@
         }
       });
     })();
+  </script>
+  <script>
+    // #region agent log
+    (() => {
+      const logo = document.querySelector('.brand-logo');
+      if (!(logo instanceof HTMLImageElement)) {
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6ca79f'},body:JSON.stringify({sessionId:'6ca79f',runId:'pre-fix',hypothesisId:'B',location:'login.blade.php:logo-probe',message:'no login logo',data:{path:location.pathname},timestamp:Date.now()})}).catch(()=>{});
+        return;
+      }
+      const css = getComputedStyle(logo);
+      const card = logo.closest('.login-card');
+      const cardCss = card ? getComputedStyle(card) : null;
+      const send = (message, extra) => {
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6ca79f'},body:JSON.stringify({sessionId:'6ca79f',runId:'pre-fix',hypothesisId:'A',location:'login.blade.php:logo-probe',message,data:extra,timestamp:Date.now()})}).catch(()=>{});
+      };
+      send('login logo styles', {
+        ua: navigator.userAgent.slice(0, 140),
+        currentSrc: logo.currentSrc || logo.src,
+        complete: logo.complete,
+        naturalWidth: logo.naturalWidth,
+        displayW: Math.round(logo.getBoundingClientRect().width),
+        filter: css.filter,
+        mixBlendMode: css.mixBlendMode,
+        opacity: css.opacity,
+        cardBackdrop: cardCss ? (cardCss.backdropFilter || cardCss.webkitBackdropFilter) : null,
+        colorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      });
+      const sample = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = logo.naturalWidth || 1;
+          canvas.height = logo.naturalHeight || 1;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (!ctx || !logo.naturalWidth) {
+            return;
+          }
+          ctx.drawImage(logo, 0, 0);
+          const n = ctx.getImageData(Math.max(2, Math.floor(canvas.width * 0.12)), Math.floor(canvas.height * 0.5), 1, 1).data;
+          const u = ctx.getImageData(Math.floor(canvas.width * 0.42), Math.floor(canvas.height * 0.5), 1, 1).data;
+          send('login logo pixels', {
+            hypothesisId: 'C',
+            nPixel: [n[0], n[1], n[2], n[3]],
+            uPixel: [u[0], u[1], u[2], u[3]],
+            nLooksWhite: n[0] > 220 && n[1] > 220 && n[2] > 220,
+            nLooksYellow: n[0] > 180 && n[1] > 140 && n[2] < 120
+          });
+        } catch (error) {
+          send('login canvas failed', { hypothesisId: 'C', error: error instanceof Error ? error.name : 'err' });
+        }
+      };
+      if (logo.complete) {
+        sample();
+      } else {
+        logo.addEventListener('load', sample, { once: true });
+      }
+    })();
+    // #endregion
   </script>
 
 </body>
