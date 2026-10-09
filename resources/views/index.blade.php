@@ -12,23 +12,20 @@
   <link rel="preload" href="/fonts/poppins-800.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="/fonts/poppins-400.woff2" as="font" type="font/woff2" crossorigin />
 
-  <link rel="stylesheet" href="/css/landing.css?v=11" />
+  <link rel="stylesheet" href="/css/landing.css?v=12" />
 </head>
 <body>
   <header class="top-header">
     <div class="header-inner">
       <a href="/" class="brand" aria-label="NU-TILIZE home">
-        <picture>
-          <source srcset="/img/nutilize_logo.webp" type="image/webp" />
-          <img
-            src="/img/nutilize_logo.png"
+        <img
+            src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}"
             alt="NU-TILIZE"
             class="brand-logo"
             width="146"
             height="49"
             decoding="async"
           />
-        </picture>
       </a>
 
       <button

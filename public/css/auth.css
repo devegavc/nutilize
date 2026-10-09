@@ -460,6 +460,7 @@ body.login-page {
   margin: 0 auto 0.55rem;
   isolation: isolate;
   mix-blend-mode: normal;
+  color-interpolation: sRGB;
 }
 
 .login-page .brand-subtitle {

@@ -185,13 +185,6 @@ class AccountSetupService
                 $user->auth_user_id = $authUserId;
                 $user->save();
 
-                // #region agent log
-                $this->debugLog('D', 'AccountSetupService.php:complete', 'password setup saved auth link', [
-                    'userId' => (int) $user->user_id,
-                    'authLinked' => $authUserId !== '',
-                ]);
-                // #endregion
-
                 AccountSetupTokenRedemption::query()->create([
                     'token_hash' => $this->hashToken($token),
                     'consumed_at' => now(),
@@ -217,13 +210,6 @@ class AccountSetupService
         $email = strtolower(trim((string) $user->email));
 
         if ($base === '' || $key === '' || $email === '') {
-            // #region agent log
-            $this->debugLog('C', 'AccountSetupService.php:syncMobileLogin', 'supabase login settings missing', [
-                'userId' => (int) $user->user_id,
-                'urlSet' => $base !== '',
-                'keySet' => $key !== '',
-            ]);
-            // #endregion
             throw new AccountSetupDeliveryException('save_failed');
         }
 
@@ -232,13 +218,6 @@ class AccountSetupService
             [$email]
         );
         $existingId = is_object($existing) ? (string) ($existing->id ?? '') : '';
-
-        // #region agent log
-        $this->debugLog('A', 'AccountSetupService.php:syncMobileLogin', 'checked mobile login account before save', [
-            'userId' => (int) $user->user_id,
-            'authExists' => $existingId !== '',
-        ]);
-        // #endregion
 
         $request = Http::withHeaders([
             'apikey' => $key,
@@ -260,42 +239,11 @@ class AccountSetupService
             $authUserId = (string) $response->json('id');
         }
 
-        // #region agent log
-        $this->debugLog($response->successful() ? 'B' : 'C', 'AccountSetupService.php:syncMobileLogin', 'supabase login sync response', [
-            'userId' => (int) $user->user_id,
-            'created' => $existingId === '',
-            'status' => $response->status(),
-            'authIdReturned' => $authUserId !== '',
-        ]);
-        // #endregion
-
         if (!$response->successful() || $authUserId === '') {
             throw new AccountSetupDeliveryException('save_failed');
         }
 
         return $authUserId;
-    }
-
-    private function debugLog(string $hypothesisId, string $location, string $message, array $data): void
-    {
-        // #region agent log
-        try {
-            file_put_contents(
-                base_path('debug-7f632d.log'),
-                json_encode([
-                    'sessionId' => '7f632d',
-                    'runId' => 'post-fix',
-                    'hypothesisId' => $hypothesisId,
-                    'location' => $location,
-                    'message' => $message,
-                    'data' => $data,
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL,
-                FILE_APPEND
-            );
-        } catch (\Throwable) {
-        }
-        // #endregion
     }
 
     private function tokenFormatIsValid(string $token): bool

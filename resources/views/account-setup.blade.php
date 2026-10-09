@@ -7,22 +7,22 @@
   <title>NUtilize | {{ $state === 'complete' ? 'Password Created' : 'Create Your Password' }}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/css/auth.css?v=login-6">
-  <link rel="stylesheet" href="/css/account-setup.css?v=3">
+  <link rel="stylesheet" href="/css/auth.css?v=login-7">
+  <link rel="stylesheet" href="/css/account-setup.css?v=4">
 </head>
-<body class="account-setup-page">
+<body class="login-page account-setup-page">
   <header class="top-header"></header>
   <div class="page-content">
     <div class="login-card mx-auto">
       <div class="login-card-inner">
         <div class="brand-area text-center">
-          <img src="/img/nutilize_logo.png" alt="NUtilize" class="brand-logo">
+          <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" alt="NUtilize" class="brand-logo">
           <p class="brand-subtitle">Campus Resource &amp; Reservation Management System</p>
           <span class="login-heading-rule" aria-hidden="true"></span>
           @if ($state === 'complete')
-            <h1 class="setup-heading">Password created</h1>
+            <h1 class="login-heading">Password created</h1>
           @else
-            <h1 class="setup-heading">Create Your Password</h1>
+            <h1 class="login-heading">Create Your Password</h1>
           @endif
         </div>
 

@@ -127,6 +127,7 @@ body {
   margin-right: auto;
   isolation: isolate;
   mix-blend-mode: normal;
+  color-interpolation: sRGB;
 }
 
 .toolbar-icon,
