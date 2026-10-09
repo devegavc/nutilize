@@ -49,7 +49,7 @@
       <section class="content-card office-requests-card">
         <h1 class="section-title">OFFICE APPROVAL DASHBOARD</h1>
         @if(!empty($officeName))
-          <p class="office-subtitle">Approving on behalf of: <strong>{{ $officeName === 'DO' ? 'Student discipline office' : ($officeName === 'SDAO' ? 'Student Development and Activities Office' : $officeName) }}</strong></p>
+          <p class="office-subtitle">Approving on behalf of: <strong>{{ \App\Models\Office::publicLabel($officeName) }}</strong></p>
         @else
           <p class="office-subtitle">Pending approvals for your office only, based on sequence.</p>
         @endif
@@ -296,7 +296,8 @@
             return false;
           }
 
-          const actorName = window.authUser?.full_name || 'Admin';
+          const rawActorName = window.authUser?.full_name || 'Admin';
+          const actorName = /^\s*do admin\s*$/i.test(rawActorName) ? 'Safety Admin' : rawActorName;
           const decisionWord = action === 'approve' ? 'approved' : 'rejected';
           const fallbackMessage = `Request ${decisionWord} by ${actorName}.`;
           showActionToast(payload.message || fallbackMessage, decisionWord === 'approved' ? 'approved' : 'rejected');

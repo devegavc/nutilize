@@ -71,10 +71,10 @@ class AdminActivityService
             foreach ($approvalRows as $row) {
                 $status = strtolower((string) ($row->status ?? ''));
                 $timestamp = strtotime((string) ($row->approved_at ?? '')) ?: 0;
-                $module = trim((string) ($row->office_name ?? ''));
+                $module = \App\Models\Office::publicLabel((string) ($row->office_name ?? ''));
 
                 if ($module === '') {
-                    $module = trim((string) ($row->office_code ?? '')) ?: 'Requests';
+                    $module = \App\Models\Office::publicLabel((string) ($row->office_code ?? '')) ?: 'Requests';
                 }
 
                 $entries[] = [

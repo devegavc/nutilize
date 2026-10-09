@@ -585,7 +585,7 @@ class DashboardRequestController extends Controller
                 'IO' => 'Item Owner',
                 'PC' => $officeMap[$officeId]['name'] ?? 'Program Chair',
                 'SDAO' => 'Student Development and Activities Office',
-                'DO' => 'Discipline Office',
+                'DO' => 'Safety',
                 'SEC' => 'Security',
                 'PF' => 'Physical Facilities',
                 default => $officeMap[$officeId]['name'] ?? 'Office',

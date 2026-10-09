@@ -60,7 +60,7 @@
 
       <section class="content-card facilities-content-card">
         <h1 class="section-title">MANAGE OFFICE ITEMS</h1>
-        <p class="office-items-subtitle">Manage equipment assigned to {{ auth()->user()?->office?->department_name ?? 'your office' }}</p>
+        <p class="office-items-subtitle">Manage equipment assigned to {{ \App\Models\Office::publicLabel(auth()->user()?->office?->department_name ?? '') ?: 'your office' }}</p>
 
         <section class="facilities-filter-row">
           <div class="facilities-tab-group" role="tablist" aria-label="Equipment category">

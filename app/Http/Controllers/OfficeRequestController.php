@@ -874,7 +874,7 @@ class OfficeRequestController extends Controller
             'IO' => 'Item Owner',
             'PC' => 'Program Chair',
             'SDAO' => 'SDAO',
-            'DO' => 'Discipline Office',
+            'DO' => 'Safety',
             'SEC' => 'Security',
             'PF' => 'Physical Facilities',
             'GENED' => 'General Education',

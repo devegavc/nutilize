@@ -181,7 +181,7 @@ class OfficeProgramUserController extends Controller
                 ->value('department_name');
 
             if (is_string($officeName) && $officeName !== '') {
-                return $officeName;
+                return \App\Models\Office::publicLabel($officeName);
             }
         }
 

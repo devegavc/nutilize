@@ -353,17 +353,17 @@ class ReservationApprovalNotifier
                 'PC' => 'Program Chair',
                 'SDAO' => 'Student Development and Activities Office',
                 'IO' => 'Inventory Office',
-                'DO' => 'Discipline Office',
+                'DO' => 'Safety',
                 'SEC' => 'Security',
                 'PF' => 'Physical Facilities',
                 'GENED' => 'General Education',
-                default => $code,
+                default => \App\Models\Office::publicLabel($code),
             };
         }
 
         $name = trim((string) ($office->department_name ?? ''));
 
-        return $name !== '' ? $name : 'Previous office';
+        return $name !== '' ? \App\Models\Office::publicLabel($name) : 'Previous office';
     }
 
     private static function timestampForReservation(Reservation $reservation, $fallback)

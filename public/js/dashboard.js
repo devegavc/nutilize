@@ -5377,9 +5377,10 @@ function positionProfilePopover(button) {
 function buildProfilePopover() {
   const panel = document.createElement('div');
   panel.className = 'profile-popover';
-  const userName = (window.authUser && (window.authUser.full_name || window.authUser.username))
+  const rawUserName = (window.authUser && (window.authUser.full_name || window.authUser.username))
     ? (window.authUser.full_name || window.authUser.username)
     : 'User';
+  const userName = /^\s*do admin\s*$/i.test(rawUserName) ? 'Safety Admin' : rawUserName;
   panel.innerHTML = `
     <button type="button" class="profile-action" data-profile-action="account">${userName}</button>
     <button type="button" class="profile-action logout" data-profile-action="logout">Logout</button>

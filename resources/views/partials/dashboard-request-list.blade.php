@@ -28,7 +28,7 @@
       <span>#NU-{{ str_pad((string) $reservation->reservation_id, 6, '0', STR_PAD_LEFT) }}</span>
       <span class="status-dots">
         @foreach($requestData['workflow_steps'] as $step)
-          <i class="bi {{ $step['icon_class'] ?? 'bi-building' }} {{ $step['dot_class'] }}" title="{{ $step['office_code'] }} - {{ $step['office_name'] }}"></i>
+          <i class="bi {{ $step['icon_class'] ?? 'bi-building' }} {{ $step['dot_class'] }}" title="{{ $step['stage_label'] ?? $step['office_name'] }}"></i>
         @endforeach
       </span>
     </div>

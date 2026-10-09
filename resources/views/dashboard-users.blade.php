@@ -91,12 +91,12 @@
           $activeUsersCount = $users->filter(fn ($user) => UserAccountStatusService::isActive($user))->count();
           $resolveUserName = fn ($user) => $user->displayName();
           $resolveUserOffice = function ($user): string {
-              $officeName = trim((string) ($user->office?->department_name ?? ''));
+              $officeName = \App\Models\Office::publicLabel((string) ($user->office?->department_name ?? ''));
               if ($officeName !== '') {
                   return $officeName;
               }
 
-              $programOfficeName = trim((string) ($user->academicProgram?->office?->department_name ?? ''));
+              $programOfficeName = \App\Models\Office::publicLabel((string) ($user->academicProgram?->office?->department_name ?? ''));
               if ($programOfficeName !== '') {
                   return $programOfficeName;
               }
@@ -361,7 +361,7 @@
             <select id="user-office" class="facilities-input facilities-select" name="office_id">
               <option value="">No Office</option>
               @foreach($offices as $office)
-                <option value="{{ $office->office_id }}">{{ $office->department_name }}</option>
+                <option value="{{ $office->office_id }}">{{ \App\Models\Office::publicLabel($office->department_name) }}</option>
               @endforeach
             </select>
             <small class="facilities-input-note" id="item-owner-office-note">
