@@ -56,7 +56,7 @@
           </div>
           <div class="request-date-row">
             <span class="today">Today</span>
-            <span class="date">{{ now()->format('F j, Y') }}</span>
+            <span class="date">{{ now('Asia/Manila')->format('F j, Y') }}</span>
           </div>
         </section>
 
