@@ -162,6 +162,37 @@
     </article>
   </div>
 
+  <script>
+    // #region agent log
+    (function () {
+      function measureHistoryToolbar(runId) {
+        var toolbar = document.querySelector('.history-toolbar');
+        if (!toolbar) return;
+        var cs = getComputedStyle(toolbar);
+        var kids = Array.prototype.map.call(toolbar.children, function (el) {
+          var childCs = getComputedStyle(el);
+          return {
+            cls: el.className || el.id || el.tagName,
+            top: el.offsetTop,
+            left: el.offsetLeft,
+            w: el.offsetWidth,
+            h: el.offsetHeight,
+            flex: childCs.flex,
+            minWidth: childCs.minWidth,
+            marginLeft: childCs.marginLeft
+          };
+        });
+        var tab = toolbar.querySelector('.history-tab-group');
+        var dates = Array.prototype.map.call(toolbar.querySelectorAll('.history-date-range input'), function (input) {
+          return { w: input.offsetWidth, minWidth: getComputedStyle(input).minWidth };
+        });
+        var tops = kids.map(function (k) { return k.top; });
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f29cc4'},body:JSON.stringify({sessionId:'f29cc4',runId:runId||'pre',hypothesisId:'A-E',location:'dashboard-history.blade.php:toolbar',message:'history toolbar layout',data:{vw:window.innerWidth,toolbarW:toolbar.clientWidth,toolbarScroll:toolbar.scrollWidth,toolbarH:toolbar.offsetHeight,flexWrap:cs.flexWrap,gap:cs.gap,rowCount:tops.filter(function(t,i){return tops.indexOf(t)===i;}).length,mq1100:window.matchMedia('(max-width: 1100px)').matches,mq700:window.matchMedia('(max-width: 700px)').matches,tabW:tab?tab.offsetWidth:null,tabMin:tab?getComputedStyle(tab).minWidth:null,dates:dates,kids:kids},timestamp:Date.now()})}).catch(function(){});
+      }
+      window.addEventListener('load', function () { measureHistoryToolbar('pre'); });
+    })();
+    // #endregion
+  </script>
   <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
 </html>

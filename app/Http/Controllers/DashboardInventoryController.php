@@ -25,7 +25,7 @@ class DashboardInventoryController extends Controller
         $rawString = ($raw !== null && $raw !== '') ? (string) $raw : '';
         $timestamp = $rawString !== '' ? strtotime($rawString) : false;
 
-        return $timestamp ? date('d/m/Y', $timestamp) : date('d/m/Y');
+        return $timestamp ? date('m/d/Y', $timestamp) : date('m/d/Y');
     }
 
     public function index()
@@ -502,7 +502,7 @@ class DashboardInventoryController extends Controller
             $tab = $isDamaged ? 'damaged' : 'maintenance';
 
             $dateSource = $unit->last_maintenance_at ?? $unit->unit_updated_at ?? $unit->unit_created_at;
-            $dateLabel = $this->formatMaintenanceDate('unit', $dateSource);
+            $dateLabel = $this->formatMaintenanceDate($dateSource);
 
             $rowsByTab[$tab][] = [
                 'row_type' => 'unit',
@@ -582,7 +582,7 @@ class DashboardInventoryController extends Controller
                     'id' => $displayId,
                     'item' => $itemLabel,
                     'count' => '1',
-                    'date' => $this->formatMaintenanceDate('reported-issue', $dateValue),
+                    'date' => $this->formatMaintenanceDate($dateValue),
                     'status' => 'Reported',
                     'statusClass' => 'reported',
                     'location' => 'Reservation',
@@ -650,7 +650,7 @@ class DashboardInventoryController extends Controller
                         'id' => $displayId,
                         'item' => $itemLabel,
                         'count' => '1',
-                        'date' => $this->formatMaintenanceDate('addressed-issue', $dateValue),
+                        'date' => $this->formatMaintenanceDate($dateValue),
                         'status' => 'Addressed',
                         'statusClass' => 'addressed',
                         'location' => 'Reservation',
@@ -738,7 +738,7 @@ class DashboardInventoryController extends Controller
                     'id' => 'report_' . (int) $report->report_id,
                     'item' => $itemLabel,
                     'count' => '1',
-                    'date' => $this->formatMaintenanceDate('legacy-report', $dateValue),
+                    'date' => $this->formatMaintenanceDate($dateValue),
                     'status' => 'Reported',
                     'statusClass' => 'reported',
                     'location' => strpos($itemLabel, 'Room ') === 0 ? 'Room' : 'Reported',
@@ -768,7 +768,7 @@ class DashboardInventoryController extends Controller
 
             foreach ($roomMaintenanceRows as $row) {
                 $dateSource = $row->updated_at ?? $row->created_at;
-                $dateLabel = $this->formatMaintenanceDate('open-room', $dateSource);
+                $dateLabel = $this->formatMaintenanceDate($dateSource);
 
                 $rowsByTab['damaged'][] = [
                     'row_type' => 'room',
@@ -792,7 +792,7 @@ class DashboardInventoryController extends Controller
 
             foreach ($roomRows as $room) {
                 $dateSource = $room->updated_at ?? $room->created_at;
-                $dateLabel = $this->formatMaintenanceDate('room-flag', $dateSource);
+                $dateLabel = $this->formatMaintenanceDate($dateSource);
 
                 $rowsByTab['maintenance'][] = [
                     'row_type' => 'room',
@@ -853,7 +853,7 @@ class DashboardInventoryController extends Controller
                     'id' => ($isRoom ? 'room_' : 'mnt_') . (int) $row->maintenance_id,
                     'item' => $itemLabel,
                     'count' => '1',
-                    'date' => $this->formatMaintenanceDate('resolved-maintenance', $dateSource),
+                    'date' => $this->formatMaintenanceDate($dateSource),
                     'status' => 'Addressed',
                     'statusClass' => 'addressed',
                     'location' => $isRoom ? 'Room' : 'Item',
@@ -954,7 +954,7 @@ class DashboardInventoryController extends Controller
                 'id' => (string) $unit->unit_code,
                 'item' => (string) $unit->item_name,
                 'count' => '1',
-                'date' => date('d/m/Y'),
+                'date' => $this->formatMaintenanceDate(null),
                 'status' => $isDamaged ? 'Damaged' : 'Maintenance',
                 'statusClass' => $isDamaged ? 'damaged' : 'maintenance',
                 'location' => $this->locationFromCategory($normalizedCategory),
@@ -1012,7 +1012,7 @@ class DashboardInventoryController extends Controller
                 'id' => 'room_' . $roomId,
                 'item' => 'Room ' . trim((string) ($room->room_number ?? '')),
                 'count' => '1',
-                'date' => date('d/m/Y'),
+                'date' => $this->formatMaintenanceDate(null),
                 'status' => $isFixed ? 'Good' : ($validated['status'] === 'damaged' ? 'Damaged' : 'Maintenance'),
                 'statusClass' => $isFixed ? 'maintenance' : ($validated['status'] === 'damaged' ? 'damaged' : 'maintenance'),
                 'location' => 'Room',
