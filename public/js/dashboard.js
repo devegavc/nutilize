@@ -8716,3 +8716,67 @@ if (document.readyState === 'loading') {
 } else {
   initializeDashboard();
 }
+
+// #region agent log
+(() => {
+  const logo = document.querySelector('.toolbar-logo, .brand-logo');
+  if (!(logo instanceof HTMLImageElement)) {
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6ca79f'},body:JSON.stringify({sessionId:'6ca79f',runId:'pre-fix',hypothesisId:'B',location:'dashboard.js:logo-probe',message:'no logo image found',data:{path:location.pathname},timestamp:Date.now()})}).catch(()=>{});
+    return;
+  }
+  const header = logo.closest('.top-header');
+  const logoCss = getComputedStyle(logo);
+  const headerCss = header ? getComputedStyle(header) : null;
+  const send = (message, extra) => {
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6ca79f'},body:JSON.stringify({sessionId:'6ca79f',runId:'pre-fix',hypothesisId:'A',location:'dashboard.js:logo-probe',message,data:extra,timestamp:Date.now()})}).catch(()=>{});
+  };
+  const base = {
+    ua: navigator.userAgent.slice(0, 140),
+    currentSrc: logo.currentSrc || logo.src,
+    complete: logo.complete,
+    naturalWidth: logo.naturalWidth,
+    displayW: Math.round(logo.getBoundingClientRect().width),
+    filter: logoCss.filter,
+    mixBlendMode: logoCss.mixBlendMode,
+    opacity: logoCss.opacity,
+    headerBackdrop: headerCss ? headerCss.backdropFilter || headerCss.webkitBackdropFilter : null,
+    headerBg: headerCss ? headerCss.backgroundImage.slice(0, 80) : null,
+    headerBorderBottom: headerCss ? headerCss.borderBottom : null,
+    colorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+    forcedColors: window.matchMedia('(forced-colors: active)').matches
+  };
+  send('logo computed styles', base);
+  const sample = () => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = logo.naturalWidth || 1;
+      canvas.height = logo.naturalHeight || 1;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx || !logo.naturalWidth) {
+        send('logo canvas skipped', { hypothesisId: 'C', hasSize: Boolean(logo.naturalWidth) });
+        return;
+      }
+      ctx.drawImage(logo, 0, 0);
+      const x = Math.max(2, Math.floor(canvas.width * 0.12));
+      const y = Math.floor(canvas.height * 0.5);
+      const n = ctx.getImageData(x, y, 1, 1).data;
+      const ux = Math.floor(canvas.width * 0.42);
+      const u = ctx.getImageData(ux, y, 1, 1).data;
+      send('logo sampled pixels', {
+        hypothesisId: 'C',
+        nPixel: [n[0], n[1], n[2], n[3]],
+        uPixel: [u[0], u[1], u[2], u[3]],
+        nLooksWhite: n[0] > 220 && n[1] > 220 && n[2] > 220,
+        nLooksYellow: n[0] > 180 && n[1] > 140 && n[2] < 120
+      });
+    } catch (error) {
+      send('logo canvas failed', { hypothesisId: 'C', error: error instanceof Error ? error.name : 'err' });
+    }
+  };
+  if (logo.complete) {
+    sample();
+  } else {
+    logo.addEventListener('load', sample, { once: true });
+  }
+})();
+// #endregion
