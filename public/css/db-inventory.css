@@ -7759,3 +7759,118 @@ body.feedback-page .feedback-content-card {
     margin-right: 14px;
   }
 }
+
+/* Analytics equipment / rooms switch. Scoped to the insights page. */
+.insights-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+}
+
+.insights-view-tab {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.insights-view-tab:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+body.page-insights:not(.analytics-view-rooms) .insights-view-tab[data-analytics-view="equipment"],
+body.page-insights.analytics-view-rooms .insights-view-tab[data-analytics-view="rooms"] {
+  background: #fff;
+  color: #24357f;
+}
+
+body.page-insights:not(.analytics-view-rooms) .insights-view-tab[data-analytics-view="equipment"]:hover,
+body.page-insights.analytics-view-rooms .insights-view-tab[data-analytics-view="rooms"]:hover {
+  background: #fff;
+}
+
+body.page-insights:not(.analytics-view-rooms) [data-analytics-panel="rooms"],
+body.page-insights.analytics-view-rooms [data-analytics-panel="equipment"] {
+  display: none !important;
+}
+
+body.page-insights:not(.analytics-view-rooms) .analytics-rooms-copy,
+body.page-insights.analytics-view-rooms .analytics-equipment-copy {
+  display: none;
+}
+
+body.page-insights:not(.analytics-view-rooms) .insight-split[data-analytics-panel="equipment"] {
+  padding-bottom: 20px;
+}
+
+body.page-insights .insight-kpi-strip[data-analytics-panel="rooms"] .insight-kpi {
+  cursor: default;
+}
+
+body.page-insights .room-analytics-top {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+}
+
+body.page-insights .room-analytics-top .room-share-card {
+  flex: 1 1 340px;
+  width: auto;
+  max-width: none;
+}
+
+body.page-insights .room-analytics-top .analytics-category-card {
+  flex: 1 1 280px;
+}
+
+body.page-insights .analytics-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  text-align: center;
+  padding: 12px;
+}
+
+body.page-insights .analytics-chart-empty[hidden] {
+  display: none !important;
+}
+
+body.page-insights .priority-pill.available {
+  background: #e2f4e6;
+  color: #227a37;
+}
+
+body.page-insights .priority-pill.maintenance {
+  background: #fff3d1;
+  color: #8a6100;
+}
+
+body.page-insights .priority-pill.unavailable {
+  background: #fde3e3;
+  color: #b31f1f;
+}
+
+@media (max-width: 1100px) {
+  body.page-insights .room-analytics-top {
+    grid-template-columns: 1fr;
+  }
+
+  body.page-insights .room-analytics-top .room-share-card {
+    width: 100%;
+    max-width: 100%;
+  }
+}
