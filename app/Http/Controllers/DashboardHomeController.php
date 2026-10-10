@@ -32,10 +32,6 @@ class DashboardHomeController extends Controller
                 ->orderByDesc('created_at')
                 ->limit(12)
                 ->get();
-
-            // #region agent log
-            @file_put_contents(base_path('debug-09fa9e.log'), json_encode(['sessionId' => '09fa9e', 'runId' => 'post-fix', 'hypothesisId' => 'B', 'location' => 'DashboardHomeController.php:index', 'message' => 'home list skips expiry purge and filter', 'data' => ['purge_called' => false, 'active_scope' => false, 'listed' => $announcements->count(), 'listed_ids' => $announcements->pluck('announcement_id')->values()->all()], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
-            // #endregion
         }
 
         $announcementAnnouncerDefault = trim((string) old('announcer_name', 'Physical Facilities Admin'));

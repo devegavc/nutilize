@@ -2190,8 +2190,9 @@ function applyMaintenanceFilters() {
   maintenanceTableBody.removeAttribute('aria-busy');
   maintenanceTableBody.innerHTML = filteredRows
     .map((row) => {
+      const reporterLabel = escapeReservationDetailsHtml(row.reporter || '');
       const reporterCell = showReporter
-        ? `<td>${row.reporter ? `<span class="maintenance-reporter-cell">${row.reporter}</span>` : '<span class="maintenance-reporter-cell muted">—</span>'}</td>`
+        ? `<td>${reporterLabel ? `<span class="maintenance-reporter-cell">${reporterLabel}</span>` : '<span class="maintenance-reporter-cell muted">—</span>'}</td>`
         : '';
       const locationCell = showLocation ? `<td>${row.location || ''}</td>` : '';
 
@@ -2202,7 +2203,7 @@ function applyMaintenanceFilters() {
         data-room-id="${row.room_id || ''}"
         data-report-id="${row.report_id || ''}"
         data-maintenance-reason="${String(row.reason || '').replace(/"/g, '&quot;')}"
-        data-reporter="${String(row.reporter || '').replace(/"/g, '&quot;')}"
+        data-reporter="${escapeReservationDetailsHtml(row.reporter || '')}"
         data-description="${String(row.description || '').replace(/"/g, '&quot;')}"
         data-proof-image="${String(row.proof_image_url || '').replace(/"/g, '&quot;')}"
       >
