@@ -7978,17 +7978,6 @@ if (requestListWrap) {
     if (!isAlreadySelected) {
       item.classList.add('is-selected');
     }
-
-    // #region agent log
-    if (item.classList.contains('is-selected')) {
-      const ownerEl = item.querySelector('.request-owner');
-      const emailEls = item.querySelectorAll('.request-email');
-      const emailEl = emailEls[0];
-      const ownerText = ownerEl ? ownerEl.textContent.trim() : '';
-      const emailText = emailEl ? emailEl.textContent.trim() : '';
-      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02a19c'},body:JSON.stringify({sessionId:'02a19c',runId:'pre-fix',hypothesisId:'C',location:'dashboard.js:request-item-click',message:'selected request detail lines',data:{emailNodeCount:emailEls.length,ownerMatchesEmail:ownerText!==''&&ownerText===emailText,emailDisplay:emailEl?getComputedStyle(emailEl).display:null,ownerDisplay:ownerEl?getComputedStyle(ownerEl).display:null,mentionsOutsider:/outsider/i.test(item.textContent)},timestamp:Date.now()})}).catch(()=>{});
-    }
-    // #endregion
   });
 
   requestListWrap.addEventListener('click', (event) => {

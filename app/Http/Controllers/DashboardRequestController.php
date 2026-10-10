@@ -177,33 +177,6 @@ class DashboardRequestController extends Controller
                 ? 'return'
                 : ($isFinalDecision ? 'rejected' : ($isFinal ? 'final' : 'pending')));
 
-            // #region agent log
-            try {
-                $logUser = $reservation->user;
-                $logEmail = strtolower(trim((string) ($logUser->email ?? '')));
-                $logFull = strtolower(trim((string) ($logUser->full_name ?? '')));
-                $logUsername = strtolower(trim((string) ($logUser->username ?? '')));
-                file_put_contents(base_path('debug-02a19c.log'), json_encode([
-                    'sessionId' => '02a19c',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'A-B-D',
-                    'location' => 'DashboardRequestController.php:preparedRequest',
-                    'message' => 'request card identity and outsider flag',
-                    'data' => [
-                        'reservation_id' => (int) $reservation->reservation_id,
-                        'full_name_blank' => $logFull === '',
-                        'full_name_equals_email' => $logEmail !== '' && $logFull === $logEmail,
-                        'username_equals_email' => $logEmail !== '' && $logUsername === $logEmail,
-                        'owner_source' => $logFull !== '' ? 'full_name' : 'username',
-                        'outside_participants' => $reservation->outside_participants,
-                        'outside_loaded' => array_key_exists('outside_participants', $reservation->getAttributes()),
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
-            } catch (\Throwable $throwable) {
-            }
-            // #endregion
-
             return [
                 'reservation' => $reservation,
                 'tab' => $tab,
