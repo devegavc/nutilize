@@ -67,54 +67,81 @@
         <div>
           <p class="user-guide-intro-kicker">Physical Facilities</p>
           <h3>Your NUtilize guide</h3>
-          <p>Review requests that reach Physical Facilities, keep facilities and equipment in order, and follow what has already been handled.</p>
+          <p>This dashboard is wider than an office queue. You give the final decision on requests, and you also look after facilities, equipment, the schedule, maintenance, and accounts.</p>
         </div>
       </article>
 
-      <p class="user-guide-kicker">How to use NUtilize</p>
+      <p class="user-guide-kicker">What each part is for</p>
 
       <ol class="user-guide-steps">
         <li class="user-guide-step">
-          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-compass"></i></span>
+          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-house-door"></i></span>
           <div class="user-guide-step-card">
-            <p class="user-guide-step-label">Step 01</p>
-            <h3>Explore the dashboard</h3>
-            <p>Use the side menu to move between Home, Inventory, Schedule, Requests, Users, History, and Maintenance. Inventory also opens Facilities, Equipment, and Analytics.</p>
-            <span class="user-guide-place">Side menu</span>
+            <p class="user-guide-step-label">Home</p>
+            <h3>See what needs you today</h3>
+            <p>The counts show total requests, borrowed items, what is available, and what is under maintenance. Tasks To Accomplish jumps to final approvals, damaged items, and repairs. Report Quick View lists new damage reports.</p>
+            <span class="user-guide-place">Home</span>
           </div>
         </li>
         <li class="user-guide-step">
           <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-journal-check"></i></span>
           <div class="user-guide-step-card">
-            <p class="user-guide-step-label">Step 02</p>
-            <h3>Review requests</h3>
-            <p>Open Requests. Final Approval is waiting on Physical Facilities. Waiting Return is already approved and still out. Returned for Revision was sent back. Pending has not reached this step yet.</p>
+            <p class="user-guide-step-label">Requests</p>
+            <h3>Give the final decision</h3>
+            <p>Other offices approve first. Your lists are Final Approval, Waiting Return, Returned for Revision, and Pending. Approve, reject with a reason, mark an item returned, or record damage.</p>
             <span class="user-guide-place">Requests</span>
           </div>
         </li>
         <li class="user-guide-step">
-          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-clipboard-check"></i></span>
+          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
           <div class="user-guide-step-card">
-            <p class="user-guide-step-label">Step 03</p>
-            <h3>Take the final action</h3>
-            <p>Approve a request, reject it with a reason, mark it returned, or record damage. A rejection sends the request back for revision.</p>
-            <span class="user-guide-place">Requests</span>
+            <p class="user-guide-step-label">Inventory</p>
+            <h3>Facilities, equipment, and use</h3>
+            <p>Facilities is the rooms and spaces. Equipment is the items people reserve. Analytics shows which items are requested most.</p>
+            <span class="user-guide-place">Inventory</span>
+          </div>
+        </li>
+        <li class="user-guide-step">
+          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span>
+          <div class="user-guide-step-card">
+            <p class="user-guide-step-label">Schedule</p>
+            <h3>See what is booked</h3>
+            <p>The calendar shows reservations by day. Open a date to see which facilities or equipment are already taken before you approve another request.</p>
+            <span class="user-guide-place">Schedule</span>
+          </div>
+        </li>
+        <li class="user-guide-step">
+          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-wrench-adjustable"></i></span>
+          <div class="user-guide-step-card">
+            <p class="user-guide-step-label">Maintenance</p>
+            <h3>Track items that are out</h3>
+            <p>Filter by Maintenance, Damaged, Reported, or Addressed. A unit or room here should not be treated as available for a new reservation.</p>
+            <span class="user-guide-place">Maintenance</span>
+          </div>
+        </li>
+        <li class="user-guide-step">
+          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
+          <div class="user-guide-step-card">
+            <p class="user-guide-step-label">History</p>
+            <h3>Review past lending</h3>
+            <p>Lending History keeps finished reservations, including what was lent and what had a problem. Use it when someone asks what already happened to an item.</p>
+            <span class="user-guide-place">History</span>
           </div>
         </li>
         <li class="user-guide-step">
           <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-people"></i></span>
           <div class="user-guide-step-card">
-            <p class="user-guide-step-label">Step 04</p>
-            <h3>Keep the records</h3>
-            <p>History keeps finished requests. Inventory and Maintenance cover facilities and equipment. Schedule shows what is booked. Users is where dashboard accounts are managed when admin access moves to another person.</p>
-            <span class="user-guide-place">History and Users</span>
+            <p class="user-guide-step-label">Users</p>
+            <h3>Accounts for this dashboard</h3>
+            <p>Users is where Physical Facilities accounts are added and updated. When admin access moves to another person, that account is managed here, and they see this same guide.</p>
+            <span class="user-guide-place">Users</span>
           </div>
         </li>
       </ol>
 
       <aside class="user-guide-note">
-        <span class="user-guide-note-icon" aria-hidden="true"><i class="bi bi-person-check"></i></span>
-        <p>This guide follows the Physical Facilities admin role. Whoever receives that role sees these same steps.</p>
+        <span class="user-guide-note-icon" aria-hidden="true"><i class="bi bi-signpost-split"></i></span>
+        <p>Office accounts only see the requests that reach their office. This guide is only for the Physical Facilities admin role.</p>
       </aside>
       @else
       <article class="user-guide-intro">

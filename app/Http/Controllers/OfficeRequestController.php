@@ -20,6 +20,9 @@ class OfficeRequestController extends Controller
 {
     private const WORKFLOW_BATCH_LIMIT = 12;
 
+    /** Pending rows scanned before deciding whose turn it is. Newer rows waiting on another office must not hide an older request that is already this office's job. */
+    private const WORKFLOW_SCAN_LIMIT = 80;
+
     private ?array $officeIdsByShortCodeCache = null;
     private ?int $physicalFacilitiesOfficeIdCache = null;
     private ?array $officeIdByDepartmentNameCache = null;
@@ -87,7 +90,7 @@ class OfficeRequestController extends Controller
         $officeId = (int) $user->office_id;
         $shouldSync = $this->shouldSyncOfficeHomeWorkflow($user);
 
-        $candidateReservationIds = $this->recentPendingReservationIdsForOffice($officeId, self::WORKFLOW_BATCH_LIMIT);
+        $candidateReservationIds = $this->recentPendingReservationIdsForOffice($officeId, self::WORKFLOW_SCAN_LIMIT);
 
         if ($user->isPhysicalFacilitiesAdmin()) {
             $actionableReservationIds = Reservation::query()
@@ -155,6 +158,10 @@ class OfficeRequestController extends Controller
                     $actionableReservationIds[] = (int) $reservationId;
                 }
             }
+
+            // #region agent log
+            file_put_contents(base_path('debug-65b897.log'), json_encode(['sessionId' => '65b897', 'hypothesisId' => 'H', 'location' => 'OfficeRequestController.php:buildOfficeHomeData', 'message' => 'office actionable ids after wider pending scan', 'data' => ['officeId' => $officeId, 'candidateCount' => count($candidateReservationIds), 'actionableIds' => $actionableReservationIds, 'includes252' => in_array(252, $actionableReservationIds, true)], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
+            // #endregion
 
             if (ItemOwnerService::isItemOwnerUser($user)) {
                 $actionableReservationIds = ItemOwnerService::filterActionableReservationIdsForItemOwner(
@@ -372,7 +379,11 @@ class OfficeRequestController extends Controller
             return [];
         }
 
-        $reservationIds = $this->capReservationIds($reservationIds);
+        $reservationIds = array_slice(
+            array_values(array_unique(array_map('intval', $reservationIds))),
+            0,
+            self::WORKFLOW_SCAN_LIMIT
+        );
 
         $this->warmBatchWorkflowLookups($reservationIds);
 
