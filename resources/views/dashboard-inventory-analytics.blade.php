@@ -10,14 +10,7 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="/css/db-inventory.css?v={{ filemtime(public_path('css/db-inventory.css')) }}" />
-  <script>
-    // #region agent log
-    window.__chartCdnStarted = Date.now();
-    // #endregion
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js" id="chartjs-cdn"
-    onload="fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'469c94'},body:JSON.stringify({sessionId:'469c94',hypothesisId:'A',location:'dashboard-inventory-analytics.blade.php:chartjs-cdn',message:'chart.js CDN loaded',data:{elapsedMs:Date.now()-(window.__chartCdnStarted||Date.now()),chartType:typeof Chart},timestamp:Date.now()})}).catch(()=>{});"
-    onerror="fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'469c94'},body:JSON.stringify({sessionId:'469c94',hypothesisId:'A',location:'dashboard-inventory-analytics.blade.php:chartjs-cdn',message:'chart.js CDN failed',data:{elapsedMs:Date.now()-(window.__chartCdnStarted||Date.now()),chartType:typeof Chart},timestamp:Date.now()})}).catch(()=>{});"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="page-insights">
   <script>
@@ -569,16 +562,6 @@
 
   <script>
     (function () {
-      // #region agent log
-      const agentLog = (hypothesisId, location, message, data) => {
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'469c94'},body:JSON.stringify({sessionId:'469c94',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{});
-      };
-      agentLog('A', 'dashboard-inventory-analytics.blade.php:chart-init', 'chart init start', {
-        chartType: typeof Chart,
-        readyState: document.readyState,
-        cdnElapsedMs: Date.now() - (window.__chartCdnStarted || Date.now())
-      });
-      // #endregion
       const monthComparison = @json($monthComparison);
       const comparisonCanvas = document.getElementById('monthComparisonChart');
 
@@ -587,14 +570,6 @@
         const currentData = monthComparison.metrics.map((row) => row.current);
         const compareData = monthComparison.metrics.map((row) => row.compare);
 
-        // #region agent log
-        agentLog('C', 'dashboard-inventory-analytics.blade.php:comparison', 'comparison canvas size', {
-          w: comparisonCanvas.clientWidth,
-          h: comparisonCanvas.clientHeight,
-          metrics: monthComparison.metrics.length
-        });
-        // #endregion
-        try {
         new Chart(comparisonCanvas.getContext('2d'), {
           type: 'bar',
           data: {
@@ -633,13 +608,6 @@
             }
           }
         });
-        // #region agent log
-        agentLog('B', 'dashboard-inventory-analytics.blade.php:comparison', 'comparison chart created', {});
-        } catch (chartError) {
-          agentLog('B', 'dashboard-inventory-analytics.blade.php:comparison', 'comparison chart threw', { error: String(chartError && chartError.message || chartError) });
-          throw chartError;
-        }
-        // #endregion
       }
 
       const yearLabels = @json($yearLabels);
@@ -647,14 +615,6 @@
       const trendCanvas = document.getElementById('monthlyTrendChart');
 
       if (trendCanvas && yearLabels.length > 0) {
-        // #region agent log
-        agentLog('B', 'dashboard-inventory-analytics.blade.php:trend', 'trend chart start', {
-          w: trendCanvas.clientWidth,
-          h: trendCanvas.clientHeight,
-          points: yearLabels.length
-        });
-        // #endregion
-        try {
         new Chart(trendCanvas.getContext('2d'), {
           type: 'line',
           data: {
@@ -685,13 +645,6 @@
             }
           }
         });
-        // #region agent log
-        agentLog('B', 'dashboard-inventory-analytics.blade.php:trend', 'trend chart created', {});
-        } catch (chartError) {
-          agentLog('B', 'dashboard-inventory-analytics.blade.php:trend', 'trend chart threw', { error: String(chartError && chartError.message || chartError) });
-          throw chartError;
-        }
-        // #endregion
       }
 
       const sharePalette = ['#3a4f9c', '#2bb3a8', '#e09a00', '#e85a5a', '#6a58c4', '#2f9fc2', '#3fa06c', '#e07000'];
@@ -699,14 +652,6 @@
       const topItemsCanvas = document.getElementById('topItemsChart');
 
       if (topItemsCanvas && shareItems.length > 0) {
-        // #region agent log
-        agentLog('B', 'dashboard-inventory-analytics.blade.php:share', 'share chart start', {
-          w: topItemsCanvas.clientWidth,
-          h: topItemsCanvas.clientHeight,
-          slices: shareItems.length
-        });
-        // #endregion
-        try {
         new Chart(topItemsCanvas.getContext('2d'), {
           type: 'doughnut',
           data: {
@@ -740,13 +685,6 @@
             }
           }
         });
-        // #region agent log
-        agentLog('B', 'dashboard-inventory-analytics.blade.php:share', 'share chart created', {});
-        } catch (chartError) {
-          agentLog('B', 'dashboard-inventory-analytics.blade.php:share', 'share chart threw', { error: String(chartError && chartError.message || chartError) });
-          throw chartError;
-        }
-        // #endregion
       }
 
       const monthSelect = document.getElementById('analytics-month-select');

@@ -39,34 +39,13 @@ class DashboardInventoryCacheService
             . $monthStart->format('Y-m') . '.'
             . $compareStart->format('Y-m');
 
-        // #region agent log
-        $debugStarted = microtime(true);
-        $debugLog = static function (string $hypothesisId, string $message, array $data = []) use ($cacheKey): void {
-            $line = json_encode([
-                'sessionId' => '469c94',
-                'hypothesisId' => $hypothesisId,
-                'location' => 'DashboardInventoryCacheService.php:getAnalyticsData',
-                'message' => $message,
-                'data' => $data + ['cacheKey' => $cacheKey],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES);
-            if (is_string($line)) {
-                file_put_contents(base_path('debug-469c94.log'), $line.PHP_EOL, FILE_APPEND | LOCK_EX);
-            }
-        };
-        $cacheHit = Cache::has($cacheKey);
-        $debugLog('D', 'analytics request', ['cacheHit' => $cacheHit]);
-        // #endregion
-
         $data = Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use (
             $monthStart,
             $monthEnd,
             $compareStart,
             $compareEnd,
-            $selectedMonth,
-            $debugLog
+            $selectedMonth
         ) {
-            $sectionStarted = microtime(true);
             $currentBookings = self::countApprovedBookings($monthStart, $monthEnd);
             $compareBookings = self::countApprovedBookings($compareStart, $compareEnd);
 
@@ -79,20 +58,9 @@ class DashboardInventoryCacheService
             $currentNewUsers = self::countNewUsers($monthStart, $monthEnd);
             $compareNewUsers = self::countNewUsers($compareStart, $compareEnd);
 
-            // #region agent log
-            $debugLog('D', 'scalar counts finished', ['ms' => (int) round((microtime(true) - $sectionStarted) * 1000)]);
-            $sectionStarted = microtime(true);
-            // #endregion
             [$yearLabels, $trendCounts] = self::getMonthlyTrend($selectedMonth);
-            // #region agent log
-            $debugLog('D', 'monthly trend finished', [
-                'ms' => (int) round((microtime(true) - $sectionStarted) * 1000),
-                'points' => count($trendCounts),
-            ]);
-            $sectionStarted = microtime(true);
-            // #endregion
 
-            $payload = array_merge([
+            return array_merge([
                 'periodLabel' => $monthStart->format('F Y'),
                 'monthLabel' => $monthStart->format('F Y'),
                 'monthKey' => $monthStart->format('Y-m'),
@@ -146,19 +114,7 @@ class DashboardInventoryCacheService
                 'shareItems' => self::getShareBorrowedItems(8, $monthStart, $monthEnd),
                 'topBorrowers' => self::getTopBorrowers(8, $monthStart, $monthEnd),
             ], InventoryInsightsService::build($monthStart, $monthEnd));
-            // #region agent log
-            $debugLog('D', 'insights payload finished', ['ms' => (int) round((microtime(true) - $sectionStarted) * 1000)]);
-            // #endregion
-            return $payload;
         });
-        // #region agent log
-        $debugLog('D', 'analytics response ready', [
-            'ms' => (int) round((microtime(true) - $debugStarted) * 1000),
-            'cacheHit' => $cacheHit,
-            'trendPoints' => count($data['trendCounts'] ?? []),
-            'shareItems' => count($data['shareItems'] ?? []),
-        ]);
-        // #endregion
 
         $canGoNext = $monthStart->lt(now()->startOfMonth());
         $previousSelected = $monthStart->copy()->subMonth();
@@ -233,28 +189,10 @@ class DashboardInventoryCacheService
         $countsByMonth = [];
 
         if (Schema::hasTable('reservations')) {
-            $trendQueryStarted = microtime(true);
             $rows = self::whereCompletedBookingStatus(DB::table('reservations'))
                 ->whereBetween('created_at', [$start->copy()->startOfMonth(), $end->copy()->endOfMonth()])
                 ->select('created_at')
                 ->get();
-            // #region agent log
-            $trendLine = json_encode([
-                'sessionId' => '469c94',
-                'hypothesisId' => 'E',
-                'location' => 'DashboardInventoryCacheService.php:getMonthlyTrend',
-                'message' => 'trend rows loaded in PHP',
-                'data' => [
-                    'rows' => $rows->count(),
-                    'ms' => (int) round((microtime(true) - $trendQueryStarted) * 1000),
-                    'selectedColumns' => ['created_at'],
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES);
-            if (is_string($trendLine)) {
-                file_put_contents(base_path('debug-469c94.log'), $trendLine.PHP_EOL, FILE_APPEND | LOCK_EX);
-            }
-            // #endregion
 
             foreach ($rows as $row) {
                 $monthKey = date('Y-m', strtotime((string) $row->created_at));

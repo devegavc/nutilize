@@ -63,7 +63,7 @@
         <p class="office-items-subtitle">Manage equipment assigned to {{ \App\Models\Office::publicLabel(auth()->user()?->office?->department_name ?? '') ?: 'your office' }}</p>
 
         <section class="facilities-filter-row">
-          <div class="facilities-tab-group" role="tablist" aria-label="Equipment category">
+          <div class="facilities-tab-group equipment-category-tabs" role="tablist" aria-label="Equipment category">
             <button class="facilities-tab active" type="button" data-equipment-tab="all">All Items</button>
             @foreach(($equipmentCategories ?? []) as $category)
               <button class="facilities-tab" type="button" data-equipment-tab="{{ $category['key'] }}">{{ $category['label'] }}</button>

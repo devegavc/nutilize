@@ -367,20 +367,29 @@
 }
 
 .equipment-filter-row {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
 .equipment-filter-row .facilities-inline-search,
 .equipment-filter-row .facilities-action-group {
-  flex-shrink: 0;
+  flex-shrink: 1;
+  max-width: 100%;
+}
+
+.equipment-filter-row .facilities-action-group {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .equipment-category-slider {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: 1 1 0;
+  gap: 8px;
+  flex: 1 1 100%;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
 
 .equipment-category-slider-btn {
@@ -414,16 +423,16 @@
 }
 
 .equipment-category-tabs {
-  flex: 1 1 0;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 148px), 1fr));
+  align-items: stretch;
+  gap: 8px;
+  flex: 1 1 100%;
+  width: 100%;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  overflow: visible;
+  white-space: normal;
 }
 
 .equipment-category-tabs::-webkit-scrollbar {
@@ -432,8 +441,29 @@
 }
 
 .equipment-category-tabs .facilities-tab {
-  flex: 0 0 auto;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  height: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  text-align: center;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.equipment-category-tabs .facilities-tab.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: var(--white);
+  box-shadow: 0 4px 10px rgba(47, 63, 136, 0.22);
 }
 
 .facilities-inline-search {
@@ -6963,6 +6993,7 @@ body.page-insights .insight-mom-head {
   .equipment-category-slider {
     flex: 1 1 100%;
     width: 100%;
+    max-width: 100%;
   }
 
   .equipment-category-slider-btn {
@@ -6970,13 +7001,18 @@ body.page-insights .insight-mom-head {
   }
 
   .equipment-category-tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 132px), 1fr));
     overflow: visible;
-    flex-wrap: wrap;
     white-space: normal;
   }
 
   .equipment-category-tabs .facilities-tab {
-    flex: 1 1 auto;
+    flex: none;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    white-space: normal;
   }
 
   .facilities-inline-search.is-expanded,
