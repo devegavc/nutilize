@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ReservationApproval;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use App\Support\ApprovalClock;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -46,7 +47,7 @@ class ReservationApprovalWorkflowService
             ->whereNull('approved_at')
             ->update([
                 'status' => $status,
-                'approved_at' => now(),
+                'approved_at' => ApprovalClock::now(),
                 'updated_at' => now(),
             ]);
     }

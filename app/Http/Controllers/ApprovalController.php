@@ -11,6 +11,7 @@ use App\Services\ItemOwnerService;
 use App\Services\ItemUnitService;
 use App\Services\ReservationApprovalWorkflowService;
 use App\Services\ReservationApprovalDeduper;
+use App\Support\ApprovalClock;
 use App\Models\ReservationApproval;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -194,7 +195,7 @@ class ApprovalController extends Controller
                 return response()->json(['error' => 'This request is waiting for the item owner who registered the borrowed equipment.'], 403);
             }
 
-            $now = now();
+            $now = ApprovalClock::now();
             $updatePayload = [
                 'status' => 'approved',
                 'approved_at' => $now,
@@ -287,7 +288,7 @@ class ApprovalController extends Controller
 
             $updatePayload = [
                 'status' => 'rejected',
-                'approved_at' => now(),
+                'approved_at' => ApprovalClock::now(),
                 'approved_by_user_id' => (int) $user->user_id,
             ];
 
@@ -439,10 +440,11 @@ class ApprovalController extends Controller
             $reservation = Reservation::query()->findOrFail($reservationId);
             $physicalFacilitiesOfficeId = $this->getPhysicalFacilitiesOfficeId();
             $now = now();
+            $approvedAt = ApprovalClock::now();
 
             // Keep the hot path to status + PF approval row only.
             // Return/damage inventory work and notifications run after the response.
-            DB::transaction(function () use ($reservation, $physicalFacilitiesOfficeId, $status, $user, $now) {
+            DB::transaction(function () use ($reservation, $physicalFacilitiesOfficeId, $status, $user, $now, $approvedAt) {
                 $reservation->update(['overall_status' => $status]);
 
                 if (is_null($physicalFacilitiesOfficeId)) {
@@ -455,7 +457,7 @@ class ApprovalController extends Controller
                     ->whereNull('approved_at')
                     ->update([
                         'status' => $status,
-                        'approved_at' => $now,
+                        'approved_at' => $approvedAt,
                         'approved_by_user_id' => (int) $user->user_id,
                         'updated_at' => $now,
                     ]);
@@ -471,7 +473,7 @@ class ApprovalController extends Controller
                         'reservation_id' => $reservation->reservation_id,
                         'office_id' => $physicalFacilitiesOfficeId,
                         'status' => $status,
-                        'approved_at' => $now,
+                        'approved_at' => $approvedAt,
                         'approved_by_user_id' => (int) $user->user_id,
                         'created_at' => $now,
                         'updated_at' => $now,
@@ -483,7 +485,7 @@ class ApprovalController extends Controller
                         ->where('approval_id', $approvalId)
                         ->update([
                             'status' => $status,
-                            'approved_at' => $now,
+                            'approved_at' => $approvedAt,
                             'approved_by_user_id' => (int) $user->user_id,
                             'updated_at' => $now,
                         ]);
@@ -495,7 +497,7 @@ class ApprovalController extends Controller
                     (int) $physicalFacilitiesOfficeId,
                     $status,
                     (int) $user->user_id,
-                    $now,
+                    $approvedAt,
                 );
             });
 
@@ -509,7 +511,7 @@ class ApprovalController extends Controller
                     ->orderByDesc('approval_id')
                     ->value('approval_id') ?? 0);
                 if ($loggedApprovalId > 0) {
-                    $this->debugApprovalTime('final-decision', $loggedApprovalId, $now);
+                    $this->debugApprovalTime('final-decision', $loggedApprovalId, $approvedAt);
                 }
             }
             // #endregion
@@ -1771,7 +1773,7 @@ class ApprovalController extends Controller
 
             $payload = [
                 'sessionId' => 'da4c65',
-                'runId' => 'pre-fix',
+                'runId' => 'post-fix',
                 'hypothesisId' => 'A-date-column,B-utc,C-history-mismatch',
                 'location' => 'ApprovalController.php:'.$source,
                 'message' => 'approval time write',

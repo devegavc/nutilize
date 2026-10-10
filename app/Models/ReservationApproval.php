@@ -12,6 +12,10 @@ class ReservationApproval extends Model
     protected $primaryKey = 'approval_id';
     protected $fillable = ['reservation_id', 'office_id', 'owner_id', 'approved_by_user_id', 'status', 'rejection_reason', 'approved_at'];
 
+    protected $casts = [
+        'approved_at' => 'datetime',
+    ];
+
     public function reservation()
     {
         return $this->belongsTo(Reservation::class, 'reservation_id', 'reservation_id');

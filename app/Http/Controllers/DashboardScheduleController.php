@@ -272,7 +272,7 @@ class DashboardScheduleController extends Controller
                     'office' => $officeLabel !== '' ? $officeLabel : 'Office',
                     'status' => ucfirst((string) ($approval->status ?? 'approved')),
                     'approved_at' => !is_null($approval->approved_at)
-                        ? Carbon::parse($approval->approved_at)->format('M j, Y')
+                        ? Carbon::parse($approval->approved_at)->format('M j, Y g:i A')
                         : '-',
                 ];
             })
