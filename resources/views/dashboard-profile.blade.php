@@ -59,6 +59,10 @@
     <div class="top-header-inner toolbar-card">
       <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" alt="NU-TILIZE" class="toolbar-logo" />
 
+      @unless(auth()->user()?->isPhysicalFacilitiesAdmin())
+        @include('partials.office-user-guide')
+      @endunless
+
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
       </button>
