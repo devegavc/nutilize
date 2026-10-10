@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountSetupController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\DashboardAnnouncementController;
+use App\Http\Controllers\DashboardFeedbackController;
 use App\Http\Controllers\DashboardHomeController;
 use App\Http\Controllers\DashboardHistoryController;
 use App\Http\Controllers\DashboardInventoryController;
@@ -115,6 +116,7 @@ Route::middleware('auth')->group(function () {
             Route::patch('/users/{userId}/status', [DashboardUserController::class, 'toggleStatus'])->name('dashboard.users.toggle-status');
             Route::delete('/users/{userId}', [DashboardUserController::class, 'destroy'])->name('dashboard.users.destroy');
             Route::get('/history', [DashboardHistoryController::class, 'index'])->name('dashboard.history');
+            Route::get('/feedback', [DashboardFeedbackController::class, 'index'])->name('dashboard.feedback');
             Route::post('/history/email', [DashboardHistoryController::class, 'sendReport'])->name('dashboard.history.email');
         });
         Route::get('/profile', [ProfileController::class, 'show'])->name('dashboard.profile');

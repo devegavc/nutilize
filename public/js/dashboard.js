@@ -4959,6 +4959,8 @@ function setActiveNavByPage() {
     navTarget = 'maintenance';
   } else if (path === '/history') {
     navTarget = 'history';
+  } else if (path === '/feedback') {
+    navTarget = 'feedback';
   } else if (path === '/schedule') {
     navTarget = 'schedule';
   } else if (path === '/requests' || path === '/request' || path.startsWith('/request/')) {

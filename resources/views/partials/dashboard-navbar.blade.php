@@ -96,6 +96,11 @@
         <span>History</span>
       </a>
 
+      <a class="nav-item" data-nav="feedback" href="/feedback">
+        <i class="bi bi-chat-square-heart-fill"></i>
+        <span>Feedback</span>
+      </a>
+
       <a class="nav-item" data-nav="maintenance" href="/maintenance">
         <i class="bi bi-wrench-adjustable-circle"></i>
         <span>Maintenance</span>
