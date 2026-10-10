@@ -27,6 +27,10 @@
   } else {
       $guideMenuLabel = implode(', ', array_slice($guideMenu, 0, -1)).', and '.$guideMenu[$guideMenuCount - 1];
   }
+
+  $guideIsPf = $guideUser
+      && method_exists($guideUser, 'isPhysicalFacilitiesAdmin')
+      && $guideUser->isPhysicalFacilitiesAdmin();
 @endphp
 
 <link rel="stylesheet" href="/css/user-guide.css?v={{ filemtime(public_path('css/user-guide.css')) }}" />
@@ -49,7 +53,7 @@
     <header class="user-guide-header">
       <div>
         <h2 id="office-user-guide-title">User Guide</h2>
-        <p>A short walkthrough for this office dashboard.</p>
+        <p>{{ $guideIsPf ? 'A short walkthrough for the Physical Facilities dashboard.' : 'A short walkthrough for this office dashboard.' }}</p>
       </div>
       <button class="user-guide-close" type="button" data-user-guide-close aria-label="Close user guide">
         <i class="bi bi-x-lg" aria-hidden="true"></i>
@@ -57,6 +61,62 @@
     </header>
 
     <div class="user-guide-body">
+      @if ($guideIsPf)
+      <article class="user-guide-intro">
+        <span class="user-guide-intro-icon" aria-hidden="true"><i class="bi bi-book"></i></span>
+        <div>
+          <p class="user-guide-intro-kicker">Physical Facilities</p>
+          <h3>Your NUtilize guide</h3>
+          <p>Review requests that reach Physical Facilities, keep facilities and equipment in order, and follow what has already been handled.</p>
+        </div>
+      </article>
+
+      <p class="user-guide-kicker">How to use NUtilize</p>
+
+      <ol class="user-guide-steps">
+        <li class="user-guide-step">
+          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-compass"></i></span>
+          <div class="user-guide-step-card">
+            <p class="user-guide-step-label">Step 01</p>
+            <h3>Explore the dashboard</h3>
+            <p>Use the side menu to move between Home, Inventory, Schedule, Requests, Users, History, and Maintenance. Inventory also opens Facilities, Equipment, and Analytics.</p>
+            <span class="user-guide-place">Side menu</span>
+          </div>
+        </li>
+        <li class="user-guide-step">
+          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-journal-check"></i></span>
+          <div class="user-guide-step-card">
+            <p class="user-guide-step-label">Step 02</p>
+            <h3>Review requests</h3>
+            <p>Open Requests. Final Approval is waiting on Physical Facilities. Waiting Return is already approved and still out. Returned for Revision was sent back. Pending has not reached this step yet.</p>
+            <span class="user-guide-place">Requests</span>
+          </div>
+        </li>
+        <li class="user-guide-step">
+          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-clipboard-check"></i></span>
+          <div class="user-guide-step-card">
+            <p class="user-guide-step-label">Step 03</p>
+            <h3>Take the final action</h3>
+            <p>Approve a request, reject it with a reason, mark it returned, or record damage. A rejection sends the request back for revision.</p>
+            <span class="user-guide-place">Requests</span>
+          </div>
+        </li>
+        <li class="user-guide-step">
+          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-people"></i></span>
+          <div class="user-guide-step-card">
+            <p class="user-guide-step-label">Step 04</p>
+            <h3>Keep the records</h3>
+            <p>History keeps finished requests. Inventory and Maintenance cover facilities and equipment. Schedule shows what is booked. Users is where dashboard accounts are managed when admin access moves to another person.</p>
+            <span class="user-guide-place">History and Users</span>
+          </div>
+        </li>
+      </ol>
+
+      <aside class="user-guide-note">
+        <span class="user-guide-note-icon" aria-hidden="true"><i class="bi bi-person-check"></i></span>
+        <p>This guide follows the Physical Facilities admin role. Whoever receives that role sees these same steps.</p>
+      </aside>
+      @else
       <article class="user-guide-intro">
         <span class="user-guide-intro-icon" aria-hidden="true"><i class="bi bi-book"></i></span>
         <div>
@@ -111,6 +171,7 @@
         <span class="user-guide-note-icon" aria-hidden="true"><i class="bi bi-signpost-split"></i></span>
         <p>If a request has not reached your office yet, leave it in the queue. It becomes actionable when the earlier offices are done.</p>
       </aside>
+      @endif
     </div>
   </section>
 </div>
