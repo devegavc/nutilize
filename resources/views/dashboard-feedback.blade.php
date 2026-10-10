@@ -49,7 +49,7 @@
           <article class="stat-card inventory-stat-card">
             <span class="stat-icon"><i class="bi bi-emoji-smile-fill"></i></span>
             <div>
-              <p class="stat-number">{{ $experience['average'] === null ? '—' : number_format($experience['average'], 1) }}<span class="feedback-score-max">/{{ $scoreMax }}</span></p>
+              <p class="stat-number feedback-score"><span>{{ $experience['average'] === null ? '—' : number_format($experience['average'], 1) }}</span><span class="feedback-score-max">/{{ $scoreMax }}</span></p>
               <p class="stat-label">Experience rating</p>
             </div>
           </article>
@@ -63,7 +63,7 @@
           <article class="stat-card inventory-stat-card">
             <span class="stat-icon"><i class="bi bi-clipboard-check-fill"></i></span>
             <div>
-              <p class="stat-number">{{ $survey['average'] === null ? '—' : number_format($survey['average'], 1) }}<span class="feedback-score-max">/{{ $scoreMax }}</span></p>
+              <p class="stat-number feedback-score"><span>{{ $survey['average'] === null ? '—' : number_format($survey['average'], 1) }}</span><span class="feedback-score-max">/{{ $scoreMax }}</span></p>
               <p class="stat-label">Survey average</p>
             </div>
           </article>
