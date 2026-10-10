@@ -13,9 +13,10 @@
   inset: 0;
   z-index: 2200;
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
-  padding: 28px 20px;
+  padding: 24px 20px;
+  overflow: auto;
 }
 
 .user-guide-backdrop {
@@ -31,7 +32,10 @@
   position: relative;
   z-index: 1;
   width: min(920px, 100%);
-  max-height: min(680px, calc(100vh - 56px));
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
+  min-height: 0;
+  margin: auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -83,6 +87,8 @@
 }
 
 .user-guide-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   padding: 18px 20px 22px;
 }
@@ -267,6 +273,7 @@ body.user-guide-open {
 
   .user-guide-panel {
     max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
   }
 
   .user-guide-steps {

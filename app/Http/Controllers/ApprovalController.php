@@ -1228,9 +1228,12 @@ class ApprovalController extends Controller
                 continue;
             }
 
-            $approvals = ReservationApprovalDeduper::collapseByOfficeId(
-                $approvalsByReservation->get($reservationId) ?? collect()
-            );
+            $approvalRows = $approvalsByReservation->get($reservationId) ?? collect();
+            if ($approvalRows->isEmpty()) {
+                continue;
+            }
+
+            $approvals = ReservationApprovalDeduper::collapseByOfficeId($approvalRows);
 
             foreach ($actionSequence as $officeId) {
                 $officeId = (int) $officeId;
@@ -2304,10 +2307,20 @@ class ApprovalController extends Controller
         $closedStatuses = array_map('strval', \App\Support\OpenReservationScope::CLOSED_STATUSES);
         $openIds = [];
         $staleIds = [];
+        $approvalCountsForPrune = DB::table('reservation_approvals')
+            ->whereIn('reservation_id', $relatedIds)
+            ->select('reservation_id', DB::raw('count(*) as approval_count'))
+            ->groupBy('reservation_id')
+            ->pluck('approval_count', 'reservation_id');
 
         foreach ($relatedIds as $reservationId) {
             $reservation = $reservations->get($reservationId);
             if (!$reservation) {
+                $staleIds[] = $reservationId;
+                continue;
+            }
+
+            if ((int) ($approvalCountsForPrune[$reservationId] ?? 0) === 0) {
                 $staleIds[] = $reservationId;
                 continue;
             }

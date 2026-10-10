@@ -788,9 +788,12 @@ class DashboardRequestController extends Controller
                 continue;
             }
 
-            $approvals = ReservationApprovalDeduper::collapseByOfficeId(
-                $approvalsByReservation->get($reservationId) ?? collect()
-            );
+            $approvalRows = $approvalsByReservation->get($reservationId) ?? collect();
+            if ($approvalRows->isEmpty()) {
+                continue;
+            }
+
+            $approvals = ReservationApprovalDeduper::collapseByOfficeId($approvalRows);
 
             foreach ($actionSequence as $officeId) {
                 $officeId = (int) $officeId;
