@@ -127,29 +127,35 @@
         </section>
 
         <section class="feedback-table-card">
-          <h2>Survey responses</h2>
-          <div class="table-wrap">
-            <table class="history-table feedback-table">
+          <header class="feedback-table-head">
+            <h2>Survey responses</h2>
+            <span class="feedback-count-badge">{{ $survey['count'] }}</span>
+          </header>
+          <div class="feedback-table-scroll">
+            <table class="feedback-table feedback-survey-table">
               <thead>
                 <tr>
                   <th>Submitted</th>
                   <th>Respondent</th>
-                  <th>Navigation</th>
-                  <th>Reservation</th>
-                  <th>Response</th>
-                  <th>Information</th>
+                  <th class="feedback-num">Navigation</th>
+                  <th class="feedback-num">Reservation</th>
+                  <th class="feedback-num">Response</th>
+                  <th class="feedback-num">Information</th>
                   <th>Comment</th>
                 </tr>
               </thead>
               <tbody>
                 @forelse ($surveys as $surveyRow)
                   <tr>
-                    <td>{{ $surveyRow['submitted_at'] }}</td>
-                    <td>{{ $surveyRow['respondent'] }}</td>
-                    <td>{{ $surveyRow['scores']['navigation'] }}</td>
-                    <td>{{ $surveyRow['scores']['reservation'] }}</td>
-                    <td>{{ $surveyRow['scores']['responsiveness'] }}</td>
-                    <td>{{ $surveyRow['scores']['information'] }}</td>
+                    <td class="feedback-when">
+                      <span class="feedback-when-date">{{ $surveyRow['submitted_date'] }}</span>
+                      <span class="feedback-when-time">{{ $surveyRow['submitted_time'] }}</span>
+                    </td>
+                    <td class="feedback-name">{{ $surveyRow['respondent'] }}</td>
+                    <td class="feedback-num"><span class="feedback-score-badge">{{ $surveyRow['scores']['navigation'] }}</span></td>
+                    <td class="feedback-num"><span class="feedback-score-badge">{{ $surveyRow['scores']['reservation'] }}</span></td>
+                    <td class="feedback-num"><span class="feedback-score-badge">{{ $surveyRow['scores']['responsiveness'] }}</span></td>
+                    <td class="feedback-num"><span class="feedback-score-badge">{{ $surveyRow['scores']['information'] }}</span></td>
                     <td class="feedback-comment">{{ $surveyRow['comment'] !== '' ? $surveyRow['comment'] : 'No additional comment' }}</td>
                   </tr>
                 @empty
@@ -163,26 +169,32 @@
         </section>
 
         <section class="feedback-table-card">
-          <h2>Reservation ratings</h2>
-          <div class="table-wrap">
-            <table class="history-table feedback-table">
+          <header class="feedback-table-head">
+            <h2>Reservation ratings</h2>
+            <span class="feedback-count-badge">{{ $experience['count'] }}</span>
+          </header>
+          <div class="feedback-table-scroll">
+            <table class="feedback-table">
               <thead>
                 <tr>
                   <th>Submitted</th>
                   <th>Reservation</th>
                   <th>Activity</th>
                   <th>Respondent</th>
-                  <th>Rating</th>
+                  <th class="feedback-num">Rating</th>
                 </tr>
               </thead>
               <tbody>
                 @forelse ($ratings as $rating)
                   <tr>
-                    <td>{{ $rating['submitted_at'] }}</td>
-                    <td>#{{ $rating['reservation_id'] }}</td>
-                    <td>{{ $rating['activity'] }}</td>
-                    <td>{{ $rating['respondent'] }}</td>
-                    <td>{{ $rating['score'] }} / {{ $scoreMax }}</td>
+                    <td class="feedback-when">
+                      <span class="feedback-when-date">{{ $rating['submitted_date'] }}</span>
+                      <span class="feedback-when-time">{{ $rating['submitted_time'] }}</span>
+                    </td>
+                    <td class="feedback-reservation-id">#{{ $rating['reservation_id'] }}</td>
+                    <td class="feedback-activity">{{ $rating['activity'] }}</td>
+                    <td class="feedback-name">{{ $rating['respondent'] }}</td>
+                    <td class="feedback-num"><span class="feedback-rating-badge">{{ $rating['score'] }} / {{ $scoreMax }}</span></td>
                   </tr>
                 @empty
                   <tr>

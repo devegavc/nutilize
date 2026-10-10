@@ -48,15 +48,16 @@ class DashboardFeedbackController extends Controller
                 'users.username',
             ])
             ->map(function ($row): array {
-                $score = $this->clampScore($row->rating);
+                $when = $this->formatWhenParts($row->created_at);
 
                 return [
                     'id' => (int) $row->rating_id,
                     'reservation_id' => (int) $row->reservation_id,
                     'activity' => trim((string) ($row->activity_name ?? '')) ?: 'Reservation',
                     'respondent' => $this->displayName($row),
-                    'score' => $score,
-                    'submitted_at' => $this->formatWhen($row->created_at),
+                    'score' => (int) $row->rating,
+                    'submitted_date' => $when['date'],
+                    'submitted_time' => $when['time'],
                 ];
             })
             ->all();
@@ -88,11 +89,12 @@ class DashboardFeedbackController extends Controller
             ])
             ->map(function ($row): array {
                 $scores = [
-                    'navigation' => $this->clampScore($row->navigation_satisfaction),
-                    'reservation' => $this->clampScore($row->reservation_satisfaction),
-                    'responsiveness' => $this->clampScore($row->responsiveness_satisfaction),
-                    'information' => $this->clampScore($row->information_satisfaction),
+                    'navigation' => (int) $row->navigation_satisfaction,
+                    'reservation' => (int) $row->reservation_satisfaction,
+                    'responsiveness' => (int) $row->responsiveness_satisfaction,
+                    'information' => (int) $row->information_satisfaction,
                 ];
+                $when = $this->formatWhenParts($row->created_at);
 
                 return [
                     'id' => (int) $row->feedback_id,
@@ -100,7 +102,8 @@ class DashboardFeedbackController extends Controller
                     'scores' => $scores,
                     'average' => round(array_sum($scores) / count($scores), 1),
                     'comment' => trim((string) ($row->additional_comments ?? '')),
-                    'submitted_at' => $this->formatWhen($row->created_at),
+                    'submitted_date' => $when['date'],
+                    'submitted_time' => $when['time'],
                 ];
             })
             ->all();
@@ -156,11 +159,6 @@ class DashboardFeedbackController extends Controller
         ];
     }
 
-    private function clampScore(mixed $score): int
-    {
-        return max(1, min(self::SCORE_MAX, (int) $score));
-    }
-
     private function displayName(object $row): string
     {
         $middle = trim((string) ($row->middle_initial ?? ''));
@@ -185,12 +183,20 @@ class DashboardFeedbackController extends Controller
         return $username !== '' ? $username : 'User';
     }
 
-    private function formatWhen(mixed $timestamp): string
+    /**
+     * @return array{date: string, time: string}
+     */
+    private function formatWhenParts(mixed $timestamp): array
     {
         if ($timestamp === null || $timestamp === '') {
-            return '';
+            return ['date' => '', 'time' => ''];
         }
 
-        return Carbon::parse($timestamp)->timezone('Asia/Manila')->format('M j, Y · g:i A');
+        $when = Carbon::parse($timestamp)->timezone('Asia/Manila');
+
+        return [
+            'date' => $when->format('M j, Y'),
+            'time' => $when->format('g:i A'),
+        ];
     }
 }
