@@ -47,10 +47,13 @@
   <button class="user-guide-backdrop" type="button" data-user-guide-close aria-label="Close user guide"></button>
   <section class="user-guide-panel" role="dialog" aria-modal="true" aria-labelledby="office-user-guide-title">
     <header class="user-guide-header">
-      <button class="user-guide-back" type="button" data-user-guide-close aria-label="Close user guide">
-        <i class="bi bi-chevron-left" aria-hidden="true"></i>
+      <div>
+        <h2 id="office-user-guide-title">User Guide</h2>
+        <p>A short walkthrough for this office dashboard.</p>
+      </div>
+      <button class="user-guide-close" type="button" data-user-guide-close aria-label="Close user guide">
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
       </button>
-      <h2 id="office-user-guide-title">User Guide</h2>
     </header>
 
     <div class="user-guide-body">
@@ -121,7 +124,7 @@
     }
     openButton.setAttribute('data-bound', '1');
 
-    var backButton = panel.querySelector('.user-guide-back');
+    var backButton = panel.querySelector('.user-guide-close');
     var guideBody = panel.querySelector('.user-guide-body');
 
     function setOpen(isOpen) {
