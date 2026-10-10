@@ -214,6 +214,9 @@ class ApprovalController extends Controller
 
             $approval->update($updatePayload);
             $this->recordApprovalHistory($approval);
+            // #region agent log
+            $this->debugApprovalTime('approve', (int) $approval->approval_id, $now);
+            // #endregion
             $this->forgetActionableOfficeCache((int) $approval->reservation_id);
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.approved');
             Cache::forget('notification_unread_count.user.' . (int) $user->user_id);
@@ -497,6 +500,19 @@ class ApprovalController extends Controller
             });
 
             $this->forgetActionableOfficeCache((int) $reservation->reservation_id);
+
+            // #region agent log
+            if (!is_null($physicalFacilitiesOfficeId)) {
+                $loggedApprovalId = (int) (DB::table('reservation_approvals')
+                    ->where('reservation_id', $reservation->reservation_id)
+                    ->where('office_id', $physicalFacilitiesOfficeId)
+                    ->orderByDesc('approval_id')
+                    ->value('approval_id') ?? 0);
+                if ($loggedApprovalId > 0) {
+                    $this->debugApprovalTime('final-decision', $loggedApprovalId, $now);
+                }
+            }
+            // #endregion
 
             $finalReservationId = (int) $reservation->reservation_id;
             dispatch(function () use ($finalReservationId, $status) {
@@ -1734,6 +1750,53 @@ class ApprovalController extends Controller
 
         return $this->officeIdByDepartmentNameCache;
     }
+
+    // #region agent log
+    private function debugApprovalTime(string $source, int $approvalId, mixed $written): void
+    {
+        try {
+            $columnType = 'unavailable';
+            try {
+                $columnType = Schema::getColumnType('reservation_approvals', 'approved_at');
+            } catch (Throwable $e) {
+                $columnType = 'unavailable';
+            }
+
+            $rawApproval = DB::table('reservation_approvals')
+                ->where('approval_id', $approvalId)
+                ->first(['approved_at', 'updated_at', 'status']);
+            $historyApprovedAt = Schema::hasTable('reservation_approval_histories')
+                ? DB::table('reservation_approval_histories')->where('approval_id', $approvalId)->value('approved_at')
+                : null;
+
+            $payload = [
+                'sessionId' => 'da4c65',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'A-date-column,B-utc,C-history-mismatch',
+                'location' => 'ApprovalController.php:'.$source,
+                'message' => 'approval time write',
+                'data' => [
+                    'source' => $source,
+                    'approval_id' => $approvalId,
+                    'driver' => DB::getDriverName(),
+                    'app_timezone' => (string) config('app.timezone'),
+                    'php_timezone' => date_default_timezone_get(),
+                    'written' => $written instanceof \DateTimeInterface ? $written->format('Y-m-d H:i:s P') : (string) $written,
+                    'now_utc' => now()->utc()->format('Y-m-d H:i:s'),
+                    'now_manila' => now('Asia/Manila')->format('Y-m-d H:i:s'),
+                    'column_type' => $columnType,
+                    'db_approved_at' => $rawApproval->approved_at ?? null,
+                    'db_updated_at' => $rawApproval->updated_at ?? null,
+                    'history_approved_at' => $historyApprovedAt,
+                    'db_status' => $rawApproval->status ?? null,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ];
+            file_put_contents(base_path('debug-da4c65.log'), json_encode($payload).PHP_EOL, FILE_APPEND);
+        } catch (Throwable $e) {
+        }
+    }
+    // #endregion
 
     private function recordApprovalHistory(ReservationApproval $approval): void
     {

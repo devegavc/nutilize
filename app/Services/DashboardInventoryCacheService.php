@@ -125,7 +125,7 @@ class DashboardInventoryCacheService
         $previousSelected = $monthStart->copy()->subMonth();
         $nextSelected = $monthStart->copy()->addMonth();
 
-        $payload = array_merge($data, [
+        return array_merge($data, [
             'previousMonthUrl' => route('dashboard.inventory.analytics', [
                 'month' => $previousSelected->format('Y-m'),
                 'compare' => $previousSelected->copy()->subMonth()->format('Y-m'),
@@ -138,48 +138,6 @@ class DashboardInventoryCacheService
                 : null,
             'canGoNext' => $canGoNext,
         ]);
-
-        // #region agent log
-        file_put_contents(base_path('debug-c44038.log'), json_encode([
-            'sessionId' => 'c44038',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'A',
-            'location' => 'DashboardInventoryCacheService.php:room-metrics',
-            'message' => 'room metrics attached',
-            'data' => [
-                'roomBookings' => $payload['roomBookings'] ?? null,
-                'roomsUsed' => $payload['roomsUsed'] ?? null,
-                'idleRoomCount' => $payload['idleRoomCount'] ?? null,
-                'roomsUnderMaintenance' => $payload['roomsUnderMaintenance'] ?? null,
-                'mostUsed' => isset($payload['mostUsedRooms']) ? count($payload['mostUsedRooms']) : 0,
-                'shareItems' => isset($payload['roomShareItems']) ? count($payload['roomShareItems']) : 0,
-                'trendPoints' => is_array($payload['roomTrendCounts'] ?? null) ? count($payload['roomTrendCounts']) : 0,
-                'trendLast' => is_array($payload['roomTrendCounts'] ?? null) && $payload['roomTrendCounts'] !== []
-                    ? (int) $payload['roomTrendCounts'][array_key_last($payload['roomTrendCounts'])]
-                    : null,
-                'compareBookings' => $payload['roomCompareBookings'] ?? null,
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
-        file_put_contents(base_path('debug-c44038.log'), json_encode([
-            'sessionId' => 'c44038',
-            'runId' => 'pre-fix',
-            'hypothesisId' => 'B',
-            'location' => 'DashboardInventoryCacheService.php:getAnalyticsData',
-            'message' => 'analytics cache payload keys',
-            'data' => [
-                'cacheKey' => $cacheKey,
-                'hasRoomBookings' => array_key_exists('roomBookings', $payload),
-                'hasRoomInsights' => array_key_exists('roomInsights', $payload),
-                'hasMostUsedRooms' => array_key_exists('mostUsedRooms', $payload),
-                'hasRoomTrendCounts' => array_key_exists('roomTrendCounts', $payload),
-                'monthKey' => $payload['monthKey'] ?? null,
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
-        // #endregion
-
-        return $payload;
     }
 
     private static function getFacilityCount(): int
