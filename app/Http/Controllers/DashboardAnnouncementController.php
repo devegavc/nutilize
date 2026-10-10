@@ -47,8 +47,6 @@ class DashboardAnnouncementController extends Controller
         ]);
 
         try {
-            Announcement::purgeExpired();
-
             $now = now();
             $announcerName = $this->resolveAnnouncerName($validated['announcer_name']);
 
@@ -67,9 +65,9 @@ class DashboardAnnouncementController extends Controller
                 $payload['announcer_name'] = $announcerName;
             }
 
-            if (Announcement::hasAnnouncementsColumn('expires_at')) {
-                $payload['expires_at'] = $now->copy()->addDays(Announcement::DEFAULT_TTL_DAYS);
-            }
+            // #region agent log
+            @file_put_contents(base_path('debug-09fa9e.log'), json_encode(['sessionId' => '09fa9e', 'runId' => 'post-fix', 'hypothesisId' => 'A', 'location' => 'DashboardAnnouncementController.php:store', 'message' => 'publish payload omits expires_at', 'data' => ['has_expires_at' => array_key_exists('expires_at', $payload), 'payload_keys' => array_keys($payload)], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
+            // #endregion
 
             DB::table('announcements')->insert($payload);
         } catch (Throwable $throwable) {
@@ -165,9 +163,13 @@ class DashboardAnnouncementController extends Controller
                 ->with('error', 'Announcements are not ready yet.');
         }
 
-        Announcement::query()
+        $deleted = Announcement::query()
             ->where('announcement_id', $announcementId)
             ->delete();
+
+        // #region agent log
+        @file_put_contents(base_path('debug-09fa9e.log'), json_encode(['sessionId' => '09fa9e', 'runId' => 'post-fix', 'hypothesisId' => 'E', 'location' => 'DashboardAnnouncementController.php:destroy', 'message' => 'admin manual delete', 'data' => ['announcement_id' => $announcementId, 'deleted' => (int) $deleted, 'auto_purge' => false], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
+        // #endregion
 
         return redirect()
             ->route('dashboard.home')

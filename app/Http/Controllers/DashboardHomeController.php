@@ -26,20 +26,16 @@ class DashboardHomeController extends Controller
         $announcements = collect();
 
         if ($announcementsTableReady) {
-            // purgeExpired is already rate-limited; keep announcement query small.
-            Announcement::purgeExpired();
-
-            $query = Announcement::query()
+            $announcements = Announcement::query()
                 ->with('author:user_id,first_name,middle_initial,last_name,suffix,full_name,username')
                 ->orderByDesc('published_at')
                 ->orderByDesc('created_at')
-                ->limit(12);
+                ->limit(12)
+                ->get();
 
-            if (Announcement::hasAnnouncementsColumn('expires_at')) {
-                $query->active();
-            }
-
-            $announcements = $query->get();
+            // #region agent log
+            @file_put_contents(base_path('debug-09fa9e.log'), json_encode(['sessionId' => '09fa9e', 'runId' => 'post-fix', 'hypothesisId' => 'B', 'location' => 'DashboardHomeController.php:index', 'message' => 'home list skips expiry purge and filter', 'data' => ['purge_called' => false, 'active_scope' => false, 'listed' => $announcements->count(), 'listed_ids' => $announcements->pluck('announcement_id')->values()->all()], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
+            // #endregion
         }
 
         $announcementAnnouncerDefault = trim((string) old('announcer_name', 'Physical Facilities Admin'));
@@ -51,7 +47,6 @@ class DashboardHomeController extends Controller
             ->view('dashboard-home', array_merge($data, [
                 'announcements' => $announcements,
                 'announcementsTableReady' => $announcementsTableReady,
-                'announcementTtlDays' => Announcement::DEFAULT_TTL_DAYS,
                 'announcementAnnouncerDefault' => $announcementAnnouncerDefault,
                 'openAnnouncementsModal' => (bool) (
                     session('open_announcements')

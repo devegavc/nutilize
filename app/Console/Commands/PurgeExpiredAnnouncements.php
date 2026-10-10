@@ -2,30 +2,21 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Announcement;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Schema;
 
 class PurgeExpiredAnnouncements extends Command
 {
     protected $signature = 'announcements:purge-expired';
 
-    protected $description = 'Delete Physical Facilities announcements that have passed their expiry time';
+    protected $description = 'Announcements no longer expire; this command does not delete anything';
 
     public function handle(): int
     {
-        if (!Schema::hasTable('announcements')) {
-            $this->info('Announcements table is not available.');
+        // #region agent log
+        @file_put_contents(base_path('debug-09fa9e.log'), json_encode(['sessionId' => '09fa9e', 'runId' => 'post-fix', 'hypothesisId' => 'D', 'location' => 'PurgeExpiredAnnouncements.php:handle', 'message' => 'purge command skipped delete', 'data' => ['deleted' => 0], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
+        // #endregion
 
-            return self::SUCCESS;
-        }
-
-        $deleted = Announcement::query()
-            ->whereNotNull('expires_at')
-            ->where('expires_at', '<=', now())
-            ->delete();
-
-        $this->info("Removed {$deleted} expired announcement(s).");
+        $this->info('Announcement expiry is disabled. No announcements were deleted.');
 
         return self::SUCCESS;
     }

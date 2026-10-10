@@ -9,4 +9,3 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('items:sync-in-use')->everyFiveMinutes();
-Schedule::command('announcements:purge-expired')->hourly();
