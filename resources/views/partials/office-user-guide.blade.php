@@ -75,67 +75,81 @@
 
       <ol class="user-guide-steps">
         <li class="user-guide-step">
-          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-house-door"></i></span>
-          <div class="user-guide-step-card">
-            <p class="user-guide-step-label">Home</p>
-            <h3>See what needs you today</h3>
-            <p>The counts show total requests, borrowed items, what is available, and what is under maintenance. Tasks To Accomplish jumps to final approvals, damaged items, and repairs. Report Quick View lists new damage reports.</p>
-            <span class="user-guide-place">Home</span>
-          </div>
+          <a class="user-guide-step-link" href="{{ route('dashboard.home') }}">
+            <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-house-door"></i></span>
+            <div class="user-guide-step-card">
+              <p class="user-guide-step-label">Home</p>
+              <h3>See what needs you today</h3>
+              <p>The counts show total requests, borrowed items, what is available, and what is under maintenance. Tasks To Accomplish jumps to final approvals, damaged items, and repairs. Report Quick View lists new damage reports.</p>
+              <span class="user-guide-place">Open Home</span>
+            </div>
+          </a>
         </li>
         <li class="user-guide-step">
-          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-journal-check"></i></span>
-          <div class="user-guide-step-card">
-            <p class="user-guide-step-label">Requests</p>
-            <h3>Give the final decision</h3>
-            <p>Other offices approve first. Your lists are Final Approval, Waiting Return, Returned for Revision, and Pending. Approve, reject with a reason, mark an item returned, or record damage.</p>
-            <span class="user-guide-place">Requests</span>
-          </div>
+          <a class="user-guide-step-link" href="{{ route('dashboard.request') }}">
+            <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-journal-check"></i></span>
+            <div class="user-guide-step-card">
+              <p class="user-guide-step-label">Requests</p>
+              <h3>Give the final decision</h3>
+              <p>Other offices approve first. Your lists are Final Approval, Waiting Return, Returned for Revision, and Pending. Approve, reject with a reason, mark an item returned, or record damage.</p>
+              <span class="user-guide-place">Open Requests</span>
+            </div>
+          </a>
         </li>
         <li class="user-guide-step">
-          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
-          <div class="user-guide-step-card">
-            <p class="user-guide-step-label">Inventory</p>
-            <h3>Facilities, equipment, and use</h3>
-            <p>Facilities is the rooms and spaces. Equipment is the items people reserve. Analytics shows which items are requested most.</p>
-            <span class="user-guide-place">Inventory</span>
-          </div>
+          <a class="user-guide-step-link" href="{{ route('dashboard.inventory') }}">
+            <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
+            <div class="user-guide-step-card">
+              <p class="user-guide-step-label">Inventory</p>
+              <h3>Facilities, equipment, and use</h3>
+              <p>Facilities is the rooms and spaces. Equipment is the items people reserve. Analytics shows which items are requested most.</p>
+              <span class="user-guide-place">Open Inventory</span>
+            </div>
+          </a>
         </li>
         <li class="user-guide-step">
-          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span>
-          <div class="user-guide-step-card">
-            <p class="user-guide-step-label">Schedule</p>
-            <h3>See what is booked</h3>
-            <p>The calendar shows reservations by day. Open a date to see which facilities or equipment are already taken before you approve another request.</p>
-            <span class="user-guide-place">Schedule</span>
-          </div>
+          <a class="user-guide-step-link" href="{{ route('dashboard.schedule') }}">
+            <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span>
+            <div class="user-guide-step-card">
+              <p class="user-guide-step-label">Schedule</p>
+              <h3>See what is booked</h3>
+              <p>The calendar shows reservations by day. Open a date to see which facilities or equipment are already taken before you approve another request.</p>
+              <span class="user-guide-place">Open Schedule</span>
+            </div>
+          </a>
         </li>
         <li class="user-guide-step">
-          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-wrench-adjustable"></i></span>
-          <div class="user-guide-step-card">
-            <p class="user-guide-step-label">Maintenance</p>
-            <h3>Track items that are out</h3>
-            <p>Filter by Maintenance, Damaged, Reported, or Addressed. A unit or room here should not be treated as available for a new reservation.</p>
-            <span class="user-guide-place">Maintenance</span>
-          </div>
+          <a class="user-guide-step-link" href="{{ route('dashboard.maintenance') }}">
+            <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-wrench-adjustable"></i></span>
+            <div class="user-guide-step-card">
+              <p class="user-guide-step-label">Maintenance</p>
+              <h3>Track items that are out</h3>
+              <p>Filter by Maintenance, Damaged, Reported, or Addressed. A unit or room here should not be treated as available for a new reservation.</p>
+              <span class="user-guide-place">Open Maintenance</span>
+            </div>
+          </a>
         </li>
         <li class="user-guide-step">
-          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
-          <div class="user-guide-step-card">
-            <p class="user-guide-step-label">History</p>
-            <h3>Review past lending</h3>
-            <p>Lending History keeps finished reservations, including what was lent and what had a problem. Use it when someone asks what already happened to an item.</p>
-            <span class="user-guide-place">History</span>
-          </div>
+          <a class="user-guide-step-link" href="{{ route('dashboard.history') }}">
+            <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
+            <div class="user-guide-step-card">
+              <p class="user-guide-step-label">History</p>
+              <h3>Review past lending</h3>
+              <p>Lending History keeps finished reservations, including what was lent and what had a problem. Use it when someone asks what already happened to an item.</p>
+              <span class="user-guide-place">Open History</span>
+            </div>
+          </a>
         </li>
         <li class="user-guide-step">
-          <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-people"></i></span>
-          <div class="user-guide-step-card">
-            <p class="user-guide-step-label">Users</p>
-            <h3>Accounts for this dashboard</h3>
-            <p>Users is where Physical Facilities accounts are added and updated. When admin access moves to another person, that account is managed here, and they see this same guide.</p>
-            <span class="user-guide-place">Users</span>
-          </div>
+          <a class="user-guide-step-link" href="{{ route('dashboard.users') }}">
+            <span class="user-guide-step-icon" aria-hidden="true"><i class="bi bi-people"></i></span>
+            <div class="user-guide-step-card">
+              <p class="user-guide-step-label">Users</p>
+              <h3>Accounts for this dashboard</h3>
+              <p>Users is where Physical Facilities accounts are added and updated. When admin access moves to another person, that account is managed here, and they see this same guide.</p>
+              <span class="user-guide-place">Open Users</span>
+            </div>
+          </a>
         </li>
       </ol>
 

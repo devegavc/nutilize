@@ -106,9 +106,6 @@ class OfficeRequestController extends Controller
                     ProgramChairOfficeResolver::openReservationIdsForProgramOffice($officeId)
                 )
             );
-            // #region agent log
-            file_put_contents(base_path('debug-65b897.log'), json_encode(['sessionId' => '65b897', 'hypothesisId' => 'G', 'location' => 'OfficeRequestController.php:buildOfficeHomeData', 'message' => 'program queue ids after dropping requests with no approvals', 'data' => ['officeId' => $officeId, 'queueIds' => $programReservationIds], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
-            // #endregion
 
             $reconcileIds = ProgramChairOfficeResolver::reservationIdsWithPendingPcApprovalsForProgram(
                 $officeId,
@@ -158,10 +155,6 @@ class OfficeRequestController extends Controller
                     $actionableReservationIds[] = (int) $reservationId;
                 }
             }
-
-            // #region agent log
-            file_put_contents(base_path('debug-65b897.log'), json_encode(['sessionId' => '65b897', 'hypothesisId' => 'H', 'location' => 'OfficeRequestController.php:buildOfficeHomeData', 'message' => 'office actionable ids after wider pending scan', 'data' => ['officeId' => $officeId, 'candidateCount' => count($candidateReservationIds), 'actionableIds' => $actionableReservationIds, 'includes252' => in_array(252, $actionableReservationIds, true)], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
-            // #endregion
 
             if (ItemOwnerService::isItemOwnerUser($user)) {
                 $actionableReservationIds = ItemOwnerService::filterActionableReservationIdsForItemOwner(

@@ -1876,10 +1876,6 @@ class ApprovalController extends Controller
 
         $unreadCount = $this->cachedUnreadNotificationCount($userId);
 
-        // #region agent log
-        file_put_contents(base_path('debug-65b897.log'), json_encode(['sessionId' => '65b897', 'hypothesisId' => 'E', 'location' => 'ApprovalController.php:getNotifications', 'message' => 'notifications returned', 'data' => ['userId' => $userId, 'count' => count($notifications), 'relatedIds' => array_map(static fn ($row) => $row['related_id'], $notifications)], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
-        // #endregion
-
         return response()->json([
             'success' => true,
             'notifications' => $notifications,
@@ -2273,9 +2269,6 @@ class ApprovalController extends Controller
     private function pruneStaleApprovalNotificationsForUser(\App\Models\User $user): void
     {
         if (!$user->isOfficeApprover()) {
-            // #region agent log
-            file_put_contents(base_path('debug-65b897.log'), json_encode(['sessionId' => '65b897', 'hypothesisId' => 'D', 'location' => 'ApprovalController.php:prune', 'message' => 'prune skipped, not office approver', 'data' => ['userId' => (int) $user->user_id, 'role' => (string) $user->role, 'officeId' => (int) $user->office_id], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
-            // #endregion
             return;
         }
 
@@ -2392,26 +2385,6 @@ class ApprovalController extends Controller
         }
 
         $staleIds = array_values(array_unique(array_filter($staleIds)));
-        // #region agent log
-        $approvalCounts = DB::table('reservation_approvals')
-            ->whereIn('reservation_id', $relatedIds !== [] ? $relatedIds : [-1])
-            ->select('reservation_id', DB::raw('count(*) as approval_count'))
-            ->groupBy('reservation_id')
-            ->pluck('approval_count', 'reservation_id');
-        $decisionRows = [];
-        foreach ($relatedIds as $reservationId) {
-            $reservation = $reservations->get($reservationId);
-            $decisionRows[] = [
-                'id' => $reservationId,
-                'exists' => (bool) $reservation,
-                'status' => $reservation ? (string) $reservation->overall_status : null,
-                'past' => $reservation ? $reservation->isPastActivity() : null,
-                'approvals' => (int) ($approvalCounts[$reservationId] ?? 0),
-                'stale' => in_array($reservationId, $staleIds, true),
-            ];
-        }
-        file_put_contents(base_path('debug-65b897.log'), json_encode(['sessionId' => '65b897', 'hypothesisId' => 'C', 'location' => 'ApprovalController.php:prune', 'message' => 'prune decisions', 'data' => ['userId' => $userId, 'officeId' => $officeId, 'role' => (string) $user->role, 'rows' => $decisionRows], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
-        // #endregion
         if ($staleIds === []) {
             return;
         }
