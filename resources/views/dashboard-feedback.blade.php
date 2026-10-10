@@ -126,7 +126,7 @@
           </article>
         </section>
 
-        <section class="feedback-table-card">
+        <section class="feedback-table-card survey-responses">
           <header class="feedback-table-head">
             <h2>Survey responses</h2>
             <span class="feedback-count-badge">{{ $survey['count'] }}</span>

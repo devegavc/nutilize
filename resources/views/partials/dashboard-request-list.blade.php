@@ -6,7 +6,9 @@
   @php
     $reservation = $requestData['reservation'];
     $user = $reservation->user;
-    $requesterName = $user->full_name ?? $user->username ?? 'User';
+    $requesterName = $user?->displayName() ?: 'User';
+    $requesterEmail = trim((string) ($user?->email ?? ''));
+    $showRequesterEmail = $requesterEmail !== '' && strcasecmp($requesterEmail, $requesterName) !== 0;
     $displayPhone = $user->phone_number ?? $user->contact_number ?? 'N/A';
     $cssVisibilityClass = $requestData['tab'] === 'final'
       ? 'final-only'
@@ -53,8 +55,8 @@
     <div class="request-main-col">
       <h3 class="request-block-title">Request details</h3>
       <p class="request-owner">{{ $requesterName }}</p>
-      @if(!empty($user->email))
-        <p class="request-email">{{ $user->email }}</p>
+      @if($showRequesterEmail)
+        <p class="request-email">{{ $requesterEmail }}</p>
       @endif
       <p class="request-phone">{{ $displayPhone }}</p>
       <div class="request-event-row">
