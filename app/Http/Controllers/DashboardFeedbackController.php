@@ -96,9 +96,12 @@ class DashboardFeedbackController extends Controller
                 ];
                 $when = $this->formatWhenParts($row->created_at);
 
+                $respondent = $this->displayName($row);
+
                 return [
                     'id' => (int) $row->feedback_id,
-                    'respondent' => $this->displayName($row),
+                    'respondent' => $respondent,
+                    'initials' => $this->initials($respondent),
                     'scores' => $scores,
                     'average' => round(array_sum($scores) / count($scores), 1),
                     'comment' => trim((string) ($row->additional_comments ?? '')),
@@ -135,20 +138,18 @@ class DashboardFeedbackController extends Controller
     private function surveySummary(array $surveys): array
     {
         $questions = [
-            'navigation' => ['label' => 'Finding your way around', 'icon' => 'bi-signpost-split-fill'],
-            'reservation' => ['label' => 'Making a reservation', 'icon' => 'bi-calendar2-check-fill'],
-            'responsiveness' => ['label' => 'How quickly offices respond', 'icon' => 'bi-lightning-charge-fill'],
-            'information' => ['label' => 'Clarity of information', 'icon' => 'bi-info-circle-fill'],
+            'navigation' => 'Finding your way around',
+            'reservation' => 'Making a reservation',
+            'responsiveness' => 'How quickly offices respond',
+            'information' => 'Clarity of information',
         ];
         $averages = [];
 
-        foreach ($questions as $key => $question) {
+        foreach ($questions as $key => $label) {
             $scores = array_map(static fn (array $survey): int => (int) $survey['scores'][$key], $surveys);
             $averages[$key] = [
-                'label' => $question['label'],
-                'icon' => $question['icon'],
+                'label' => $label,
                 'average' => $scores === [] ? null : round(array_sum($scores) / count($scores), 1),
-                'count' => count($scores),
             ];
         }
 
@@ -183,6 +184,15 @@ class DashboardFeedbackController extends Controller
         $username = trim((string) ($row->username ?? ''));
 
         return $username !== '' ? $username : 'User';
+    }
+
+    private function initials(string $name): string
+    {
+        $words = preg_split('/\s+/', trim($name)) ?: [];
+        $first = mb_substr((string) ($words[0] ?? 'U'), 0, 1);
+        $second = isset($words[1]) ? mb_substr((string) $words[1], 0, 1) : '';
+
+        return mb_strtoupper($first.$second);
     }
 
     /**

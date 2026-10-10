@@ -77,40 +77,28 @@
         </section>
 
         <section class="feedback-panels">
-          <article class="feedback-panel feedback-survey-panel">
-            <header class="feedback-survey-head">
-              <div>
-                <h2>Survey</h2>
-                <p class="feedback-panel-hint">Four questions about using NUtilize, scored out of {{ $scoreMax }}.</p>
-              </div>
-              @if ($survey['average'] !== null)
-                <p class="feedback-survey-overall">
-                  <strong>{{ number_format($survey['average'], 1) }}</strong>
-                  <span>overall</span>
-                </p>
-              @endif
-            </header>
+          <article class="feedback-panel">
+            <h2>Survey</h2>
+            <p class="feedback-panel-hint">Average score for each question, out of {{ $scoreMax }}.</p>
             @if ($survey['count'] === 0)
               <p class="feedback-empty">No survey responses yet.</p>
             @else
-              <div class="feedback-question-grid">
+              <ul class="feedback-meter-list">
                 @foreach ($survey['questions'] as $question)
                   @php
                     $percent = $question['average'] === null ? 0 : (int) round(($question['average'] / $scoreMax) * 100);
                   @endphp
-                  <article class="feedback-question">
-                    <span class="feedback-question-icon" aria-hidden="true"><i class="bi {{ $question['icon'] }}"></i></span>
-                    <div class="feedback-question-copy">
-                      <h3>{{ $question['label'] }}</h3>
-                      <div class="feedback-meter" role="meter" aria-valuemin="0" aria-valuemax="{{ $scoreMax }}" aria-valuenow="{{ $question['average'] }}" aria-label="{{ $question['label'] }}">
-                        <span style="width: {{ $percent }}%"></span>
-                      </div>
-                      <p>{{ $question['count'] }} {{ $question['count'] === 1 ? 'answer' : 'answers' }}</p>
+                  <li>
+                    <div class="feedback-meter-label">
+                      <span>{{ $question['label'] }}</span>
+                      <strong>{{ number_format($question['average'], 1) }}</strong>
                     </div>
-                    <p class="feedback-question-score">{{ number_format($question['average'], 1) }}</p>
-                  </article>
+                    <div class="feedback-meter" role="meter" aria-valuemin="0" aria-valuemax="{{ $scoreMax }}" aria-valuenow="{{ $question['average'] }}" aria-label="{{ $question['label'] }}">
+                      <span style="width: {{ $percent }}%"></span>
+                    </div>
+                  </li>
                 @endforeach
-              </div>
+              </ul>
             @endif
           </article>
 
@@ -143,41 +131,48 @@
             <h2>Survey responses</h2>
             <span class="feedback-count-badge">{{ $survey['count'] }}</span>
           </header>
-          <div class="feedback-table-scroll">
-            <table class="feedback-table feedback-survey-table">
-              <thead>
-                <tr>
-                  <th>Submitted</th>
-                  <th>Respondent</th>
-                  <th class="feedback-num">Navigation</th>
-                  <th class="feedback-num">Reservation</th>
-                  <th class="feedback-num">Response</th>
-                  <th class="feedback-num">Information</th>
-                  <th>Comment</th>
-                </tr>
-              </thead>
-              <tbody>
-                @forelse ($surveys as $surveyRow)
-                  <tr>
-                    <td class="feedback-when">
-                      <span class="feedback-when-date">{{ $surveyRow['submitted_date'] }}</span>
-                      <span class="feedback-when-time">{{ $surveyRow['submitted_time'] }}</span>
-                    </td>
-                    <td class="feedback-name">{{ $surveyRow['respondent'] }}</td>
-                    <td class="feedback-num"><span class="feedback-score-badge">{{ $surveyRow['scores']['navigation'] }}</span></td>
-                    <td class="feedback-num"><span class="feedback-score-badge">{{ $surveyRow['scores']['reservation'] }}</span></td>
-                    <td class="feedback-num"><span class="feedback-score-badge">{{ $surveyRow['scores']['responsiveness'] }}</span></td>
-                    <td class="feedback-num"><span class="feedback-score-badge">{{ $surveyRow['scores']['information'] }}</span></td>
-                    <td class="feedback-comment">{{ $surveyRow['comment'] !== '' ? $surveyRow['comment'] : 'No additional comment' }}</td>
-                  </tr>
-                @empty
-                  <tr>
-                    <td colspan="7">No survey responses yet.</td>
-                  </tr>
-                @endforelse
-              </tbody>
-            </table>
-          </div>
+          @if ($surveys === [])
+            <p class="feedback-empty">No survey responses yet.</p>
+          @else
+            <ul class="survey-response-list">
+              @foreach ($surveys as $surveyRow)
+                <li class="survey-response">
+                  <div class="survey-response-top">
+                    <div class="survey-response-person">
+                      <span class="survey-response-avatar" aria-hidden="true">{{ $surveyRow['initials'] }}</span>
+                      <div>
+                        <p class="survey-response-name">{{ $surveyRow['respondent'] }}</p>
+                        <p class="survey-response-when">{{ $surveyRow['submitted_date'] }} · {{ $surveyRow['submitted_time'] }}</p>
+                      </div>
+                    </div>
+                    <p class="survey-response-average">
+                      <strong>{{ number_format($surveyRow['average'], 1) }}</strong>
+                      <span>/ {{ $scoreMax }}</span>
+                    </p>
+                  </div>
+                  <dl class="survey-response-scores">
+                    @foreach ([
+                      'navigation' => 'Navigation',
+                      'reservation' => 'Reservation',
+                      'responsiveness' => 'Response',
+                      'information' => 'Information',
+                    ] as $scoreKey => $scoreLabel)
+                      <div>
+                        <dt>{{ $scoreLabel }}</dt>
+                        <dd>
+                          <span class="feedback-score-badge">{{ $surveyRow['scores'][$scoreKey] }}</span>
+                          <span class="survey-score-track" aria-hidden="true">
+                            <span style="width: {{ (int) round(($surveyRow['scores'][$scoreKey] / $scoreMax) * 100) }}%"></span>
+                          </span>
+                        </dd>
+                      </div>
+                    @endforeach
+                  </dl>
+                  <p class="survey-response-comment{{ $surveyRow['comment'] === '' ? ' is-empty' : '' }}">{{ $surveyRow['comment'] !== '' ? $surveyRow['comment'] : 'No additional comment' }}</p>
+                </li>
+              @endforeach
+            </ul>
+          @endif
         </section>
 
         <section class="feedback-table-card">
