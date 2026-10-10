@@ -120,7 +120,7 @@ class DashboardInventoryCacheService
         $previousSelected = $monthStart->copy()->subMonth();
         $nextSelected = $monthStart->copy()->addMonth();
 
-        return array_merge($data, [
+        $payload = array_merge($data, [
             'previousMonthUrl' => route('dashboard.inventory.analytics', [
                 'month' => $previousSelected->format('Y-m'),
                 'compare' => $previousSelected->copy()->subMonth()->format('Y-m'),
@@ -133,6 +133,27 @@ class DashboardInventoryCacheService
                 : null,
             'canGoNext' => $canGoNext,
         ]);
+
+        // #region agent log
+        file_put_contents(base_path('debug-c44038.log'), json_encode([
+            'sessionId' => 'c44038',
+            'runId' => 'pre-fix',
+            'hypothesisId' => 'B',
+            'location' => 'DashboardInventoryCacheService.php:getAnalyticsData',
+            'message' => 'analytics cache payload keys',
+            'data' => [
+                'cacheKey' => $cacheKey,
+                'hasRoomBookings' => array_key_exists('roomBookings', $payload),
+                'hasRoomInsights' => array_key_exists('roomInsights', $payload),
+                'hasMostUsedRooms' => array_key_exists('mostUsedRooms', $payload),
+                'hasRoomTrendCounts' => array_key_exists('roomTrendCounts', $payload),
+                'monthKey' => $payload['monthKey'] ?? null,
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
+        // #endregion
+
+        return $payload;
     }
 
     private static function getFacilityCount(): int

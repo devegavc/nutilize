@@ -391,6 +391,73 @@
 
           $roomUnavailableCopy = 'Room usage is not available for this month.';
           $sharePalette = ['#3a4f9c', '#2bb3a8', '#e09a00', '#e85a5a', '#6a58c4', '#2f9fc2', '#3fa06c', '#e07000'];
+
+          // #region agent log
+          try {
+              $debugTables = [
+                  'rooms' => \Illuminate\Support\Facades\Schema::hasTable('rooms'),
+                  'reservation_rooms' => \Illuminate\Support\Facades\Schema::hasTable('reservation_rooms'),
+                  'reservation_details' => \Illuminate\Support\Facades\Schema::hasTable('reservation_details'),
+                  'reservations' => \Illuminate\Support\Facades\Schema::hasTable('reservations'),
+              ];
+              $debugRoomCount = $debugTables['rooms']
+                  ? (int) \Illuminate\Support\Facades\DB::table('rooms')->count()
+                  : null;
+              $debugLinkedRooms = ($debugTables['reservation_details'] && $debugTables['reservation_rooms'])
+                  ? (int) \Illuminate\Support\Facades\DB::table('reservation_details')
+                      ->whereNotNull('reservation_rooms_id')
+                      ->distinct()
+                      ->count('reservation_id')
+                  : null;
+              $debugMonthRoomBookings = null;
+              if ($debugTables['reservations'] && $debugTables['reservation_details'] && isset($monthKey)) {
+                  [$debugYear, $debugMonth] = array_map('intval', explode('-', (string) $monthKey));
+                  $debugSince = \Carbon\Carbon::create($debugYear, $debugMonth, 1)->startOfMonth();
+                  $debugUntil = $debugSince->copy()->endOfMonth();
+                  $debugMonthRoomBookings = (int) \Illuminate\Support\Facades\DB::table('reservation_details as details')
+                      ->join('reservations', 'reservations.reservation_id', '=', 'details.reservation_id')
+                      ->whereNotNull('details.reservation_rooms_id')
+                      ->whereBetween('reservations.created_at', [$debugSince, $debugUntil])
+                      ->whereNotIn(\Illuminate\Support\Facades\DB::raw("LOWER(TRIM(COALESCE(reservations.overall_status, '')))"), ['cancelled', 'canceled'])
+                      ->distinct()
+                      ->count('reservations.reservation_id');
+              }
+              file_put_contents(base_path('debug-c44038.log'), json_encode([
+                  'sessionId' => 'c44038',
+                  'runId' => 'pre-fix',
+                  'hypothesisId' => 'A',
+                  'location' => 'dashboard-inventory-analytics.blade.php:room-payload',
+                  'message' => 'room analytics view payload',
+                  'data' => [
+                      'ready' => $roomInsightsReady,
+                      'monthKey' => $monthKey ?? null,
+                      'hasRoomBookings' => isset($roomBookings),
+                      'hasRoomInsights' => isset($roomInsights),
+                      'hasMostUsedRooms' => isset($mostUsedRooms),
+                      'hasRoomShareItems' => isset($roomShareItems),
+                      'hasRoomTrendCounts' => isset($roomTrendCounts),
+                      'bookingsValue' => $roomBookingsValue,
+                      'roomsUsedValue' => $roomsUsedValue,
+                      'shareRows' => count($roomShareNormalized),
+                      'tables' => $debugTables,
+                      'roomCount' => $debugRoomCount,
+                      'reservationsWithRooms' => $debugLinkedRooms,
+                      'monthRoomBookings' => $debugMonthRoomBookings,
+                  ],
+                  'timestamp' => (int) round(microtime(true) * 1000),
+              ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
+          } catch (\Throwable $debugError) {
+              file_put_contents(base_path('debug-c44038.log'), json_encode([
+                  'sessionId' => 'c44038',
+                  'runId' => 'pre-fix',
+                  'hypothesisId' => 'E',
+                  'location' => 'dashboard-inventory-analytics.blade.php:room-payload',
+                  'message' => 'room analytics probe failed',
+                  'data' => ['error' => $debugError->getMessage()],
+                  'timestamp' => (int) round(microtime(true) * 1000),
+              ]).PHP_EOL, FILE_APPEND);
+          }
+          // #endregion
         @endphp
 
         {{-- Month comparison + trend side by side --}}
