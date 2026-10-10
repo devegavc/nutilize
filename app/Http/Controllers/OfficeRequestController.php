@@ -99,8 +99,13 @@ class OfficeRequestController extends Controller
                 ->all();
         } elseif ($user->isProgramChairAdmin()) {
             $programReservationIds = $this->capReservationIds(
-                ProgramChairOfficeResolver::openReservationIdsForProgramOffice($officeId)
+                $this->reservationIdsWithApprovalRows(
+                    ProgramChairOfficeResolver::openReservationIdsForProgramOffice($officeId)
+                )
             );
+            // #region agent log
+            file_put_contents(base_path('debug-65b897.log'), json_encode(['sessionId' => '65b897', 'hypothesisId' => 'G', 'location' => 'OfficeRequestController.php:buildOfficeHomeData', 'message' => 'program queue ids after dropping requests with no approvals', 'data' => ['officeId' => $officeId, 'queueIds' => $programReservationIds], 'timestamp' => (int) round(microtime(true) * 1000)]) . "\n", FILE_APPEND);
+            // #endregion
 
             $reconcileIds = ProgramChairOfficeResolver::reservationIdsWithPendingPcApprovalsForProgram(
                 $officeId,
@@ -760,6 +765,36 @@ class OfficeRequestController extends Controller
             0,
             self::WORKFLOW_BATCH_LIMIT
         );
+    }
+
+    /**
+     * Empty reservation shells have no approval workflow, so they must not
+     * occupy the queue window ahead of requests that are still pending.
+     *
+     * @param  array<int, int>  $reservationIds
+     * @return array<int, int>
+     */
+    private function reservationIdsWithApprovalRows(array $reservationIds): array
+    {
+        $reservationIds = array_values(array_unique(array_filter(array_map('intval', $reservationIds))));
+        if ($reservationIds === []) {
+            return [];
+        }
+
+        $withRows = array_fill_keys(
+            DB::table('reservation_approvals')
+                ->whereIn('reservation_id', $reservationIds)
+                ->distinct()
+                ->pluck('reservation_id')
+                ->map(fn ($id) => (int) $id)
+                ->all(),
+            true
+        );
+
+        return array_values(array_filter(
+            $reservationIds,
+            static fn (int $id): bool => isset($withRows[$id])
+        ));
     }
 
     /**

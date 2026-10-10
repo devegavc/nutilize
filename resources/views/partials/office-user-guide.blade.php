@@ -184,6 +184,7 @@
       return;
     }
     openButton.setAttribute('data-bound', '1');
+    document.body.appendChild(panel);
 
     var backButton = panel.querySelector('.user-guide-close');
     var guideBody = panel.querySelector('.user-guide-body');
