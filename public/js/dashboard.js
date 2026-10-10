@@ -1386,7 +1386,7 @@ function showQuickReportDetailsModal(report) {
         </div>
 
         <footer class="quick-report-details-footer">
-          <a class="quick-report-footer-link" href="/maintenance">Open Item Maintenance</a>
+          <a class="quick-report-footer-link" href="/maintenance"><i class="bi bi-wrench" aria-hidden="true"></i><span>Item Maintenance.</span></a>
         </footer>
       </article>
     </div>
