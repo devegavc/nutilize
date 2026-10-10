@@ -19,29 +19,9 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegisterController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
 
 // The landing page must read the session cookie. A public cache, or skipping
 // the session here, makes a new browser tab show the logged-out page.
-Route::post('/__agent-debug', function (Request $request) {
-    if (!app()->environment('local')) {
-        abort(404);
-    }
-
-    $payload = $request->json()->all();
-    if (!is_array($payload)) {
-        return response()->noContent();
-    }
-
-    $payload['sessionId'] = 'b628c2';
-    $line = json_encode($payload, JSON_UNESCAPED_SLASHES);
-    if (is_string($line)) {
-        file_put_contents(base_path('debug-b628c2.log'), $line."\n", FILE_APPEND | LOCK_EX);
-    }
-
-    return response()->noContent();
-})->middleware('throttle:120,1');
-
 Route::view('/', 'index')
     ->name('index')
     ->middleware(['redirect.authenticated', 'cache.headers:private;no_cache']);

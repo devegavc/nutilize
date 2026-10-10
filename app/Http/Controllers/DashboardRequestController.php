@@ -64,33 +64,6 @@ class DashboardRequestController extends Controller
 
         $viewData = $this->buildRequestPageViewData($user, false);
 
-        // #region agent log
-        $stepCounts = [];
-        foreach (['finalRequests', 'returnRequests', 'rejectedRequests', 'pendingRequests'] as $bucket) {
-            foreach ($viewData[$bucket] ?? [] as $row) {
-                $steps = $row['workflow_steps'] ?? null;
-                $stepCounts[] = is_array($steps) ? count($steps) : null;
-            }
-        }
-        $logLine = json_encode([
-            'sessionId' => 'b628c2',
-            'runId' => 'pre-fix',
-            'hypothesisId' => 'B',
-            'location' => 'DashboardRequestController.php:requestList',
-            'message' => 'request list payload',
-            'data' => [
-                'requestCount' => count($stepCounts),
-                'stepCounts' => array_slice($stepCounts, 0, 12),
-                'nullStepRows' => count(array_filter($stepCounts, static fn ($count) => $count === null)),
-                'emptyStepRows' => count(array_filter($stepCounts, static fn ($count) => $count === 0)),
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES);
-        if (is_string($logLine)) {
-            file_put_contents(base_path('debug-b628c2.log'), $logLine."\n", FILE_APPEND | LOCK_EX);
-        }
-        // #endregion
-
         return response()->json([
             'success' => true,
             'html' => view('partials.dashboard-request-list', $viewData)->render(),
@@ -204,6 +177,32 @@ class DashboardRequestController extends Controller
                 ? 'return'
                 : ($isFinalDecision ? 'rejected' : ($isFinal ? 'final' : 'pending')));
 
+            // #region agent log
+            try {
+                $logUser = $reservation->user;
+                $logEmail = strtolower(trim((string) ($logUser->email ?? '')));
+                $logFull = strtolower(trim((string) ($logUser->full_name ?? '')));
+                $logUsername = strtolower(trim((string) ($logUser->username ?? '')));
+                file_put_contents(base_path('debug-02a19c.log'), json_encode([
+                    'sessionId' => '02a19c',
+                    'runId' => 'pre-fix',
+                    'hypothesisId' => 'A-B-D',
+                    'location' => 'DashboardRequestController.php:preparedRequest',
+                    'message' => 'request card identity and outsider flag',
+                    'data' => [
+                        'reservation_id' => (int) $reservation->reservation_id,
+                        'full_name_blank' => $logFull === '',
+                        'full_name_equals_email' => $logEmail !== '' && $logFull === $logEmail,
+                        'username_equals_email' => $logEmail !== '' && $logUsername === $logEmail,
+                        'owner_source' => $logFull !== '' ? 'full_name' : 'username',
+                        'outside_participants' => $reservation->outside_participants,
+                        'outside_loaded' => array_key_exists('outside_participants', $reservation->getAttributes()),
+                    ],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
+            } catch (\Throwable $throwable) {
+            }
+            // #endregion
 
             return [
                 'reservation' => $reservation,

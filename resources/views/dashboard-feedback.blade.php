@@ -77,28 +77,40 @@
         </section>
 
         <section class="feedback-panels">
-          <article class="feedback-panel">
-            <h2>Survey</h2>
-            <p class="feedback-panel-hint">Average score for each question, out of {{ $scoreMax }}.</p>
+          <article class="feedback-panel feedback-survey-panel">
+            <header class="feedback-survey-head">
+              <div>
+                <h2>Survey</h2>
+                <p class="feedback-panel-hint">Four questions about using NUtilize, scored out of {{ $scoreMax }}.</p>
+              </div>
+              @if ($survey['average'] !== null)
+                <p class="feedback-survey-overall">
+                  <strong>{{ number_format($survey['average'], 1) }}</strong>
+                  <span>overall</span>
+                </p>
+              @endif
+            </header>
             @if ($survey['count'] === 0)
               <p class="feedback-empty">No survey responses yet.</p>
             @else
-              <ul class="feedback-meter-list">
+              <div class="feedback-question-grid">
                 @foreach ($survey['questions'] as $question)
                   @php
                     $percent = $question['average'] === null ? 0 : (int) round(($question['average'] / $scoreMax) * 100);
                   @endphp
-                  <li>
-                    <div class="feedback-meter-label">
-                      <span>{{ $question['label'] }}</span>
-                      <strong>{{ number_format($question['average'], 1) }}</strong>
+                  <article class="feedback-question">
+                    <span class="feedback-question-icon" aria-hidden="true"><i class="bi {{ $question['icon'] }}"></i></span>
+                    <div class="feedback-question-copy">
+                      <h3>{{ $question['label'] }}</h3>
+                      <div class="feedback-meter" role="meter" aria-valuemin="0" aria-valuemax="{{ $scoreMax }}" aria-valuenow="{{ $question['average'] }}" aria-label="{{ $question['label'] }}">
+                        <span style="width: {{ $percent }}%"></span>
+                      </div>
+                      <p>{{ $question['count'] }} {{ $question['count'] === 1 ? 'answer' : 'answers' }}</p>
                     </div>
-                    <div class="feedback-meter" role="meter" aria-valuemin="0" aria-valuemax="{{ $scoreMax }}" aria-valuenow="{{ $question['average'] }}" aria-label="{{ $question['label'] }}">
-                      <span style="width: {{ $percent }}%"></span>
-                    </div>
-                  </li>
+                    <p class="feedback-question-score">{{ number_format($question['average'], 1) }}</p>
+                  </article>
                 @endforeach
-              </ul>
+              </div>
             @endif
           </article>
 

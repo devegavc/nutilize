@@ -48,7 +48,7 @@ class SecurityHeaders
             "style-src 'self' 'nonce-{$nonce}' https://cdn.jsdelivr.net https://fonts.googleapis.com",
             "img-src 'self' data:",
             "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
-            "connect-src 'self' http://127.0.0.1:7591",
+            "connect-src 'self'",
             "frame-src 'self'",
             "media-src 'self'",
             "object-src 'none'",

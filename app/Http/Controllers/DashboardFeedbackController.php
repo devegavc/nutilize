@@ -135,18 +135,20 @@ class DashboardFeedbackController extends Controller
     private function surveySummary(array $surveys): array
     {
         $questions = [
-            'navigation' => 'Finding your way around',
-            'reservation' => 'Making a reservation',
-            'responsiveness' => 'How quickly offices respond',
-            'information' => 'Clarity of information',
+            'navigation' => ['label' => 'Finding your way around', 'icon' => 'bi-signpost-split-fill'],
+            'reservation' => ['label' => 'Making a reservation', 'icon' => 'bi-calendar2-check-fill'],
+            'responsiveness' => ['label' => 'How quickly offices respond', 'icon' => 'bi-lightning-charge-fill'],
+            'information' => ['label' => 'Clarity of information', 'icon' => 'bi-info-circle-fill'],
         ];
         $averages = [];
 
-        foreach ($questions as $key => $label) {
+        foreach ($questions as $key => $question) {
             $scores = array_map(static fn (array $survey): int => (int) $survey['scores'][$key], $surveys);
             $averages[$key] = [
-                'label' => $label,
+                'label' => $question['label'],
+                'icon' => $question['icon'],
                 'average' => $scores === [] ? null : round(array_sum($scores) / count($scores), 1),
+                'count' => count($scores),
             ];
         }
 

@@ -446,15 +446,6 @@ function stampCspStyle(style) {
   return style;
 }
 
-function agentDebugLog(hypothesisId, location, message, data) {
-  // #region agent log
-  const payload = {sessionId:'b628c2',runId:'pre-fix',hypothesisId,location,message,data,timestamp:Date.now()};
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b628c2'},body:JSON.stringify(payload)}).catch(()=>{});
-  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-  fetch('/__agent-debug',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':token,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},body:JSON.stringify(payload),credentials:'same-origin'}).catch(()=>{});
-  // #endregion
-}
-
 function applyCspPresentation() {
   document.querySelectorAll('[data-bar-width]').forEach((el) => {
     const value = Number(el.getAttribute('data-bar-width'));
@@ -471,26 +462,12 @@ function applyCspPresentation() {
     }
   });
 
-  const timelineDebug = [];
   document.querySelectorAll('[data-timeline-steps]').forEach((el) => {
     const steps = Number(el.getAttribute('data-timeline-steps'));
-    const applied = Number.isInteger(steps) && steps > 0 && steps < 100;
-    if (applied) {
+    if (Number.isInteger(steps) && steps > 0 && steps < 100) {
       el.style.setProperty('--timeline-steps', String(steps));
     }
-    timelineDebug.push({
-      stepsAttr: el.getAttribute('data-timeline-steps'),
-      applied,
-      cssVar: el.style.getPropertyValue('--timeline-steps'),
-      stepCount: el.querySelectorAll('.status-step').length,
-    });
   });
-  // #region agent log
-  agentDebugLog('A', 'dashboard.js:applyCspPresentation', 'timeline presentation applied', {
-    timelineCount: timelineDebug.length,
-    timelines: timelineDebug.slice(0, 8),
-  });
-  // #endregion
 }
 
 function showAppNotice(message, options = {}) {
@@ -3017,32 +2994,10 @@ async function refreshRequestListPreservingTab(explicitUrl) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok || !data.success || typeof data.html !== 'string') {
-    // #region agent log
-    agentDebugLog('B', 'dashboard.js:refreshRequestListPreservingTab', 'refresh response unusable', {
-      status: response.status,
-      ok: response.ok,
-      success: Boolean(data.success),
-      hasHtml: typeof data.html === 'string',
-      error: typeof data.error === 'string' ? data.error : (typeof data.message === 'string' ? data.message : ''),
-    });
-    // #endregion
     throw new Error(data.error || data.message || 'Unable to refresh request list.');
   }
 
   requestListWrap.innerHTML = data.html;
-
-  // #region agent log
-  const refreshedTimelines = Array.from(requestListWrap.querySelectorAll('[data-timeline-steps]')).slice(0, 8).map((el) => ({
-    stepsAttr: el.getAttribute('data-timeline-steps'),
-    cssVar: el.style.getPropertyValue('--timeline-steps'),
-    stepCount: el.querySelectorAll('.status-step').length,
-  }));
-  agentDebugLog('A', 'dashboard.js:refreshRequestListPreservingTab', 'request list html replaced', {
-    status: response.status,
-    timelineCount: requestListWrap.querySelectorAll('[data-timeline-steps]').length,
-    timelines: refreshedTimelines,
-  });
-  // #endregion
 
   if (typeof explicitUrl === 'string' && explicitUrl.trim() !== '') {
     const parsedUrl = new URL(explicitUrl, window.location.origin);
@@ -3061,12 +3016,6 @@ async function refreshRequestListPreservingTab(explicitUrl) {
 
 async function refreshRequestListSafely(explicitUrl) {
   if (!requestListWrap || requestListRefreshInFlight) {
-    // #region agent log
-    agentDebugLog('C', 'dashboard.js:refreshRequestListSafely', 'refresh skipped', {
-      hasWrap: Boolean(requestListWrap),
-      inFlight: requestListRefreshInFlight,
-    });
-    // #endregion
     return;
   }
 
@@ -3102,11 +3051,6 @@ async function refreshRequestListSafely(explicitUrl) {
     try {
       await refreshRequestListSafely();
     } catch (error) {
-      // #region agent log
-      agentDebugLog('B', 'dashboard.js:initRequestListPolling', 'poll refresh failed', {
-        error: error instanceof Error ? error.message : 'unknown',
-      });
-      // #endregion
       console.error('Error polling request list:', error);
     }
   };
@@ -8035,19 +7979,16 @@ if (requestListWrap) {
       item.classList.add('is-selected');
     }
 
-    const timeline = item.querySelector('.status-timeline');
-    if (timeline instanceof HTMLElement && item.classList.contains('is-selected')) {
-      const computed = window.getComputedStyle(timeline);
-      // #region agent log
-      agentDebugLog('A', 'dashboard.js:request-item-click', 'selected request timeline', {
-        stepsAttr: timeline.getAttribute('data-timeline-steps'),
-        cssVar: timeline.style.getPropertyValue('--timeline-steps'),
-        gridTemplateColumns: computed.gridTemplateColumns,
-        display: computed.display,
-        stepCount: timeline.querySelectorAll('.status-step').length,
-      });
-      // #endregion
+    // #region agent log
+    if (item.classList.contains('is-selected')) {
+      const ownerEl = item.querySelector('.request-owner');
+      const emailEls = item.querySelectorAll('.request-email');
+      const emailEl = emailEls[0];
+      const ownerText = ownerEl ? ownerEl.textContent.trim() : '';
+      const emailText = emailEl ? emailEl.textContent.trim() : '';
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02a19c'},body:JSON.stringify({sessionId:'02a19c',runId:'pre-fix',hypothesisId:'C',location:'dashboard.js:request-item-click',message:'selected request detail lines',data:{emailNodeCount:emailEls.length,ownerMatchesEmail:ownerText!==''&&ownerText===emailText,emailDisplay:emailEl?getComputedStyle(emailEl).display:null,ownerDisplay:ownerEl?getComputedStyle(ownerEl).display:null,mentionsOutsider:/outsider/i.test(item.textContent)},timestamp:Date.now()})}).catch(()=>{});
     }
+    // #endregion
   });
 
   requestListWrap.addEventListener('click', (event) => {
