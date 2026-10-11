@@ -3387,12 +3387,6 @@ async function submitReturnDecision(item, button, status) {
     }
   }
 
-  if (status === 'damaged') {
-    // #region agent log
-    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2da69'},body:JSON.stringify({sessionId:'c2da69',location:'dashboard.js:submitReturnDecision',message:'damage targets parsed',data:{rawPrefix:damageTargetsRaw.slice(0,80),targetCount:damageTargets.length,parseFailed:damageTargetParseFailed},timestamp:Date.now(),hypothesisId:'E',runId:'post-fix'})}).catch(()=>{});
-    // #endregion
-  }
-
   if (status === 'damaged' && damageTargetParseFailed) {
     showAppNotice('The item list could not be read. Refresh the page and try again.');
     return;
@@ -3405,12 +3399,6 @@ async function submitReturnDecision(item, button, status) {
   const damagedRoomIds = confirmation && Array.isArray(confirmation.damagedRoomIds) ? confirmation.damagedRoomIds : [];
   if (!confirmed) {
     return;
-  }
-
-  if (status === 'damaged') {
-    // #region agent log
-    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2da69'},body:JSON.stringify({sessionId:'c2da69',location:'dashboard.js:submitReturnDecision',message:'damage proof choice',data:{hasFile:Boolean(proofFile),fileType:proofFile?proofFile.type:'',fileSize:proofFile?proofFile.size:0,itemCount:damagedItemIds.length,roomCount:damagedRoomIds.length},timestamp:Date.now(),hypothesisId:'A',runId:'pre-fix'})}).catch(()=>{});
-    // #endregion
   }
 
   if (button) {
@@ -5161,6 +5149,17 @@ function setActiveNavByPage() {
   document.querySelectorAll('.nav-submenu').forEach((submenu) => {
     submenu.classList.toggle('is-open', inventoryOpen);
   });
+
+  // #region agent log
+  if (inventoryOpen) {
+    const sideNav = document.querySelector('#navbar-container .side-nav');
+    const navBox = document.getElementById('navbar-container');
+    const sideStyle = sideNav ? getComputedStyle(sideNav) : null;
+    const boxStyle = navBox ? getComputedStyle(navBox) : null;
+    const bodyStyle = getComputedStyle(document.body);
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02a19c'},body:JSON.stringify({sessionId:'02a19c',runId:'pre-fix',hypothesisId:'A-E',location:'dashboard.js:inventory-nav-scroll',message:'inventory sidebar overflow',data:{path,subTarget,viewportH:window.innerHeight,sideOverflowY:sideStyle?sideStyle.overflowY:null,boxOverflowY:boxStyle?boxStyle.overflowY:null,bodyOverflowY:bodyStyle.overflowY,sideClient:sideNav?sideNav.clientHeight:null,sideScroll:sideNav?sideNav.scrollHeight:null,sideOverflowPx:sideNav?sideNav.scrollHeight-sideNav.clientHeight:null,sideScrollbarW:sideNav?sideNav.offsetWidth-sideNav.clientWidth:null,boxClient:navBox?navBox.clientHeight:null,boxScroll:navBox?navBox.scrollHeight:null,boxScrollbarW:navBox?navBox.offsetWidth-navBox.clientWidth:null,bodyClient:document.body.clientHeight,bodyScroll:document.body.scrollHeight,docClient:document.documentElement.clientHeight,docScroll:document.documentElement.scrollHeight},timestamp:Date.now()})}).catch(()=>{});
+  }
+  // #endregion
 
   if (toolbarProfileButtons.length) {
     toolbarProfileButtons.forEach((button) => {

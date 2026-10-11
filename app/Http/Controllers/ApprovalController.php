@@ -447,26 +447,6 @@ class ApprovalController extends Controller
             }
         }
 
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-c2da69.log'), json_encode([
-                'sessionId' => 'c2da69',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'B',
-                'location' => 'ApprovalController.php:finalDamagedReservation',
-                'message' => 'damage proof decision',
-                'data' => [
-                    'hasFile' => $request->hasFile('proof_photo'),
-                    'stored' => $proofImageUrl !== null,
-                    'itemCount' => is_array($damageSelection) ? count($damageSelection['items'] ?? []) : null,
-                    'roomCount' => is_array($damageSelection) ? count($damageSelection['rooms'] ?? []) : null,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ]).PHP_EOL, FILE_APPEND);
-        } catch (Throwable $throwable) {
-        }
-        // #endregion
-
         return $this->finalizePhysicalFacilitiesDecision($reservationId, 'damaged', $proofImageUrl, $damageSelection);
     }
 
@@ -596,10 +576,8 @@ class ApprovalController extends Controller
 
         $filename = 'damage-'.bin2hex(random_bytes(16)).'.'.$extension;
         $mime = $file->getMimeType() ?: 'application/octet-stream';
-        $bytes = (int) $file->getSize();
         $serviceKey = (string) config('services.supabase.service_role_key');
         $supabaseUrl = rtrim((string) config('services.supabase.url'), '/');
-        $storedAs = 'failed';
 
         if ($serviceKey !== '' && $supabaseUrl !== '') {
             $response = Http::withHeaders([
@@ -612,7 +590,6 @@ class ApprovalController extends Controller
                 ->post($supabaseUrl.'/storage/v1/object/assets/issues/'.$filename);
 
             if ($response->successful()) {
-                $storedAs = 'supabase';
                 $proofUrl = $supabaseUrl.'/storage/v1/object/public/assets/issues/'.$filename;
             }
         }
@@ -623,28 +600,9 @@ class ApprovalController extends Controller
                 $proofUrl = null;
             } else {
                 $file->move($directory, $filename);
-                $storedAs = 'local';
                 $proofUrl = url('uploads/damage-proofs/'.$filename);
             }
         }
-
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-c2da69.log'), json_encode([
-                'sessionId' => 'c2da69',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'C',
-                'location' => 'ApprovalController.php:storeDamageProofPhoto',
-                'message' => 'damage proof stored',
-                'data' => [
-                    'storedAs' => $storedAs,
-                    'bytes' => $bytes,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ]).PHP_EOL, FILE_APPEND);
-        } catch (Throwable $throwable) {
-        }
-        // #endregion
 
         return $proofUrl ?? null;
     }
@@ -666,25 +624,6 @@ class ApprovalController extends Controller
             $damageNote = ($status === 'damaged' && is_array($damageSelection))
                 ? $this->damageItemNote((int) $reservation->reservation_id, $damageSelection)
                 : null;
-
-            // #region agent log
-            try {
-                file_put_contents(base_path('debug-c2da69.log'), json_encode([
-                    'sessionId' => 'c2da69',
-                    'runId' => 'post-fix',
-                    'hypothesisId' => 'D',
-                    'location' => 'ApprovalController.php:finalizePhysicalFacilitiesDecision',
-                    'message' => 'damaged item note',
-                    'data' => [
-                        'noteSaved' => is_string($damageNote) && $damageNote !== '',
-                        'selectedItemCount' => is_array($damageSelection) ? count($damageSelection['items'] ?? []) : null,
-                        'selectedRoomCount' => is_array($damageSelection) ? count($damageSelection['rooms'] ?? []) : null,
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ]).PHP_EOL, FILE_APPEND);
-            } catch (Throwable $throwable) {
-            }
-            // #endregion
 
             // Keep the hot path to status + PF approval row only.
             // Return/damage inventory work and notifications run after the response.
