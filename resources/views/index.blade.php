@@ -137,24 +137,21 @@
             </div>
           </div>
 
-          <!-- Computer Lab Card -->
+          <!-- Student Lobby Card -->
           <div class="facility-card">
             <div class="facility-image">
-              <picture>
-                <source srcset="/img/nu_comlab.webp" type="image/webp" />
-                <img
-                  src="/img/nu_comlab.jpg"
-                  alt="Computer Lab"
-                  width="800"
-                  height="600"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </picture>
+              <img
+                src="/img/nu_lobby.jpg"
+                alt="Student Lobby"
+                width="480"
+                height="480"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
             <div class="facility-info">
-              <h3 class="facility-name">COMPUTER LAB</h3>
-              <p class="facility-description">Technology-equipped computer laboratories designed to support programming, research, multimedia activities, and collaborative learning sessions.</p>
+              <h3 class="facility-name">STUDENT LOBBY</h3>
+              <p class="facility-description">A welcoming common area where students can gather, wait between classes, and interact, providing a convenient space for everyday campus activities.</p>
             </div>
           </div>
         </div>

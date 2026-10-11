@@ -417,32 +417,6 @@
         }));
       };
 
-      // #region agent log
-      const agentLog = function (hypothesisId, message, data) {
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'469c94'},body:JSON.stringify({sessionId:'469c94',hypothesisId:hypothesisId,location:'office-history.blade.php:pagination',message:message,data:data,timestamp:Date.now()})}).catch(function () {});
-      };
-      const measurePager = function (phase) {
-        const card = pagination.closest('.office-archive-history-card');
-        const wrap = document.querySelector('.office-archive-wrap');
-        const firstRow = tbody.querySelector('tr');
-        const pagerStyle = window.getComputedStyle(pagination);
-        const cardStyle = card ? window.getComputedStyle(card) : null;
-        const wrapStyle = wrap ? window.getComputedStyle(wrap) : null;
-        const pagerRect = pagination.getBoundingClientRect();
-        const rowRect = firstRow ? firstRow.getBoundingClientRect() : null;
-        const overlap = rowRect ? !(pagerRect.bottom < rowRect.top || pagerRect.top > rowRect.bottom || pagerRect.right < rowRect.left || pagerRect.left > rowRect.right) : false;
-        agentLog(phase === 'before-render' ? 'D' : 'A', 'pager geometry ' + phase, {
-          phase: phase,
-          hidden: pagination.hidden,
-          htmlStart: (pagination.innerHTML || '').replace(/\s+/g, ' ').slice(0, 180),
-          pager: { top: Math.round(pagerRect.top), left: Math.round(pagerRect.left), width: Math.round(pagerRect.width), height: Math.round(pagerRect.height), position: pagerStyle.position, display: pagerStyle.display, overflow: pagerStyle.overflow, zIndex: pagerStyle.zIndex, flex: pagerStyle.flex },
-          card: cardStyle ? { height: Math.round(card.getBoundingClientRect().height), scrollHeight: card.scrollHeight, overflow: cardStyle.overflow, display: cardStyle.display } : null,
-          wrap: wrapStyle ? { height: Math.round(wrap.getBoundingClientRect().height), scrollHeight: wrap.scrollHeight, overflowY: wrapStyle.overflowY, flex: wrapStyle.flex, maxHeight: wrapStyle.maxHeight } : null,
-          rowCount: dataRows(tbody).length,
-          overlapFirstRow: overlap
-        });
-      };
-      // #endregion
       const renderPager = function (start, end, uiPage, uiPages) {
         const previous = uiPage > 1
           ? '<a href="' + uiPageUrl(uiPage - 1) + '" rel="prev">&laquo; Previous</a>'
@@ -457,9 +431,6 @@
           + '<div>' + previous + ' ' + next + '</div>'
           + '<p>Showing <span class="font-medium">' + start + '</span> to <span class="font-medium">' + end + '</span> of <span class="font-medium">' + total + '</span> results</p>'
           + '</nav>';
-        // #region agent log
-        requestAnimationFrame(function () { measurePager('after-render'); });
-        // #endregion
       };
 
       const uiPages = Math.ceil(total / UI_PAGE_SIZE);
@@ -468,18 +439,10 @@
       const start = total <= UI_PAGE_SIZE ? 1 : ((uiPage - 1) * UI_PAGE_SIZE) + 1;
       const end = total <= UI_PAGE_SIZE ? total : Math.min(uiPage * UI_PAGE_SIZE, total);
 
-      // #region agent log
-      measurePager('before-render');
-      agentLog('E', 'history page sizes', { total: total, serverPerPage: serverPerPage, serverPage: serverPage, uiPage: uiPage, start: start, end: end });
-      // #endregion
       rowsForRange(start, end).then(function (rows) {
         const expected = end - start + 1;
 
         if (rows.length < expected) {
-          // #region agent log
-          agentLog('D', 'pager left as server links', { rows: rows.length, expected: expected, total: total });
-          requestAnimationFrame(function () { measurePager('short-fetch'); });
-          // #endregion
           if (total <= UI_PAGE_SIZE) {
             pagination.hidden = false;
           }
@@ -495,11 +458,7 @@
         }
 
         renderPager(start, end, uiPage, uiPages);
-      }).catch(function (error) {
-        // #region agent log
-        agentLog('D', 'history row fetch failed', { error: String(error && error.message || error) });
-        requestAnimationFrame(function () { measurePager('fetch-failed'); });
-        // #endregion
+      }).catch(function () {
         if (total <= UI_PAGE_SIZE) {
           pagination.hidden = false;
         }
