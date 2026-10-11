@@ -81,6 +81,10 @@
       </header>
       <div class="inventory-confirm-body">
         <p id="inventory-confirm-message">Are you sure you want to perform this action? This action cannot be undone.</p>
+        <div class="inventory-confirm-targets" id="inventory-confirm-targets" hidden>
+          <p class="inventory-confirm-targets-label" id="inventory-confirm-targets-label">Which item was damaged?</p>
+          <div class="inventory-confirm-target-list" id="inventory-confirm-target-list"></div>
+        </div>
         <div class="inventory-confirm-proof" id="inventory-confirm-proof" hidden>
           <label class="inventory-confirm-proof-label" for="inventory-confirm-proof-input">
             Damage proof photo <span>(optional)</span>

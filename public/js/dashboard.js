@@ -2937,7 +2937,7 @@ function getRequestDecisionConfirmConfig(status) {
     case 'damaged':
       return {
         title: 'Confirm Damage',
-        message: 'Mark this request as damaged? You can attach a photo as proof. The photo is optional. This action cannot be undone.',
+        message: 'Mark this request as damaged? Choose the item that came back damaged. A photo is optional. This action cannot be undone.',
         confirmText: 'Damage',
         variant: 'danger',
         allowProof: true,
@@ -2952,8 +2952,11 @@ function getRequestDecisionConfirmConfig(status) {
   }
 }
 
-async function confirmRequestDecision(status) {
+async function confirmRequestDecision(status, damageTargets = []) {
   const config = getRequestDecisionConfirmConfig(status);
+  if (status === 'damaged') {
+    config.damageTargets = damageTargets;
+  }
   return openInventoryConfirmModal(config);
 }
 
@@ -3371,16 +3374,28 @@ async function submitReturnDecision(item, button, status) {
     return;
   }
 
-  const confirmation = await confirmRequestDecision(status);
+  let damageTargets = [];
+  if (status === 'damaged' && button.dataset.damageTargets) {
+    try {
+      const parsedTargets = JSON.parse(button.dataset.damageTargets);
+      damageTargets = Array.isArray(parsedTargets) ? parsedTargets : [];
+    } catch (error) {
+      damageTargets = [];
+    }
+  }
+
+  const confirmation = await confirmRequestDecision(status, damageTargets);
   const confirmed = confirmation === true || (confirmation && confirmation.confirmed === true);
   const proofFile = confirmation && confirmation.file instanceof File ? confirmation.file : null;
+  const damagedItemIds = confirmation && Array.isArray(confirmation.damagedItemIds) ? confirmation.damagedItemIds : [];
+  const damagedRoomIds = confirmation && Array.isArray(confirmation.damagedRoomIds) ? confirmation.damagedRoomIds : [];
   if (!confirmed) {
     return;
   }
 
   if (status === 'damaged') {
     // #region agent log
-    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2da69'},body:JSON.stringify({sessionId:'c2da69',location:'dashboard.js:submitReturnDecision',message:'damage proof choice',data:{hasFile:Boolean(proofFile),fileType:proofFile?proofFile.type:'',fileSize:proofFile?proofFile.size:0},timestamp:Date.now(),hypothesisId:'A',runId:'pre-fix'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2da69'},body:JSON.stringify({sessionId:'c2da69',location:'dashboard.js:submitReturnDecision',message:'damage proof choice',data:{hasFile:Boolean(proofFile),fileType:proofFile?proofFile.type:'',fileSize:proofFile?proofFile.size:0,itemCount:damagedItemIds.length,roomCount:damagedRoomIds.length},timestamp:Date.now(),hypothesisId:'A',runId:'pre-fix'})}).catch(()=>{});
     // #endregion
   }
 
@@ -3407,10 +3422,18 @@ async function submitReturnDecision(item, button, status) {
       if (status === 'damaged' && proofFile) {
         const formData = new FormData();
         formData.append('proof_photo', proofFile);
+        damagedItemIds.forEach((itemId) => formData.append('damaged_item_ids[]', String(itemId)));
+        damagedRoomIds.forEach((roomId) => formData.append('damaged_room_ids[]', String(roomId)));
         requestInit.method = 'POST';
         requestInit.body = formData;
       } else {
         requestHeaders['Content-Type'] = 'application/json';
+        if (status === 'damaged') {
+          requestInit.body = JSON.stringify({
+            damaged_item_ids: damagedItemIds,
+            damaged_room_ids: damagedRoomIds,
+          });
+        }
       }
 
       response = await fetch(`/request/${reservationId}/final-${action}`, requestInit);
@@ -4311,7 +4334,66 @@ function showSaveSuccessToast(message) {
 
 let damageProofPreviewUrl = '';
 
+function renderDamageTargets(targets) {
+  const wrap = document.getElementById('inventory-confirm-targets');
+  const list = document.getElementById('inventory-confirm-target-list');
+
+  if (!(wrap instanceof HTMLElement) || !(list instanceof HTMLElement)) {
+    return;
+  }
+
+  list.replaceChildren();
+  const rows = Array.isArray(targets) ? targets.filter((target) => target && Number(target.id) > 0) : [];
+
+  if (!rows.length) {
+    wrap.hidden = true;
+    return;
+  }
+
+  rows.forEach((target) => {
+    const label = document.createElement('label');
+    label.className = 'inventory-confirm-target';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = String(target.id);
+    input.dataset.targetType = target.type === 'room' ? 'room' : 'item';
+    input.checked = rows.length === 1;
+
+    const text = document.createElement('span');
+    text.textContent = String(target.label || 'Resource');
+
+    label.append(input, text);
+    list.append(label);
+  });
+
+  wrap.hidden = false;
+}
+
+function selectedDamageTargets() {
+  return Array.from(document.querySelectorAll('#inventory-confirm-target-list input[type="checkbox"]:checked'))
+    .filter((input) => input instanceof HTMLInputElement)
+    .map((input) => ({
+      type: input.dataset.targetType === 'room' ? 'room' : 'item',
+      id: Number.parseInt(input.value, 10),
+    }))
+    .filter((target) => target.id > 0);
+}
+
 function resetDamageProofField() {
+  const targetWrap = document.getElementById('inventory-confirm-targets');
+  const targetList = document.getElementById('inventory-confirm-target-list');
+  if (targetWrap) {
+    targetWrap.hidden = true;
+  }
+  if (targetList) {
+    targetList.replaceChildren();
+  }
+  const targetLabel = document.getElementById('inventory-confirm-targets-label');
+  if (targetLabel) {
+    targetLabel.textContent = 'Which item was damaged?';
+  }
+
   const proofWrap = document.getElementById('inventory-confirm-proof');
   const proofInput = document.getElementById('inventory-confirm-proof-input');
   const proofPreview = document.getElementById('inventory-confirm-proof-preview');
@@ -4372,6 +4454,7 @@ function openInventoryConfirmModal(options = {}) {
     confirmText = 'Delete',
     variant = 'delete',
     allowProof = false,
+    damageTargets = [],
   } = options;
 
   inventoryConfirmTitle.textContent = title;
@@ -4390,6 +4473,9 @@ function openInventoryConfirmModal(options = {}) {
   inventoryConfirmModal.dataset.confirmVariant = variant;
   inventoryConfirmModal.dataset.allowProof = allowProof ? '1' : '';
   resetDamageProofField();
+  if (allowProof) {
+    renderDamageTargets(damageTargets);
+  }
   const proofWrap = document.getElementById('inventory-confirm-proof');
   if (proofWrap) {
     proofWrap.hidden = !allowProof;
@@ -7805,7 +7891,22 @@ if (inventoryConfirmModal instanceof HTMLElement) {
           return;
         }
 
-        finalizeInventoryConfirm({ confirmed: true, file: proofFile || null });
+        const targetWrap = document.getElementById('inventory-confirm-targets');
+        const selectedTargets = selectedDamageTargets();
+        if (targetWrap instanceof HTMLElement && !targetWrap.hidden && selectedTargets.length === 0) {
+          const targetHint = document.getElementById('inventory-confirm-targets-label');
+          if (targetHint) {
+            targetHint.textContent = 'Choose at least one damaged item.';
+          }
+          return;
+        }
+
+        finalizeInventoryConfirm({
+          confirmed: true,
+          file: proofFile || null,
+          damagedItemIds: selectedTargets.filter((target) => target.type === 'item').map((target) => target.id),
+          damagedRoomIds: selectedTargets.filter((target) => target.type === 'room').map((target) => target.id),
+        });
         return;
       }
 

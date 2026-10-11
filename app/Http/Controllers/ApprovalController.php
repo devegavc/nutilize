@@ -425,6 +425,13 @@ class ApprovalController extends Controller
     public function finalDamagedReservation(Request $request, $reservationId)
     {
         $proofImageUrl = null;
+        $damageSelection = $this->damageSelectionFromRequest($request, (int) $reservationId);
+
+        if (is_array($damageSelection) && ($damageSelection['invalid'] ?? false) === true) {
+            return response()->json([
+                'error' => 'Choose at least one item that was damaged.',
+            ], 422);
+        }
 
         if ($request->hasFile('proof_photo')) {
             $request->validate([
@@ -451,6 +458,8 @@ class ApprovalController extends Controller
                 'data' => [
                     'hasFile' => $request->hasFile('proof_photo'),
                     'stored' => $proofImageUrl !== null,
+                    'itemCount' => is_array($damageSelection) ? count($damageSelection['items'] ?? []) : null,
+                    'roomCount' => is_array($damageSelection) ? count($damageSelection['rooms'] ?? []) : null,
                 ],
                 'timestamp' => (int) round(microtime(true) * 1000),
             ]).PHP_EOL, FILE_APPEND);
@@ -458,7 +467,76 @@ class ApprovalController extends Controller
         }
         // #endregion
 
-        return $this->finalizePhysicalFacilitiesDecision($reservationId, 'damaged', $proofImageUrl);
+        return $this->finalizePhysicalFacilitiesDecision($reservationId, 'damaged', $proofImageUrl, $damageSelection);
+    }
+
+    /**
+     * @return array{items: array<int, int>, rooms: array<int, int>, invalid?: bool}|null
+     */
+    private function damageSelectionFromRequest(Request $request, int $reservationId): ?array
+    {
+        if (!$request->exists('damaged_item_ids') && !$request->exists('damaged_room_ids')) {
+            return null;
+        }
+
+        $itemIds = collect($request->input('damaged_item_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        $roomIds = collect($request->input('damaged_room_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        $allowed = $this->reservationResourceIds($reservationId);
+        $itemIds = array_values(array_intersect($itemIds, $allowed['items']));
+        $roomIds = array_values(array_intersect($roomIds, $allowed['rooms']));
+
+        if ($itemIds === [] && $roomIds === [] && ($allowed['items'] !== [] || $allowed['rooms'] !== [])) {
+            return ['items' => [], 'rooms' => [], 'invalid' => true];
+        }
+
+        return ['items' => $itemIds, 'rooms' => $roomIds];
+    }
+
+    /**
+     * @return array{items: array<int, int>, rooms: array<int, int>}
+     */
+    private function reservationResourceIds(int $reservationId): array
+    {
+        $itemIds = [];
+        $roomIds = [];
+
+        if (Schema::hasTable('reservation_details') && Schema::hasTable('reservation_items') && Schema::hasTable('items')) {
+            $itemIds = DB::table('reservation_details as details')
+                ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
+                ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+                ->where('details.reservation_id', $reservationId)
+                ->pluck('items.item_id')
+                ->map(fn ($itemId) => (int) $itemId)
+                ->filter(fn ($itemId) => $itemId > 0)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        if (Schema::hasTable('reservation_details') && Schema::hasTable('reservation_rooms') && Schema::hasTable('rooms')) {
+            $roomIds = DB::table('reservation_details as details')
+                ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+                ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+                ->where('details.reservation_id', $reservationId)
+                ->pluck('rooms.room_id')
+                ->map(fn ($roomId) => (int) $roomId)
+                ->filter(fn ($roomId) => $roomId > 0)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return ['items' => $itemIds, 'rooms' => $roomIds];
     }
 
     private function storeDamageProofPhoto(UploadedFile $file): ?string
@@ -523,7 +601,7 @@ class ApprovalController extends Controller
         return $proofUrl ?? null;
     }
 
-    private function finalizePhysicalFacilitiesDecision($reservationId, string $status, ?string $proofImageUrl = null)
+    private function finalizePhysicalFacilitiesDecision($reservationId, string $status, ?string $proofImageUrl = null, ?array $damageSelection = null)
     {
         try {
             $user = Auth::user();
@@ -600,11 +678,11 @@ class ApprovalController extends Controller
             $this->forgetActionableOfficeCache((int) $reservation->reservation_id);
 
             $finalReservationId = (int) $reservation->reservation_id;
-            dispatch(function () use ($finalReservationId, $status, $proofImageUrl) {
+            dispatch(function () use ($finalReservationId, $status, $proofImageUrl, $damageSelection) {
                 try {
                     /** @var self $self */
                     $self = app(self::class);
-                    $self->runFinalDecisionSideEffects($finalReservationId, $status, $proofImageUrl);
+                    $self->runFinalDecisionSideEffects($finalReservationId, $status, $proofImageUrl, $damageSelection);
                 } catch (Throwable $throwable) {
                     report($throwable);
                 }
@@ -633,7 +711,7 @@ class ApprovalController extends Controller
     /**
      * Inventory / notification work after a PF final decision. Public for afterResponse.
      */
-    public function runFinalDecisionSideEffects(int $reservationId, string $status, ?string $proofImageUrl = null): void
+    public function runFinalDecisionSideEffects(int $reservationId, string $status, ?string $proofImageUrl = null, ?array $damageSelection = null): void
     {
         $reservation = Reservation::query()->find($reservationId);
         if (!$reservation) {
@@ -645,8 +723,14 @@ class ApprovalController extends Controller
         }
 
         if ($status === 'damaged') {
-            $this->applyReservationDamageToMaintenance($reservation);
-            $this->createDamageReportsForReservation($reservation, $proofImageUrl);
+            $this->applyReservationDamageToMaintenance($reservation, $damageSelection);
+            $this->createDamageReportsForReservation($reservation, $proofImageUrl, $damageSelection);
+            if (is_array($damageSelection)) {
+                $allowed = $this->reservationResourceIds($reservationId);
+                $releaseItems = array_values(array_diff($allowed['items'], $damageSelection['items'] ?? []));
+                $releaseRooms = array_values(array_diff($allowed['rooms'], $damageSelection['rooms'] ?? []));
+                $this->releaseReservationInventory($reservationId, $releaseItems, $releaseRooms);
+            }
         }
 
         if ($status === 'approved') {
@@ -960,7 +1044,7 @@ class ApprovalController extends Controller
         return $this->pickUnitsForReservationUsage($itemId, $quantity, Reservation::query()->find($reservationId));
     }
 
-    private function releaseReservationInventory(int $reservationId): void
+    private function releaseReservationInventory(int $reservationId, ?array $onlyItemIds = null, ?array $onlyRoomIds = null): void
     {
         $itemIdsToSync = [];
 
@@ -978,6 +1062,10 @@ class ApprovalController extends Controller
                 $itemId = (int) $row->item_id;
 
                 if ($unitId <= 0 || $itemId <= 0) {
+                    continue;
+                }
+
+                if (is_array($onlyItemIds) && !in_array($itemId, $onlyItemIds, true)) {
                     continue;
                 }
 
@@ -1003,6 +1091,9 @@ class ApprovalController extends Controller
                 ->join('reservation_items as ri', 'ri.reservation_items_id', '=', 'details.reservation_items_id')
                 ->join('items as items', 'items.item_id', '=', 'ri.item_id')
                 ->where('details.reservation_id', $reservationId)
+                ->when(is_array($onlyItemIds), function ($query) use ($onlyItemIds) {
+                    $query->whereIn('items.item_id', $onlyItemIds === [] ? [0] : $onlyItemIds);
+                })
                 ->select(['items.item_id', DB::raw('SUM(GREATEST(details.quantity, 1)) as qty')])
                 ->groupBy('items.item_id')
                 ->get();
@@ -1028,6 +1119,10 @@ class ApprovalController extends Controller
                 ->filter(fn ($roomId) => !is_null($roomId))
                 ->map(fn ($roomId) => (int) $roomId)
                 ->unique()
+                ->when(is_array($onlyRoomIds), function ($roomIds) use ($onlyRoomIds) {
+                    return $roomIds->intersect($onlyRoomIds);
+                })
+                ->values()
                 ->all();
 
             if (!empty($roomIds)) {
@@ -1041,7 +1136,7 @@ class ApprovalController extends Controller
         }
     }
 
-    private function applyReservationDamageToMaintenance(Reservation $reservation): void
+    private function applyReservationDamageToMaintenance(Reservation $reservation, ?array $damageSelection = null): void
     {
         if (!Schema::hasTable('reservation_details')) {
             return;
@@ -1060,6 +1155,13 @@ class ApprovalController extends Controller
                 ];
             })
             ->filter(fn ($row) => $row['item_id'] > 0)
+            ->filter(function ($row) use ($damageSelection) {
+                if (!is_array($damageSelection)) {
+                    return true;
+                }
+
+                return in_array($row['item_id'], $damageSelection['items'] ?? [], true);
+            })
             ->values()
             ->all();
 
@@ -1117,6 +1219,10 @@ class ApprovalController extends Controller
                 ->map(fn ($roomId) => (int) $roomId)
                 ->all();
 
+            if (is_array($damageSelection)) {
+                $roomIds = array_values(array_intersect($roomIds, $damageSelection['rooms'] ?? []));
+            }
+
             if (!empty($roomIds)) {
                 DB::table('rooms')
                     ->whereIn('room_id', $roomIds)
@@ -1159,7 +1265,7 @@ class ApprovalController extends Controller
         }
     }
 
-    private function createDamageReportsForReservation(Reservation $reservation, ?string $proofImageUrl = null): void
+    private function createDamageReportsForReservation(Reservation $reservation, ?string $proofImageUrl = null, ?array $damageSelection = null): void
     {
         if (!Schema::hasTable('reports')) {
             return;
@@ -1184,6 +1290,9 @@ class ApprovalController extends Controller
             ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
             ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
             ->where('details.reservation_id', $reservation->reservation_id)
+            ->when(is_array($damageSelection), function ($query) use ($damageSelection) {
+                $query->whereIn('items.item_id', ($damageSelection['items'] ?? []) === [] ? [0] : $damageSelection['items']);
+            })
             ->whereNotNull('items.item_id')
             ->distinct()
             ->pluck('items.item_id')
@@ -1199,6 +1308,9 @@ class ApprovalController extends Controller
             ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
             ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
             ->where('details.reservation_id', $reservation->reservation_id)
+            ->when(is_array($damageSelection), function ($query) use ($damageSelection) {
+                $query->whereIn('rooms.room_id', ($damageSelection['rooms'] ?? []) === [] ? [0] : $damageSelection['rooms']);
+            })
             ->whereNotNull('rooms.room_id')
             ->distinct()
             ->pluck('rooms.room_id')

@@ -88,11 +88,23 @@
                   data-confirm-text="Return">
             Returned
           </button>
+          @php
+            $damageTargets = collect($requestData['resources'] ?? [])
+                ->filter(fn ($resource) => (int) ($resource['target_id'] ?? 0) > 0)
+                ->map(fn ($resource) => [
+                    'type' => ($resource['target_type'] ?? '') === 'room' ? 'room' : 'item',
+                    'id' => (int) $resource['target_id'],
+                    'label' => ((int) ($resource['quantity'] ?? 1)).' x '.($resource['label'] ?? 'Resource'),
+                ])
+                ->unique(fn ($resource) => $resource['type'].'-'.$resource['id'])
+                ->values();
+          @endphp
           <button class="damage-btn confirm-action-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="damaged"
                   data-confirm-title="Confirm Damage"
-                  data-confirm-message="Mark this request as damaged? You can attach a photo as proof. The photo is optional. This action cannot be undone."
+                  data-confirm-message="Mark this request as damaged? Choose the item that came back damaged. A photo is optional. This action cannot be undone."
                   data-confirm-text="Damage"
-                  data-confirm-variant="danger">
+                  data-confirm-variant="danger"
+                  data-damage-targets="{{ e($damageTargets->toJson()) }}">
             Damaged
           </button>
         @elseif($requestData['tab'] === 'final')

@@ -219,7 +219,9 @@ class DashboardRequestController extends Controller
             ->select([
                 'details.reservation_id',
                 'details.quantity',
+                'rooms.room_id',
                 'rooms.room_number',
+                'items.item_id',
                 'items.item_name',
             ])
             ->get();
@@ -231,10 +233,14 @@ class DashboardRequestController extends Controller
             $name = $isRoom ? ('Room ' . $row->room_number) : ($row->item_name ?? 'Resource');
             $quantity = max(1, (int) $row->quantity);
 
+            $targetId = $isRoom ? (int) ($row->room_id ?? 0) : (int) ($row->item_id ?? 0);
+
             $resourceMap[$row->reservation_id][] = [
                 'label' => $name,
                 'icon' => $isRoom ? 'bi-house-door-fill' : 'bi-box-seam',
                 'quantity' => $quantity,
+                'target_type' => $isRoom ? 'room' : 'item',
+                'target_id' => $targetId,
             ];
         }
 
