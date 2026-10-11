@@ -539,6 +539,54 @@ class ApprovalController extends Controller
         return ['items' => $itemIds, 'rooms' => $roomIds];
     }
 
+    /**
+     * @param  array{items?: array<int, int>, rooms?: array<int, int>}  $damageSelection
+     */
+    private function damageItemNote(int $reservationId, array $damageSelection): ?string
+    {
+        $labels = [];
+
+        $itemIds = $damageSelection['items'] ?? [];
+        if ($itemIds !== [] && Schema::hasTable('items')) {
+            $names = DB::table('reservation_details as details')
+                ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
+                ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+                ->where('details.reservation_id', $reservationId)
+                ->whereIn('items.item_id', $itemIds)
+                ->orderBy('items.item_name')
+                ->pluck('items.item_name');
+
+            foreach ($names as $name) {
+                $label = trim((string) $name);
+                if ($label !== '') {
+                    $labels[$label] = $label;
+                }
+            }
+        }
+
+        $roomIds = $damageSelection['rooms'] ?? [];
+        if ($roomIds !== [] && Schema::hasTable('rooms')) {
+            $numbers = DB::table('reservation_details as details')
+                ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+                ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+                ->where('details.reservation_id', $reservationId)
+                ->whereIn('rooms.room_id', $roomIds)
+                ->orderBy('rooms.room_number')
+                ->pluck('rooms.room_number');
+
+            foreach ($numbers as $number) {
+                $label = 'Room '.trim((string) $number);
+                $labels[$label] = $label;
+            }
+        }
+
+        if ($labels === []) {
+            return null;
+        }
+
+        return mb_substr('Damaged: '.implode(', ', array_values($labels)), 0, 500);
+    }
+
     private function storeDamageProofPhoto(UploadedFile $file): ?string
     {
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
@@ -615,26 +663,53 @@ class ApprovalController extends Controller
             $physicalFacilitiesOfficeId = $this->getPhysicalFacilitiesOfficeId();
             $now = now();
             $approvedAt = ApprovalClock::now();
+            $damageNote = ($status === 'damaged' && is_array($damageSelection))
+                ? $this->damageItemNote((int) $reservation->reservation_id, $damageSelection)
+                : null;
+
+            // #region agent log
+            try {
+                file_put_contents(base_path('debug-c2da69.log'), json_encode([
+                    'sessionId' => 'c2da69',
+                    'runId' => 'post-fix',
+                    'hypothesisId' => 'D',
+                    'location' => 'ApprovalController.php:finalizePhysicalFacilitiesDecision',
+                    'message' => 'damaged item note',
+                    'data' => [
+                        'noteSaved' => is_string($damageNote) && $damageNote !== '',
+                        'selectedItemCount' => is_array($damageSelection) ? count($damageSelection['items'] ?? []) : null,
+                        'selectedRoomCount' => is_array($damageSelection) ? count($damageSelection['rooms'] ?? []) : null,
+                    ],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ]).PHP_EOL, FILE_APPEND);
+            } catch (Throwable $throwable) {
+            }
+            // #endregion
 
             // Keep the hot path to status + PF approval row only.
             // Return/damage inventory work and notifications run after the response.
-            DB::transaction(function () use ($reservation, $physicalFacilitiesOfficeId, $status, $user, $now, $approvedAt) {
+            DB::transaction(function () use ($reservation, $physicalFacilitiesOfficeId, $status, $user, $now, $approvedAt, $damageNote) {
                 $reservation->update(['overall_status' => $status]);
 
                 if (is_null($physicalFacilitiesOfficeId)) {
                     return;
                 }
 
+                $approvalUpdate = [
+                    'status' => $status,
+                    'approved_at' => $approvedAt,
+                    'approved_by_user_id' => (int) $user->user_id,
+                    'updated_at' => $now,
+                ];
+                if (is_string($damageNote) && $damageNote !== '' && Schema::hasColumn('reservation_approvals', 'rejection_reason')) {
+                    $approvalUpdate['rejection_reason'] = $damageNote;
+                }
+
                 DB::table('reservation_approvals')
                     ->where('reservation_id', $reservation->reservation_id)
                     ->where('office_id', $physicalFacilitiesOfficeId)
                     ->whereNull('approved_at')
-                    ->update([
-                        'status' => $status,
-                        'approved_at' => $approvedAt,
-                        'approved_by_user_id' => (int) $user->user_id,
-                        'updated_at' => $now,
-                    ]);
+                    ->update($approvalUpdate);
 
                 $pfApproval = DB::table('reservation_approvals')
                     ->where('reservation_id', $reservation->reservation_id)
@@ -643,26 +718,17 @@ class ApprovalController extends Controller
                     ->first();
 
                 if (!$pfApproval) {
-                    $approvalId = (int) DB::table('reservation_approvals')->insertGetId([
+                    $approvalId = (int) DB::table('reservation_approvals')->insertGetId(array_merge($approvalUpdate, [
                         'reservation_id' => $reservation->reservation_id,
                         'office_id' => $physicalFacilitiesOfficeId,
-                        'status' => $status,
-                        'approved_at' => $approvedAt,
-                        'approved_by_user_id' => (int) $user->user_id,
                         'created_at' => $now,
-                        'updated_at' => $now,
-                    ]);
+                    ]));
                 } else {
                     $approvalId = (int) $pfApproval->approval_id;
 
                     DB::table('reservation_approvals')
                         ->where('approval_id', $approvalId)
-                        ->update([
-                            'status' => $status,
-                            'approved_at' => $approvedAt,
-                            'approved_by_user_id' => (int) $user->user_id,
-                            'updated_at' => $now,
-                        ]);
+                        ->update($approvalUpdate);
                 }
 
                 $this->upsertApprovalHistory(
@@ -694,7 +760,7 @@ class ApprovalController extends Controller
                     'approved' => 'Request approved successfully.',
                     'rejected' => 'Request rejected.',
                     'returned' => 'Request marked as returned.',
-                    'damaged' => 'Request marked as damaged.',
+                    'damaged' => $damageNote ?: 'Request marked as damaged.',
                     default => 'Request updated successfully.',
                 },
                 'reservation_id' => $reservation->reservation_id,
@@ -1300,8 +1366,24 @@ class ApprovalController extends Controller
             ->map(fn ($itemId) => (int) $itemId)
             ->all();
 
+        $itemNames = $itemIds === []
+            ? collect()
+            : DB::table('items')->whereIn('item_id', $itemIds)->pluck('item_name', 'item_id');
+
         foreach ($itemIds as $itemId) {
-            DB::table('reports')->insert(array_merge($reportBase, ['item_id' => $itemId, 'room_id' => null]));
+            $itemName = trim((string) ($itemNames[$itemId] ?? 'Item'));
+            $reportRow = array_merge($reportBase, [
+                'item_id' => $itemId,
+                'room_id' => null,
+                'report_info' => mb_substr(sprintf('Reservation #%s: %s marked damaged by Physical Facilities.', $reservation->reservation_id, $itemName), 0, 255),
+            ]);
+            if (Schema::hasColumn('reports', 'reservation_id')) {
+                $reportRow['reservation_id'] = (int) $reservation->reservation_id;
+            }
+            if (Schema::hasColumn('reports', 'description')) {
+                $reportRow['description'] = $itemName.' was marked damaged.';
+            }
+            DB::table('reports')->insert($reportRow);
         }
 
         $roomIds = DB::table('reservation_details as details')
@@ -1318,11 +1400,27 @@ class ApprovalController extends Controller
             ->map(fn ($roomId) => (int) $roomId)
             ->all();
 
+        $roomNumbers = $roomIds === []
+            ? collect()
+            : DB::table('rooms')->whereIn('room_id', $roomIds)->pluck('room_number', 'room_id');
+
         foreach ($roomIds as $roomId) {
-            DB::table('reports')->insert(array_merge($reportBase, ['item_id' => null, 'room_id' => $roomId]));
+            $roomLabel = 'Room '.trim((string) ($roomNumbers[$roomId] ?? $roomId));
+            $reportRow = array_merge($reportBase, [
+                'item_id' => null,
+                'room_id' => $roomId,
+                'report_info' => mb_substr(sprintf('Reservation #%s: %s marked damaged by Physical Facilities.', $reservation->reservation_id, $roomLabel), 0, 255),
+            ]);
+            if (Schema::hasColumn('reports', 'reservation_id')) {
+                $reportRow['reservation_id'] = (int) $reservation->reservation_id;
+            }
+            if (Schema::hasColumn('reports', 'description')) {
+                $reportRow['description'] = $roomLabel.' was marked damaged.';
+            }
+            DB::table('reports')->insert($reportRow);
         }
 
-        if (empty($itemIds) && empty($roomIds)) {
+        if ($damageSelection === null && empty($itemIds) && empty($roomIds)) {
             DB::table('reports')->insert(array_merge($reportBase, ['item_id' => null, 'room_id' => null]));
         }
     }

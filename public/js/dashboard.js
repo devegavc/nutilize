@@ -2937,7 +2937,7 @@ function getRequestDecisionConfirmConfig(status) {
     case 'damaged':
       return {
         title: 'Confirm Damage',
-        message: 'Mark this request as damaged? Choose the item that came back damaged. A photo is optional. This action cannot be undone.',
+        message: 'Choose the damaged item. Only the items you check are recorded as damaged. A photo is optional.',
         confirmText: 'Damage',
         variant: 'danger',
         allowProof: true,
@@ -3468,7 +3468,7 @@ async function submitReturnDecision(item, button, status) {
       status === 'returned' ? { badgeLabel: 'Returned' } : { badgeLabel: 'Damaged' },
     );
     showRequestDecisionToast(
-      status === 'returned' ? 'Request marked as returned.' : 'Request marked as damaged.',
+      status === 'returned' ? 'Request marked as returned.' : (data.message || 'Request marked as damaged.'),
       status === 'returned' ? 'approved' : 'rejected',
     );
     await refreshRequestListSafely();

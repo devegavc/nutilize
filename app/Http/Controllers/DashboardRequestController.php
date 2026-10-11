@@ -165,6 +165,12 @@ class DashboardRequestController extends Controller
                 && !$isWaitingReturn
                 && !$isClosed;
             $resources = $resourceMap[$reservation->reservation_id] ?? [];
+            $damagedItemNote = '';
+            if ($overallStatus === 'damaged') {
+                $damagedItemNote = collect($reservation->approvals ?? [])
+                    ->map(fn ($approval) => trim((string) ($approval->rejection_reason ?? '')))
+                    ->first(fn ($note) => str_starts_with($note, 'Damaged:')) ?? '';
+            }
             $currentActionableOfficeId = $actionableOfficeIds[(int) $reservation->reservation_id] ?? null;
             $workflow = $this->buildWorkflowForReservation($reservation, $currentActionableOfficeId);
             $workflowSteps = collect($workflow['steps']);
@@ -183,6 +189,7 @@ class DashboardRequestController extends Controller
                 'workflow_steps' => $workflow['steps'],
                 'current_stage_label' => $currentStageLabel,
                 'resources' => $resources,
+                'damaged_item_note' => $damagedItemNote,
                 'decision_badge' => $tab === 'return'
                     ? 'Waiting Return'
                     : ($tab === 'closed' ? ucfirst($overallStatus) : ($tab === 'rejected' ? 'Rejected' : (!$isFinal ? 'Pending' : 'Final Review'))),

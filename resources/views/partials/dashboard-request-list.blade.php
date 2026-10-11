@@ -80,6 +80,9 @@
           <span><i class="bi bi-box-seam"></i> No resources listed</span>
         @endforelse
       </div>
+      @if(($requestData['damaged_item_note'] ?? '') !== '')
+        <p class="request-damage-note">{{ $requestData['damaged_item_note'] }}</p>
+      @endif
       <div class="request-action-stack">
         @if($requestData['tab'] === 'return')
           <button class="return-btn confirm-action-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="returned"
@@ -101,7 +104,7 @@
           @endphp
           <button class="damage-btn confirm-action-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="damaged"
                   data-confirm-title="Confirm Damage"
-                  data-confirm-message="Mark this request as damaged? Choose the item that came back damaged. A photo is optional. This action cannot be undone."
+                  data-confirm-message="Choose the damaged item. Only the items you check are recorded as damaged. A photo is optional."
                   data-confirm-text="Damage"
                   data-confirm-variant="danger"
                   data-damage-targets="{{ e($damageTargets->toJson()) }}">
@@ -128,7 +131,7 @@
           {{ $requesterName }}'s request
           {{ $displayBadge === 'Pending' ? 'is pending' : ($displayBadge === 'Waiting Return' ? 'is waiting for return' : 'has been ' . strtolower($displayBadge)) }}
         </p>
-        <p class="request-decision-text"></p>
+        <p class="request-decision-text">{{ $requestData['damaged_item_note'] ?? '' }}</p>
         <span class="request-decision-badge">{{ $displayBadge }}</span>
       </div>
     </div>
