@@ -537,15 +537,6 @@ class OfficeRequestController extends Controller
                 $actionableOfficeId,
                 $pfOfficeId,
             );
-
-            if (!is_null($pfOfficeId)) {
-                ReservationApprovalNotifier::notifyOfficeIfRelevant(
-                    $reservation,
-                    (int) $pfOfficeId,
-                    $actionableOfficeId,
-                    $pfOfficeId,
-                );
-            }
         }
     }
 

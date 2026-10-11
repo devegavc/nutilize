@@ -2371,50 +2371,20 @@ class ApprovalController extends Controller
     }
 
     /**
-     * PF Home "Pending Final Approvals" plus open PF approval rows.
-     * Uses TRIM/case-insensitive status so "Pending Approval" matches the dashboard count.
+     * Reservations that are Physical Facilities' turn to approve.
+     * Earlier offices still show on the home list and do not create a PF alert.
      *
      * @return array<int, int>
      */
     private function pendingFinalReservationIdsForPhysicalFacilities(int $pfOfficeId, int $limit): array
     {
-        $awaitingIds = Reservation::query()
+        return Reservation::query()
             ->whereRaw("LOWER(TRIM(COALESCE(overall_status, ''))) = ?", ['awaiting_physical_facilities'])
             ->orderByDesc('created_at')
             ->limit($limit)
             ->pluck('reservation_id')
             ->map(fn ($id) => (int) $id)
             ->all();
-
-        $pendingApprovalIds = [];
-        if ($pfOfficeId > 0) {
-            $query = ReservationApproval::query()
-                ->join('reservations', 'reservations.reservation_id', '=', 'reservation_approvals.reservation_id')
-                ->where('reservation_approvals.office_id', $pfOfficeId)
-                ->whereNull('reservation_approvals.approved_at')
-                ->whereRaw("LOWER(TRIM(COALESCE(reservations.overall_status, ''))) IN (?, ?, ?)", [
-                    'awaiting_physical_facilities',
-                    'pending approval',
-                    'pending_office_approvals',
-                ]);
-
-            \App\Support\OpenReservationScope::apply($query, 'reservations.overall_status');
-
-            $pendingApprovalIds = $query
-                ->orderByDesc('reservations.created_at')
-                ->limit($limit)
-                ->pluck('reservation_approvals.reservation_id')
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values()
-                ->all();
-        }
-
-        return array_values(array_unique(array_slice(
-            array_merge($awaitingIds, $pendingApprovalIds),
-            0,
-            $limit
-        )));
     }
 
     private function formatNotificationTime(mixed $createdAt): string
@@ -2653,6 +2623,29 @@ class ApprovalController extends Controller
         }
 
         $staleIds = array_values(array_unique(array_filter($staleIds)));
+        // #region agent log
+        try {
+            $staleStatuses = [];
+            foreach ($staleIds as $staleId) {
+                $status = strtolower(trim((string) ($reservations->get($staleId)->overall_status ?? 'missing')));
+                $staleStatuses[$status] = ($staleStatuses[$status] ?? 0) + 1;
+            }
+            file_put_contents(base_path('debug-c2da69.log'), json_encode([
+                'sessionId' => 'c2da69',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'D',
+                'location' => 'ApprovalController.php:pruneStaleApprovalNotificationsForUser',
+                'message' => 'pf alerts pruned before their turn',
+                'data' => [
+                    'staleCount' => count($staleIds),
+                    'staleStatuses' => $staleStatuses,
+                    'isPf' => $user->isPhysicalFacilitiesAdmin(),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]).PHP_EOL, FILE_APPEND);
+        } catch (Throwable $throwable) {
+        }
+        // #endregion
         if ($staleIds === []) {
             return;
         }

@@ -139,9 +139,8 @@ class ReservationApprovalNotifier
     }
 
     /**
-     * Notify admins in $officeId when that office should be alerted:
-     * - it is the current actionable approver, or
-     * - it is the Physical Facilities office (PF visibility across requests).
+     * Notify admins in $officeId only when that office is the current approver.
+     * Requests still with another office stay on the PF home list and are not alerted yet.
      * Skips users who already have an unread/read row for this reservation and type (idempotent).
      */
     public static function notifyOfficeIfRelevant(
@@ -159,8 +158,7 @@ class ReservationApprovalNotifier
         $actionableOfficeId = !is_null($actionableOfficeId) ? (int) $actionableOfficeId : null;
         $pfOfficeId = !is_null($pfOfficeId) ? (int) $pfOfficeId : null;
 
-        $shouldNotify = ($actionableOfficeId !== null && $officeId === $actionableOfficeId)
-            || ($pfOfficeId !== null && $officeId === $pfOfficeId);
+        $shouldNotify = $actionableOfficeId !== null && $officeId === $actionableOfficeId;
 
         if (!$shouldNotify) {
             return;
