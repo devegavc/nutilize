@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\UserAccountStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
@@ -15,6 +16,43 @@ class LoginController extends Controller
     private const LOGIN_MAX_ATTEMPTS = 5;
 
     private const LOGIN_DECAY_SECONDS = 300;
+
+    public function showPrivacyNotice(): View
+    {
+        return view('data-privacy');
+    }
+
+    public function acceptPrivacyNotice(Request $request): RedirectResponse
+    {
+        $agreed = $request->boolean('privacy_agreement');
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-c2da69.log'), json_encode([
+                'sessionId' => 'c2da69',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'B',
+                'location' => 'LoginController.php:acceptPrivacyNotice',
+                'message' => 'privacy agreement submit',
+                'data' => [
+                    'agreed' => $agreed,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]).PHP_EOL, FILE_APPEND);
+        } catch (\Throwable $throwable) {
+        }
+        // #endregion
+
+        $request->validate([
+            'privacy_agreement' => ['accepted'],
+        ], [
+            'privacy_agreement.accepted' => 'Check the box to agree to the NUtilize Data Privacy Notice before continuing.',
+        ]);
+
+        $request->session()->put('nutilize_privacy_accepted', true);
+
+        return redirect()->route('login');
+    }
 
     public function authenticate(Request $request): RedirectResponse
     {

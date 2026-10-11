@@ -26,10 +26,19 @@ Route::view('/', 'index')
     ->name('index')
     ->middleware(['redirect.authenticated', 'cache.headers:private;no_cache']);
 
+Route::get('/data-privacy', [LoginController::class, 'showPrivacyNotice'])
+    ->name('data-privacy')
+    ->middleware('redirect.authenticated');
+Route::post('/data-privacy', [LoginController::class, 'acceptPrivacyNotice'])
+    ->name('data-privacy.accept')
+    ->middleware('redirect.authenticated');
+
 Route::view('/login', 'login')
     ->name('login')
-    ->middleware('redirect.authenticated');
-Route::post('/login', [LoginController::class, 'authenticate'])->name('login.authenticate');
+    ->middleware(['redirect.authenticated', 'privacy.accepted']);
+Route::post('/login', [LoginController::class, 'authenticate'])
+    ->name('login.authenticate')
+    ->middleware('privacy.accepted');
 
 Route::get('/register', [RegisterController::class, 'create'])->name('register');
 Route::post('/register', [RegisterController::class, 'store'])->name('register.store');

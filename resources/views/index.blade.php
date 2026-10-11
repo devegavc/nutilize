@@ -45,7 +45,7 @@
         <a href="#facilities" class="nav-link">Facilities</a>
         <a href="#about" class="nav-link">About</a>
         <a href="#contact" class="nav-link">Contact</a>
-        <a href="/login" class="login-btn">Login</a>
+        <a href="/data-privacy" class="login-btn">Login</a>
       </nav>
     </div>
   </header>
@@ -74,7 +74,7 @@
       </div>
 
       <div class="hero-actions">
-        <a href="/login" class="cta-btn">Get Started</a>
+        <a href="/data-privacy" class="cta-btn">Get Started</a>
         <a
           href="https://play.google.com/apps/internaltest/4701385867618457904"
           class="cta-btn cta-btn-secondary"

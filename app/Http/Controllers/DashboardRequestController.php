@@ -194,6 +194,56 @@ class DashboardRequestController extends Controller
 
         $reservations->setCollection($preparedRequests);
 
+        // #region agent log
+        try {
+            $rejectedRows = $preparedRequests->where('tab', 'rejected')->take(12);
+            $rejectedIds = $rejectedRows->map(fn ($row) => (int) $row['reservation']->reservation_id)->values()->all();
+            $dbReasons = $rejectedIds === []
+                ? collect()
+                : DB::table('reservation_approvals')
+                    ->whereIn('reservation_id', $rejectedIds)
+                    ->get(['approval_id', 'reservation_id', 'office_id', 'status', 'rejection_reason']);
+            $loaded = $rejectedRows->map(function ($row) {
+                $reservation = $row['reservation'];
+                $approvals = collect($reservation->approvals ?? []);
+
+                return [
+                    'reservation_id' => (int) $reservation->reservation_id,
+                    'overall_status' => strtolower((string) $reservation->overall_status),
+                    'approval_count' => $approvals->count(),
+                    'loaded' => $approvals->map(fn ($approval) => [
+                        'approval_id' => (int) $approval->approval_id,
+                        'office_id' => (int) $approval->office_id,
+                        'status' => strtolower((string) ($approval->status ?? '')),
+                        'reason_in_attributes' => array_key_exists('rejection_reason', $approval->getAttributes()),
+                        'reason_length' => mb_strlen(trim((string) ($approval->rejection_reason ?? ''))),
+                    ])->values()->all(),
+                ];
+            })->values()->all();
+            file_put_contents(base_path('debug-02a19c.log'), json_encode([
+                'sessionId' => '02a19c',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'A-B-C-E',
+                'location' => 'DashboardRequestController.php:rejectedRemarks',
+                'message' => 'loaded approvals vs stored rejection reasons',
+                'data' => [
+                    'column_exists' => Schema::hasColumn('reservation_approvals', 'rejection_reason'),
+                    'rejected_on_page' => count($rejectedIds),
+                    'loaded' => $loaded,
+                    'database' => $dbReasons->map(fn ($row) => [
+                        'approval_id' => (int) $row->approval_id,
+                        'reservation_id' => (int) $row->reservation_id,
+                        'office_id' => (int) $row->office_id,
+                        'status' => strtolower((string) ($row->status ?? '')),
+                        'reason_length' => mb_strlen(trim((string) ($row->rejection_reason ?? ''))),
+                    ])->values()->all(),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
+        } catch (\Throwable $throwable) {
+        }
+        // #endregion
+
         return [
             'finalRequests' => $preparedRequests->where('tab', 'final')->values(),
             'returnRequests' => $preparedRequests->where('tab', 'return')->values(),
