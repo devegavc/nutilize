@@ -13,7 +13,7 @@
         crossorigin="anonymous">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/css/auth.css?v=privacy-1">
+  <link rel="stylesheet" href="/css/auth.css?v=20261011">
 </head>
 <body class="login-page privacy-page">
 
@@ -23,7 +23,9 @@
         <div class="brand-area text-center">
           <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}"
                alt="NUtilize"
-               class="brand-logo">
+               class="brand-logo"
+               width="168"
+               height="56">
           <p class="brand-subtitle">
             Campus Resource & Reservation Management System
           </p>

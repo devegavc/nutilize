@@ -81,7 +81,7 @@ class DashboardRequestController extends Controller
         $reservationsQuery = Reservation::query()
             ->with([
                 'user:user_id,first_name,middle_initial,last_name,suffix,full_name,username,email,phone_number,contact_number',
-                'approvals:approval_id,reservation_id,office_id,owner_id,status,approved_at',
+                'approvals:approval_id,reservation_id,office_id,owner_id,status,rejection_reason,approved_at',
             ])
             ->orderByDesc('created_at');
 
@@ -127,7 +127,7 @@ class DashboardRequestController extends Controller
 
         if ($didSync) {
             $reservations->getCollection()->load([
-                'approvals:approval_id,reservation_id,office_id,owner_id,status,approved_at',
+                'approvals:approval_id,reservation_id,office_id,owner_id,status,rejection_reason,approved_at',
             ]);
         }
 
