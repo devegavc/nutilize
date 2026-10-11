@@ -4738,7 +4738,12 @@ function buildPreviewTemporaryUnitCodes(totalCount) {
     return [];
   }
 
-  const itemId = activeEquipmentEditingRow?.dataset?.itemId || '0000';
+  const itemId = activeEquipmentEditingRow?.dataset?.itemId || '';
+
+  if (!itemId) {
+    return [];
+  }
+
   const paddedId = String(itemId).padStart(4, '0');
 
   return Array.from({ length: parsedTotal }, (_, index) => `#TMP-${paddedId}-U${String(index + 1).padStart(3, '0')}`);
@@ -4849,6 +4854,11 @@ function previewTemporaryEquipmentUnitCodes() {
 
   if (totalCount <= 0) {
     showAppNotice('Set Total Count first before previewing temporary codes.');
+    return;
+  }
+
+  if (!activeEquipmentEditingRow?.dataset?.itemId) {
+    showAppNotice('A free temporary code is assigned when you save this item. Leave the unit code blank.');
     return;
   }
 

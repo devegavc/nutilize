@@ -39,8 +39,14 @@ class ItemUnitService
             $provided = ItemAsset::normalizeCode((string) ($rawCodes[$index] ?? ''));
             $existing = ItemAsset::normalizeCode((string) ($existingCodes[$index] ?? ''));
 
-            if ($provided !== '') {
+            if ($provided !== '' && !self::isForeignTemporaryCode($provided, $itemId)) {
                 $resolved[$index] = $provided;
+                continue;
+            }
+
+            if ($provided !== '') {
+                $needsTemporary[$index] = $index + 1;
+                $resolved[$index] = '';
                 continue;
             }
 
@@ -57,6 +63,24 @@ class ItemUnitService
             $taken = array_fill_keys(array_filter($resolved), true);
             $generated = self::generateUniqueTemporaryCodes($itemId, $needsTemporary, $taken, $ignoreItemId);
 
+            // #region agent log
+            try {
+                file_put_contents(base_path('debug-c2da69.log'), json_encode([
+                    'sessionId' => 'c2da69',
+                    'runId' => 'post-fix',
+                    'hypothesisId' => 'A',
+                    'location' => 'ItemUnitService.php:resolveUnitCodes',
+                    'message' => 'assigned free temporary unit codes',
+                    'data' => [
+                        'itemId' => $itemId,
+                        'assignedCount' => count($generated),
+                    ],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ]).PHP_EOL, FILE_APPEND);
+            } catch (\Throwable $throwable) {
+            }
+            // #endregion
+
             foreach ($generated as $index => $code) {
                 $resolved[$index] = $code;
             }
@@ -66,6 +90,23 @@ class ItemUnitService
         self::assertUnitCodesAreValid($resolved, $itemId, $ignoreItemId);
 
         return $resolved;
+    }
+
+    /**
+     * Client previews use #TMP-0000 before the item exists. Those are placeholders,
+     * not codes the admin chose, and must not block a new item.
+     */
+    private static function isForeignTemporaryCode(string $code, int $itemId): bool
+    {
+        if (!ItemAsset::isTemporaryCode($code)) {
+            return false;
+        }
+
+        if (!preg_match('/^#TMP-(\d+)-U\d+(?:-.+)?$/i', ItemAsset::normalizeCode($code), $matches)) {
+            return false;
+        }
+
+        return (int) $matches[1] !== $itemId;
     }
 
     /**
