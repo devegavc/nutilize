@@ -67,7 +67,7 @@
             <table class="inventory-table facilities-inventory-table">
               <thead>
                 <tr>
-                  <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>
+                  <th><i class="bi bi-credit-card-2-front-fill"></i> ID</th>
                   <th>Room Number</th>
                   <th>Classification</th>
                   <th>Table Type</th>

@@ -83,7 +83,7 @@
             <table class="inventory-table most-requested-table">
               <thead>
                 <tr>
-                  <th class="col-asset-id">Asset ID</th>
+                  <th class="col-asset-id">ID</th>
                   <th class="col-item-name">Item Name</th>
                   <th class="col-owner">Owner</th>
                   <th class="col-category">Category</th>
