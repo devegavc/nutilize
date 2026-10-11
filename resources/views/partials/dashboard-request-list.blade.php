@@ -90,7 +90,7 @@
           </button>
           <button class="damage-btn confirm-action-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="damaged"
                   data-confirm-title="Confirm Damage"
-                  data-confirm-message="Mark this request as damaged? This action cannot be undone."
+                  data-confirm-message="Mark this request as damaged? You can attach a photo as proof. The photo is optional. This action cannot be undone."
                   data-confirm-text="Damage"
                   data-confirm-variant="danger">
             Damaged

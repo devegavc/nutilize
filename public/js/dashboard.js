@@ -2937,9 +2937,10 @@ function getRequestDecisionConfirmConfig(status) {
     case 'damaged':
       return {
         title: 'Confirm Damage',
-        message: 'Mark this request as damaged? This action cannot be undone.',
+        message: 'Mark this request as damaged? You can attach a photo as proof. The photo is optional. This action cannot be undone.',
         confirmText: 'Damage',
         variant: 'danger',
+        allowProof: true,
       };
     default:
       return {
@@ -3370,9 +3371,17 @@ async function submitReturnDecision(item, button, status) {
     return;
   }
 
-  const confirmed = await confirmRequestDecision(status);
+  const confirmation = await confirmRequestDecision(status);
+  const confirmed = confirmation === true || (confirmation && confirmation.confirmed === true);
+  const proofFile = confirmation && confirmation.file instanceof File ? confirmation.file : null;
   if (!confirmed) {
     return;
+  }
+
+  if (status === 'damaged') {
+    // #region agent log
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2da69'},body:JSON.stringify({sessionId:'c2da69',location:'dashboard.js:submitReturnDecision',message:'damage proof choice',data:{hasFile:Boolean(proofFile),fileType:proofFile?proofFile.type:'',fileSize:proofFile?proofFile.size:0},timestamp:Date.now(),hypothesisId:'A',runId:'pre-fix'})}).catch(()=>{});
+    // #endregion
   }
 
   if (button) {
@@ -3385,15 +3394,26 @@ async function submitReturnDecision(item, button, status) {
     let finalStatus = 0;
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
-      response = await fetch(`/request/${reservationId}/final-${action}`, {
+      const requestHeaders = {
+        'X-CSRF-TOKEN': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+      };
+      const requestInit = {
         method: 'PATCH',
-        headers: {
-          'X-CSRF-TOKEN': csrfToken,
-          'X-Requested-With': 'XMLHttpRequest',
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
+        headers: requestHeaders,
+      };
+
+      if (status === 'damaged' && proofFile) {
+        const formData = new FormData();
+        formData.append('proof_photo', proofFile);
+        requestInit.method = 'POST';
+        requestInit.body = formData;
+      } else {
+        requestHeaders['Content-Type'] = 'application/json';
+      }
+
+      response = await fetch(`/request/${reservationId}/final-${action}`, requestInit);
 
       finalStatus = response.status || 0;
       const responseText = await response.text();
@@ -4289,14 +4309,47 @@ function showSaveSuccessToast(message) {
   });
 }
 
+let damageProofPreviewUrl = '';
+
+function resetDamageProofField() {
+  const proofWrap = document.getElementById('inventory-confirm-proof');
+  const proofInput = document.getElementById('inventory-confirm-proof-input');
+  const proofPreview = document.getElementById('inventory-confirm-proof-preview');
+  const proofHint = document.getElementById('inventory-confirm-proof-hint');
+
+  if (proofWrap) {
+    proofWrap.hidden = true;
+  }
+
+  if (proofInput instanceof HTMLInputElement) {
+    proofInput.value = '';
+  }
+
+  if (proofPreview instanceof HTMLImageElement) {
+    proofPreview.hidden = true;
+    proofPreview.removeAttribute('src');
+  }
+
+  if (damageProofPreviewUrl) {
+    URL.revokeObjectURL(damageProofPreviewUrl);
+    damageProofPreviewUrl = '';
+  }
+
+  if (proofHint) {
+    proofHint.textContent = 'JPG, PNG, WEBP, or GIF up to 5 MB. You can continue without a photo.';
+  }
+}
+
 function closeInventoryConfirmModal() {
   if (!(inventoryConfirmModal instanceof HTMLElement)) {
     return;
   }
 
+  resetDamageProofField();
   inventoryConfirmModal.classList.remove('is-open');
   inventoryConfirmModal.setAttribute('aria-hidden', 'true');
   inventoryConfirmModal.dataset.confirmVariant = '';
+  inventoryConfirmModal.dataset.allowProof = '';
   inventoryConfirmResolver = null;
 }
 
@@ -4318,6 +4371,7 @@ function openInventoryConfirmModal(options = {}) {
     message = 'Are you sure you want to delete this item? This cannot be undone.',
     confirmText = 'Delete',
     variant = 'delete',
+    allowProof = false,
   } = options;
 
   inventoryConfirmTitle.textContent = title;
@@ -4334,6 +4388,12 @@ function openInventoryConfirmModal(options = {}) {
   }
 
   inventoryConfirmModal.dataset.confirmVariant = variant;
+  inventoryConfirmModal.dataset.allowProof = allowProof ? '1' : '';
+  resetDamageProofField();
+  const proofWrap = document.getElementById('inventory-confirm-proof');
+  if (proofWrap) {
+    proofWrap.hidden = !allowProof;
+  }
   inventoryConfirmModal.classList.add('is-open');
   inventoryConfirmModal.setAttribute('aria-hidden', 'false');
 
@@ -7731,7 +7791,51 @@ if (inventoryConfirmModal instanceof HTMLElement) {
   }
 
   if (inventoryConfirmSubmit instanceof HTMLButtonElement) {
-    inventoryConfirmSubmit.addEventListener('click', () => finalizeInventoryConfirm(true));
+    inventoryConfirmSubmit.addEventListener('click', () => {
+      if (inventoryConfirmModal.dataset.allowProof === '1') {
+        const proofInput = document.getElementById('inventory-confirm-proof-input');
+        const proofFile = proofInput instanceof HTMLInputElement && proofInput.files ? proofInput.files[0] : null;
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+        if (proofFile && (!allowedTypes.includes(proofFile.type) || proofFile.size > 5 * 1024 * 1024)) {
+          const proofHint = document.getElementById('inventory-confirm-proof-hint');
+          if (proofHint) {
+            proofHint.textContent = 'Use a JPG, PNG, WEBP, or GIF photo under 5 MB, or leave the photo empty.';
+          }
+          return;
+        }
+
+        finalizeInventoryConfirm({ confirmed: true, file: proofFile || null });
+        return;
+      }
+
+      finalizeInventoryConfirm(true);
+    });
+  }
+
+  const damageProofInput = document.getElementById('inventory-confirm-proof-input');
+  if (damageProofInput instanceof HTMLInputElement) {
+    damageProofInput.addEventListener('change', () => {
+      const preview = document.getElementById('inventory-confirm-proof-preview');
+      const selected = damageProofInput.files ? damageProofInput.files[0] : null;
+
+      if (damageProofPreviewUrl) {
+        URL.revokeObjectURL(damageProofPreviewUrl);
+        damageProofPreviewUrl = '';
+      }
+
+      if (!(preview instanceof HTMLImageElement) || !selected) {
+        if (preview instanceof HTMLImageElement) {
+          preview.hidden = true;
+          preview.removeAttribute('src');
+        }
+        return;
+      }
+
+      damageProofPreviewUrl = URL.createObjectURL(selected);
+      preview.src = damageProofPreviewUrl;
+      preview.hidden = false;
+    });
   }
 
   document.addEventListener('click', (event) => {

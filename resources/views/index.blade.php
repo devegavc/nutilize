@@ -12,7 +12,7 @@
   <link rel="preload" href="/fonts/poppins-800.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="/fonts/poppins-400.woff2" as="font" type="font/woff2" crossorigin />
 
-  <link rel="stylesheet" href="/css/landing.css?v=12" />
+  <link rel="stylesheet" href="/css/landing.css?v=13" />
 </head>
 <body>
   <header class="top-header">

@@ -13,9 +13,12 @@ use App\Services\ReservationApprovalWorkflowService;
 use App\Services\ReservationApprovalDeduper;
 use App\Support\ApprovalClock;
 use App\Models\ReservationApproval;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -419,12 +422,108 @@ class ApprovalController extends Controller
         return $this->finalizePhysicalFacilitiesDecision($reservationId, 'returned');
     }
 
-    public function finalDamagedReservation($reservationId)
+    public function finalDamagedReservation(Request $request, $reservationId)
     {
-        return $this->finalizePhysicalFacilitiesDecision($reservationId, 'damaged');
+        $proofImageUrl = null;
+
+        if ($request->hasFile('proof_photo')) {
+            $request->validate([
+                'proof_photo' => ['file', 'image', 'mimes:jpeg,jpg,png,webp,gif', 'max:5120'],
+            ]);
+
+            $proofImageUrl = $this->storeDamageProofPhoto($request->file('proof_photo'));
+
+            if ($proofImageUrl === null) {
+                return response()->json([
+                    'error' => 'The proof photo could not be saved. You can mark this request as damaged without a photo.',
+                ], 422);
+            }
+        }
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-c2da69.log'), json_encode([
+                'sessionId' => 'c2da69',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'B',
+                'location' => 'ApprovalController.php:finalDamagedReservation',
+                'message' => 'damage proof decision',
+                'data' => [
+                    'hasFile' => $request->hasFile('proof_photo'),
+                    'stored' => $proofImageUrl !== null,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]).PHP_EOL, FILE_APPEND);
+        } catch (Throwable $throwable) {
+        }
+        // #endregion
+
+        return $this->finalizePhysicalFacilitiesDecision($reservationId, 'damaged', $proofImageUrl);
     }
 
-    private function finalizePhysicalFacilitiesDecision($reservationId, string $status)
+    private function storeDamageProofPhoto(UploadedFile $file): ?string
+    {
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+            $extension = 'jpg';
+        }
+
+        $filename = 'damage-'.bin2hex(random_bytes(16)).'.'.$extension;
+        $mime = $file->getMimeType() ?: 'application/octet-stream';
+        $bytes = (int) $file->getSize();
+        $serviceKey = (string) config('services.supabase.service_role_key');
+        $supabaseUrl = rtrim((string) config('services.supabase.url'), '/');
+        $storedAs = 'failed';
+
+        if ($serviceKey !== '' && $supabaseUrl !== '') {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer '.$serviceKey,
+                'apikey' => $serviceKey,
+                'Content-Type' => $mime,
+                'x-upsert' => 'false',
+            ])->withBody((string) file_get_contents($file->getRealPath()), $mime)
+                ->timeout(20)
+                ->post($supabaseUrl.'/storage/v1/object/assets/issues/'.$filename);
+
+            if ($response->successful()) {
+                $storedAs = 'supabase';
+                $proofUrl = $supabaseUrl.'/storage/v1/object/public/assets/issues/'.$filename;
+            }
+        }
+
+        if (!isset($proofUrl)) {
+            $directory = public_path('uploads/damage-proofs');
+            if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
+                $proofUrl = null;
+            } else {
+                $file->move($directory, $filename);
+                $storedAs = 'local';
+                $proofUrl = url('uploads/damage-proofs/'.$filename);
+            }
+        }
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-c2da69.log'), json_encode([
+                'sessionId' => 'c2da69',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'C',
+                'location' => 'ApprovalController.php:storeDamageProofPhoto',
+                'message' => 'damage proof stored',
+                'data' => [
+                    'storedAs' => $storedAs,
+                    'bytes' => $bytes,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]).PHP_EOL, FILE_APPEND);
+        } catch (Throwable $throwable) {
+        }
+        // #endregion
+
+        return $proofUrl ?? null;
+    }
+
+    private function finalizePhysicalFacilitiesDecision($reservationId, string $status, ?string $proofImageUrl = null)
     {
         try {
             $user = Auth::user();
@@ -501,11 +600,11 @@ class ApprovalController extends Controller
             $this->forgetActionableOfficeCache((int) $reservation->reservation_id);
 
             $finalReservationId = (int) $reservation->reservation_id;
-            dispatch(function () use ($finalReservationId, $status) {
+            dispatch(function () use ($finalReservationId, $status, $proofImageUrl) {
                 try {
                     /** @var self $self */
                     $self = app(self::class);
-                    $self->runFinalDecisionSideEffects($finalReservationId, $status);
+                    $self->runFinalDecisionSideEffects($finalReservationId, $status, $proofImageUrl);
                 } catch (Throwable $throwable) {
                     report($throwable);
                 }
@@ -534,7 +633,7 @@ class ApprovalController extends Controller
     /**
      * Inventory / notification work after a PF final decision. Public for afterResponse.
      */
-    public function runFinalDecisionSideEffects(int $reservationId, string $status): void
+    public function runFinalDecisionSideEffects(int $reservationId, string $status, ?string $proofImageUrl = null): void
     {
         $reservation = Reservation::query()->find($reservationId);
         if (!$reservation) {
@@ -547,7 +646,7 @@ class ApprovalController extends Controller
 
         if ($status === 'damaged') {
             $this->applyReservationDamageToMaintenance($reservation);
-            $this->createDamageReportsForReservation($reservation);
+            $this->createDamageReportsForReservation($reservation, $proofImageUrl);
         }
 
         if ($status === 'approved') {
@@ -1060,7 +1159,7 @@ class ApprovalController extends Controller
         }
     }
 
-    private function createDamageReportsForReservation(Reservation $reservation): void
+    private function createDamageReportsForReservation(Reservation $reservation, ?string $proofImageUrl = null): void
     {
         if (!Schema::hasTable('reports')) {
             return;
@@ -1076,6 +1175,9 @@ class ApprovalController extends Controller
         ];
         if ($hasGeneratedAtColumn) {
             $reportBase['generated_at'] = $now;
+        }
+        if (is_string($proofImageUrl) && $proofImageUrl !== '' && Schema::hasColumn('reports', 'proof_image_url')) {
+            $reportBase['proof_image_url'] = $proofImageUrl;
         }
 
         $itemIds = DB::table('reservation_details as details')

@@ -711,11 +711,15 @@ class DashboardInventoryController extends Controller
                 }
 
                 $proofUrl = trim((string) ($report->proof_image_url ?? ''));
-                if ($proofUrl !== '' && !str_starts_with($proofUrl, 'http')) {
+                $isLocalDamageProof = $proofUrl !== '' && str_contains($proofUrl, '/uploads/damage-proofs/');
+                if ($proofUrl !== '' && !$isLocalDamageProof && !str_starts_with($proofUrl, 'http')) {
                     $proofUrl = '';
                 }
 
-                if ($proofUrl !== '') {
+                if ($isLocalDamageProof) {
+                    $proofPath = parse_url($proofUrl, PHP_URL_PATH);
+                    $proofUrl = is_string($proofPath) && $proofPath !== '' ? $proofPath : $proofUrl;
+                } elseif ($proofUrl !== '') {
                     $filename = basename(parse_url($proofUrl, PHP_URL_PATH) ?: '');
                     if ($filename !== '') {
                         $proofUrl = route('dashboard.storage.proof', ['filename' => $filename]);

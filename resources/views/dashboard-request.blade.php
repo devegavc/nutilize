@@ -81,6 +81,17 @@
       </header>
       <div class="inventory-confirm-body">
         <p id="inventory-confirm-message">Are you sure you want to perform this action? This action cannot be undone.</p>
+        <div class="inventory-confirm-proof" id="inventory-confirm-proof" hidden>
+          <label class="inventory-confirm-proof-label" for="inventory-confirm-proof-input">
+            Damage proof photo <span>(optional)</span>
+          </label>
+          <input id="inventory-confirm-proof-input"
+                 class="inventory-confirm-proof-input"
+                 type="file"
+                 accept="image/jpeg,image/png,image/webp,image/gif">
+          <p class="inventory-confirm-proof-hint" id="inventory-confirm-proof-hint">JPG, PNG, WEBP, or GIF up to 5 MB. You can continue without a photo.</p>
+          <img id="inventory-confirm-proof-preview" class="inventory-confirm-proof-preview" alt="" hidden>
+        </div>
       </div>
       <div class="inventory-confirm-actions">
         <button type="button" class="inventory-confirm-btn cancel" id="inventory-confirm-cancel">Cancel</button>
