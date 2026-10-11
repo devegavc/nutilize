@@ -5713,6 +5713,17 @@ async function buildNotificationsPopover() {
     try {
       // Fresh list on open. Heavy sync is separate so it cannot empty the bell.
       await fetchNotifications({ sync: false, force: true });
+      // #region agent log
+      try {
+        const upcomingTitles = Array.from(document.querySelectorAll('.upcoming-card li strong'))
+          .map((node) => (node.textContent || '').trim())
+          .filter((title) => title !== '' && title !== 'No open requests');
+        const messages = notificationItems.map((item) => String(item.message || ''));
+        const missingTitles = upcomingTitles.filter((title) => !messages.some((message) => message.includes(title)));
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2da69'},body:JSON.stringify({sessionId:'c2da69',location:'dashboard.js:refreshPopoverNotifications',message:'upcoming titles missing from notifications',data:{upcomingCount:upcomingTitles.length,notificationCount:messages.length,missingTitles:missingTitles.slice(0,5)},timestamp:Date.now(),hypothesisId:'C',runId:'post-fix'})}).catch(()=>{});
+      } catch (_logError) {
+      }
+      // #endregion
       renderList();
     } catch (_error) {
       // No-op: errors already logged

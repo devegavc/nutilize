@@ -839,6 +839,41 @@ class ApprovalController extends Controller
         }
 
         if (is_null($nextActionableOfficeId)) {
+            $reservation->unsetRelation('approvals');
+            $pfReady = !is_null($pfOfficeId)
+                && !is_null($fromApprovingOfficeId)
+                && (int) $fromApprovingOfficeId !== (int) $pfOfficeId
+                && $this->isReadyForFinalPhysicalFacilitiesApproval($reservation, (int) $pfOfficeId);
+
+            // #region agent log
+            try {
+                file_put_contents(base_path('debug-c2da69.log'), json_encode([
+                    'sessionId' => 'c2da69',
+                    'runId' => 'post-fix',
+                    'hypothesisId' => 'A',
+                    'location' => 'ApprovalController.php:notifyNextActionableOfficeWithReservation',
+                    'message' => 'workflow ended before physical facilities',
+                    'data' => [
+                        'reservationId' => (int) $reservation->reservation_id,
+                        'fromOfficeId' => $fromApprovingOfficeId,
+                        'pfOfficeId' => $pfOfficeId,
+                        'pfReady' => $pfReady,
+                    ],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ]).PHP_EOL, FILE_APPEND);
+            } catch (Throwable $throwable) {
+            }
+            // #endregion
+
+            if ($pfReady) {
+                ReservationApprovalNotifier::notifyOfficeAfterPriorApproval(
+                    $reservation,
+                    (int) $pfOfficeId,
+                    (int) $fromApprovingOfficeId,
+                    $pfOfficeId,
+                );
+            }
+
             return;
         }
 
@@ -2095,7 +2130,7 @@ class ApprovalController extends Controller
 
         // Cheap insert-if-missing so the bell is not empty while requests are waiting.
         // Runs after optional heavy sync so wiped-but-still-actionable rows come back.
-        $this->seedApprovalNotificationsForUser($user);
+        $this->seedApprovalNotificationsForUser($user, $request->boolean('force'));
 
         $limit = min(max((int) $request->query('limit', 20), 1), 50);
         $userId = (int) $user->user_id;
@@ -2162,7 +2197,7 @@ class ApprovalController extends Controller
         });
     }
 
-    private function seedApprovalNotificationsForUser(\App\Models\User $user): void
+    private function seedApprovalNotificationsForUser(\App\Models\User $user, bool $force = false): void
     {
         if (!$user->isOfficeApprover()) {
             return;
@@ -2175,7 +2210,21 @@ class ApprovalController extends Controller
 
         $seedCacheKey = 'notification_seed.user.' . $userId;
         $inboxIsEmpty = !Notification::where('user_id', $userId)->exists();
-        if (!$inboxIsEmpty && Cache::has($seedCacheKey)) {
+        if (!$force && !$inboxIsEmpty && Cache::has($seedCacheKey)) {
+            // #region agent log
+            try {
+                file_put_contents(base_path('debug-c2da69.log'), json_encode([
+                    'sessionId' => 'c2da69',
+                    'runId' => 'post-fix',
+                    'hypothesisId' => 'B',
+                    'location' => 'ApprovalController.php:seedApprovalNotificationsForUser',
+                    'message' => 'notification seed skipped',
+                    'data' => ['userId' => $userId, 'force' => false],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ]).PHP_EOL, FILE_APPEND);
+            } catch (Throwable $throwable) {
+            }
+            // #endregion
             return;
         }
 

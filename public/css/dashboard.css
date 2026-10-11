@@ -552,6 +552,33 @@ body {
   gap: 12px;
   box-shadow: 0 10px 20px rgba(27, 38, 93, 0.14);
   height: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: #9aa3bc transparent;
+}
+
+.side-nav:has(.nav-submenu.is-open) {
+  padding: 10px 14px;
+  gap: 5px;
+}
+
+.side-nav::-webkit-scrollbar {
+  width: 8px;
+}
+
+.side-nav::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 10px 0;
+}
+
+.side-nav::-webkit-scrollbar-thumb {
+  background: #9aa3bc;
+  border-radius: 999px;
+}
+
+.side-nav::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .nav-item {

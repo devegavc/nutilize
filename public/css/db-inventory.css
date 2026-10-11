@@ -1,4 +1,4 @@
-@import url("./dashboard.css?v=20260929-office-card-align");
+@import url("./dashboard.css?v=20261011-nav-scroll");
 
 .inventory-stats-grid {
   grid-template-columns: repeat(3, 1fr);
