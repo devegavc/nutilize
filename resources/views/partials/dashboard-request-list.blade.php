@@ -107,7 +107,7 @@
                   data-confirm-message="Choose the damaged item. Only the items you check are recorded as damaged. A photo is optional."
                   data-confirm-text="Damage"
                   data-confirm-variant="danger"
-                  data-damage-targets="{{ e($damageTargets->toJson()) }}">
+                  data-damage-targets="{{ $damageTargets->toJson() }}">
             Damaged
           </button>
         @elseif($requestData['tab'] === 'final')

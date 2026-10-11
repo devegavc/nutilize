@@ -3375,13 +3375,27 @@ async function submitReturnDecision(item, button, status) {
   }
 
   let damageTargets = [];
-  if (status === 'damaged' && button.dataset.damageTargets) {
+  let damageTargetParseFailed = false;
+  const damageTargetsRaw = status === 'damaged' ? String(button.dataset.damageTargets || '') : '';
+  if (status === 'damaged' && damageTargetsRaw) {
     try {
-      const parsedTargets = JSON.parse(button.dataset.damageTargets);
+      const parsedTargets = JSON.parse(damageTargetsRaw);
       damageTargets = Array.isArray(parsedTargets) ? parsedTargets : [];
     } catch (error) {
       damageTargets = [];
+      damageTargetParseFailed = true;
     }
+  }
+
+  if (status === 'damaged') {
+    // #region agent log
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2da69'},body:JSON.stringify({sessionId:'c2da69',location:'dashboard.js:submitReturnDecision',message:'damage targets parsed',data:{rawPrefix:damageTargetsRaw.slice(0,80),targetCount:damageTargets.length,parseFailed:damageTargetParseFailed},timestamp:Date.now(),hypothesisId:'E',runId:'post-fix'})}).catch(()=>{});
+    // #endregion
+  }
+
+  if (status === 'damaged' && damageTargetParseFailed) {
+    showAppNotice('The item list could not be read. Refresh the page and try again.');
+    return;
   }
 
   const confirmation = await confirmRequestDecision(status, damageTargets);
