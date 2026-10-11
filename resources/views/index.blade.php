@@ -243,6 +243,12 @@
 
       const sections = hashLinks.map(l => document.querySelector(l.getAttribute('href'))).filter(Boolean);
 
+      // #region agent log
+      const htmlStyle = getComputedStyle(document.documentElement);
+      const bodyStyle = getComputedStyle(document.body);
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02a19c'},body:JSON.stringify({sessionId:'02a19c',runId:'pre-fix',hypothesisId:'A-E',location:'index.blade.php:nav-layout',message:'landing scroll container',data:{scrollingElement:document.scrollingElement?document.scrollingElement.tagName:null,htmlOverflowX:htmlStyle.overflowX,htmlOverflowY:htmlStyle.overflowY,bodyOverflowX:bodyStyle.overflowX,bodyOverflowY:bodyStyle.overflowY,htmlClient:document.documentElement.clientHeight,htmlScroll:document.documentElement.scrollHeight,bodyClient:document.body.clientHeight,bodyScroll:document.body.scrollHeight,windowScrollY:window.scrollY,bodyScrollTop:document.body.scrollTop,docScrollTop:document.documentElement.scrollTop,sectionIds:sections.map((section)=>section.id),sectionTops:sections.map((section)=>Math.round(section.getBoundingClientRect().top+window.scrollY)),hashCount:hashLinks.length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+
       function setActiveLink() {
         const fromTop = window.scrollY + headerOffset() + 2;
         let current = sections[0] || null;
@@ -262,11 +268,23 @@
       hashLinks.forEach(link => {
         link.addEventListener('click', function (e) {
           e.preventDefault();
-          const target = document.querySelector(this.getAttribute('href'));
+          const href = this.getAttribute('href');
+          const target = document.querySelector(href);
+          // #region agent log
+          const yPreview = target ? target.getBoundingClientRect().top + window.scrollY - headerOffset() : null;
+          fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02a19c'},body:JSON.stringify({sessionId:'02a19c',runId:'pre-fix',hypothesisId:'B-C-D',location:'index.blade.php:nav-click',message:'nav hash click',data:{href,targetFound:Boolean(target),targetId:target?target.id:null,y:yPreview===null?null:Math.round(yPreview),windowScrollY:window.scrollY,bodyScrollTop:document.body.scrollTop,docScrollTop:document.documentElement.scrollTop},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           if (!target) return;
           setMenuOpen(false);
           const y = target.getBoundingClientRect().top + window.scrollY - headerOffset();
           window.scrollTo({ top: y, behavior: 'smooth' });
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              // #region agent log
+              fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02a19c'},body:JSON.stringify({sessionId:'02a19c',runId:'pre-fix',hypothesisId:'A-C-E',location:'index.blade.php:nav-after-scroll',message:'scroll position after nav click',data:{href,intendedY:Math.round(y),windowScrollY:window.scrollY,bodyScrollTop:document.body.scrollTop,docScrollTop:document.documentElement.scrollTop,targetTop:Math.round(target.getBoundingClientRect().top)},timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
+            });
+          });
         });
       });
 
