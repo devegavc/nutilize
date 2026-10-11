@@ -764,7 +764,7 @@ body.login-page.privacy-page {
 
 .privacy-page .page-content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   box-sizing: border-box;
   width: 100%;
@@ -776,7 +776,11 @@ body.login-page.privacy-page {
 .privacy-card {
   display: flex;
   flex-direction: column;
-  width: min(800px, 100%);
+  width: 100%;
+  max-width: 800px;
+  margin-top: auto;
+  margin-bottom: auto;
+  max-height: calc(100vh - 3rem);
   max-height: calc(100dvh - 3rem);
   overflow: hidden;
   border-radius: 18px;
@@ -828,7 +832,7 @@ body.login-page.privacy-page {
 
 .privacy-notice {
   flex: 1 1 auto;
-  min-height: 12.5rem;
+  min-height: 0;
   margin: 0;
   padding: 1.35rem 1.6rem 1.45rem;
   overflow-x: hidden;
@@ -1028,17 +1032,5 @@ body.login-page.privacy-page {
 
   .privacy-footer {
     padding: 0.9rem 1rem 0.95rem;
-  }
-}
-
-@media (max-height: 760px) and (min-width: 701px) {
-  .privacy-card {
-    max-height: none;
-  }
-
-  .privacy-notice {
-    min-height: 0;
-    max-height: none;
-    overflow: visible;
   }
 }

@@ -196,12 +196,8 @@
             data-total="{{ $historyTotal }}"
             data-server-per-page="{{ $historyServerPerPage }}"
             data-server-page="{{ $historyServerPage }}"
-            @if($historyTotal <= 50) hidden @endif
-          >
-            @if($historyTotal > 0)
-              {{ $historyRows->links() }}
-            @endif
-          </div>
+            hidden
+          ></div>
         </section>
       </section>
     </section>

@@ -13,7 +13,7 @@
         crossorigin="anonymous">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/css/auth.css?v=20261014">
+  <link rel="stylesheet" href="/css/auth.css?v=20261015">
 </head>
 <body class="login-page privacy-page">
 
@@ -130,6 +130,16 @@
         }
       });
       syncContinue();
+
+      // #region agent log
+      const card = document.querySelector('.privacy-card');
+      const notice = document.querySelector('.privacy-notice');
+      const header = document.querySelector('.privacy-header');
+      const button = document.getElementById('privacyContinue');
+      const cardStyle = card ? getComputedStyle(card) : null;
+      const noticeStyle = notice ? getComputedStyle(notice) : null;
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2da69'},body:JSON.stringify({sessionId:'c2da69',location:'data-privacy.blade.php:layout',message:'privacy layout metrics',data:{innerWidth:window.innerWidth,innerHeight:window.innerHeight,shortDesktop:window.matchMedia('(max-height: 760px) and (min-width: 701px)').matches,narrow:window.matchMedia('(max-width: 700px)').matches,dvh:CSS.supports('height','100dvh'),cardMaxHeight:cardStyle?cardStyle.maxHeight:null,noticeOverflow:noticeStyle?noticeStyle.overflowY:null,headerTop:header?Math.round(header.getBoundingClientRect().top):null,buttonBottom:button?Math.round(button.getBoundingClientRect().bottom):null,cardHeight:card?Math.round(card.getBoundingClientRect().height):null},timestamp:Date.now(),hypothesisId:'A',runId:'post-fix'})}).catch(()=>{});
+      // #endregion
     })();
   </script>
 </body>

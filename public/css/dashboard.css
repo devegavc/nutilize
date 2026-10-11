@@ -2395,6 +2395,40 @@ body.office-app .content-card > .inventory-grid > .table-wrap {
   -webkit-overflow-scrolling: touch;
 }
 
+body.office-app .workspace-grid > .content-card.office-archive-card {
+  align-self: stretch;
+  height: 100%;
+  max-height: 100%;
+}
+
+body.office-app .office-archive-history-card {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+body.office-app .office-archive-wrap {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.office-archive-history-card > .office-request-pagination {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+.office-archive-history-card > .office-request-pagination nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.office-archive-history-card > .office-request-pagination p {
+  margin: 0;
+}
+
 body.office-app .content-card > .inventory-grid {
   flex: 1 1 auto;
   height: auto;
