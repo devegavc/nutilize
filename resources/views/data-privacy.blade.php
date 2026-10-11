@@ -13,28 +13,24 @@
         crossorigin="anonymous">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/css/auth.css?v=20261012">
+  <link rel="stylesheet" href="/css/auth.css?v=20261014">
 </head>
 <body class="login-page privacy-page">
 
   <div class="page-content">
-    <div class="login-card mx-auto">
-      <div class="login-card-inner">
-        <div class="brand-area text-center">
-          <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}"
-               alt="NUtilize"
-               class="brand-logo"
-               width="168"
-               height="56">
-          <p class="brand-subtitle">
-            Campus Resource & Reservation Management System
-          </p>
-          <span class="login-heading-rule" aria-hidden="true"></span>
-          <h1 class="login-heading">Data Privacy Notice</h1>
-          <p class="privacy-act">Republic Act No. 10173</p>
-        </div>
+    <article class="privacy-card">
+      <header class="privacy-header">
+        <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}"
+             alt="NUtilize"
+             class="privacy-logo"
+             width="150"
+             height="50">
+        <p class="privacy-tagline">Campus Resource & Reservation Management System</p>
+        <h1 class="privacy-title">Data Privacy Notice</h1>
+        <p class="privacy-act">Republic Act No. 10173</p>
+      </header>
 
-        <div class="privacy-notice" tabindex="0">
+      <div class="privacy-notice" tabindex="0">
           <p>
             We value your privacy and are committed to protecting your personal information. This notice explains how NUtilize collects, uses, and safeguards your data. By creating an account, you acknowledge that your information will be handled for the purposes described here, in line with the Data Privacy Act of 2012 (Republic Act No. 10173).
           </p>
@@ -81,7 +77,7 @@
           </p>
         </div>
 
-        <form id="privacyForm" class="privacy-form" action="{{ route('data-privacy.accept') }}" method="POST">
+        <form id="privacyForm" class="privacy-footer" action="{{ route('data-privacy.accept') }}" method="POST">
           @csrf
 
           @if ($errors->any())
@@ -104,14 +100,12 @@
             <span>I have read and understood this Data Privacy Notice.</span>
           </label>
 
-          <button type="submit" class="btn btn-login w-100" id="privacyContinue" disabled>
+          <button type="submit" class="privacy-continue" id="privacyContinue" disabled>
             Continue to Login
           </button>
+          <a href="{{ route('index') }}" class="privacy-back">Back to home</a>
         </form>
-
-        <a href="{{ route('index') }}" class="privacy-back">Back to home</a>
-      </div>
-    </div>
+    </article>
   </div>
 
   <script>
