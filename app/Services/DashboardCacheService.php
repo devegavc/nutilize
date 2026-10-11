@@ -21,13 +21,13 @@ class DashboardCacheService
      */
     public static function getDashboardData(int $userId, int $officeId): array
     {
-        $cacheKey = "dashboard.data.v8.user.{$userId}.office.{$officeId}";
+        $cacheKey = "dashboard.data.v9.user.{$userId}.office.{$officeId}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL * 60, function () use ($officeId) {
             return [
                 'stats' => self::getStats(),
                 'quickReports' => self::getQuickReports(4),
-                'upcomingRequests' => self::getUpcomingRequests(5),
+                'upcomingRequests' => self::getUpcomingRequests(),
                 'tasks' => self::getTasks($officeId),
                 'dailyHighlights' => self::getDailyHighlights(),
             ];
@@ -295,13 +295,13 @@ class DashboardCacheService
     /**
      * Get open reservation requests for the PF dashboard (all active workflows).
      */
-    private static function getUpcomingRequests(int $limit = 50): array
+    private static function getUpcomingRequests(int $limit = 0): array
     {
         if (!self::hasTable('reservations')) {
             return [];
         }
 
-        $rows = DB::table('reservations as reservations')
+        $query = DB::table('reservations as reservations')
             ->leftJoin('users as users', 'users.user_id', '=', 'reservations.user_id')
             ->select([
                 'reservations.reservation_id',
@@ -317,9 +317,13 @@ class DashboardCacheService
             ])
             ->whereNotIn(DB::raw("LOWER(COALESCE(reservations.overall_status, ''))"), ['approved', 'rejected', 'returned', 'damaged', 'cancelled', 'canceled', 'expired'])
             ->whereRaw("LOWER(COALESCE(reservations.overall_status, '')) NOT LIKE ?", ['cancel%'])
-            ->orderByDesc('reservations.created_at')
-            ->limit($limit)
-            ->get();
+            ->orderByDesc('reservations.created_at');
+
+        if ($limit > 0) {
+            $query->limit($limit);
+        }
+
+        $rows = $query->get();
 
         if ($rows->isEmpty()) {
             return [];

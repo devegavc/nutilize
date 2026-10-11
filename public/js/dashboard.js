@@ -5150,17 +5150,6 @@ function setActiveNavByPage() {
     submenu.classList.toggle('is-open', inventoryOpen);
   });
 
-  // #region agent log
-  if (inventoryOpen) {
-    const sideNav = document.querySelector('#navbar-container .side-nav');
-    const navBox = document.getElementById('navbar-container');
-    const sideStyle = sideNav ? getComputedStyle(sideNav) : null;
-    const boxStyle = navBox ? getComputedStyle(navBox) : null;
-    const bodyStyle = getComputedStyle(document.body);
-    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02a19c'},body:JSON.stringify({sessionId:'02a19c',runId:'pre-fix',hypothesisId:'A-E',location:'dashboard.js:inventory-nav-scroll',message:'inventory sidebar overflow',data:{path,subTarget,viewportH:window.innerHeight,sideOverflowY:sideStyle?sideStyle.overflowY:null,boxOverflowY:boxStyle?boxStyle.overflowY:null,bodyOverflowY:bodyStyle.overflowY,sideClient:sideNav?sideNav.clientHeight:null,sideScroll:sideNav?sideNav.scrollHeight:null,sideOverflowPx:sideNav?sideNav.scrollHeight-sideNav.clientHeight:null,sideScrollbarW:sideNav?sideNav.offsetWidth-sideNav.clientWidth:null,boxClient:navBox?navBox.clientHeight:null,boxScroll:navBox?navBox.scrollHeight:null,boxScrollbarW:navBox?navBox.offsetWidth-navBox.clientWidth:null,bodyClient:document.body.clientHeight,bodyScroll:document.body.scrollHeight,docClient:document.documentElement.clientHeight,docScroll:document.documentElement.scrollHeight},timestamp:Date.now()})}).catch(()=>{});
-  }
-  // #endregion
-
   if (toolbarProfileButtons.length) {
     toolbarProfileButtons.forEach((button) => {
       button.classList.toggle('profile-current-page', isProfilePage);
@@ -5713,17 +5702,6 @@ async function buildNotificationsPopover() {
     try {
       // Fresh list on open. Heavy sync is separate so it cannot empty the bell.
       await fetchNotifications({ sync: false, force: true });
-      // #region agent log
-      try {
-        const upcomingTitles = Array.from(document.querySelectorAll('.upcoming-card li strong'))
-          .map((node) => (node.textContent || '').trim())
-          .filter((title) => title !== '' && title !== 'No open requests');
-        const messages = notificationItems.map((item) => String(item.message || ''));
-        const missingTitles = upcomingTitles.filter((title) => !messages.some((message) => message.includes(title)));
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2da69'},body:JSON.stringify({sessionId:'c2da69',location:'dashboard.js:refreshPopoverNotifications',message:'upcoming titles missing from notifications',data:{upcomingCount:upcomingTitles.length,notificationCount:messages.length,missingTitles:missingTitles.slice(0,5)},timestamp:Date.now(),hypothesisId:'C',runId:'post-fix'})}).catch(()=>{});
-      } catch (_logError) {
-      }
-      // #endregion
       renderList();
     } catch (_error) {
       // No-op: errors already logged
