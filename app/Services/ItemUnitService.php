@@ -63,24 +63,6 @@ class ItemUnitService
             $taken = array_fill_keys(array_filter($resolved), true);
             $generated = self::generateUniqueTemporaryCodes($itemId, $needsTemporary, $taken, $ignoreItemId);
 
-            // #region agent log
-            try {
-                file_put_contents(base_path('debug-c2da69.log'), json_encode([
-                    'sessionId' => 'c2da69',
-                    'runId' => 'post-fix',
-                    'hypothesisId' => 'A',
-                    'location' => 'ItemUnitService.php:resolveUnitCodes',
-                    'message' => 'assigned free temporary unit codes',
-                    'data' => [
-                        'itemId' => $itemId,
-                        'assignedCount' => count($generated),
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ]).PHP_EOL, FILE_APPEND);
-            } catch (\Throwable $throwable) {
-            }
-            // #endregion
-
             foreach ($generated as $index => $code) {
                 $resolved[$index] = $code;
             }

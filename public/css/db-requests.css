@@ -464,7 +464,8 @@
 .request-meta-row {
   margin-top: 2px;
   display: none;
-  gap: 28px;
+  flex-wrap: wrap;
+  gap: 8px 28px;
   color: #6d7798;
   font-size: 0.9rem;
 }

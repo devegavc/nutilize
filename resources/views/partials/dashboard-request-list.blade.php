@@ -63,9 +63,13 @@
         <strong>Event Name</strong>
         <span>{{ $reservation->activity_name ?? 'Untitled Activity' }}</span>
       </div>
+      @php
+        $eventStart = $reservation->Start_of_activity ?? $reservation->Date_of_Activity;
+        $eventEnd = $reservation->End_of_Activity ?? $reservation->end_of_activity;
+      @endphp
       <div class="request-meta-row">
-        <span>Date: {{ optional($reservation->Start_of_activity ?? $reservation->Date_of_Activity)->format('d/m/Y') ?? 'N/A' }}</span>
-        <span>Time: {{ optional($reservation->Start_of_activity ?? $reservation->Date_of_Activity)->format('g:i A') ?? 'N/A' }}</span>
+        <span>Start: {{ $eventStart ? $eventStart->format('d/m/Y g:i A') : 'N/A' }}</span>
+        <span>End: {{ $eventEnd ? $eventEnd->format('d/m/Y g:i A') : 'N/A' }}</span>
       </div>
     </div>
 
