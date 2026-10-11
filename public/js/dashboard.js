@@ -3458,20 +3458,6 @@ function setRequestTabMode(mode) {
   requestContentCard.classList.toggle('return-mode', requestMode === 'return');
   requestContentCard.classList.toggle('rejected-mode', requestMode === 'rejected');
   requestContentCard.classList.toggle('final-mode', requestMode === 'final');
-
-  if (requestMode === 'rejected') {
-    logReturnRemarksState('tab');
-  }
-}
-
-function logReturnRemarksState(source) {
-  // #region agent log
-  const cards = Array.from(document.querySelectorAll('.request-item.rejected-only'));
-  const sections = cards.map((card) => card.querySelector('.request-remarks-text')).filter(Boolean);
-  const fallback = 'No remarks were recorded for this return.';
-  const selected = document.querySelector('.request-item.rejected-only.is-selected .request-remarks');
-  fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02a19c'},body:JSON.stringify({sessionId:'02a19c',runId:'pre-fix',hypothesisId:'D',location:'dashboard.js:return-remarks',message:'returned-for-revision remarks visibility',data:{source,rejectedCards:cards.length,remarksSections:sections.length,fallbackCount:sections.filter((node)=>node.textContent.includes(fallback)).length,nonemptyCount:sections.filter((node)=>!node.textContent.includes(fallback)&&node.textContent.trim()!=='').length,selectedRemarksDisplay:selected?getComputedStyle(selected).display:null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 }
 
 function setFacilityTableTypeSelect(value) {
@@ -7992,10 +7978,6 @@ if (requestListWrap) {
 
     if (!isAlreadySelected) {
       item.classList.add('is-selected');
-    }
-
-    if (item.classList.contains('rejected-only') && item.classList.contains('is-selected')) {
-      logReturnRemarksState('select');
     }
   });
 

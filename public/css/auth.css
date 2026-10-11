@@ -766,6 +766,13 @@ body.login-page {
   white-space: normal;
 }
 
+.privacy-act {
+  margin: 0.35rem 0 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
 .privacy-notice {
   max-height: min(38vh, 280px);
   margin: 0 0 1rem;
