@@ -13,7 +13,7 @@
         crossorigin="anonymous">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/css/auth.css?v=20261015">
+  <link rel="stylesheet" href="/css/auth.css?v=20261016">
 </head>
 <body class="login-page privacy-page">
 
@@ -130,6 +130,14 @@
         }
       });
       syncContinue();
+
+      // #region agent log
+      const card = document.querySelector('.privacy-card');
+      if (card) {
+        const rect = card.getBoundingClientRect();
+        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2da69'},body:JSON.stringify({sessionId:'c2da69',location:'data-privacy.blade.php:center',message:'privacy card horizontal position',data:{innerWidth:window.innerWidth,cardWidth:Math.round(rect.width),leftGap:Math.round(rect.left),rightGap:Math.round(window.innerWidth-rect.right)},timestamp:Date.now(),hypothesisId:'B',runId:'post-fix'})}).catch(()=>{});
+      }
+      // #endregion
     })();
   </script>
 </body>
