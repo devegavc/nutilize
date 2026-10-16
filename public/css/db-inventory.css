@@ -7878,8 +7878,25 @@ body.page-insights .priority-pill.unavailable {
 .equipment-demand-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 14px 22px 8px;
+  gap: 18px;
+  padding: 18px 26px 28px;
+}
+
+.equipment-demand-panel .equipment-demand-section.inventory-grid,
+#equipment-planning.inventory-grid {
+  margin: 0;
+  min-height: 0;
+  overflow: visible;
+  background: #f7f8fc;
+  box-shadow: none;
+  border: 1px solid #d7deee;
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+}
+
+.equipment-demand-panel .insight-kpi-strip {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .equipment-demand-panel [hidden] {
@@ -8043,16 +8060,17 @@ body.page-insights .priority-pill.unavailable {
 
 .equipment-planning-visual {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-  margin: 4px 0 14px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 14px 0 18px;
 }
 
 .equipment-planning-card {
   border: 1px solid #cdd6ee;
   border-radius: 14px;
   background: #f7f9ff;
-  padding: 12px 14px;
+  padding: 16px 18px 14px;
+  min-width: 0;
 }
 
 .equipment-planning-card.is-shortage {
@@ -8063,16 +8081,23 @@ body.page-insights .priority-pill.unavailable {
 .equipment-planning-card-head {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  align-items: baseline;
-  margin-bottom: 8px;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
   color: #1b2b6a;
 }
 
+.equipment-planning-card-head strong {
+  min-width: 0;
+  line-height: 1.35;
+}
+
 .equipment-planning-badge {
+  flex: 0 0 auto;
   font-size: 0.75rem;
   font-weight: 700;
   color: #24357f;
+  padding-top: 2px;
 }
 
 .equipment-planning-card.is-shortage .equipment-planning-badge {
@@ -8081,17 +8106,26 @@ body.page-insights .priority-pill.unavailable {
 
 .equipment-planning-bar-row {
   display: grid;
-  grid-template-columns: 92px 1fr 36px;
-  gap: 8px;
+  grid-template-columns: 104px minmax(0, 1fr) 44px;
+  gap: 10px;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
   font-size: 0.75rem;
   color: #39457f;
 }
 
+.equipment-planning-bar-row > span:first-child {
+  white-space: nowrap;
+}
+
+.equipment-planning-card .equipment-demand-note {
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
 .equipment-planning-track {
   display: block;
-  height: 8px;
+  height: 10px;
   border-radius: 999px;
   background: #e4eaf6;
   overflow: hidden;
@@ -8101,7 +8135,6 @@ body.page-insights .priority-pill.unavailable {
   display: block;
   height: 100%;
   border-radius: 999px;
-  min-width: 4px;
 }
 
 .equipment-planning-fill.is-peak {
@@ -8110,6 +8143,26 @@ body.page-insights .priority-pill.unavailable {
 
 .equipment-planning-fill.is-stock {
   background: #2bb3a8;
+}
+
+#equipment-planning .table-wrap {
+  padding: 4px 0 0;
+  overflow-x: auto;
+}
+
+#equipment-planning .analytics-table thead th {
+  white-space: normal;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  padding: 12px 14px;
+}
+
+#equipment-planning .analytics-table tbody td {
+  padding: 12px 14px;
+}
+
+#equipment-planning .equipment-demand-definitions {
+  margin-top: 14px;
 }
 
 .equipment-demand-text-btn:disabled {
