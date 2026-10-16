@@ -98,6 +98,7 @@ SQL;
             'id' => (int) $term->id,
             'academic_year' => (string) $term->academic_year,
             'name' => (string) $term->name,
+            'term_key' => trim((string) ($term->term_key ?? '')),
             'starts_on' => $term->starts_on->toDateString(),
             'ends_on' => $term->ends_on->toDateString(),
             'weeks' => self::spanWeeks($window['start'], $window['end']),
@@ -393,6 +394,185 @@ SQL;
         }
 
         return $series;
+    }
+
+    public static function normalizeTermKey(mixed $value): string
+    {
+        $key = strtolower(trim((string) $value));
+        $key = preg_replace('/[^a-z0-9]+/', '-', $key) ?? '';
+
+        return trim($key, '-');
+    }
+
+    /**
+     * Earlier academic years that share the configured matching key and have already ended.
+     * Display name is not used. A term that has not ended is excluded.
+     *
+     * @param  array<string, mixed>  $target
+     * @param  array<int, array<string, mixed>>  $catalog
+     * @return array<int, array<string, mixed>>
+     */
+    public static function historicalMatches(array $target, array $catalog, string $today): array
+    {
+        $key = trim((string) ($target['term_key'] ?? ''));
+        if ($key === '') {
+            return [];
+        }
+
+        $todayDate = Carbon::parse($today, self::TIMEZONE)->startOfDay();
+        $targetStart = Carbon::parse((string) $target['starts_on'], self::TIMEZONE)->startOfDay();
+        $matches = [];
+
+        foreach ($catalog as $term) {
+            if ((int) ($term['id'] ?? 0) === (int) ($target['id'] ?? 0)) {
+                continue;
+            }
+            if (trim((string) ($term['term_key'] ?? '')) !== $key) {
+                continue;
+            }
+            if ((string) ($term['academic_year'] ?? '') === (string) ($target['academic_year'] ?? '')) {
+                continue;
+            }
+
+            $start = Carbon::parse((string) $term['starts_on'], self::TIMEZONE)->startOfDay();
+            $end = Carbon::parse((string) $term['ends_on'], self::TIMEZONE)->startOfDay();
+            if ($end->greaterThanOrEqualTo($todayDate) || $start->greaterThanOrEqualTo($targetStart)) {
+                continue;
+            }
+
+            $matches[] = $term;
+        }
+
+        usort($matches, static fn (array $left, array $right): int => strcmp((string) $left['starts_on'], (string) $right['starts_on']));
+
+        return $matches;
+    }
+
+    public static function stockGap(int $baseline, ?int $serviceableStock): ?int
+    {
+        if ($serviceableStock === null) {
+            return null;
+        }
+
+        return max(0, $baseline - max(0, $serviceableStock));
+    }
+
+    /**
+     * Highest observed peak across completed matching terms.
+     *
+     * @param  array<int, array{label: string, peak: int, reservations: int, approved_quantity: int}>  $observations
+     * @return array{peak: int, reservation_count: int, approved_quantity: int, source_label: string, source_labels: array<int, string>, terms_at_peak: int, term_count: int}|null
+     */
+    public static function conservativeBaseline(array $observations): ?array
+    {
+        if ($observations === []) {
+            return null;
+        }
+
+        $peak = max(array_map(static fn (array $row): int => (int) $row['peak'], $observations));
+        $atPeak = array_values(array_filter(
+            $observations,
+            static fn (array $row): bool => (int) $row['peak'] === $peak
+        ));
+        $source = $atPeak[count($atPeak) - 1];
+
+        return [
+            'peak' => $peak,
+            'reservation_count' => (int) $source['reservations'],
+            'approved_quantity' => (int) $source['approved_quantity'],
+            'source_label' => (string) $source['label'],
+            'source_labels' => array_map(static fn (array $row): string => (string) $row['label'], $atPeak),
+            'terms_at_peak' => count($atPeak),
+            'term_count' => count($observations),
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $sourceLabels
+     * @return array<int, string>
+     */
+    public static function planningSentences(
+        string $itemName,
+        string $targetLabel,
+        int $peak,
+        string $sourceLabel,
+        array $sourceLabels,
+        int $termCount,
+        int $termsAtPeak,
+        ?int $serviceableStock,
+        ?int $historicalGap,
+        bool $hasConfirmed,
+        ?int $confirmedPeak,
+        ?int $confirmedGap
+    ): array {
+        $sentences = [];
+
+        if ($serviceableStock === null || $historicalGap === null) {
+            $sentences[] = sprintf(
+                'Current serviceable stock is not recorded, so a historical planning gap cannot be calculated for %s. During %s, peak simultaneous approved demand was %d units.',
+                $itemName,
+                $sourceLabel,
+                $peak
+            );
+        } elseif ($historicalGap > 0) {
+            $unitWord = $historicalGap === 1 ? 'unit' : 'units';
+            $sentences[] = sprintf(
+                'Potential shortage for %s: %s reached a peak simultaneous demand of %d units during %s. Current serviceable stock is %d units. If similar demand recurs, there would be a gap of %d %s. Consider adding %d serviceable %s or adjusting reservation schedules.',
+                $targetLabel,
+                $itemName,
+                $peak,
+                $sourceLabel,
+                $serviceableStock,
+                $historicalGap,
+                $unitWord,
+                $historicalGap,
+                $unitWord
+            );
+        } else {
+            $sentences[] = sprintf(
+                'Historical demand covered by current stock. %s reached a peak simultaneous demand of %d units during %s, and current serviceable stock is %d units.',
+                $itemName,
+                $peak,
+                $sourceLabel,
+                $serviceableStock
+            );
+        }
+
+        if ($termCount > 1 && $termsAtPeak > 1) {
+            $sentences[] = sprintf(
+                'The conservative historical planning baseline is the highest observed peak. That peak occurred in %d of %d completed matching terms: %s.',
+                $termsAtPeak,
+                $termCount,
+                implode(', ', $sourceLabels)
+            );
+        } elseif ($termCount > 1) {
+            $sentences[] = sprintf(
+                'The conservative historical planning baseline is the highest observed peak, from %s, among %d completed matching terms. The other matching terms peaked lower.',
+                $sourceLabel,
+                $termCount
+            );
+        } else {
+            $sentences[] = sprintf(
+                'The baseline comes from the only completed matching term, %s.',
+                $sourceLabel
+            );
+        }
+
+        if ($hasConfirmed) {
+            $confirmedGapText = $confirmedGap === null
+                ? 'Current serviceable stock is not recorded, so the confirmed booking gap cannot be calculated.'
+                : ($confirmedGap > 0
+                    ? sprintf('The confirmed booking gap against current stock is %d %s.', $confirmedGap, $confirmedGap === 1 ? 'unit' : 'units')
+                    : 'Current stock covers that confirmed peak.');
+            $sentences[] = sprintf(
+                'Confirmed bookings during %s reach a separate peak of %d units. %s This confirmed booking gap is not added to the historical planning gap.',
+                $targetLabel,
+                (int) $confirmedPeak,
+                $confirmedGapText
+            );
+        }
+
+        return $sentences;
     }
 
     /**
@@ -705,9 +885,6 @@ SQL;
             ? self::monthBuckets($period['start'], $period['end'])
             : self::weekBuckets($period['start'], $period['end']);
         $series = self::weeklySeries($buckets, $approvedEvents, $weeklyItemId);
-        // #region agent log
-        file_put_contents(base_path('debug-f0ec29.log'), json_encode(['sessionId' => 'f0ec29', 'hypothesisId' => 'A', 'location' => 'EquipmentDemandAnalyticsService.php:assemble', 'message' => 'demand trend grain', 'data' => ['mode' => $period['mode'] ?? null, 'grain' => $monthly ? 'month' : 'week', 'points' => count($series), 'labels' => array_column($series, 'label')], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
-        // #endregion
         $topItem = $itemRows[0] ?? null;
         if ($rank === 'quantity' && $ranked !== []) {
             $byFrequency = $ranked;
@@ -759,6 +936,9 @@ SQL;
             ],
             'availability' => $availability,
             'insights' => $insights,
+            'planning' => ($period['mode'] ?? '') === 'term'
+                ? self::buildPlanning($period, $terms, $lines)
+                : self::planningNotApplicable(),
             'definitions' => self::definitions(),
         ];
     }
@@ -792,6 +972,288 @@ SQL;
         }
 
         return 'Peak does not exceed current serviceable stock.';
+    }
+
+    /**
+     * @param  array<string, mixed>  $period
+     * @param  array<int, array<string, mixed>>  $terms
+     * @param  array<int, array<string, mixed>>  $targetLines
+     * @return array<string, mixed>
+     */
+    private static function buildPlanning(array $period, array $terms, array $targetLines): array
+    {
+        $target = null;
+        foreach ($terms as $term) {
+            if ((int) ($term['id'] ?? 0) === (int) ($period['term_id'] ?? 0)) {
+                $target = $term;
+                break;
+            }
+        }
+
+        $basis = self::planningBasis();
+        if ($target === null) {
+            return self::planningInsufficient('Insufficient historical data for term planning.', 'The selected term is not in the saved term list.', null, $basis);
+        }
+
+        $today = Carbon::now(self::TIMEZONE)->toDateString();
+        $matches = self::historicalMatches($target, $terms, $today);
+        $targetView = self::planningTarget($target);
+
+        if (trim((string) ($target['term_key'] ?? '')) === '') {
+            return self::planningInsufficient(
+                'Insufficient historical data for term planning.',
+                'This term has no matching key. Set the same matching key on this term and on the completed term from an earlier academic year. The display name is not used for matching.',
+                $targetView,
+                $basis
+            );
+        }
+
+        if ($matches === []) {
+            return self::planningInsufficient(
+                'Insufficient historical data for term planning.',
+                'No completed term from an earlier academic year uses the matching key “'.$target['term_key'].'”. A term that has not ended is not used as history.',
+                $targetView,
+                $basis
+            );
+        }
+
+        $historicalByTerm = [];
+        foreach ($matches as $match) {
+            $window = self::termWindow((string) $match['starts_on'], (string) $match['ends_on']);
+            $historicalByTerm[] = [
+                'term' => $match,
+                'items' => self::approvedItemStats(self::fetchOverlappingLines($window['start'], $window['end'])),
+            ];
+        }
+
+        $confirmed = self::approvedItemStats($targetLines);
+        $itemIds = [];
+        foreach ($historicalByTerm as $block) {
+            foreach ($block['items'] as $itemId => $stats) {
+                $itemIds[(int) $itemId] = (string) $stats['item_name'];
+            }
+        }
+
+        $stock = $itemIds === [] ? [] : self::serviceableStock(array_keys($itemIds));
+        $stockKnown = $itemIds !== [] && $stock !== null;
+        $rows = [];
+
+        foreach ($itemIds as $itemId => $fallbackName) {
+            $observations = [];
+            $name = $fallbackName;
+            foreach ($historicalByTerm as $block) {
+                $stats = $block['items'][$itemId] ?? null;
+                if ($stats !== null) {
+                    $name = (string) $stats['item_name'];
+                }
+                $observations[] = [
+                    'label' => (string) $block['term']['label'],
+                    'peak' => (int) ($stats['peak'] ?? 0),
+                    'reservations' => (int) ($stats['reservation_count'] ?? 0),
+                    'approved_quantity' => (int) ($stats['approved_quantity'] ?? 0),
+                ];
+            }
+
+            $baseline = self::conservativeBaseline($observations);
+            if ($baseline === null) {
+                continue;
+            }
+
+            $serviceable = $stockKnown ? (int) ($stock[$itemId] ?? 0) : null;
+            $gap = self::stockGap($baseline['peak'], $serviceable);
+            $confirmedStats = $confirmed[$itemId] ?? null;
+            $hasConfirmed = $confirmedStats !== null && (int) $confirmedStats['reservation_count'] > 0;
+            $confirmedPeak = $hasConfirmed ? (int) $confirmedStats['peak'] : null;
+            $confirmedGap = $hasConfirmed ? self::stockGap((int) $confirmedPeak, $serviceable) : null;
+
+            $rows[] = [
+                'item_id' => $itemId,
+                'item_name' => $name,
+                'historical_reservation_count' => $baseline['reservation_count'],
+                'historical_approved_quantity' => $baseline['approved_quantity'],
+                'historical_peak' => $baseline['peak'],
+                'baseline_term' => $baseline['source_label'],
+                'baseline_terms' => $baseline['source_labels'],
+                'terms_at_peak' => $baseline['terms_at_peak'],
+                'historical_term_count' => $baseline['term_count'],
+                'history' => $observations,
+                'serviceable_stock' => $serviceable,
+                'historical_gap' => $gap,
+                'issued_label' => 'Not recorded',
+                'confirmed_peak' => $confirmedPeak,
+                'confirmed_reservations' => $hasConfirmed ? (int) $confirmedStats['reservation_count'] : null,
+                'confirmed_gap' => $confirmedGap,
+                'sentences' => self::planningSentences(
+                    $name,
+                    (string) $targetView['label'],
+                    $baseline['peak'],
+                    $baseline['source_label'],
+                    $baseline['source_labels'],
+                    $baseline['term_count'],
+                    $baseline['terms_at_peak'],
+                    $serviceable,
+                    $gap,
+                    $hasConfirmed,
+                    $confirmedPeak,
+                    $confirmedGap
+                ),
+            ];
+        }
+
+        usort($rows, static function (array $left, array $right): int {
+            return [($right['historical_gap'] ?? -1), $right['historical_peak'], $left['item_name']]
+                <=> [($left['historical_gap'] ?? -1), $left['historical_peak'], $right['item_name']];
+        });
+
+        $hasGap = false;
+        foreach ($rows as $row) {
+            if (($row['historical_gap'] ?? 0) > 0) {
+                $hasGap = true;
+                break;
+            }
+        }
+
+        return [
+            'applicable' => true,
+            'status' => $rows === [] ? 'insufficient_history' : ($hasGap ? 'potential_shortage' : 'covered'),
+            'message' => $rows === []
+                ? 'Insufficient historical data for term planning.'
+                : ($hasGap
+                    ? 'Some items would exceed current serviceable stock if similar demand recurs.'
+                    : 'Historical demand covered by current stock.'),
+            'detail' => $rows === []
+                ? 'The completed matching terms have no approved equipment reservations.'
+                : 'Historical planning gap uses the highest peak simultaneous approved quantity. It is not the sum of quantities across the term, and it is not added to confirmed bookings in the target term.',
+            'target' => $targetView,
+            'references' => array_map(static fn (array $match): array => [
+                'id' => (int) $match['id'],
+                'label' => (string) $match['label'],
+                'academic_year' => (string) $match['academic_year'],
+                'name' => (string) $match['name'],
+                'term_key' => (string) $match['term_key'],
+                'starts_on' => (string) $match['starts_on'],
+                'ends_on' => (string) $match['ends_on'],
+            ], $matches),
+            'items' => $rows,
+            'basis' => $basis,
+            'unmet' => self::unmetDemandNote(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $target
+     * @return array<string, mixed>
+     */
+    private static function planningInsufficient(string $message, string $detail, ?array $target, string $basis): array
+    {
+        return [
+            'applicable' => true,
+            'status' => 'insufficient_history',
+            'message' => $message,
+            'detail' => $detail,
+            'target' => $target,
+            'references' => [],
+            'items' => [],
+            'basis' => $basis,
+            'unmet' => self::unmetDemandNote(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function planningNotApplicable(): array
+    {
+        return [
+            'applicable' => false,
+            'status' => 'not_applicable',
+            'message' => '',
+            'detail' => '',
+            'target' => null,
+            'references' => [],
+            'items' => [],
+            'basis' => '',
+            'unmet' => self::unmetDemandNote(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $term
+     * @return array<string, mixed>
+     */
+    private static function planningTarget(array $term): array
+    {
+        return [
+            'id' => (int) ($term['id'] ?? 0),
+            'label' => (string) ($term['label'] ?? ''),
+            'academic_year' => (string) ($term['academic_year'] ?? ''),
+            'name' => (string) ($term['name'] ?? ''),
+            'term_key' => (string) ($term['term_key'] ?? ''),
+            'starts_on' => (string) ($term['starts_on'] ?? ''),
+            'ends_on' => (string) ($term['ends_on'] ?? ''),
+        ];
+    }
+
+    private static function planningBasis(): string
+    {
+        return 'This is a rule-based historical planning indicator, not a forecast. It does not mean an item will be reserved again. The baseline is the highest peak simultaneous approved quantity in a completed matching term. Cumulative term quantity is not treated as the number of units to own. Current serviceable stock is today\'s count of available and in-use units, not the stock on those past dates. Checkout quantities are not recorded.';
+    }
+
+    /**
+     * @return array{available: bool, note: string}
+     */
+    private static function unmetDemandNote(): array
+    {
+        return [
+            'available' => false,
+            'note' => 'Rejections store a free-text note, not a reason code for insufficient equipment. Rejected and cancelled requests are excluded from approved demand and are not counted as unmet stock. Approved history may understate total demand.',
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $lines
+     * @return array<int, array<string, mixed>>
+     */
+    private static function approvedItemStats(array $lines): array
+    {
+        $items = [];
+
+        foreach ($lines as $line) {
+            if (!($line['approved'] ?? false)) {
+                continue;
+            }
+
+            $itemId = (int) $line['item_id'];
+            $quantity = self::normalizeQuantity($line['quantity'] ?? 0);
+            $items[$itemId] ??= [
+                'item_id' => $itemId,
+                'item_name' => (string) ($line['item_name'] ?? 'Unnamed item'),
+                'reservations' => [],
+                'approved_quantity' => 0,
+                'intervals' => [],
+            ];
+            $items[$itemId]['approved_quantity'] += $quantity;
+            $items[$itemId]['reservations'][(int) $line['reservation_id']] = true;
+            $items[$itemId]['intervals'][] = [
+                'start' => $line['start'],
+                'end' => $line['end'],
+                'quantity' => $quantity,
+                'activity' => (string) ($line['activity_name'] ?? ''),
+            ];
+        }
+
+        foreach ($items as $itemId => $item) {
+            $peak = self::peakDemand($item['intervals']);
+            $items[$itemId] = [
+                'item_id' => $itemId,
+                'item_name' => $item['item_name'],
+                'reservation_count' => count($item['reservations']),
+                'approved_quantity' => (int) $item['approved_quantity'],
+                'peak' => $peak['peak'],
+            ];
+        }
+
+        return $items;
     }
 
     /**
@@ -961,6 +1423,7 @@ SQL;
             'weekly' => null,
             'availability' => [],
             'insights' => [],
+            'planning' => self::planningNotApplicable(),
             'definitions' => self::definitions(),
         ];
     }

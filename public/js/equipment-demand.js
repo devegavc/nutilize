@@ -126,6 +126,7 @@
     editingTermId = term ? term.id : null;
     termForm.querySelector('[name="academic_year"]').value = term ? term.academic_year : (state.academicYear || '');
     termForm.querySelector('[name="name"]').value = term ? term.name : '';
+    termForm.querySelector('[name="term_key"]').value = term ? (term.term_key || '') : '';
     termForm.querySelector('[name="starts_on"]').value = term ? term.starts_on : '';
     termForm.querySelector('[name="ends_on"]').value = term ? term.ends_on : '';
     document.getElementById('equipment-term-form-title').textContent = term ? 'Edit academic term' : 'Add academic term';
@@ -144,6 +145,8 @@
     if (active) {
       results.hidden = true;
       emptyBox.hidden = true;
+      const planning = document.getElementById('equipment-planning');
+      if (planning) planning.hidden = true;
     }
   };
 
@@ -243,9 +246,6 @@
     if (title) title.textContent = weekly?.title || 'Weekly demand';
     note.textContent = weekly?.note || '';
     unit.textContent = weekly ? `Unit: ${weekly.unit}` : '';
-    // #region agent log
-    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f0ec29'},body:JSON.stringify({sessionId:'f0ec29',hypothesisId:'B',location:'equipment-demand.js:renderChart',message:'chart grain rendered',data:{grain:weekly?.grain||null,title:weekly?.title||null,labels:(weekly?.points||[]).map((point)=>point.label)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     const itemSelect = document.getElementById('equipment-weekly-item');
     const options = [{ value: '', label: 'All items (reservation count)' }];
@@ -310,6 +310,7 @@
     const noTerms = payload.empty_reason === 'no_terms' || payload.empty_reason === 'terms_unavailable';
     if (noTerms) {
       results.hidden = true;
+      document.getElementById('equipment-planning').hidden = true;
       emptyBox.hidden = false;
       emptyTitle.textContent = 'Add a term to see demand';
       emptyCopy.textContent = payload.empty_reason === 'terms_unavailable'
@@ -318,6 +319,8 @@
       showForm(null);
       return;
     }
+
+    renderPlanning(payload.planning);
 
     if (payload.empty) {
       results.hidden = true;
@@ -342,6 +345,64 @@
     renderInsights(payload.insights);
     renderChart(payload.weekly);
     requestAnimationFrame(() => weeklyChart && weeklyChart.resize());
+  };
+
+  const renderPlanning = (planning) => {
+    const section = document.getElementById('equipment-planning');
+    if (!section) return;
+    if (!planning || planning.applicable === false) {
+      section.hidden = true;
+      return;
+    }
+
+    section.hidden = false;
+    document.getElementById('equipment-planning-message').textContent = planning.message || '';
+    const target = planning.target;
+    document.getElementById('equipment-planning-target').textContent = target
+      ? `Target: ${target.label} (${target.starts_on} to ${target.ends_on}). Matching key: ${target.term_key || 'not set'}.`
+      : '';
+    const references = planning.references || [];
+    document.getElementById('equipment-planning-references').textContent = references.length
+      ? `Historical reference: ${references.map((term) => `${term.label} (${term.starts_on} to ${term.ends_on})`).join('; ')}.`
+      : 'Historical reference: none.';
+    document.getElementById('equipment-planning-detail').textContent = planning.detail || '';
+    document.getElementById('equipment-planning-basis').textContent = planning.basis || '';
+    document.getElementById('equipment-planning-unmet').textContent = planning.unmet?.note || '';
+
+    const items = planning.items || [];
+    document.getElementById('equipment-planning-table').hidden = items.length === 0;
+    const body = document.getElementById('equipment-planning-items');
+    const notes = document.getElementById('equipment-planning-notes');
+    body.replaceChildren();
+    notes.replaceChildren();
+
+    items.forEach((item) => {
+      const row = document.createElement('tr');
+      if ((item.historical_gap || 0) > 0) row.classList.add('is-shortage');
+      const history = (item.history || []).map((term) => `${term.label}: ${term.reservations} reservations, peak ${term.peak}`).join('; ');
+      row.append(
+        textCell(item.item_name),
+        textCell(item.historical_reservation_count),
+        textCell(`${item.historical_peak} (${item.baseline_term})`),
+        textCell(item.serviceable_stock === null ? 'Not recorded' : item.serviceable_stock),
+        textCell(item.historical_gap === null ? 'Not recorded' : item.historical_gap),
+        textCell(item.confirmed_peak === null ? 'None' : item.confirmed_peak),
+        textCell(item.confirmed_gap === null ? 'None' : item.confirmed_gap),
+        textCell(item.issued_label || 'Not recorded')
+      );
+      const historyCell = document.createElement('td');
+      historyCell.colSpan = 8;
+      historyCell.textContent = history;
+      const historyRow = document.createElement('tr');
+      historyRow.appendChild(historyCell);
+      body.append(row, historyRow);
+
+      (item.sentences || []).forEach((sentence) => {
+        const note = document.createElement('li');
+        note.textContent = sentence;
+        notes.appendChild(note);
+      });
+    });
   };
 
   const dashboardParams = () => {
@@ -454,6 +515,7 @@
     const body = {
       academic_year: termForm.querySelector('[name="academic_year"]').value.trim(),
       name: termForm.querySelector('[name="name"]').value.trim(),
+      term_key: termForm.querySelector('[name="term_key"]').value.trim(),
       starts_on: termForm.querySelector('[name="starts_on"]').value,
       ends_on: termForm.querySelector('[name="ends_on"]').value,
     };

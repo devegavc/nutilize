@@ -74,12 +74,25 @@ class DashboardInventoryController extends Controller
     }
 
     /**
-     * @return array{academic_year: string, name: string, starts_on: string, ends_on: string}
+     * @return array{academic_year: string, name: string, term_key: string, starts_on: string, ends_on: string}
      */
     private function validatedAcademicTerm(Request $request, ?AcademicTerm $current = null): array
     {
+        $request->merge([
+            'term_key' => EquipmentDemandAnalyticsService::normalizeTermKey($request->input('term_key')),
+        ]);
+
         $validated = $request->validate([
             'academic_year' => ['required', 'string', 'max:32', 'regex:/^[A-Za-z0-9][A-Za-z0-9 .\/-]{0,31}$/'],
+            'term_key' => [
+                'required',
+                'string',
+                'max:40',
+                'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
+                Rule::unique('academic_terms', 'term_key')
+                    ->where(fn ($query) => $query->where('academic_year', trim((string) $request->input('academic_year'))))
+                    ->ignore($current?->id),
+            ],
             'name' => [
                 'required',
                 'string',
@@ -104,6 +117,7 @@ class DashboardInventoryController extends Controller
         return [
             'academic_year' => trim($validated['academic_year']),
             'name' => trim($validated['name']),
+            'term_key' => $validated['term_key'],
             'starts_on' => $startsOn->toDateString(),
             'ends_on' => $endsOn->toDateString(),
         ];

@@ -18,27 +18,30 @@
       <select id="equipment-demand-term" aria-label="Academic term"></select>
       <span id="equipment-demand-term-length" class="equipment-demand-term-length"></span>
       <button type="button" class="equipment-demand-text-btn" id="equipment-demand-add-term">Add term</button>
-      <button type="button" class="equipment-demand-text-btn" id="equipment-demand-edit-term">Edit dates</button>
+      <button type="button" class="equipment-demand-text-btn" id="equipment-demand-edit-term">Edit term</button>
     </div>
   </div>
 
   <form id="equipment-term-form" class="equipment-term-form" hidden>
     <h2 id="equipment-term-form-title">Add academic term</h2>
-    <p>Set the term’s start and end dates. The report uses that span, not a fixed 14 weeks.</p>
-    <div class="equipment-term-fields">
-      <label>Academic year
-        <input type="text" name="academic_year" maxlength="32" required placeholder="2026-2027" autocomplete="off" />
-      </label>
-      <label>Term
-        <input type="text" name="name" maxlength="80" required placeholder="First Semester" autocomplete="off" />
-      </label>
-      <label>Starts
-        <input type="date" name="starts_on" required />
-      </label>
-      <label>Ends
-        <input type="date" name="ends_on" required />
-      </label>
-    </div>
+      <p>Set the term’s dates and a matching key. Use the same key every year for this term, such as first-term. Planning matches that key, not the display name.</p>
+      <div class="equipment-term-fields">
+        <label>Academic year
+          <input type="text" name="academic_year" maxlength="32" required placeholder="2026-2027" autocomplete="off" />
+        </label>
+        <label>Term name
+          <input type="text" name="name" maxlength="80" required placeholder="First Semester" autocomplete="off" />
+        </label>
+        <label>Matching key
+          <input type="text" name="term_key" maxlength="40" required placeholder="first-term" autocomplete="off" />
+        </label>
+        <label>Starts
+          <input type="date" name="starts_on" required />
+        </label>
+        <label>Ends
+          <input type="date" name="ends_on" required />
+        </label>
+      </div>
     <div class="equipment-term-actions">
       <button type="submit" class="equipment-demand-text-btn is-primary" id="equipment-term-submit">Save term</button>
       <button type="button" class="equipment-demand-text-btn" id="equipment-term-cancel">Cancel</button>
@@ -179,6 +182,41 @@
       <ul id="equipment-demand-insights"></ul>
     </section>
   </div>
+
+  <section id="equipment-planning" class="equipment-demand-section inventory-grid analytics-table-grid insight-section" hidden>
+    <div class="inventory-grid-head analytics-grid-head insight-head">
+      <div>
+        <h2>Planning for the next matching term</h2>
+        <p id="equipment-planning-message"></p>
+      </div>
+    </div>
+    <p id="equipment-planning-target" class="equipment-demand-note"></p>
+    <p id="equipment-planning-references" class="equipment-demand-note"></p>
+    <p id="equipment-planning-detail" class="equipment-demand-note"></p>
+    <div class="table-wrap" id="equipment-planning-table">
+      <table class="inventory-table analytics-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Historical reservations</th>
+            <th>Historical peak</th>
+            <th>Current serviceable stock</th>
+            <th>Historical planning gap</th>
+            <th>Confirmed peak</th>
+            <th>Confirmed booking gap</th>
+            <th>Issued quantity</th>
+          </tr>
+        </thead>
+        <tbody id="equipment-planning-items"></tbody>
+      </table>
+    </div>
+    <ul id="equipment-planning-notes" class="equipment-planning-notes"></ul>
+    <details class="equipment-demand-definitions">
+      <summary>How this planning figure is calculated</summary>
+      <p id="equipment-planning-basis"></p>
+      <p id="equipment-planning-unmet"></p>
+    </details>
+  </section>
 
   <details class="equipment-demand-definitions">
     <summary>How these figures are counted</summary>

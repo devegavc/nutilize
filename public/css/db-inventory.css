@@ -7986,7 +7986,7 @@ body.page-insights .priority-pill.unavailable {
 
 .equipment-term-fields {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
   margin: 10px 0;
 }
@@ -8029,10 +8029,16 @@ body.page-insights .priority-pill.unavailable {
 }
 
 .equipment-demand-insights li,
-.equipment-demand-definitions li {
+.equipment-demand-definitions li,
+.equipment-planning-notes li {
   margin: 0 0 8px;
   color: #24315f;
   font-size: 0.86rem;
+}
+
+.equipment-planning-notes {
+  margin: 12px 0 0;
+  padding-left: 18px;
 }
 
 .equipment-demand-text-btn:disabled {

@@ -297,4 +297,129 @@ class EquipmentDemandAnalyticsServiceTest extends TestCase
 
         $this->assertStringNotContainsString('Review stock', implode(' ', $sentences));
     }
+
+    public function test_matching_key_ignores_display_name_and_skips_unfinished_or_later_terms(): void
+    {
+        $target = [
+            'id' => 3,
+            'academic_year' => '2026-2027',
+            'name' => 'First Term',
+            'term_key' => 'first-term',
+            'starts_on' => '2026-08-03',
+            'ends_on' => '2026-11-08',
+        ];
+        $catalog = [
+            $target,
+            [
+                'id' => 1,
+                'academic_year' => '2025-2026',
+                'name' => '1st Semester',
+                'term_key' => 'first-term',
+                'starts_on' => '2025-08-04',
+                'ends_on' => '2025-11-09',
+            ],
+            [
+                'id' => 2,
+                'academic_year' => '2025-2026',
+                'name' => 'First Term',
+                'term_key' => 'second-term',
+                'starts_on' => '2026-01-05',
+                'ends_on' => '2026-04-05',
+            ],
+            [
+                'id' => 4,
+                'academic_year' => '2024-2025',
+                'name' => 'Opening Term',
+                'term_key' => 'first-term',
+                'starts_on' => '2024-08-05',
+                'ends_on' => '2026-10-16',
+            ],
+            [
+                'id' => 5,
+                'academic_year' => '2027-2028',
+                'name' => 'First Term',
+                'term_key' => 'first-term',
+                'starts_on' => '2027-08-02',
+                'ends_on' => '2027-11-07',
+            ],
+        ];
+
+        $matches = EquipmentDemandAnalyticsService::historicalMatches($target, $catalog, '2026-10-16');
+
+        $this->assertSame([1], array_column($matches, 'id'));
+        $this->assertSame('', EquipmentDemandAnalyticsService::normalizeTermKey(''));
+        $this->assertSame('first-term', EquipmentDemandAnalyticsService::normalizeTermKey(' First Term '));
+    }
+
+    public function test_conservative_baseline_uses_the_highest_peak_and_not_the_term_total(): void
+    {
+        $baseline = EquipmentDemandAnalyticsService::conservativeBaseline([
+            ['label' => 'First Term 2024-2025', 'peak' => 8, 'reservations' => 3, 'approved_quantity' => 40],
+            ['label' => 'First Term 2025-2026', 'peak' => 15, 'reservations' => 4, 'approved_quantity' => 90],
+        ]);
+
+        $this->assertSame(15, $baseline['peak']);
+        $this->assertSame(4, $baseline['reservation_count']);
+        $this->assertSame('First Term 2025-2026', $baseline['source_label']);
+        $this->assertSame(1, $baseline['terms_at_peak']);
+        $this->assertSame(5, EquipmentDemandAnalyticsService::stockGap(15, 10));
+        $this->assertSame(0, EquipmentDemandAnalyticsService::stockGap(10, 12));
+        $this->assertNull(EquipmentDemandAnalyticsService::stockGap(15, null));
+    }
+
+    public function test_planning_copy_keeps_confirmed_bookings_separate_from_history(): void
+    {
+        $sentences = EquipmentDemandAnalyticsService::planningSentences(
+            'Item A',
+            'First Term 2026-2027',
+            15,
+            'First Term 2025-2026',
+            ['First Term 2025-2026'],
+            2,
+            1,
+            10,
+            5,
+            true,
+            4,
+            0
+        );
+        $text = implode(' ', $sentences);
+
+        $this->assertStringContainsString('Potential shortage for First Term 2026-2027', $text);
+        $this->assertStringContainsString('peak simultaneous demand of 15 units during First Term 2025-2026', $text);
+        $this->assertStringContainsString('gap of 5 units', $text);
+        $this->assertStringContainsString('If similar demand recurs', $text);
+        $this->assertStringContainsString('highest observed peak, from First Term 2025-2026, among 2 completed matching terms', $text);
+        $this->assertStringContainsString('separate peak of 4 units', $text);
+        $this->assertStringContainsString('not added to the historical planning gap', $text);
+        $this->assertStringNotContainsString('19', $text);
+        $this->assertStringNotContainsString('growth', strtolower($text));
+        $this->assertStringNotContainsString('will be reserved', strtolower($text));
+    }
+
+    public function test_covered_stock_and_missing_history_use_the_required_wording(): void
+    {
+        $covered = implode(' ', EquipmentDemandAnalyticsService::planningSentences(
+            'Item B',
+            'First Term 2026-2027',
+            6,
+            'First Term 2025-2026',
+            ['First Term 2025-2026'],
+            1,
+            1,
+            10,
+            0,
+            false,
+            null,
+            null
+        ));
+
+        $this->assertStringContainsString('Historical demand covered by current stock.', $covered);
+        $this->assertSame([], EquipmentDemandAnalyticsService::historicalMatches([
+            'id' => 9,
+            'academic_year' => '2026-2027',
+            'term_key' => '',
+            'starts_on' => '2026-08-03',
+        ], [], '2026-10-16'));
+    }
 }
