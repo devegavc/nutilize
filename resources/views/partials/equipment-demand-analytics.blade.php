@@ -17,33 +17,33 @@
       <label for="equipment-demand-term">Term</label>
       <select id="equipment-demand-term" aria-label="Academic term"></select>
       <span id="equipment-demand-term-length" class="equipment-demand-term-length"></span>
-      <button type="button" class="equipment-demand-text-btn" id="equipment-demand-add-term">Add term</button>
+      <button type="button" class="equipment-demand-text-btn" id="equipment-demand-add-term">Add academic year</button>
       <button type="button" class="equipment-demand-text-btn" id="equipment-demand-edit-term">Edit term</button>
     </div>
   </div>
 
   <form id="equipment-term-form" class="equipment-term-form" hidden>
-    <h2 id="equipment-term-form-title">Add academic term</h2>
-      <p>Set the term’s dates and a matching key. Use the same key every year for this term, such as first-term. Planning matches that key, not the display name.</p>
+    <h2 id="equipment-term-form-title">Add academic year</h2>
+    <p id="equipment-term-form-help">This creates 1st, 2nd, and 3rd Term and keeps the same match for every year. You only adjust dates when the calendar moves.</p>
+    <div class="equipment-term-fields" data-year-fields>
+      <label>Academic year
+        <input type="text" name="academic_year" maxlength="9" required placeholder="2027-2028" autocomplete="off" />
+      </label>
+    </div>
+    <div data-date-fields hidden>
+      <p id="equipment-term-date-note" class="equipment-demand-note"></p>
       <div class="equipment-term-fields">
-        <label>Academic year
-          <input type="text" name="academic_year" maxlength="32" required placeholder="2026-2027" autocomplete="off" />
-        </label>
-        <label>Term name
-          <input type="text" name="name" maxlength="80" required placeholder="First Semester" autocomplete="off" />
-        </label>
-        <label>Matching key
-          <input type="text" name="term_key" maxlength="40" required placeholder="first-term" autocomplete="off" />
-        </label>
         <label>Starts
-          <input type="date" name="starts_on" required />
+          <input type="date" name="starts_on" />
         </label>
         <label>Ends
-          <input type="date" name="ends_on" required />
+          <input type="date" name="ends_on" />
         </label>
       </div>
+      <p class="equipment-demand-note">Leave a date empty when the exact day is not known yet. The break before the next term stays inside the term that just ended.</p>
+    </div>
     <div class="equipment-term-actions">
-      <button type="submit" class="equipment-demand-text-btn is-primary" id="equipment-term-submit">Save term</button>
+      <button type="submit" class="equipment-demand-text-btn is-primary" id="equipment-term-submit">Save</button>
       <button type="button" class="equipment-demand-text-btn" id="equipment-term-cancel">Cancel</button>
     </div>
     <p id="equipment-term-form-error" class="equipment-demand-error" hidden></p>
@@ -227,7 +227,7 @@
 <script type="application/json" id="equipment-demand-config">
 {!! json_encode([
     'dashboardUrl' => route('dashboard.inventory.analytics.equipment'),
-    'storeTermUrl' => route('dashboard.academic-terms.store'),
+    'storeYearUrl' => route('dashboard.academic-years.store'),
     'updateTermUrl' => url('/inventory/academic-terms/__ID__'),
     'monthKey' => $monthKey,
     'csrf' => csrf_token(),

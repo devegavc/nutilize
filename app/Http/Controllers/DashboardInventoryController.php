@@ -50,20 +50,96 @@ class DashboardInventoryController extends Controller
         });
     }
 
-    public function storeAcademicTerm(Request $request): JsonResponse
+    public function storeAcademicYear(Request $request): JsonResponse
     {
-        $term = AcademicTerm::query()->create($this->validatedAcademicTerm($request));
+        $academicYear = trim((string) $request->validate([
+            'academic_year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
+        ])['academic_year']);
+
+        [$start, $end] = array_map('intval', explode('-', $academicYear));
+        if ($end !== $start + 1) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'academic_year' => 'Use a year span such as 2026-2027.',
+            ]);
+        }
+
+        if (AcademicTerm::query()->where('academic_year', $academicYear)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'academic_year' => 'That academic year already has its three terms.',
+            ]);
+        }
+
+        EquipmentDemandAnalyticsService::createAcademicYear($academicYear);
+        $terms = EquipmentDemandAnalyticsService::listTerms();
+        $created = array_values(array_filter(
+            $terms,
+            static fn (array $term): bool => $term['academic_year'] === $academicYear
+        ));
 
         return response()->json([
             'ok' => true,
-            'term' => EquipmentDemandAnalyticsService::presentTerm($term),
-            'terms' => EquipmentDemandAnalyticsService::listTerms(),
+            'term' => $created[0] ?? null,
+            'terms' => $terms,
         ]);
     }
 
     public function updateAcademicTerm(Request $request, AcademicTerm $term): JsonResponse
     {
-        $term->fill($this->validatedAcademicTerm($request, $term));
+        $validated = $request->validate([
+            'starts_on' => ['nullable', 'date'],
+            'ends_on' => ['nullable', 'date'],
+        ]);
+
+        $startsOn = !empty($validated['starts_on'])
+            ? Carbon::parse($validated['starts_on'])->toDateString()
+            : null;
+        $endsOn = !empty($validated['ends_on'])
+            ? Carbon::parse($validated['ends_on'])->toDateString()
+            : null;
+
+        if ($startsOn !== null && $endsOn !== null && $endsOn < $startsOn) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'ends_on' => 'The end date must be on or after the start date.',
+            ]);
+        }
+
+        if ($startsOn !== null && $endsOn !== null && Carbon::parse($startsOn)->diffInDays(Carbon::parse($endsOn), true) > 800) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'ends_on' => 'A term cannot be longer than 800 days.',
+            ]);
+        }
+
+        $siblings = AcademicTerm::query()
+            ->where('academic_year', $term->academic_year)
+            ->where('id', '!=', $term->id)
+            ->get()
+            ->map(static fn (AcademicTerm $sibling): array => [
+                'name' => (string) $sibling->name,
+                'starts_on' => $sibling->starts_on?->toDateString(),
+                'ends_on' => $sibling->ends_on?->toDateString(),
+            ])
+            ->all();
+        $siblings[] = [
+            'name' => (string) $term->name,
+            'starts_on' => $startsOn,
+            'ends_on' => $endsOn,
+        ];
+        $overlap = EquipmentDemandAnalyticsService::overlapMessage($siblings);
+        if ($overlap !== null) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'ends_on' => $overlap,
+            ]);
+        }
+
+        $term->starts_on = $startsOn;
+        $term->ends_on = $endsOn;
+        if ($startsOn !== null && $endsOn !== null) {
+            $term->date_note = null;
+        } elseif ($endsOn === null) {
+            $term->date_note = $term->date_note ?: 'The exact end day is not set.';
+        } else {
+            $term->date_note = $term->date_note ?: 'The exact start day is not set.';
+        }
         $term->save();
 
         return response()->json([
@@ -71,56 +147,6 @@ class DashboardInventoryController extends Controller
             'term' => EquipmentDemandAnalyticsService::presentTerm($term),
             'terms' => EquipmentDemandAnalyticsService::listTerms(),
         ]);
-    }
-
-    /**
-     * @return array{academic_year: string, name: string, term_key: string, starts_on: string, ends_on: string}
-     */
-    private function validatedAcademicTerm(Request $request, ?AcademicTerm $current = null): array
-    {
-        $request->merge([
-            'term_key' => EquipmentDemandAnalyticsService::normalizeTermKey($request->input('term_key')),
-        ]);
-
-        $validated = $request->validate([
-            'academic_year' => ['required', 'string', 'max:32', 'regex:/^[A-Za-z0-9][A-Za-z0-9 .\/-]{0,31}$/'],
-            'term_key' => [
-                'required',
-                'string',
-                'max:40',
-                'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
-                Rule::unique('academic_terms', 'term_key')
-                    ->where(fn ($query) => $query->where('academic_year', trim((string) $request->input('academic_year'))))
-                    ->ignore($current?->id),
-            ],
-            'name' => [
-                'required',
-                'string',
-                'max:80',
-                'regex:/^[A-Za-z0-9][A-Za-z0-9 .,&\'\/()-]{0,79}$/',
-                Rule::unique('academic_terms', 'name')
-                    ->where(fn ($query) => $query->where('academic_year', trim((string) $request->input('academic_year'))))
-                    ->ignore($current?->id),
-            ],
-            'starts_on' => ['required', 'date'],
-            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
-        ]);
-
-        $startsOn = Carbon::parse($validated['starts_on'])->startOfDay();
-        $endsOn = Carbon::parse($validated['ends_on'])->startOfDay();
-        if ($startsOn->diffInDays($endsOn, true) > 800) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'ends_on' => 'A term cannot be longer than 800 days.',
-            ]);
-        }
-
-        return [
-            'academic_year' => trim($validated['academic_year']),
-            'name' => trim($validated['name']),
-            'term_key' => $validated['term_key'],
-            'starts_on' => $startsOn->toDateString(),
-            'ends_on' => $endsOn->toDateString(),
-        ];
     }
 
     private function equipmentDemandResponse(callable $callback): JsonResponse

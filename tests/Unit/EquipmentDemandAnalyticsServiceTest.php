@@ -422,4 +422,49 @@ class EquipmentDemandAnalyticsServiceTest extends TestCase
             'starts_on' => '2026-08-03',
         ], [], '2026-10-16'));
     }
+
+    public function test_2026_calendar_includes_the_break_and_does_not_invent_later_days(): void
+    {
+        $calendar = EquipmentDemandAnalyticsService::officialCalendar('2026-2027');
+        $byKey = [];
+        foreach ($calendar as $term) {
+            $byKey[$term['term_key']] = $term;
+        }
+
+        $this->assertSame(['term-1', 'term-2', 'term-3'], array_column($calendar, 'term_key'));
+        $this->assertSame('2026-07-13', $byKey['term-1']['starts_on']);
+        $this->assertSame('2026-11-02', $byKey['term-1']['ends_on']);
+        $this->assertSame('2026-11-03', $byKey['term-2']['starts_on']);
+        $this->assertNull($byKey['term-2']['ends_on']);
+        $this->assertNull($byKey['term-3']['starts_on']);
+        $this->assertNull($byKey['term-3']['ends_on']);
+        $this->assertNull(EquipmentDemandAnalyticsService::overlapMessage($calendar));
+        $this->assertNull(EquipmentDemandAnalyticsService::officialCalendar('2027-2028'));
+
+        $termOne = EquipmentDemandAnalyticsService::termWindow('2026-07-13', '2026-11-02');
+        $duringBreak = EquipmentDemandAnalyticsService::usageBounds('2026-10-25 08:00:00', null, '2026-10-25 10:00:00');
+        $termTwoStart = EquipmentDemandAnalyticsService::usageBounds('2026-11-03 08:00:00', null, '2026-11-03 10:00:00');
+
+        $this->assertTrue(EquipmentDemandAnalyticsService::overlaps(
+            $duringBreak['start'],
+            $duringBreak['end'],
+            $termOne['start'],
+            $termOne['end']
+        ));
+        $this->assertFalse(EquipmentDemandAnalyticsService::overlaps(
+            $termTwoStart['start'],
+            $termTwoStart['end'],
+            $termOne['start'],
+            $termOne['end']
+        ));
+
+        $copied = EquipmentDemandAnalyticsService::shiftedTermRows($calendar);
+        $this->assertSame('term-1', $copied[0]['term_key']);
+        $this->assertSame('2027-07-13', $copied[0]['starts_on']);
+        $this->assertSame('2027-11-02', $copied[0]['ends_on']);
+        $this->assertSame('2027-11-03', $copied[1]['starts_on']);
+        $this->assertNull($copied[1]['ends_on']);
+        $this->assertNull($copied[2]['starts_on']);
+        $this->assertNull($copied[2]['ends_on']);
+    }
 }

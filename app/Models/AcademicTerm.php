@@ -12,6 +12,7 @@ class AcademicTerm extends Model
         'term_key',
         'starts_on',
         'ends_on',
+        'date_note',
     ];
 
     protected $casts = [

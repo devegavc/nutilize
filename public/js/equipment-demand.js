@@ -97,7 +97,9 @@
     const selected = available.find((term) => String(term.id) === String(state.termId)) || available[0];
     if (selected) {
       state.termId = String(selected.id);
-      termLength.textContent = `${selected.weeks} weeks · ${selected.starts_on} to ${selected.ends_on}`;
+      termLength.textContent = selected.complete
+        ? `${selected.weeks} weeks · ${selected.starts_on} to ${selected.ends_on}`
+        : (selected.date_note || 'Exact dates are still needed.');
     } else {
       termLength.textContent = years.length ? '' : 'No terms yet';
     }
@@ -124,12 +126,20 @@
   const showForm = (term) => {
     termForm.hidden = false;
     editingTermId = term ? term.id : null;
-    termForm.querySelector('[name="academic_year"]').value = term ? term.academic_year : (state.academicYear || '');
-    termForm.querySelector('[name="name"]').value = term ? term.name : '';
-    termForm.querySelector('[name="term_key"]').value = term ? (term.term_key || '') : '';
-    termForm.querySelector('[name="starts_on"]').value = term ? term.starts_on : '';
-    termForm.querySelector('[name="ends_on"]').value = term ? term.ends_on : '';
-    document.getElementById('equipment-term-form-title').textContent = term ? 'Edit academic term' : 'Add academic term';
+    const yearFields = termForm.querySelector('[data-year-fields]');
+    const dateFields = termForm.querySelector('[data-date-fields]');
+    yearFields.hidden = Boolean(term);
+    dateFields.hidden = !term;
+    termForm.querySelector('[name="academic_year"]').required = !term;
+    if (term) {
+      termForm.querySelector('[name="starts_on"]').value = term.starts_on || '';
+      termForm.querySelector('[name="ends_on"]').value = term.ends_on || '';
+      document.getElementById('equipment-term-date-note').textContent = term.date_note || `${term.name} dates can be changed when the calendar moves.`;
+      document.getElementById('equipment-term-form-title').textContent = `Edit ${term.name}`;
+    } else {
+      termForm.querySelector('[name="academic_year"]').value = state.academicYear || '';
+      document.getElementById('equipment-term-form-title').textContent = 'Add academic year';
+    }
     termFormError.hidden = true;
   };
 
@@ -320,6 +330,15 @@
       return;
     }
 
+    if (payload.empty_reason === 'incomplete_term') {
+      results.hidden = true;
+      document.getElementById('equipment-planning').hidden = true;
+      emptyBox.hidden = false;
+      emptyTitle.textContent = 'Exact dates are still needed';
+      emptyCopy.textContent = payload.detail || payload.period?.date_note || 'This term does not have an exact start and end yet.';
+      return;
+    }
+
     renderPlanning(payload.planning);
 
     if (payload.empty) {
@@ -359,7 +378,7 @@
     document.getElementById('equipment-planning-message').textContent = planning.message || '';
     const target = planning.target;
     document.getElementById('equipment-planning-target').textContent = target
-      ? `Target: ${target.label} (${target.starts_on} to ${target.ends_on}). Matching key: ${target.term_key || 'not set'}.`
+      ? `Target: ${target.label} (${target.starts_on} to ${target.ends_on}).`
       : '';
     const references = planning.references || [];
     document.getElementById('equipment-planning-references').textContent = references.length
@@ -512,20 +531,22 @@
   termForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     termFormError.hidden = true;
-    const body = {
-      academic_year: termForm.querySelector('[name="academic_year"]').value.trim(),
-      name: termForm.querySelector('[name="name"]').value.trim(),
-      term_key: termForm.querySelector('[name="term_key"]').value.trim(),
-      starts_on: termForm.querySelector('[name="starts_on"]').value,
-      ends_on: termForm.querySelector('[name="ends_on"]').value,
-    };
-    const url = editingTermId
+    const editing = Boolean(editingTermId);
+    const body = editing
+      ? {
+          starts_on: termForm.querySelector('[name="starts_on"]').value || null,
+          ends_on: termForm.querySelector('[name="ends_on"]').value || null,
+        }
+      : {
+          academic_year: termForm.querySelector('[name="academic_year"]').value.trim(),
+        };
+    const url = editing
       ? config.updateTermUrl.replace('__ID__', String(editingTermId))
-      : config.storeTermUrl;
+      : config.storeYearUrl;
 
     try {
       const response = await fetch(url, {
-        method: editingTermId ? 'PATCH' : 'POST',
+        method: editing ? 'PATCH' : 'POST',
         credentials: 'same-origin',
         headers: {
           Accept: 'application/json',

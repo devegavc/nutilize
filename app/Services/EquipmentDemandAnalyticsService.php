@@ -77,8 +77,8 @@ SQL;
         }
 
         return AcademicTerm::query()
-            ->orderByDesc('starts_on')
-            ->orderBy('name')
+            ->orderByDesc('academic_year')
+            ->orderBy('term_key')
             ->get()
             ->map(fn (AcademicTerm $term): array => self::presentTerm($term))
             ->all();
@@ -89,19 +89,21 @@ SQL;
      */
     public static function presentTerm(AcademicTerm $term): array
     {
-        $window = self::termWindow(
-            $term->starts_on->toDateString(),
-            $term->ends_on->toDateString()
-        );
+        $startsOn = $term->starts_on?->toDateString();
+        $endsOn = $term->ends_on?->toDateString();
+        $complete = $startsOn !== null && $endsOn !== null;
+        $window = $complete ? self::termWindow($startsOn, $endsOn) : null;
 
         return [
             'id' => (int) $term->id,
             'academic_year' => (string) $term->academic_year,
             'name' => (string) $term->name,
             'term_key' => trim((string) ($term->term_key ?? '')),
-            'starts_on' => $term->starts_on->toDateString(),
-            'ends_on' => $term->ends_on->toDateString(),
-            'weeks' => self::spanWeeks($window['start'], $window['end']),
+            'starts_on' => $startsOn,
+            'ends_on' => $endsOn,
+            'complete' => $complete,
+            'date_note' => $term->date_note ? (string) $term->date_note : null,
+            'weeks' => $window ? self::spanWeeks($window['start'], $window['end']) : null,
             'label' => trim($term->name.' '.$term->academic_year),
         ];
     }
@@ -415,7 +417,7 @@ SQL;
     public static function historicalMatches(array $target, array $catalog, string $today): array
     {
         $key = trim((string) ($target['term_key'] ?? ''));
-        if ($key === '') {
+        if ($key === '' || empty($target['starts_on'])) {
             return [];
         }
 
@@ -431,6 +433,9 @@ SQL;
                 continue;
             }
             if ((string) ($term['academic_year'] ?? '') === (string) ($target['academic_year'] ?? '')) {
+                continue;
+            }
+            if (empty($term['starts_on']) || empty($term['ends_on'])) {
                 continue;
             }
 
@@ -455,6 +460,146 @@ SQL;
         }
 
         return max(0, $baseline - max(0, $serviceableStock));
+    }
+
+    /**
+     * The 2026–2027 dates are stored records, not a rule for every future year.
+     * Term 1 includes finals week and the break through the day before Term 2.
+     * February and June days are not invented.
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    public static function officialCalendar(string $academicYear): ?array
+    {
+        if ($academicYear !== '2026-2027') {
+            return null;
+        }
+
+        return [
+            [
+                'term_key' => 'term-1',
+                'name' => '1st Term',
+                'starts_on' => '2026-07-13',
+                'ends_on' => '2026-11-02',
+                'date_note' => null,
+            ],
+            [
+                'term_key' => 'term-2',
+                'name' => '2nd Term',
+                'starts_on' => '2026-11-03',
+                'ends_on' => null,
+                'date_note' => 'The official end is February 2027. The exact day is not set.',
+            ],
+            [
+                'term_key' => 'term-3',
+                'name' => '3rd Term',
+                'starts_on' => null,
+                'ends_on' => null,
+                'date_note' => 'Starts the day after 2nd Term ends, in February 2027, and runs through June 2027. Exact days are not set.',
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $terms
+     * @return array<int, array<string, mixed>>
+     */
+    public static function shiftedTermRows(array $terms): array
+    {
+        $rows = [];
+        foreach ($terms as $term) {
+            $startsOn = self::shiftYear($term['starts_on'] ?? null);
+            $endsOn = self::shiftYear($term['ends_on'] ?? null);
+            $rows[] = [
+                'term_key' => (string) ($term['term_key'] ?? ''),
+                'name' => (string) ($term['name'] ?? ''),
+                'starts_on' => $startsOn,
+                'ends_on' => $endsOn,
+                'date_note' => ($startsOn !== null && $endsOn !== null)
+                    ? 'Copied from the previous academic year. Change any date that moved.'
+                    : ((string) ($term['date_note'] ?? '') !== ''
+                        ? (string) $term['date_note']
+                        : 'Exact dates are still needed.'),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $terms
+     */
+    public static function overlapMessage(array $terms): ?string
+    {
+        $complete = array_values(array_filter(
+            $terms,
+            static fn (array $term): bool => !empty($term['starts_on']) && !empty($term['ends_on'])
+        ));
+        usort($complete, static fn (array $left, array $right): int => strcmp((string) $left['starts_on'], (string) $right['starts_on']));
+
+        $count = count($complete);
+        for ($index = 0; $index < $count - 1; $index++) {
+            if ((string) $complete[$index + 1]['starts_on'] <= (string) $complete[$index]['ends_on']) {
+                return $complete[$index]['name'].' and '.$complete[$index + 1]['name'].' overlap. A term ends the day before the next one starts.';
+            }
+        }
+
+        return null;
+    }
+
+    public static function createAcademicYear(string $academicYear): void
+    {
+        $rows = self::officialCalendar($academicYear);
+        if ($rows === null) {
+            $previous = self::previousAcademicYear($academicYear);
+            $existing = AcademicTerm::query()
+                ->where('academic_year', $previous)
+                ->orderBy('term_key')
+                ->get()
+                ->map(static fn (AcademicTerm $term): array => [
+                    'term_key' => (string) $term->term_key,
+                    'name' => (string) $term->name,
+                    'starts_on' => $term->starts_on?->toDateString(),
+                    'ends_on' => $term->ends_on?->toDateString(),
+                    'date_note' => $term->date_note,
+                ])
+                ->all();
+            $rows = $existing !== []
+                ? self::shiftedTermRows($existing)
+                : self::emptyTermSlots();
+        }
+
+        foreach ($rows as $row) {
+            AcademicTerm::query()->create($row + ['academic_year' => $academicYear]);
+        }
+    }
+
+    public static function previousAcademicYear(string $academicYear): string
+    {
+        [$start, $end] = array_map('intval', explode('-', $academicYear));
+
+        return ($start - 1).'-'.($end - 1);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public static function emptyTermSlots(): array
+    {
+        return [
+            ['term_key' => 'term-1', 'name' => '1st Term', 'starts_on' => null, 'ends_on' => null, 'date_note' => 'Set the start and end dates.'],
+            ['term_key' => 'term-2', 'name' => '2nd Term', 'starts_on' => null, 'ends_on' => null, 'date_note' => 'Set the start and end dates.'],
+            ['term_key' => 'term-3', 'name' => '3rd Term', 'starts_on' => null, 'ends_on' => null, 'date_note' => 'Set the start and end dates.'],
+        ];
+    }
+
+    private static function shiftYear(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return Carbon::parse((string) $value, self::TIMEZONE)->addYear()->toDateString();
     }
 
     /**
@@ -687,6 +832,19 @@ SQL;
             }
 
             $selected ??= $terms[0];
+            if (empty($selected['starts_on']) || empty($selected['ends_on'])) {
+                return [
+                    'mode' => 'term',
+                    'label' => $selected['label'],
+                    'empty_reason' => 'incomplete_term',
+                    'date_note' => $selected['date_note']
+                        ?? 'The exact start or end day is not set.',
+                    'term_id' => (int) $selected['id'],
+                    'starts_on' => $selected['starts_on'] ?? null,
+                    'ends_on' => $selected['ends_on'] ?? null,
+                ];
+            }
+
             $window = self::termWindow($selected['starts_on'], $selected['ends_on']);
 
             return [
@@ -1385,7 +1543,10 @@ SQL;
             'timezone' => self::TIMEZONE,
             'year' => $period['year'] ?? null,
             'month' => $period['month'] ?? null,
-            'term_id' => $period['term_id'] ?? null,
+                'term_id' => $period['term_id'] ?? null,
+                'date_note' => $period['date_note'] ?? null,
+                'starts_on' => $period['starts_on'] ?? null,
+                'ends_on' => $period['ends_on'] ?? null,
             'boundary' => 'Included when usage starts before the period ends and ends after the period starts. Counted once at the full line quantity.',
         ];
     }
@@ -1401,17 +1562,19 @@ SQL;
             'ok' => true,
             'empty' => true,
             'empty_reason' => $period['empty_reason'],
+            'detail' => $period['date_note'] ?? null,
             'period' => [
                 'mode' => $period['mode'],
                 'label' => $period['label'],
-                'starts_on' => null,
-                'ends_on' => null,
+                'starts_on' => $period['starts_on'] ?? null,
+                'ends_on' => $period['ends_on'] ?? null,
                 'end_exclusive' => null,
                 'weeks' => null,
                 'timezone' => self::TIMEZONE,
                 'year' => null,
                 'month' => null,
-                'term_id' => null,
+                'term_id' => $period['term_id'] ?? null,
+                'date_note' => $period['date_note'] ?? null,
                 'boundary' => 'Included when usage starts before the period ends and ends after the period starts. Counted once at the full line quantity.',
             ],
             'terms' => $terms,
