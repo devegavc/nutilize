@@ -199,7 +199,7 @@
     if (!items || items.length === 0) {
       const row = document.createElement('tr');
       const cell = document.createElement('td');
-      cell.colSpan = 5;
+      cell.colSpan = 4;
       cell.className = 'insight-empty';
       cell.textContent = 'No approved equipment demand in this period.';
       row.appendChild(cell);
@@ -213,8 +213,7 @@
         textCell(item.item_name),
         textCell(item.reservation_count),
         textCell(item.approved_quantity),
-        textCell(item.requested_quantity),
-        textCell(item.issued_label || 'Not recorded')
+        textCell(item.requested_quantity)
       );
       body.appendChild(row);
     });
@@ -406,11 +405,10 @@
         textCell(item.serviceable_stock === null ? 'Not recorded' : item.serviceable_stock),
         textCell(item.historical_gap === null ? 'Not recorded' : item.historical_gap),
         textCell(item.confirmed_peak === null ? 'None' : item.confirmed_peak),
-        textCell(item.confirmed_gap === null ? 'None' : item.confirmed_gap),
-        textCell(item.issued_label || 'Not recorded')
+        textCell(item.confirmed_gap === null ? 'None' : item.confirmed_gap)
       );
       const historyCell = document.createElement('td');
-      historyCell.colSpan = 8;
+      historyCell.colSpan = 7;
       historyCell.textContent = history;
       const historyRow = document.createElement('tr');
       historyRow.appendChild(historyCell);

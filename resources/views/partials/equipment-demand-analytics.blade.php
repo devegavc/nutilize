@@ -116,7 +116,7 @@
       <div class="inventory-grid-head analytics-grid-head insight-head">
         <div>
           <h2>Most in-demand items</h2>
-          <p>Approved demand is the planning basis. Requested quantity includes every submitted status. Issued quantity is not recorded.</p>
+          <p>Approved demand is the planning basis. Requested quantity includes every submitted status.</p>
         </div>
         <div class="equipment-demand-rank" role="group" aria-label="Rank items">
           <button type="button" class="equipment-demand-text-btn" data-demand-rank="reservations">By reservations</button>
@@ -131,7 +131,6 @@
               <th>Approved reservations</th>
               <th>Approved quantity</th>
               <th>Requested quantity</th>
-              <th>Issued quantity</th>
             </tr>
           </thead>
           <tbody id="equipment-demand-items"></tbody>
@@ -203,9 +202,8 @@
             <th>Current serviceable stock</th>
             <th>Historical planning gap</th>
             <th>Confirmed peak</th>
-            <th>Confirmed booking gap</th>
-            <th>Issued quantity</th>
-          </tr>
+              <th>Confirmed booking gap</th>
+            </tr>
         </thead>
         <tbody id="equipment-planning-items"></tbody>
       </table>

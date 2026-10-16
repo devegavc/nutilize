@@ -683,37 +683,16 @@ SQL;
             );
         }
 
-        if ($termCount > 1 && $termsAtPeak > 1) {
+        if ($hasConfirmed && $confirmedGap !== null && $confirmedGap > 0) {
+            $confirmedUnit = $confirmedGap === 1 ? 'unit' : 'units';
             $sentences[] = sprintf(
-                'The conservative historical planning baseline is the highest observed peak. That peak occurred in %d of %d completed matching terms: %s.',
-                $termsAtPeak,
-                $termCount,
-                implode(', ', $sourceLabels)
-            );
-        } elseif ($termCount > 1) {
-            $sentences[] = sprintf(
-                'The conservative historical planning baseline is the highest observed peak, from %s, among %d completed matching terms. The other matching terms peaked lower.',
-                $sourceLabel,
-                $termCount
-            );
-        } else {
-            $sentences[] = sprintf(
-                'The baseline comes from the only completed matching term, %s.',
-                $sourceLabel
-            );
-        }
-
-        if ($hasConfirmed) {
-            $confirmedGapText = $confirmedGap === null
-                ? 'Current serviceable stock is not recorded, so the confirmed booking gap cannot be calculated.'
-                : ($confirmedGap > 0
-                    ? sprintf('The confirmed booking gap against current stock is %d %s.', $confirmedGap, $confirmedGap === 1 ? 'unit' : 'units')
-                    : 'Current stock covers that confirmed peak.');
-            $sentences[] = sprintf(
-                'Confirmed bookings during %s reach a separate peak of %d units. %s This confirmed booking gap is not added to the historical planning gap.',
+                'Confirmed bookings for %s during %s reach a separate peak of %d %s. The confirmed booking gap is %d %s.',
+                $itemName,
                 $targetLabel,
                 (int) $confirmedPeak,
-                $confirmedGapText
+                (int) $confirmedPeak === 1 ? 'unit' : 'units',
+                $confirmedGap,
+                $confirmedUnit
             );
         }
 
@@ -1281,7 +1260,7 @@ SQL;
                     : 'Historical demand covered by current stock.'),
             'detail' => $rows === []
                 ? 'The completed matching terms have no approved equipment reservations.'
-                : 'Historical planning gap uses the highest peak simultaneous approved quantity. It is not the sum of quantities across the term, and it is not added to confirmed bookings in the target term.',
+                : 'The historical gap is the highest peak from the completed matching terms, compared with current stock. Confirmed bookings already in this term are listed separately and are not added to that peak.',
             'target' => $targetView,
             'references' => array_map(static fn (array $match): array => [
                 'id' => (int) $match['id'],

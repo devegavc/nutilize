@@ -389,9 +389,8 @@ class EquipmentDemandAnalyticsServiceTest extends TestCase
         $this->assertStringContainsString('peak simultaneous demand of 15 units during First Term 2025-2026', $text);
         $this->assertStringContainsString('gap of 5 units', $text);
         $this->assertStringContainsString('If similar demand recurs', $text);
-        $this->assertStringContainsString('highest observed peak, from First Term 2025-2026, among 2 completed matching terms', $text);
-        $this->assertStringContainsString('separate peak of 4 units', $text);
-        $this->assertStringContainsString('not added to the historical planning gap', $text);
+        $this->assertStringNotContainsString('highest observed peak', $text);
+        $this->assertStringNotContainsString('Confirmed bookings', $text);
         $this->assertStringNotContainsString('19', $text);
         $this->assertStringNotContainsString('growth', strtolower($text));
         $this->assertStringNotContainsString('will be reserved', strtolower($text));
