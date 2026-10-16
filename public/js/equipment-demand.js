@@ -21,9 +21,7 @@
   const termLength = document.getElementById('equipment-demand-term-length');
 
   let dashboardRequestId = 0;
-  let lineRequestId = 0;
   let lastDashboard = null;
-  let lastLines = null;
   let terms = [];
   let editingTermId = null;
   let weeklyChart = null;
@@ -38,9 +36,6 @@
     academicYear: '',
     rank: 'reservations',
     chartItemId: '',
-    lineItemId: '',
-    lineBasis: 'approved',
-    linePage: 1,
   };
 
   try {
@@ -49,7 +44,6 @@
       Object.keys(state).forEach((key) => {
         if (saved[key] !== undefined && saved[key] !== null) state[key] = String(saved[key]);
       });
-      state.linePage = Math.max(1, Number(saved.linePage) || 1);
     }
   } catch (error) {}
 
@@ -122,11 +116,6 @@
     });
     document.querySelectorAll('[data-demand-rank]').forEach((button) => {
       const selected = button.getAttribute('data-demand-rank') === state.rank;
-      button.classList.toggle('is-selected', selected);
-      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    });
-    document.querySelectorAll('[data-line-basis]').forEach((button) => {
-      const selected = button.getAttribute('data-line-basis') === state.lineBasis;
       button.classList.toggle('is-selected', selected);
       button.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
@@ -355,61 +344,6 @@
     requestAnimationFrame(() => weeklyChart && weeklyChart.resize());
   };
 
-  const renderLines = (payload) => {
-    lastLines = payload;
-    const body = document.getElementById('equipment-demand-lines');
-    const itemSelect = document.getElementById('equipment-lines-item');
-    const options = [{ value: '', label: 'All items' }];
-    (lastDashboard?.chart_items || []).forEach((item) => {
-      options.push({ value: String(item.item_id), label: item.item_name });
-    });
-    fillSelect(itemSelect, options, state.lineItemId);
-
-    body.replaceChildren();
-    const rows = payload.rows || [];
-    if (rows.length === 0) {
-      const row = document.createElement('tr');
-      const cell = document.createElement('td');
-      cell.colSpan = 6;
-      cell.className = 'insight-empty';
-      cell.textContent = 'No reservation lines in this period for the current filter.';
-      row.appendChild(cell);
-      body.appendChild(row);
-    } else {
-      rows.forEach((line) => {
-        const row = document.createElement('tr');
-        row.append(
-          textCell(line.activity_name),
-          textCell(line.usage_start),
-          textCell(line.usage_end),
-          textCell(line.item_name),
-          textCell(line.quantity),
-          textCell(line.status)
-        );
-        body.appendChild(row);
-      });
-    }
-
-    const page = payload.page || 1;
-    const pages = Math.max(1, Math.ceil((payload.total || 0) / (payload.per_page || 15)));
-    const quantityNote = payload.item_quantity === null
-      ? `${payload.reservation_count || 0} reservations`
-      : `${payload.item_quantity} ${payload.basis === 'approved' ? 'approved' : 'submitted'} units of this item`;
-    document.getElementById('equipment-lines-summary').textContent =
-      payload.basis === 'approved'
-        ? `Approved lines. ${payload.total || 0} lines · ${quantityNote}.`
-        : `All submitted lines, including pending, rejected, and cancelled. ${payload.total || 0} lines · ${quantityNote}.`;
-    document.getElementById('equipment-lines-page').textContent = `Page ${page} of ${pages}`;
-    document.getElementById('equipment-lines-prev').disabled = page <= 1;
-    document.getElementById('equipment-lines-next').disabled = page >= pages;
-  };
-
-  const showLinesError = (message) => {
-    document.getElementById('equipment-lines-error-text').textContent = message;
-    document.getElementById('equipment-lines-error').hidden = false;
-    if (lastLines) renderLines(lastLines);
-  };
-
   const dashboardParams = () => {
     const params = new URLSearchParams({ mode: state.mode, rank: state.rank });
     if (state.mode === 'term') {
@@ -420,32 +354,6 @@
     }
     if (state.chartItemId) params.set('chart_item_id', state.chartItemId);
     return params;
-  };
-
-  const loadLines = async () => {
-    if (!lastDashboard || lastDashboard.empty) return;
-    const requestId = ++lineRequestId;
-    document.getElementById('equipment-lines-error').hidden = true;
-    const params = dashboardParams();
-    params.set('page', String(state.linePage));
-    params.set('basis', state.lineBasis);
-    if (state.lineItemId) params.set('item_id', state.lineItemId);
-
-    try {
-      const response = await fetch(`${config.linesUrl}?${params.toString()}`, {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-      });
-      if (requestId !== lineRequestId) return;
-      if (!response.ok) throw new Error(await readError(response));
-      const payload = await response.json();
-      if (requestId !== lineRequestId) return;
-      if (!payload || payload.ok === false) throw new Error(payload?.message || 'Reservation lines could not be loaded.');
-      renderLines(payload);
-    } catch (error) {
-      if (requestId !== lineRequestId) return;
-      showLinesError(error.message || 'Reservation lines could not be loaded.');
-    }
   };
 
   const loadDashboard = async () => {
@@ -467,7 +375,6 @@
       if (!payload || payload.ok === false) throw new Error(payload?.message || 'The equipment report could not be loaded.');
       setLoading(false);
       renderDashboard(payload);
-      if (!payload.empty) loadLines();
     } catch (error) {
       if (requestId !== dashboardRequestId) return;
       setLoading(false);
@@ -490,7 +397,6 @@
   document.querySelectorAll('[data-demand-mode]').forEach((button) => {
     button.addEventListener('click', () => {
       state.mode = button.getAttribute('data-demand-mode') === 'term' ? 'term' : 'month';
-      state.linePage = 1;
       applyMode();
       if (state.mode === 'month') hideForm();
       loadDashboard();
@@ -499,25 +405,21 @@
 
   monthSelect.addEventListener('change', () => {
     state.month = monthSelect.value;
-    state.linePage = 1;
     loadDashboard();
   });
   yearSelect.addEventListener('change', () => {
     state.year = yearSelect.value;
-    state.linePage = 1;
     buildMonthControls();
     loadDashboard();
   });
   yearFilter.addEventListener('change', () => {
     state.academicYear = yearFilter.value;
     state.termId = '';
-    state.linePage = 1;
     syncTermControls();
     loadDashboard();
   });
   termSelect.addEventListener('change', () => {
     state.termId = termSelect.value;
-    state.linePage = 1;
     syncTermControls();
     loadDashboard();
   });
@@ -534,33 +436,7 @@
     state.chartItemId = event.target.value;
     loadDashboard();
   });
-  document.getElementById('equipment-lines-item').addEventListener('change', (event) => {
-    state.lineItemId = event.target.value;
-    state.linePage = 1;
-    saveState();
-    loadLines();
-  });
-  document.querySelectorAll('[data-line-basis]').forEach((button) => {
-    button.addEventListener('click', () => {
-      state.lineBasis = button.getAttribute('data-line-basis') === 'requested' ? 'requested' : 'approved';
-      state.linePage = 1;
-      applyMode();
-      saveState();
-      loadLines();
-    });
-  });
-  document.getElementById('equipment-lines-prev').addEventListener('click', () => {
-    state.linePage = Math.max(1, Number(state.linePage) - 1);
-    saveState();
-    loadLines();
-  });
-  document.getElementById('equipment-lines-next').addEventListener('click', () => {
-    state.linePage = Number(state.linePage) + 1;
-    saveState();
-    loadLines();
-  });
   document.getElementById('equipment-demand-retry').addEventListener('click', loadDashboard);
-  document.getElementById('equipment-lines-retry').addEventListener('click', loadLines);
   document.getElementById('equipment-demand-add-term').addEventListener('click', () => {
     state.mode = 'term';
     applyMode();
@@ -603,7 +479,6 @@
       state.mode = 'term';
       state.termId = String(payload.term.id);
       state.academicYear = payload.term.academic_year;
-      state.linePage = 1;
       hideForm();
       syncTermControls();
       applyMode();

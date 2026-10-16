@@ -178,48 +178,6 @@
       <h2 class="insight-card-title">What the figures show</h2>
       <ul id="equipment-demand-insights"></ul>
     </section>
-
-    <section class="inventory-grid analytics-table-grid insight-section equipment-demand-section">
-      <div class="inventory-grid-head analytics-grid-head insight-head">
-        <div>
-          <h2>Reservation lines</h2>
-          <p id="equipment-lines-summary">Approved equipment lines in this period.</p>
-        </div>
-        <div class="equipment-demand-line-filters">
-          <label>Item
-            <select id="equipment-lines-item" aria-label="Filter reservation lines by item"></select>
-          </label>
-          <div class="equipment-demand-rank" role="group" aria-label="Line status">
-            <button type="button" class="equipment-demand-text-btn" data-line-basis="approved">Approved</button>
-            <button type="button" class="equipment-demand-text-btn" data-line-basis="requested">All submitted</button>
-          </div>
-        </div>
-      </div>
-      <div id="equipment-lines-error" class="equipment-demand-banner" role="alert" hidden>
-        <p id="equipment-lines-error-text">Reservation lines could not be loaded.</p>
-        <button type="button" class="equipment-demand-text-btn" id="equipment-lines-retry">Retry</button>
-      </div>
-      <div class="table-wrap">
-        <table class="inventory-table analytics-table">
-          <thead>
-            <tr>
-              <th>Activity</th>
-              <th>Usage start</th>
-              <th>Usage end</th>
-              <th>Item</th>
-              <th>Quantity</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="equipment-demand-lines"></tbody>
-        </table>
-      </div>
-      <div class="equipment-demand-pager">
-        <button type="button" class="equipment-demand-text-btn" id="equipment-lines-prev">Previous</button>
-        <span id="equipment-lines-page"></span>
-        <button type="button" class="equipment-demand-text-btn" id="equipment-lines-next">Next</button>
-      </div>
-    </section>
   </div>
 
   <details class="equipment-demand-definitions">
@@ -231,7 +189,6 @@
 <script type="application/json" id="equipment-demand-config">
 {!! json_encode([
     'dashboardUrl' => route('dashboard.inventory.analytics.equipment'),
-    'linesUrl' => route('dashboard.inventory.analytics.equipment.lines'),
     'storeTermUrl' => route('dashboard.academic-terms.store'),
     'updateTermUrl' => url('/inventory/academic-terms/__ID__'),
     'monthKey' => $monthKey,

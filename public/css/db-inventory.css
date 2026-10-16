@@ -7889,9 +7889,7 @@ body.page-insights .priority-pill.unavailable {
 .equipment-demand-toolbar,
 .equipment-demand-filters,
 .equipment-demand-rank,
-.equipment-demand-line-filters,
-.equipment-term-actions,
-.equipment-demand-pager {
+.equipment-term-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -7937,7 +7935,6 @@ body.page-insights .priority-pill.unavailable {
 
 .equipment-demand-filters label,
 .equipment-demand-item-filter,
-.equipment-demand-line-filters label,
 .equipment-term-fields label {
   display: inline-flex;
   align-items: center;
@@ -8036,11 +8033,6 @@ body.page-insights .priority-pill.unavailable {
   margin: 0 0 8px;
   color: #24315f;
   font-size: 0.86rem;
-}
-
-.equipment-demand-pager {
-  justify-content: flex-end;
-  padding: 10px 2px 0;
 }
 
 .equipment-demand-text-btn:disabled {

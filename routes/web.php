@@ -100,7 +100,6 @@ Route::middleware('auth')->group(function () {
             Route::get('/inventory', [DashboardInventoryController::class, 'index'])->name('dashboard.inventory');
             Route::get('/inventory/analytics', [DashboardInventoryController::class, 'analytics'])->name('dashboard.inventory.analytics');
             Route::get('/inventory/analytics/equipment', [DashboardInventoryController::class, 'equipmentDemand'])->name('dashboard.inventory.analytics.equipment');
-            Route::get('/inventory/analytics/equipment/lines', [DashboardInventoryController::class, 'equipmentDemandLines'])->name('dashboard.inventory.analytics.equipment.lines');
             Route::post('/inventory/academic-terms', [DashboardInventoryController::class, 'storeAcademicTerm'])->name('dashboard.academic-terms.store');
             Route::patch('/inventory/academic-terms/{term}', [DashboardInventoryController::class, 'updateAcademicTerm'])->name('dashboard.academic-terms.update');
             Route::get('/inventory/equipments', [DashboardInventoryController::class, 'equipments'])->name('dashboard.inventory.equipments');

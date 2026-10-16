@@ -21,8 +21,6 @@ class EquipmentDemandAnalyticsService
 {
     public const TIMEZONE = 'Asia/Manila';
 
-    public const PER_PAGE = 15;
-
     /**
      * Post-approval statuses observed in this app.
      * overdue and "to return" have an approved approval chain and are still
@@ -67,34 +65,6 @@ SQL;
         $lines = self::fetchOverlappingLines($period['start'], $period['end']);
 
         return self::assemble($period, $terms, $lines, $rank, $chartItemId);
-    }
-
-    /**
-     * @param  array<string, mixed>  $input
-     * @return array<string, mixed>
-     */
-    public static function drillDown(array $input): array
-    {
-        $terms = self::listTerms();
-        $period = self::resolvePeriod($input, $terms);
-        $page = max(1, (int) ($input['page'] ?? 1));
-        $itemId = self::positiveInt($input['item_id'] ?? null);
-        $basis = ($input['basis'] ?? '') === 'requested' ? 'requested' : 'approved';
-
-        if (isset($period['empty_reason'])) {
-            return [
-                'ok' => true,
-                'page' => 1,
-                'per_page' => self::PER_PAGE,
-                'total' => 0,
-                'reservation_count' => 0,
-                'item_quantity' => null,
-                'basis' => $basis,
-                'rows' => [],
-            ];
-        }
-
-        return self::fetchDrillDown($period['start'], $period['end'], $itemId, $basis, $page);
     }
 
     /**
@@ -894,115 +864,6 @@ SQL;
         return $normalized;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private static function fetchDrillDown(
-        Carbon $periodStart,
-        Carbon $periodEnd,
-        ?int $itemId,
-        string $basis,
-        int $page
-    ): array {
-        $empty = [
-            'ok' => true,
-            'page' => 1,
-            'per_page' => self::PER_PAGE,
-            'total' => 0,
-            'reservation_count' => 0,
-            'item_quantity' => $itemId === null ? null : 0,
-            'basis' => $basis,
-            'rows' => [],
-        ];
-
-        if (!self::tablesReady() || DB::getDriverName() !== 'pgsql') {
-            return $empty;
-        }
-
-        $where = [
-            self::USAGE_START_SQL.' IS NOT NULL',
-            self::USAGE_START_SQL.' < ?',
-            '('.self::USAGE_END_SQL.') > ?',
-        ];
-        $bindings = [
-            $periodEnd->format('Y-m-d H:i:s'),
-            $periodStart->format('Y-m-d H:i:s'),
-        ];
-
-        if ($itemId !== null) {
-            $where[] = 'lines.item_id = ?';
-            $bindings[] = $itemId;
-        }
-
-        if ($basis === 'approved') {
-            $placeholders = implode(', ', array_fill(0, count(self::APPROVED_STATUSES), '?'));
-            $where[] = "LOWER(TRIM(COALESCE(r.overall_status, ''))) IN ({$placeholders})";
-            array_push($bindings, ...self::APPROVED_STATUSES);
-        }
-
-        $whereSql = implode(' AND ', $where);
-        $from = self::equipmentFromSql();
-
-        $totals = DB::selectOne(
-            "SELECT COUNT(*) AS line_count, COUNT(DISTINCT lines.reservation_id) AS reservation_count, COALESCE(SUM(lines.quantity), 0) AS quantity FROM {$from} WHERE {$whereSql}",
-            $bindings
-        );
-
-        $total = (int) ($totals->line_count ?? 0);
-        $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
-        $page = min($page, $lastPage);
-        $offset = ($page - 1) * self::PER_PAGE;
-
-        $pageBindings = $bindings;
-        $pageBindings[] = self::PER_PAGE;
-        $pageBindings[] = $offset;
-
-        $rows = DB::select(
-            'SELECT lines.reservation_id, lines.item_id, items.item_name, lines.quantity, r.activity_name, '
-            ."LOWER(TRIM(COALESCE(r.overall_status, ''))) AS status, "
-            .'r."Start_of_activity" AS start_of_activity, r."Date_of_Activity" AS date_of_activity, r."End_of_Activity" AS end_of_activity '
-            ."FROM {$from} WHERE {$whereSql} "
-            .'ORDER BY '.self::USAGE_START_SQL.' ASC, lines.reservation_id ASC, items.item_name ASC '
-            .'LIMIT ? OFFSET ?',
-            $pageBindings
-        );
-
-        $presented = [];
-        foreach ($rows as $row) {
-            $bounds = self::usageBounds(
-                self::sqlTimestamp($row->start_of_activity ?? null),
-                self::sqlTimestamp($row->date_of_activity ?? null),
-                self::sqlTimestamp($row->end_of_activity ?? null)
-            );
-            if ($bounds === null) {
-                continue;
-            }
-
-            $presented[] = [
-                'reservation_id' => (int) $row->reservation_id,
-                'activity_name' => trim((string) ($row->activity_name ?? '')) ?: 'Untitled activity',
-                'item_name' => trim((string) ($row->item_name ?? '')) ?: 'Unnamed item',
-                'quantity' => self::normalizeQuantity($row->quantity ?? 0),
-                'status' => self::statusLabel((string) ($row->status ?? '')),
-                'usage_start' => self::formatInstant($bounds['start'], $bounds['calendar_day']),
-                'usage_end' => $bounds['calendar_day']
-                    ? $bounds['start']->format('M j, Y').' (calendar day)'
-                    : self::formatInstant($bounds['end'], false),
-            ];
-        }
-
-        return [
-            'ok' => true,
-            'page' => $page,
-            'per_page' => self::PER_PAGE,
-            'total' => $total,
-            'reservation_count' => (int) ($totals->reservation_count ?? 0),
-            'item_quantity' => $itemId === null ? null : self::normalizeQuantity($totals->quantity ?? 0),
-            'basis' => $basis,
-            'rows' => $presented,
-        ];
-    }
-
     private static function overlapFromSql(): string
     {
         return 'SELECT lines.reservation_id, lines.item_id, items.item_name, lines.quantity, r.activity_name, '
@@ -1119,34 +980,6 @@ SQL;
     private static function normalizeStatus(?string $status): string
     {
         return strtolower(trim((string) $status));
-    }
-
-    private static function statusLabel(string $status): string
-    {
-        $normalized = self::normalizeStatus($status);
-
-        return match ($normalized) {
-            'approved' => 'Approved',
-            'returned' => 'Returned',
-            'damaged' => 'Damaged',
-            'overdue' => 'Overdue',
-            'to return' => 'To return',
-            'rejected' => 'Rejected',
-            'cancelled', 'canceled' => 'Cancelled',
-            'expired', 'timed out' => 'Timed out',
-            'pending approval', 'pending_office_approvals', 'awaiting_physical_facilities' => 'Pending',
-            '' => 'Blank',
-            default => ucfirst($normalized),
-        };
-    }
-
-    private static function formatInstant(Carbon $instant, bool $calendarDay): string
-    {
-        if ($calendarDay) {
-            return $instant->format('M j, Y');
-        }
-
-        return $instant->format('M j, Y g:i A');
     }
 
     private static function sqlTimestamp(mixed $value): ?string

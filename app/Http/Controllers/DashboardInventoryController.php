@@ -50,13 +50,6 @@ class DashboardInventoryController extends Controller
         });
     }
 
-    public function equipmentDemandLines(Request $request): JsonResponse
-    {
-        return $this->equipmentDemandResponse(function () use ($request) {
-            return EquipmentDemandAnalyticsService::drillDown($request->query());
-        });
-    }
-
     public function storeAcademicTerm(Request $request): JsonResponse
     {
         $term = AcademicTerm::query()->create($this->validatedAcademicTerm($request));
