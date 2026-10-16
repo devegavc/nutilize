@@ -204,6 +204,34 @@ class EquipmentDemandAnalyticsServiceTest extends TestCase
         $this->assertSame(20, array_sum($values));
     }
 
+    public function test_term_months_include_empty_months_and_repeat_a_spanning_booking(): void
+    {
+        $buckets = EquipmentDemandAnalyticsService::monthBuckets(
+            Carbon::parse('2026-06-29 00:00:00', 'Asia/Manila'),
+            Carbon::parse('2026-11-02 00:00:00', 'Asia/Manila')
+        );
+        $event = [
+            'start' => Carbon::parse('2026-08-31 08:00:00', 'Asia/Manila'),
+            'end' => Carbon::parse('2026-09-02 10:00:00', 'Asia/Manila'),
+            'reservation_id' => 20,
+            'item_id' => 7,
+            'quantity' => 4,
+        ];
+
+        $series = EquipmentDemandAnalyticsService::weeklySeries($buckets, [$event], null);
+        $byLabel = [];
+        foreach ($series as $point) {
+            $byLabel[$point['label']] = $point['value'];
+        }
+
+        $this->assertSame(['Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026'], array_column($series, 'label'));
+        $this->assertSame(0, $byLabel['Jun 2026']);
+        $this->assertSame(0, $byLabel['Jul 2026']);
+        $this->assertSame(1, $byLabel['Aug 2026']);
+        $this->assertSame(1, $byLabel['Sep 2026']);
+        $this->assertSame(0, $byLabel['Oct 2026']);
+    }
+
     public function test_overall_weekly_series_counts_reservations_instead_of_adding_item_quantities(): void
     {
         $bucket = [[

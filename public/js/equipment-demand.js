@@ -250,8 +250,13 @@
     const canvas = document.getElementById('equipment-weekly-chart');
     const note = document.getElementById('equipment-weekly-note');
     const unit = document.getElementById('equipment-weekly-unit');
+    const title = document.getElementById('equipment-demand-chart-title');
+    if (title) title.textContent = weekly?.title || 'Weekly demand';
     note.textContent = weekly?.note || '';
     unit.textContent = weekly ? `Unit: ${weekly.unit}` : '';
+    // #region agent log
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f0ec29'},body:JSON.stringify({sessionId:'f0ec29',hypothesisId:'B',location:'equipment-demand.js:renderChart',message:'chart grain rendered',data:{grain:weekly?.grain||null,title:weekly?.title||null,labels:(weekly?.points||[]).map((point)=>point.label)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     const itemSelect = document.getElementById('equipment-weekly-item');
     const options = [{ value: '', label: 'All items (reservation count)' }];

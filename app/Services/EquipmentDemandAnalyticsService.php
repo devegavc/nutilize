@@ -354,7 +354,36 @@ SQL;
     }
 
     /**
-     * Each overlapping event contributes its full quantity to every week it
+     * Calendar months in Asia/Manila that intersect the half-open period.
+     *
+     * @return array<int, array{start: Carbon, end: Carbon, label: string}>
+     */
+    public static function monthBuckets(Carbon $periodStart, Carbon $periodEnd): array
+    {
+        if ($periodEnd->lessThanOrEqualTo($periodStart)) {
+            return [];
+        }
+
+        $cursor = $periodStart->copy()->startOfMonth();
+        $buckets = [];
+
+        while ($cursor->lt($periodEnd) && count($buckets) < 24) {
+            $monthEnd = $cursor->copy()->addMonth();
+            if ($monthEnd->gt($periodStart)) {
+                $buckets[] = [
+                    'start' => $cursor->copy(),
+                    'end' => $monthEnd,
+                    'label' => $cursor->format('M Y'),
+                ];
+            }
+            $cursor = $monthEnd;
+        }
+
+        return $buckets;
+    }
+
+    /**
+     * Each overlapping event contributes its full quantity to every bucket it
      * touches. With no item, the value is distinct approved reservations.
      *
      * @param  array<int, array{start: Carbon, end: Carbon, label: string}>  $buckets
@@ -701,7 +730,14 @@ SQL;
         }
 
         $weeklyItemId = $chartItem['item_id'] ?? null;
-        $buckets = self::weekBuckets($period['start'], $period['end']);
+        $monthly = ($period['mode'] ?? '') === 'term';
+        $buckets = $monthly
+            ? self::monthBuckets($period['start'], $period['end'])
+            : self::weekBuckets($period['start'], $period['end']);
+        $series = self::weeklySeries($buckets, $approvedEvents, $weeklyItemId);
+        // #region agent log
+        file_put_contents(base_path('debug-f0ec29.log'), json_encode(['sessionId' => 'f0ec29', 'hypothesisId' => 'A', 'location' => 'EquipmentDemandAnalyticsService.php:assemble', 'message' => 'demand trend grain', 'data' => ['mode' => $period['mode'] ?? null, 'grain' => $monthly ? 'month' : 'week', 'points' => count($series), 'labels' => array_column($series, 'label')], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
+        // #endregion
         $topItem = $itemRows[0] ?? null;
         if ($rank === 'quantity' && $ranked !== []) {
             $byFrequency = $ranked;
@@ -743,9 +779,13 @@ SQL;
             'weekly' => [
                 'item_id' => $weeklyItemId,
                 'item_name' => $chartItem['item_name'] ?? null,
+                'grain' => $monthly ? 'month' : 'week',
+                'title' => $monthly ? 'Monthly demand' : 'Weekly demand',
                 'unit' => $weeklyItemId === null ? 'Approved reservations' : 'Approved quantity',
-                'note' => 'Each bar repeats a booking in every week it overlaps. Do not add the bars together to get the period total.',
-                'points' => self::weeklySeries($buckets, $approvedEvents, $weeklyItemId),
+                'note' => $monthly
+                    ? 'Each point repeats a booking in every month it overlaps. Do not add the points together to get the term total.'
+                    : 'Each point repeats a booking in every week it overlaps. Do not add the points together to get the month total.',
+                'points' => $series,
             ],
             'availability' => $availability,
             'insights' => $insights,

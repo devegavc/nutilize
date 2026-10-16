@@ -139,7 +139,7 @@
     <section class="insight-panel equipment-demand-chart-panel">
       <div class="equipment-demand-chart-head">
         <div>
-          <h2 class="insight-card-title">Weekly demand</h2>
+          <h2 class="insight-card-title" id="equipment-demand-chart-title">Weekly demand</h2>
           <p class="insight-panel-hint" id="equipment-weekly-note"></p>
         </div>
         <label class="equipment-demand-item-filter">Item
