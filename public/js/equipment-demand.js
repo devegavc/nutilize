@@ -390,36 +390,77 @@
     const items = planning.items || [];
     document.getElementById('equipment-planning-table').hidden = items.length === 0;
     const body = document.getElementById('equipment-planning-items');
-    const notes = document.getElementById('equipment-planning-notes');
+    const visual = document.getElementById('equipment-planning-visual');
     body.replaceChildren();
-    notes.replaceChildren();
+    visual.replaceChildren();
 
     items.forEach((item) => {
+      const peak = Number(item.historical_peak) || 0;
+      const stock = item.serviceable_stock === null ? null : Number(item.serviceable_stock);
+      const gap = item.historical_gap === null ? null : Number(item.historical_gap);
+      const scale = Math.max(peak, stock || 0, 1);
+      const card = document.createElement('article');
+      card.className = 'equipment-planning-card' + (gap > 0 ? ' is-shortage' : '');
+
+      const title = document.createElement('strong');
+      title.textContent = item.item_name;
+      const badge = document.createElement('span');
+      badge.className = 'equipment-planning-badge';
+      badge.textContent = gap === null ? 'Stock not recorded' : (gap > 0 ? `Gap ${gap}` : 'Covered');
+      const head = document.createElement('div');
+      head.className = 'equipment-planning-card-head';
+      head.append(title, badge);
+
+      const bars = document.createElement('div');
+      bars.className = 'equipment-planning-bars';
+      bars.append(
+        planningBar('Past peak', peak, scale),
+        planningBar('Current stock', stock === null ? 0 : stock, scale)
+      );
+
+      const meta = document.createElement('p');
+      meta.className = 'equipment-demand-note';
+      const history = (item.history || [])
+        .filter((term) => Number(term.peak) > 0)
+        .map((term) => `${term.label}: peak ${term.peak}`)
+        .join(' · ');
+      meta.textContent = gap > 0
+        ? `If similar demand recurs, review ${gap} ${gap === 1 ? 'unit' : 'units'} or the schedule. ${history}`
+        : (history || 'Past peak is within current stock.');
+
+      card.append(head, bars, meta);
+      visual.appendChild(card);
+
       const row = document.createElement('tr');
-      if ((item.historical_gap || 0) > 0) row.classList.add('is-shortage');
-      const history = (item.history || []).map((term) => `${term.label}: ${term.reservations} reservations, peak ${term.peak}`).join('; ');
+      if (gap > 0) row.classList.add('is-shortage');
       row.append(
         textCell(item.item_name),
         textCell(item.historical_reservation_count),
-        textCell(`${item.historical_peak} (${item.baseline_term})`),
-        textCell(item.serviceable_stock === null ? 'Not recorded' : item.serviceable_stock),
-        textCell(item.historical_gap === null ? 'Not recorded' : item.historical_gap),
+        textCell(item.historical_peak),
+        textCell(stock === null ? 'Not recorded' : stock),
+        textCell(gap === null ? 'Not recorded' : gap),
         textCell(item.confirmed_peak === null ? 'None' : item.confirmed_peak),
         textCell(item.confirmed_gap === null ? 'None' : item.confirmed_gap)
       );
-      const historyCell = document.createElement('td');
-      historyCell.colSpan = 7;
-      historyCell.textContent = history;
-      const historyRow = document.createElement('tr');
-      historyRow.appendChild(historyCell);
-      body.append(row, historyRow);
-
-      (item.sentences || []).forEach((sentence) => {
-        const note = document.createElement('li');
-        note.textContent = sentence;
-        notes.appendChild(note);
-      });
+      body.appendChild(row);
     });
+  };
+
+  const planningBar = (label, value, scale) => {
+    const row = document.createElement('div');
+    row.className = 'equipment-planning-bar-row';
+    const name = document.createElement('span');
+    name.textContent = label;
+    const track = document.createElement('span');
+    track.className = 'equipment-planning-track';
+    const fill = document.createElement('span');
+    fill.className = 'equipment-planning-fill' + (label === 'Past peak' ? ' is-peak' : ' is-stock');
+    fill.style.width = value > 0 ? `${Math.max(8, Math.round((value / scale) * 100))}%` : '0';
+    track.appendChild(fill);
+    const count = document.createElement('strong');
+    count.textContent = String(value);
+    row.append(name, track, count);
+    return row;
   };
 
   const dashboardParams = () => {

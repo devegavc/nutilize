@@ -8041,6 +8041,77 @@ body.page-insights .priority-pill.unavailable {
   padding-left: 18px;
 }
 
+.equipment-planning-visual {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin: 4px 0 14px;
+}
+
+.equipment-planning-card {
+  border: 1px solid #cdd6ee;
+  border-radius: 14px;
+  background: #f7f9ff;
+  padding: 12px 14px;
+}
+
+.equipment-planning-card.is-shortage {
+  background: #fff6f6;
+  border-color: #f0c2c2;
+}
+
+.equipment-planning-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 8px;
+  color: #1b2b6a;
+}
+
+.equipment-planning-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #24357f;
+}
+
+.equipment-planning-card.is-shortage .equipment-planning-badge {
+  color: #9d1c1c;
+}
+
+.equipment-planning-bar-row {
+  display: grid;
+  grid-template-columns: 92px 1fr 36px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  color: #39457f;
+}
+
+.equipment-planning-track {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: #e4eaf6;
+  overflow: hidden;
+}
+
+.equipment-planning-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  min-width: 4px;
+}
+
+.equipment-planning-fill.is-peak {
+  background: #4457ab;
+}
+
+.equipment-planning-fill.is-stock {
+  background: #2bb3a8;
+}
+
 .equipment-demand-text-btn:disabled {
   opacity: 0.45;
   cursor: default;

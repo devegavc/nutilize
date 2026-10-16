@@ -192,6 +192,7 @@
     <p id="equipment-planning-target" class="equipment-demand-note"></p>
     <p id="equipment-planning-references" class="equipment-demand-note"></p>
     <p id="equipment-planning-detail" class="equipment-demand-note"></p>
+    <div id="equipment-planning-visual" class="equipment-planning-visual"></div>
     <div class="table-wrap" id="equipment-planning-table">
       <table class="inventory-table analytics-table">
         <thead>
@@ -205,10 +206,9 @@
               <th>Confirmed booking gap</th>
             </tr>
         </thead>
-        <tbody id="equipment-planning-items"></tbody>
+        <tbody id="equipment-planning-items">        </tbody>
       </table>
     </div>
-    <ul id="equipment-planning-notes" class="equipment-planning-notes"></ul>
     <details class="equipment-demand-definitions">
       <summary>How this planning figure is calculated</summary>
       <p id="equipment-planning-basis"></p>
