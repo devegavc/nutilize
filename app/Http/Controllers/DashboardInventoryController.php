@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AcademicTerm;
 use App\Services\DashboardInventoryCacheService;
+use App\Services\EquipmentDemandAnalyticsService;
 use App\Services\ItemOwnerService;
 use App\Services\ItemUnitService;
 use App\Support\InventoryInput;
@@ -39,6 +41,95 @@ class DashboardInventoryController extends Controller
         $compareMonth = $this->resolveCompareMonth($request->query('compare'), $selectedMonth);
 
         return view('dashboard-inventory-analytics', DashboardInventoryCacheService::getAnalyticsData($selectedMonth, $compareMonth));
+    }
+
+    public function equipmentDemand(Request $request): JsonResponse
+    {
+        return $this->equipmentDemandResponse(function () use ($request) {
+            return EquipmentDemandAnalyticsService::dashboard($request->query());
+        });
+    }
+
+    public function equipmentDemandLines(Request $request): JsonResponse
+    {
+        return $this->equipmentDemandResponse(function () use ($request) {
+            return EquipmentDemandAnalyticsService::drillDown($request->query());
+        });
+    }
+
+    public function storeAcademicTerm(Request $request): JsonResponse
+    {
+        $term = AcademicTerm::query()->create($this->validatedAcademicTerm($request));
+
+        return response()->json([
+            'ok' => true,
+            'term' => EquipmentDemandAnalyticsService::presentTerm($term),
+            'terms' => EquipmentDemandAnalyticsService::listTerms(),
+        ]);
+    }
+
+    public function updateAcademicTerm(Request $request, AcademicTerm $term): JsonResponse
+    {
+        $term->fill($this->validatedAcademicTerm($request, $term));
+        $term->save();
+
+        return response()->json([
+            'ok' => true,
+            'term' => EquipmentDemandAnalyticsService::presentTerm($term),
+            'terms' => EquipmentDemandAnalyticsService::listTerms(),
+        ]);
+    }
+
+    /**
+     * @return array{academic_year: string, name: string, starts_on: string, ends_on: string}
+     */
+    private function validatedAcademicTerm(Request $request, ?AcademicTerm $current = null): array
+    {
+        $validated = $request->validate([
+            'academic_year' => ['required', 'string', 'max:32', 'regex:/^[A-Za-z0-9][A-Za-z0-9 .\/-]{0,31}$/'],
+            'name' => [
+                'required',
+                'string',
+                'max:80',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9 .,&\'\/()-]{0,79}$/',
+                Rule::unique('academic_terms', 'name')
+                    ->where(fn ($query) => $query->where('academic_year', trim((string) $request->input('academic_year'))))
+                    ->ignore($current?->id),
+            ],
+            'starts_on' => ['required', 'date'],
+            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
+        ]);
+
+        $startsOn = Carbon::parse($validated['starts_on'])->startOfDay();
+        $endsOn = Carbon::parse($validated['ends_on'])->startOfDay();
+        if ($startsOn->diffInDays($endsOn, true) > 800) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'ends_on' => 'A term cannot be longer than 800 days.',
+            ]);
+        }
+
+        return [
+            'academic_year' => trim($validated['academic_year']),
+            'name' => trim($validated['name']),
+            'starts_on' => $startsOn->toDateString(),
+            'ends_on' => $endsOn->toDateString(),
+        ];
+    }
+
+    private function equipmentDemandResponse(callable $callback): JsonResponse
+    {
+        try {
+            return response()->json($callback());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'ok' => false,
+                'message' => 'The equipment report could not be loaded.',
+            ], 500);
+        }
     }
 
     private function resolveMonth(?string $monthValue): Carbon
