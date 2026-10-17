@@ -148,15 +148,17 @@
         </p>
 
         <section class="registration-allowance" aria-label="Registration emails">
-          <div class="registration-allowance-head">
+          <header class="registration-allowance-head">
+            <span class="registration-allowance-icon" aria-hidden="true"><i class="bi bi-envelope-check-fill"></i></span>
             <div>
               <h2>Emails allowed to register</h2>
-              <p>A person can create an account only when their email is on this list. Uploading another file adds new emails and leaves the ones already listed.</p>
+              <p>A person can create an account only when their email is on this list. A later upload adds new addresses and leaves the ones already listed.</p>
             </div>
-          </div>
+            <span class="registration-allowance-count">{{ $allowances->total() }} {{ $allowances->total() === 1 ? 'email' : 'emails' }}</span>
+          </header>
 
-          <div class="registration-allowance-forms">
-            <form method="POST" action="{{ route('dashboard.registration-allowances.import') }}" enctype="multipart/form-data">
+          <div class="registration-allowance-actions">
+            <form class="registration-allowance-card" method="POST" action="{{ route('dashboard.registration-allowances.import') }}" enctype="multipart/form-data">
               @csrf
               @if($allowanceSearch !== '')
                 <input type="hidden" name="allowance_q" value="{{ $allowanceSearch }}" />
@@ -164,11 +166,17 @@
               @if($allowances->currentPage() > 1)
                 <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
               @endif
-              <label for="allowance-file">Upload CSV or Excel</label>
-              <input id="allowance-file" type="file" name="file" accept=".csv,.txt,.xlsx" required />
+              <span class="registration-allowance-kicker"><i class="bi bi-file-earmark-spreadsheet"></i> Upload a list</span>
+              <p>Use a CSV or Excel file with a column named Email.</p>
+              <label class="registration-allowance-file" for="allowance-file">
+                <input id="allowance-file" type="file" name="file" accept=".csv,.txt,.xlsx" required />
+                <i class="bi bi-upload" aria-hidden="true"></i>
+                <span data-file-label>Choose file</span>
+              </label>
               <button class="facilities-add-btn" type="submit">Upload</button>
             </form>
-            <form method="POST" action="{{ route('dashboard.registration-allowances.store') }}">
+
+            <form class="registration-allowance-card" method="POST" action="{{ route('dashboard.registration-allowances.store') }}">
               @csrf
               @if($allowanceSearch !== '')
                 <input type="hidden" name="allowance_q" value="{{ $allowanceSearch }}" />
@@ -176,19 +184,24 @@
               @if($allowances->currentPage() > 1)
                 <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
               @endif
-              <label for="allowance-email">Add one email</label>
-              <input id="allowance-email" type="email" name="email" maxlength="100" placeholder="student@school.edu" required />
+              <label class="registration-allowance-kicker" for="allowance-email"><i class="bi bi-person-plus"></i> Add one email</label>
+              <p>For a new student or a transfer who is not in the file.</p>
+              <input id="allowance-email" type="email" name="email" maxlength="100" placeholder="name@students.nu-lipa.edu.ph" required />
               <button class="facilities-add-btn" type="submit">Add email</button>
             </form>
           </div>
 
           <form class="registration-allowance-search" method="GET" action="{{ route('dashboard.users') }}">
-            <label for="allowance-search">Find an email</label>
+            <label class="visually-hidden" for="allowance-search">Find an email</label>
+            <i class="bi bi-search" aria-hidden="true"></i>
             <input id="allowance-search" type="search" name="allowance_q" value="{{ $allowanceSearch }}" placeholder="Search the registration list" />
             <button class="users-reset-btn" type="submit">Search</button>
+            @if($allowanceSearch !== '')
+              <a class="users-reset-btn" href="{{ route('dashboard.users') }}">Clear</a>
+            @endif
           </form>
 
-          <div class="table-wrap">
+          <div class="table-wrap registration-allowance-table">
             <table class="inventory-table">
               <thead>
                 <tr>
@@ -201,9 +214,13 @@
                 @forelse($allowances as $allowance)
                   @php $hasAccount = $allowanceRegistered->contains($allowance->email); @endphp
                   <tr>
-                    <td>{{ $allowance->email }}</td>
-                    <td>{{ $hasAccount ? 'Registered' : 'Not registered' }}</td>
+                    <td class="registration-allowance-email">{{ $allowance->email }}</td>
                     <td>
+                      <span class="registration-allowance-status {{ $hasAccount ? 'is-registered' : 'is-waiting' }}">
+                        {{ $hasAccount ? 'Registered' : 'Not registered' }}
+                      </span>
+                    </td>
+                    <td class="registration-allowance-action">
                       @if(!$hasAccount)
                         <form method="POST" action="{{ route('dashboard.registration-allowances.destroy', $allowance) }}">
                           @csrf
@@ -214,14 +231,20 @@
                           @if($allowances->currentPage() > 1)
                             <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
                           @endif
-                          <button class="users-reset-btn" type="submit">Remove</button>
+                          <button type="submit">Remove</button>
                         </form>
                       @endif
                     </td>
                   </tr>
                 @empty
                   <tr>
-                    <td colspan="3">No emails are allowed to register yet.</td>
+                    <td colspan="3">
+                      <div class="registration-allowance-empty">
+                        <i class="bi bi-inbox" aria-hidden="true"></i>
+                        <strong>{{ $allowanceSearch !== '' ? 'No matching email' : 'No emails yet' }}</strong>
+                        <span>{{ $allowanceSearch !== '' ? 'Try another search.' : 'Upload a file or add the first address.' }}</span>
+                      </div>
+                    </td>
                   </tr>
                 @endforelse
               </tbody>
@@ -243,6 +266,13 @@
             </div>
           @endif
         </section>
+        <script>
+          document.getElementById('allowance-file')?.addEventListener('change', (event) => {
+            const input = event.currentTarget;
+            const label = input.parentElement?.querySelector('[data-file-label]');
+            if (label) label.textContent = input.files?.[0]?.name || 'Choose file';
+          });
+        </script>
 
         <section class="users-tools-bar" aria-label="User table filters">
           <div class="users-search-wrap">

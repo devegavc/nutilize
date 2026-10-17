@@ -5874,65 +5874,311 @@ body.insight-filtering .insight-kpi:not(.is-active) {
 }
 
 .user-management-card .registration-allowance {
-  margin: 0 0 18px;
-  padding: 14px;
-  border: 1px solid #d9e2f7;
-  border-radius: 14px;
-  background: #f8faff;
+  margin: 0 18px 16px;
+  padding: 16px;
+  border: 1px solid rgba(56, 71, 156, 0.14);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(244, 247, 255, 0.96), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 8px 22px rgba(28, 43, 110, 0.05);
+}
+
+.user-management-card .registration-allowance-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.user-management-card .registration-allowance-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 12px;
+  background: var(--blue-grad, linear-gradient(135deg, #24357f, #4457ab));
+  color: #fff;
+  font-size: 1.1rem;
 }
 
 .user-management-card .registration-allowance-head h2 {
   margin: 0 0 4px;
   color: #1b2b6a;
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
-.user-management-card .registration-allowance-head p,
-.user-management-card .registration-allowance-pages {
+.user-management-card .registration-allowance-head p {
   margin: 0;
+  max-width: 62ch;
   color: #5d6996;
   font-size: 0.82rem;
+  line-height: 1.45;
 }
 
-.user-management-card .registration-allowance-forms,
-.user-management-card .registration-allowance-search,
+.user-management-card .registration-allowance-count {
+  margin-left: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #d5def4;
+  color: #24357f;
+  font-size: 0.75rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.user-management-card .registration-allowance-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.user-management-card .registration-allowance-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 168px;
+  padding: 14px;
+  border: 1px solid #e1e7f6;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.user-management-card .registration-allowance-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #24357f;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.user-management-card .registration-allowance-card p {
+  margin: 0;
+  color: #6b769c;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.user-management-card .registration-allowance-card input[type="email"] {
+  width: 100%;
+  min-height: 38px;
+  margin-top: auto;
+  border: 1px solid #cad4ee;
+  border-radius: 10px;
+  background: #fbfcff;
+  color: #1d2b63;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.user-management-card .registration-allowance-card input[type="email"]:focus {
+  outline: none;
+  border-color: rgba(56, 71, 156, 0.56);
+  box-shadow: 0 0 0 2px rgba(56, 71, 156, 0.14);
+  background: #fff;
+}
+
+.user-management-card .registration-allowance-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  margin-top: auto;
+  padding: 8px 10px;
+  border: 1px dashed #b7c4e6;
+  border-radius: 10px;
+  background: #f7f9ff;
+  color: #2e3f8f;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.user-management-card .registration-allowance-file input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.user-management-card .registration-allowance-file span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-management-card .registration-allowance-card .facilities-add-btn {
+  align-self: flex-start;
+}
+
+.user-management-card .registration-allowance-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  position: relative;
+}
+
+.user-management-card .registration-allowance-search i {
+  position: absolute;
+  left: 12px;
+  color: #4f5fa9;
+  pointer-events: none;
+}
+
+.user-management-card .registration-allowance-search input {
+  flex: 1 1 auto;
+  min-height: 38px;
+  border: 1px solid #cad4ee;
+  border-radius: 10px;
+  background: #fff;
+  color: #1d2b63;
+  padding: 8px 10px 8px 34px;
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.user-management-card .registration-allowance-search input:focus {
+  outline: none;
+  border-color: rgba(56, 71, 156, 0.56);
+  box-shadow: 0 0 0 2px rgba(56, 71, 156, 0.14);
+}
+
+.user-management-card .registration-allowance-search a.users-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.user-management-card .registration-allowance-table {
+  margin-top: 12px;
+  max-height: 320px;
+  border: 1px solid #e4eaf8;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.user-management-card .registration-allowance-email {
+  font-weight: 700;
+  color: #1d2b63;
+}
+
+.user-management-card .registration-allowance-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.user-management-card .registration-allowance-status.is-registered {
+  background: rgba(76, 175, 80, 0.14);
+  color: #1f7a36;
+}
+
+.user-management-card .registration-allowance-status.is-waiting {
+  background: rgba(68, 87, 171, 0.12);
+  color: #24357f;
+}
+
+.user-management-card .registration-allowance-action {
+  width: 88px;
+  text-align: right;
+}
+
+.user-management-card .registration-allowance-action form {
+  display: inline;
+}
+
+.user-management-card .registration-allowance-action button {
+  border: 0;
+  background: transparent;
+  color: #9d1c1c;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.user-management-card .registration-allowance-action button:hover {
+  text-decoration: underline;
+}
+
+.user-management-card .registration-allowance-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 22px 8px;
+  color: #6b769c;
+  text-align: center;
+}
+
+.user-management-card .registration-allowance-empty i {
+  font-size: 1.3rem;
+  color: #8ea0d4;
+}
+
+.user-management-card .registration-allowance-empty strong {
+  color: #1d2b63;
+}
+
 .user-management-card .registration-allowance-pages {
   display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.user-management-card .registration-allowance form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
+  justify-content: flex-end;
+  align-items: center;
   gap: 8px;
-}
-
-.user-management-card .registration-allowance label {
-  width: 100%;
-  color: #39457f;
-  font-size: 0.75rem;
+  margin: 10px 0 0;
+  color: #5d6996;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
-.user-management-card .registration-allowance input[type="email"],
-.user-management-card .registration-allowance input[type="search"],
-.user-management-card .registration-allowance input[type="file"] {
-  border: 1px solid #cdd6ee;
-  border-radius: 8px;
+.user-management-card .registration-allowance-pages a,
+.user-management-card .registration-allowance-pages span {
+  padding: 6px 10px;
+  border-radius: 999px;
   background: #fff;
-  color: #1b2b6a;
-  padding: 7px 8px;
-  font: inherit;
-  font-size: 0.82rem;
+  border: 1px solid #d5def4;
 }
 
-.user-management-card .registration-allowance .table-wrap {
-  margin-top: 12px;
-  max-height: 280px;
+.user-management-card .registration-allowance-pages a {
+  color: #24357f;
+  text-decoration: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 800px) {
+  .user-management-card .registration-allowance-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .user-management-card .registration-allowance-head {
+    flex-wrap: wrap;
+  }
+
+  .user-management-card .registration-allowance-count {
+    margin-left: 54px;
+  }
 }
 
 .user-management-card .users-table .user-status-cell {
