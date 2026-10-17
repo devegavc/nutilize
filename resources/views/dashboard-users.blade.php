@@ -273,27 +273,6 @@
             if (label) label.textContent = input.files?.[0]?.name || 'Choose file';
           });
         </script>
-        @if(session('allowance_notice'))
-          <div class="allowance-notice is-open is-{{ session('allowance_notice.kind') }}" id="allowance-notice" role="dialog" aria-modal="true" aria-labelledby="allowance-notice-title">
-            <div class="allowance-notice-card">
-              <h2 id="allowance-notice-title">{{ session('allowance_notice.title') }}</h2>
-              <p>{{ session('allowance_notice.message') }}</p>
-              <button type="button" id="allowance-notice-close">OK</button>
-            </div>
-          </div>
-          <script>
-            (() => {
-              const notice = document.getElementById('allowance-notice');
-              const close = document.getElementById('allowance-notice-close');
-              const dismiss = () => notice?.remove();
-              close?.addEventListener('click', dismiss);
-              document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape') dismiss();
-              });
-              close?.focus();
-            })();
-          </script>
-        @endif
 
         <section class="users-tools-bar" aria-label="User table filters">
           <div class="users-search-wrap">
@@ -1078,5 +1057,48 @@
       });
     })();
   </script>
+  @php $allowanceNotice = session('allowance_notice'); @endphp
+  @if(is_array($allowanceNotice))
+    <div class="allowance-notice is-{{ $allowanceNotice['kind'] ?? 'added' }}" id="allowance-notice" role="dialog" aria-modal="true" aria-labelledby="allowance-notice-title">
+      <button type="button" class="allowance-notice-backdrop" data-allowance-close aria-label="Close"></button>
+      <article class="allowance-notice-card">
+        <header class="allowance-notice-head">
+          <span class="allowance-notice-icon" aria-hidden="true">
+            @if(($allowanceNotice['kind'] ?? '') === 'used')
+              <i class="bi bi-envelope-exclamation-fill"></i>
+            @elseif(($allowanceNotice['kind'] ?? '') === 'removed')
+              <i class="bi bi-envelope-x-fill"></i>
+            @elseif(($allowanceNotice['kind'] ?? '') === 'error')
+              <i class="bi bi-exclamation-circle-fill"></i>
+            @else
+              <i class="bi bi-envelope-check-fill"></i>
+            @endif
+          </span>
+          <h2 id="allowance-notice-title">{{ $allowanceNotice['title'] ?? 'Email added' }}</h2>
+        </header>
+        <div class="allowance-notice-body">
+          @if(!empty($allowanceNotice['email']))
+            <p class="allowance-notice-email">{{ $allowanceNotice['email'] }}</p>
+          @endif
+          <p>{{ $allowanceNotice['message'] ?? '' }}</p>
+        </div>
+        <footer class="allowance-notice-actions">
+          <button type="button" id="allowance-notice-close">OK</button>
+        </footer>
+      </article>
+    </div>
+    <script>
+      (() => {
+        const notice = document.getElementById('allowance-notice');
+        const dismiss = () => notice?.remove();
+        document.getElementById('allowance-notice-close')?.addEventListener('click', dismiss);
+        notice?.querySelector('[data-allowance-close]')?.addEventListener('click', dismiss);
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') dismiss();
+        });
+        document.getElementById('allowance-notice-close')?.focus();
+      })();
+    </script>
+  @endif
 </body>
 </html>

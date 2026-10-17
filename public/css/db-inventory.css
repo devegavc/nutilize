@@ -6188,52 +6188,128 @@ body.insight-filtering .insight-kpi:not(.is-active) {
   display: grid;
   place-items: center;
   padding: 18px;
-  background: rgba(18, 22, 34, 0.5);
+}
+
+.allowance-notice-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(18, 22, 34, 0.48);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
 }
 
 .allowance-notice-card {
+  position: relative;
   width: min(420px, 92vw);
-  padding: 22px 22px 18px;
-  border-radius: 16px;
-  background: #fff;
+  overflow: hidden;
   border: 1px solid #d7ddea;
-  box-shadow: 0 16px 34px rgba(20, 26, 48, 0.24);
-  text-align: center;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(20, 26, 48, 0.22);
+  z-index: 1;
 }
 
-.allowance-notice-card h2 {
-  margin: 0 0 8px;
-  color: #1f7a36;
-  font-size: 1.25rem;
+.allowance-notice-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #2f9e44, #51cf66);
 }
 
-.allowance-notice.is-used .allowance-notice-card h2,
-.allowance-notice.is-error .allowance-notice-card h2 {
+.allowance-notice.is-used .allowance-notice-card::before,
+.allowance-notice.is-error .allowance-notice-card::before {
+  background: linear-gradient(90deg, #e0a100, #f4b70a);
+}
+
+.allowance-notice.is-removed .allowance-notice-card::before {
+  background: linear-gradient(90deg, #24357f, #4457ab);
+}
+
+.allowance-notice-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid #e6eaf2;
+  background: #fbfcff;
+}
+
+.allowance-notice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(47, 158, 68, 0.12);
+  color: #2f9e44;
+  font-size: 1.05rem;
+}
+
+.allowance-notice.is-used .allowance-notice-icon,
+.allowance-notice.is-error .allowance-notice-icon {
+  background: rgba(244, 183, 10, 0.18);
   color: #9a6700;
 }
 
-.allowance-notice.is-removed .allowance-notice-card h2 {
+.allowance-notice.is-removed .allowance-notice-icon {
+  background: rgba(36, 53, 127, 0.1);
   color: #24357f;
 }
 
-.allowance-notice-card p {
+.allowance-notice-head h2 {
   margin: 0;
-  color: #2f3545;
-  font-size: 0.98rem;
+  color: #1c2b4f;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.allowance-notice-body {
+  padding: 16px 18px 6px;
+}
+
+.allowance-notice-email {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f4f7ff;
+  border: 1px solid #d9e2f7;
+  color: #1d2b63;
+  font-size: 0.92rem;
+  font-weight: 800;
+  word-break: break-all;
+}
+
+.allowance-notice-body p {
+  margin: 0 0 12px;
+  color: #3b4458;
+  font-size: 0.95rem;
   line-height: 1.45;
 }
 
-.allowance-notice-card button {
-  margin-top: 16px;
-  min-width: 104px;
-  height: 38px;
+.allowance-notice-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid #e6eaf2;
+  background: #fbfcff;
+}
+
+.allowance-notice-actions button {
+  min-width: 96px;
+  height: 36px;
   border: 0;
-  border-radius: 9px;
-  background: #24357f;
-  color: #fff;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f4b70a 0%, #e7a900 100%);
+  color: #1c2b4f;
   font: inherit;
-  font-weight: 700;
+  font-size: 0.9rem;
+  font-weight: 800;
   cursor: pointer;
+  box-shadow: 0 5px 10px rgba(244, 183, 10, 0.18);
 }
 
 .user-management-card .users-table .user-status-cell {

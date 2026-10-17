@@ -29,9 +29,12 @@ class RegistrationAllowanceController extends Controller
             ]);
         }
 
-        return $this->notice($request, $existed ? 'used' : 'added', $existed
-            ? $normalized.' is already on the registration list.'
-            : $normalized.' was added. That person can now register.');
+        return $this->notice(
+            $request,
+            $existed ? 'used' : 'added',
+            $existed ? 'It is already on the registration list.' : 'That person can now register.',
+            $normalized
+        );
     }
 
     public function import(Request $request): RedirectResponse
@@ -87,10 +90,10 @@ class RegistrationAllowanceController extends Controller
             return $this->notice($request, 'used', $exception->getMessage());
         }
 
-        return $this->notice($request, 'removed', $email.' was removed from the registration list.');
+        return $this->notice($request, 'removed', 'It was removed from the registration list.', $email);
     }
 
-    private function notice(Request $request, string $kind, string $message): RedirectResponse
+    private function notice(Request $request, string $kind, string $message, ?string $email = null): RedirectResponse
     {
         $title = match ($kind) {
             'used' => 'Email already used',
@@ -105,6 +108,7 @@ class RegistrationAllowanceController extends Controller
                 'title' => $title,
                 'message' => $message,
                 'kind' => $kind,
+                'email' => $email,
             ]);
     }
 
