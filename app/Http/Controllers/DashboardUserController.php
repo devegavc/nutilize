@@ -11,6 +11,7 @@ use App\Services\ItemOwnerService;
 use App\Services\RegistrationAllowanceService;
 use App\Services\UserAccountStatusService;
 use App\Services\UserNameService;
+use App\Support\SimpleXlsx;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -27,20 +28,7 @@ class DashboardUserController extends Controller
     {
         $this->applyInactivityPolicySafely();
 
-        $relations = ['office'];
-        if (Schema::hasTable('academic_programs') && Schema::hasColumn('users', 'program_id')) {
-            $relations[] = 'academicProgram.office';
-        }
-
-        $orderColumn = Schema::hasColumn('users', 'created_at') ? 'created_at' : 'user_id';
-
-        try {
-            $users = User::with($relations)
-                ->orderBy($orderColumn, 'desc')
-                ->get();
-        } catch (QueryException) {
-            $users = User::query()->orderBy($orderColumn, 'desc')->get();
-        }
+        $users = $this->managedUsers();
 
         $offices = Office::orderBy('department_name', 'asc')->get();
 
@@ -70,6 +58,102 @@ class DashboardUserController extends Controller
             'allowanceSearch' => trim((string) $request->query('allowance_q', '')),
             'allowanceRegistered' => $registeredEmails,
         ]);
+    }
+
+    public function exportRegisteredUsers()
+    {
+        $this->applyInactivityPolicySafely();
+
+        $rows = [[
+            'Email',
+            'Name',
+            'Username',
+            'Role',
+            'Office',
+            'Status',
+        ]];
+
+        foreach ($this->managedUsers() as $user) {
+            $rows[] = [
+                (string) $user->email,
+                $user->displayName(),
+                (string) $user->username,
+                $this->exportRoleLabel($user),
+                $this->exportOfficeLabel($user),
+                $this->exportStatusLabel($user),
+            ];
+        }
+
+        $filename = 'registered-users-'.now()->format('Y-m-d').'.xlsx';
+
+        return response(SimpleXlsx::binary($rows), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    private function managedUsers()
+    {
+        $relations = ['office'];
+        if (Schema::hasTable('academic_programs') && Schema::hasColumn('users', 'program_id')) {
+            $relations[] = 'academicProgram.office';
+        }
+
+        $orderColumn = Schema::hasColumn('users', 'created_at') ? 'created_at' : 'user_id';
+
+        try {
+            return User::with($relations)
+                ->orderBy($orderColumn, 'desc')
+                ->get();
+        } catch (QueryException) {
+            return User::query()->orderBy($orderColumn, 'desc')->get();
+        }
+    }
+
+    private function exportRoleLabel(User $user): string
+    {
+        if (ItemOwnerService::isItemOwnerUser($user)) {
+            return 'ITEM OWNER';
+        }
+
+        $role = strtolower((string) $user->role);
+        if ($role === 'faculty') {
+            return 'FACULTY';
+        }
+        if (in_array($role, ['user', 'student'], true)) {
+            return 'STUDENT';
+        }
+
+        return strtoupper($role);
+    }
+
+    private function exportOfficeLabel(User $user): string
+    {
+        $officeName = Office::publicLabel((string) ($user->office?->department_name ?? ''));
+        if ($officeName !== '') {
+            return $officeName;
+        }
+
+        $programOfficeName = Office::publicLabel((string) ($user->academicProgram?->office?->department_name ?? ''));
+        if ($programOfficeName !== '') {
+            return $programOfficeName;
+        }
+
+        $programName = trim((string) ($user->academicProgram?->name ?? ''));
+        if ($programName !== '') {
+            return $programName;
+        }
+
+        return 'No Office';
+    }
+
+    private function exportStatusLabel(User $user): string
+    {
+        if (!UserAccountStatusService::isStatusManaged($user)) {
+            return '—';
+        }
+
+        return UserAccountStatusService::isActive($user) ? 'Active' : 'Inactive';
     }
 
     public function store(Request $request)

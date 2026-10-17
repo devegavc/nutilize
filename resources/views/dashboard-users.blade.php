@@ -314,6 +314,7 @@
             <button class="users-reset-btn" id="users-reset-filters" type="button">Reset</button>
           </div>
 
+          <a class="users-download-btn" href="{{ route('dashboard.users.export') }}"><i class="bi bi-download" aria-hidden="true"></i> Download Excel</a>
           <button class="facilities-add-btn" id="user-add-btn" type="button"><span class="btn-icon">+</span> Add User</button>
         </section>
 
