@@ -11,6 +11,7 @@ use App\Services\ItemOwnerService;
 use App\Services\RegistrationAllowanceService;
 use App\Services\UserAccountStatusService;
 use App\Services\UserNameService;
+use App\Support\RoleCatalog;
 use App\Support\SimpleXlsx;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -116,15 +117,12 @@ class DashboardUserController extends Controller
             return 'ITEM OWNER';
         }
 
-        $role = strtolower((string) $user->role);
-        if ($role === 'faculty') {
-            return 'FACULTY';
-        }
-        if (in_array($role, ['user', 'student'], true)) {
-            return 'STUDENT';
+        $label = strtoupper(RoleCatalog::label((string) $user->role));
+        if ($user->role_needs_review) {
+            $label .= ' (NEEDS REVIEW)';
         }
 
-        return strtoupper($role);
+        return $label;
     }
 
     private function exportOfficeLabel(User $user): string
@@ -165,7 +163,7 @@ class DashboardUserController extends Controller
         $data = $request->validate([
             'username' => 'required|string|max:50|unique:users,username',
             'email' => 'required|email|max:100|unique:users,email',
-            'role' => ['required', Rule::in(['user', 'student', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
+            'role' => ['required', Rule::in(RoleCatalog::assignableValues())],
             'full_name' => 'nullable|string|max:255',
             'office_id' => ['nullable', 'exists:offices,office_id'],
         ]);
@@ -233,7 +231,7 @@ class DashboardUserController extends Controller
         $data = $request->validate([
             'username' => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($user->user_id, 'user_id')],
             'email' => ['required', 'email', 'max:100', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
-            'role' => ['required', Rule::in(['user', 'student', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
+            'role' => ['required', Rule::in(RoleCatalog::assignableValues())],
             'full_name' => 'nullable|string|max:255',
             'office_id' => ['nullable', 'exists:offices,office_id'],
         ]);

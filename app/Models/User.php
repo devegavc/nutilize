@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\ItemOwnerService;
+use App\Support\RoleCatalog;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['first_name', 'middle_initial', 'last_name', 'full_name', 'username', 'email', 'password', 'role', 'office_id', 'program_id', 'suffix', 'contact_number', 'phone_number', 'is_active', 'status_changed_at'])]
+#[Fillable(['first_name', 'middle_initial', 'last_name', 'full_name', 'username', 'email', 'password', 'role', 'office_id', 'program_id', 'suffix', 'contact_number', 'phone_number', 'is_active', 'status_changed_at', 'role_needs_review'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -31,17 +32,28 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'status_changed_at' => 'datetime',
+            'role_needs_review' => 'boolean',
         ];
     }
 
     public function isFaculty(): bool
     {
-        return strtolower((string) $this->role) === 'faculty';
+        $role = (string) $this->role;
+
+        return $role === RoleCatalog::FACULTY || strtolower($role) === 'faculty';
     }
 
     public function isStudentUser(): bool
     {
-        return in_array(strtolower((string) $this->role), ['user', 'student'], true);
+        $role = (string) $this->role;
+
+        return $role === RoleCatalog::STUDENT
+            || in_array(strtolower($role), ['user', 'student'], true);
+    }
+
+    public function isDean(): bool
+    {
+        return RoleCatalog::isDeanCode((string) $this->role);
     }
 
     public function office()
@@ -56,6 +68,10 @@ class User extends Authenticatable
 
     public function isPhysicalFacilitiesAdmin()
     {
+        if ((string) $this->role === 'PFO') {
+            return true;
+        }
+
         if (!$this->office || !$this->office->isPhysicalFacilities()) {
             return false;
         }
@@ -67,22 +83,63 @@ class User extends Authenticatable
 
     public function isOfficeApprover()
     {
+        if ($this->isDean()) {
+            return true;
+        }
+
         if (is_null($this->office_id)) {
             return false;
         }
 
-        $role = strtolower((string) $this->role);
+        $role = (string) $this->role;
+        $lower = strtolower($role);
 
-        if (in_array($role, ['admin', 'pc_admin'], true)) {
+        if (RoleCatalog::isProgramChairCode($role)) {
+            return $this->officeMatchesChairRole($role);
+        }
+
+        if (RoleCatalog::isOfficeRoleCode($role)) {
+            return $this->officeMatchesOfficeRole($role);
+        }
+
+        if (in_array($lower, ['admin', 'pc_admin'], true)) {
             return true;
         }
 
-        return $role === 'pf_admin' && $this->office && $this->office->isPhysicalFacilities();
+        return $lower === 'pf_admin' && $this->office && $this->office->isPhysicalFacilities();
     }
 
     public function isProgramChairAdmin(): bool
     {
-        return strtolower((string) $this->role) === 'pc_admin' && !is_null($this->office_id);
+        $role = (string) $this->role;
+
+        if (RoleCatalog::isProgramChairCode($role)) {
+            return $this->officeMatchesChairRole($role);
+        }
+
+        return strtolower($role) === 'pc_admin' && !is_null($this->office_id);
+    }
+
+    private function officeMatchesChairRole(string $role): bool
+    {
+        $expected = RoleCatalog::PROGRAM_OFFICES[$role] ?? null;
+        if ($expected === null || !$this->office) {
+            return false;
+        }
+
+        return RoleCatalog::normalize($this->office->department_name) === RoleCatalog::normalize($expected);
+    }
+
+    private function officeMatchesOfficeRole(string $role): bool
+    {
+        if (!$this->office) {
+            return false;
+        }
+
+        return RoleCatalog::officeRoleForDepartment(
+            (string) $this->office->department_name,
+            (string) ($this->office->short_code ?? '')
+        ) === $role;
     }
 
     public function isItemOwnerAdmin(): bool
@@ -96,9 +153,10 @@ class User extends Authenticatable
             return false;
         }
 
-        $role = strtolower((string) $this->role);
+        $role = (string) $this->role;
 
-        return in_array($role, ['user', 'student'], true);
+        return $role === RoleCatalog::STUDENT
+            || in_array(strtolower($role), ['user', 'student'], true);
     }
 
     public function reservations()

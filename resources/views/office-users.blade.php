@@ -85,9 +85,10 @@
 
         @php
           $normalizeUserRole = fn ($user) => strtolower(trim((string) ($user->role ?? '')));
-          $programChairUsers = $users->filter(fn ($user) => $normalizeUserRole($user) === 'pc_admin')->values();
-          $facultyUsers = $users->filter(fn ($user) => $normalizeUserRole($user) === 'faculty')->values();
-          $students = $users->filter(fn ($user) => !in_array($normalizeUserRole($user), ['pc_admin', 'faculty'], true))->values();
+          $isChair = fn ($user) => \App\Support\RoleCatalog::isProgramChairCode((string) $user->role) || $normalizeUserRole($user) === 'pc_admin';
+          $programChairUsers = $users->filter($isChair)->values();
+          $facultyUsers = $users->filter(fn ($user) => $user->isFaculty())->values();
+          $students = $users->filter(fn ($user) => !$isChair($user) && !$user->isFaculty())->values();
           $resolveUserStatus = function ($user): string {
               $rawStatus = strtolower(trim((string) ($user->status ?? $user->account_status ?? '')));
 
@@ -110,7 +111,7 @@
           $rowRoleValue = function ($user) use ($normalizeUserRole): string {
               $role = $normalizeUserRole($user);
 
-              if ($role === 'pc_admin') {
+              if ($role === 'pc_admin' || str_starts_with((string) $user->role, 'PC_')) {
                   return 'pc_admin';
               }
 

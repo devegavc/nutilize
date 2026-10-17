@@ -10,10 +10,12 @@ class ReservationApproval extends Model
     use HasFactory;
 
     protected $primaryKey = 'approval_id';
-    protected $fillable = ['reservation_id', 'office_id', 'owner_id', 'approved_by_user_id', 'status', 'rejection_reason', 'approved_at'];
+    protected $fillable = ['reservation_id', 'office_id', 'owner_id', 'approved_by_user_id', 'approved_by_role', 'on_behalf_of_program_chair', 'dean_required', 'status', 'rejection_reason', 'approved_at'];
 
     protected $casts = [
         'approved_at' => 'datetime',
+        'on_behalf_of_program_chair' => 'boolean',
+        'dean_required' => 'boolean',
     ];
 
     public function reservation()

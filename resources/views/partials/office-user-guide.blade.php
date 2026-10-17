@@ -3,7 +3,7 @@
   $guideRole = strtolower((string) ($guideUser->role ?? ''));
   $guideUsername = strtolower((string) ($guideUser->username ?? ''));
   $guideOfficeCode = strtolower((string) ($guideUser?->office?->short_code ?? ''));
-  $guideIsPcAdmin = $guideRole === 'pc_admin';
+  $guideIsPcAdmin = ($guideUser && $guideUser->isProgramChairAdmin()) || $guideRole === 'pc_admin' || str_starts_with((string) ($guideUser->role ?? ''), 'PC_');
   $guideIsIoAdmin = ($guideUser && \App\Services\ItemOwnerService::isItemOwnerUser($guideUser))
       || $guideUsername === 'io_admin'
       || $guideOfficeCode === 'io'

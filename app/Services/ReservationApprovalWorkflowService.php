@@ -72,6 +72,7 @@ class ReservationApprovalWorkflowService
         }
 
         self::reconcileItemOwnerApprovals($reservationId);
+        ProgramChairStageService::markIfRequesterIsChair($reservationId);
     }
 
     /**

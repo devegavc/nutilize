@@ -11,8 +11,8 @@
     || $currentUsername === 'io_admin'
     || $currentOfficeCode === 'io'
     || ($currentRole === 'admin' && $currentOfficeCode === 'io');
-  $isPcAdmin = $currentRole === 'pc_admin';
-  $isPfAdminUser = in_array($currentRole, ['admin', 'pf_admin'], true);
+  $isPcAdmin = ($authUser && $authUser->isProgramChairAdmin()) || $currentRole === 'pc_admin';
+  $isPfAdminUser = ($authUser && $authUser->isPhysicalFacilitiesAdmin()) || in_array($currentRole, ['admin', 'pf_admin', 'pfo'], true);
 @endphp
 
 <div id="navbar-container" data-nav-server-rendered="1">

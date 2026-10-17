@@ -5264,8 +5264,8 @@ async function loadNavbar() {
         || currentUsername === 'io_admin'
         || currentOfficeCode === 'io'
         || (currentRole === 'admin' && currentOfficeCode === 'io');
-      const isPfAdmin = ['admin', 'pf_admin'].includes(currentRole);
-      const isPcAdmin = currentRole === 'pc_admin';
+      const isPfAdmin = ['admin', 'pf_admin', 'pfo'].includes(currentRole) || window.authUser?.is_pf_admin === true;
+      const isPcAdmin = currentRole === 'pc_admin' || currentRole.startsWith('pc_') || window.authUser?.is_program_chair === true;
 
       navbarContainer.querySelectorAll('[data-visible-for="io-admin"]').forEach((item) => {
         if (!isIoAdmin) {

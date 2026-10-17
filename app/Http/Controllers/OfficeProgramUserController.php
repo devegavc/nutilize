@@ -22,7 +22,7 @@ class OfficeProgramUserController extends Controller
         $programIds = $this->resolveProgramIdsForChair($chair);
 
         $users = $this->programMembersQuery($chair, $programIds)
-            ->orderByRaw("CASE WHEN LOWER(role) = 'pc_admin' THEN 0 ELSE 1 END")
+            ->orderByRaw("CASE WHEN role LIKE 'PC_%' OR LOWER(role) = 'pc_admin' THEN 0 ELSE 1 END")
             ->orderByDesc('created_at')
             ->get();
 
@@ -55,7 +55,7 @@ class OfficeProgramUserController extends Controller
                 $user->username = $data['username'];
                 $user->email = $data['email'];
                 $user->password = $this->accountSetup->unknownPassword();
-                $user->role = 'user';
+                $user->role = \App\Support\RoleCatalog::STUDENT;
                 $user->full_name = $data['full_name'] ?? null;
                 $user->program_id = (int) ($this->resolveProgramIdsForChair($chair)[0] ?? $chair->program_id);
                 $user->office_id = null;
@@ -109,7 +109,7 @@ class OfficeProgramUserController extends Controller
         $chair = $this->programChair();
         $user = $this->findProgramMember($chair, $userId, $this->resolveProgramIdsForChair($chair));
 
-        if ((int) Auth::id() === (int) $user->user_id || strtolower((string) $user->role) === 'pc_admin') {
+        if ((int) Auth::id() === (int) $user->user_id || $user->isProgramChairAdmin() || \App\Support\RoleCatalog::isProgramChairCode((string) $user->role)) {
             return redirect()->route('office.users')->with('error', 'Program chair accounts cannot be deleted from this page.');
         }
 
@@ -198,7 +198,7 @@ class OfficeProgramUserController extends Controller
                 $query->orWhere(function ($memberQuery) use ($programIds): void {
                     $memberQuery
                         ->whereIn('program_id', $programIds)
-                        ->whereRaw('LOWER(role) IN (?, ?, ?)', ['user', 'student', 'faculty']);
+                        ->whereRaw('role IN (?, ?) OR LOWER(role) IN (?, ?, ?)', ['Student', 'Faculty', 'user', 'student', 'faculty']);
                 });
             }
         });

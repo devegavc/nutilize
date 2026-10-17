@@ -103,6 +103,14 @@ class LoginController extends Controller
 
     public static function redirectAuthenticated(?User $user): RedirectResponse
     {
+        if ($user && $user->isPhysicalFacilitiesAdmin()) {
+            return redirect()->route('dashboard.home');
+        }
+
+        if ($user && $user->isOfficeApprover()) {
+            return redirect()->route('office.home');
+        }
+
         if ($user && (int) $user->user_id === 8) {
             return redirect()->route('office.home');
         }

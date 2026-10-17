@@ -8,7 +8,7 @@
       : 'n/a';
   $userOffice = $resolveUserOffice($user);
   $userName = $resolveUserName($user);
-  $roleKey = ItemOwnerService::isItemOwnerUser($user) ? 'item_owner' : strtolower((string) $user->role);
+  $roleKey = ItemOwnerService::isItemOwnerUser($user) ? 'item_owner' : (string) $user->role;
   $statusDuration = $showsAccountStatus ? UserAccountStatusService::statusDurationLabel($user) : '';
   $rowClass = $rowClass ?? 'admin-row';
   $roleBadgeClass = $roleBadgeClass ?? 'admin-badge';

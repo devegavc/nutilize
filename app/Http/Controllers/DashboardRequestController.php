@@ -534,7 +534,7 @@ class DashboardRequestController extends Controller
 
         return DB::table('users')
             ->where('office_id', $pfOfficeId)
-            ->whereRaw('LOWER(role) = ?', ['admin'])
+            ->whereRaw('LOWER(role) IN (?, ?, ?)', ['admin', 'pf_admin', 'pfo'])
             ->value('user_id');
     }
 

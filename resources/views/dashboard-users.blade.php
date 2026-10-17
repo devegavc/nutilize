@@ -80,18 +80,18 @@
           use App\Services\ItemOwnerService;
           use App\Services\UserAccountStatusService;
 
-          $adminRoles = ['admin', 'pf_admin', 'pc_admin'];
+          $isStaffRole = function ($user): bool {
+              if (ItemOwnerService::isItemOwnerUser($user)) {
+                  return false;
+              }
+
+              return \App\Support\RoleCatalog::isStaffRole((string) $user->role);
+          };
           $itemOwners = $users->filter(fn ($user) => ItemOwnerService::isItemOwnerUser($user))->values();
-          $admins = $users->filter(function ($user) use ($adminRoles) {
-              return in_array(strtolower((string) $user->role), $adminRoles, true)
-                  && !ItemOwnerService::isItemOwnerUser($user);
-          })->values();
-          $mobilePool = $users->filter(function ($user) use ($adminRoles) {
-              return !in_array(strtolower((string) $user->role), $adminRoles, true)
-                  && !ItemOwnerService::isItemOwnerUser($user);
-          });
-          $facultyUsers = $mobilePool->filter(fn ($user) => strtolower((string) $user->role) === 'faculty')->values();
-          $studentUsers = $mobilePool->filter(fn ($user) => strtolower((string) $user->role) !== 'faculty')->values();
+          $admins = $users->filter(fn ($user) => $isStaffRole($user))->values();
+          $mobilePool = $users->filter(fn ($user) => !$isStaffRole($user) && !ItemOwnerService::isItemOwnerUser($user));
+          $facultyUsers = $mobilePool->filter(fn ($user) => $user->isFaculty())->values();
+          $studentUsers = $mobilePool->filter(fn ($user) => !$user->isFaculty())->values();
           $formatUserCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'user' : 'users');
           $formatStudentCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'student' : 'students');
           $activeUsersCount = $users->filter(fn ($user) => UserAccountStatusService::isActive($user))->count();
@@ -292,10 +292,13 @@
               <label for="users-role-filter">Role</label>
               <select id="users-role-filter">
                 <option value="all">All Roles</option>
-                <option value="admin">Admin</option>
-                <option value="item_owner">Item Owner</option>
-                <option value="faculty">Faculty</option>
-                <option value="student">Student</option>
+                @foreach(\App\Support\RoleCatalog::groupedAssignable() as $group => $options)
+                  <optgroup label="{{ $group }}">
+                    @foreach($options as $code => $label)
+                      <option value="{{ $code }}">{{ $label }}</option>
+                    @endforeach
+                  </optgroup>
+                @endforeach
               </select>
             </div>
 
@@ -357,7 +360,7 @@
                       'resolveUserName' => $resolveUserName,
                       'rowClass' => 'admin-row',
                       'roleBadgeClass' => 'admin-badge',
-                      'roleLabel' => strtoupper((string) $user->role),
+                      'roleLabel' => strtoupper(\App\Support\RoleCatalog::label((string) $user->role)).($user->role_needs_review ? ' (NEEDS REVIEW)' : ''),
                       'deleteConfirm' => 'Delete this user?',
                     ])
                   @endforeach
@@ -488,10 +491,13 @@
           <section class="equipment-form-section">
             <label class="facilities-field-label" for="user-role">Role</label>
             <select id="user-role" class="facilities-input facilities-select" name="role" required>
-              <option value="student">STUDENT</option>
-              <option value="faculty">FACULTY</option>
-              <option value="admin">ADMIN</option>
-              <option value="item_owner">ITEM OWNER</option>
+              @foreach(\App\Support\RoleCatalog::groupedAssignable() as $group => $options)
+                <optgroup label="{{ $group }}">
+                  @foreach($options as $code => $label)
+                    <option value="{{ $code }}">{{ $label }}</option>
+                  @endforeach
+                </optgroup>
+              @endforeach
             </select>
 
             <label class="facilities-field-label" for="user-office">Office</label>
@@ -577,7 +583,18 @@
       }
     };
 
-    const resetModal = (presetRole = 'student') => {
+    const canonicalRole = (role) => {
+      const value = String(role || '');
+      if (value === 'user' || value === 'student') {
+        return 'Student';
+      }
+      if (value === 'faculty') {
+        return 'Faculty';
+      }
+      return value;
+    };
+
+    const resetModal = (presetRole = 'Student') => {
       userForm.action = window.userStoreEndpoint;
       userFormMethod.value = 'POST';
       userModalTitle.textContent = presetRole === 'item_owner' ? 'Add Item Owner' : 'Add User';
@@ -585,7 +602,7 @@
       userUsernameInput.value = '';
       userFullNameInput.value = '';
       userEmailInput.value = '';
-      userRoleInput.value = presetRole === 'user' ? 'student' : presetRole;
+      userRoleInput.value = canonicalRole(presetRole);
       userOfficeInput.value = presetRole === 'item_owner' ? itemOwnerOfficeId : '';
       syncSetupNote(true);
       syncRoleOfficeFields();
@@ -596,7 +613,7 @@
       const username = row.dataset.userUsername;
       const fullName = row.dataset.userFullName || row.dataset.userName;
       const email = row.dataset.userEmail;
-      const role = row.dataset.userRole === 'user' ? 'student' : row.dataset.userRole;
+      const role = canonicalRole(row.dataset.userRole);
       const officeId = row.dataset.userOfficeId;
 
       userForm.action = `${window.userEndpointBase}/${userId}`;
@@ -701,19 +718,15 @@
             return rowRole === 'item_owner';
           }
 
-          if (selectedRole === 'admin') {
-            return ['admin', 'pf_admin', 'pc_admin'].includes(rowRole);
-          }
-
-          if (selectedRole === 'faculty') {
+          if (selectedRole === 'Faculty') {
             return rowRole === 'faculty';
           }
 
-          if (selectedRole === 'student') {
+          if (selectedRole === 'Student') {
             return rowRole === 'student' || rowRole === 'user';
           }
 
-          return rowRole === selectedRole;
+          return rowRole === selectedRole.toLowerCase();
         };
 
         const compareRows = (left, right, sortMode) => {

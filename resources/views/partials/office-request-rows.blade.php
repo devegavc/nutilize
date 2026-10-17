@@ -41,6 +41,9 @@
     <td>
       <div class="office-queue-status-stack">
         <span class="badge {{ $badgeClass }}">{{ $badgeText }}</span>
+        @if(!empty($request->dean_queue_label))
+          <span class="badge pending" title="{{ $request->dean_queue_label }}">{{ $request->dean_queue_label }}</span>
+        @endif
         @if($hasOutsideParticipants)
           <span class="badge outsider office-queue-outsider-badge" title="This event includes outside participants">Outsider involved</span>
         @endif

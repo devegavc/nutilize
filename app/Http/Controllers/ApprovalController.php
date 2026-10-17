@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Notification;
 use App\Models\Office;
 use App\Models\Reservation;
+use App\Services\ProgramChairStageService;
 use App\Services\ReservationApprovalNotifier;
 use App\Services\ProgramChairOfficeResolver;
 use App\Services\ItemOwnerService;
@@ -181,21 +182,9 @@ class ApprovalController extends Controller
             }
 
             $approval = ReservationApproval::findOrFail($approvalId);
-
-            if ((int) $approval->office_id !== (int) $user->office_id) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
-
-            // Fast order_sequence check — avoid the full workflow warmBatch on Hostinger.
-            if (
-                !$user->isPhysicalFacilitiesAdmin()
-                && !$this->isOfficeNextPendingApprover((int) $approval->reservation_id, (int) $user->office_id)
-            ) {
-                return response()->json(['error' => 'This request is waiting for a previous office approval.'], 422);
-            }
-
-            if (!ReservationApprovalWorkflowService::userCanActOnApproval($user, $approval)) {
-                return response()->json(['error' => 'This request is waiting for the item owner who registered the borrowed equipment.'], 403);
+            $decision = $this->decisionForActor($user, $approval);
+            if ($decision instanceof \Illuminate\Http\JsonResponse) {
+                return $decision;
             }
 
             $now = ApprovalClock::now();
@@ -203,6 +192,8 @@ class ApprovalController extends Controller
                 'status' => 'approved',
                 'approved_at' => $now,
                 'approved_by_user_id' => (int) $user->user_id,
+                'approved_by_role' => (string) $user->role,
+                'on_behalf_of_program_chair' => $decision['on_behalf'],
             ];
 
             $isItemOwnerApprover = ItemOwnerService::isItemOwnerUser($user);
@@ -216,7 +207,10 @@ class ApprovalController extends Controller
                 }
             }
 
-            $approval->update($updatePayload);
+            $blocked = $this->saveApprovalDecision($approval, $updatePayload);
+            if ($blocked instanceof \Illuminate\Http\JsonResponse) {
+                return $blocked;
+            }
             $this->recordApprovalHistory($approval);
             $this->forgetActionableOfficeCache((int) $approval->reservation_id);
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.approved');
@@ -261,20 +255,9 @@ class ApprovalController extends Controller
             }
 
             $approval = ReservationApproval::findOrFail($approvalId);
-
-            if ((int) $approval->office_id !== (int) $user->office_id) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
-
-            if (
-                !$user->isPhysicalFacilitiesAdmin()
-                && !$this->isOfficeNextPendingApprover((int) $approval->reservation_id, (int) $user->office_id)
-            ) {
-                return response()->json(['error' => 'This request is waiting for a previous office approval.'], 422);
-            }
-
-            if (!ReservationApprovalWorkflowService::userCanActOnApproval($user, $approval)) {
-                return response()->json(['error' => 'This request is waiting for the item owner who registered the borrowed equipment.'], 403);
+            $decision = $this->decisionForActor($user, $approval);
+            if ($decision instanceof \Illuminate\Http\JsonResponse) {
+                return $decision;
             }
 
             $rejectionReason = trim((string) request()->input('rejection_reason', ''));
@@ -290,13 +273,18 @@ class ApprovalController extends Controller
                 'status' => 'rejected',
                 'approved_at' => ApprovalClock::now(),
                 'approved_by_user_id' => (int) $user->user_id,
+                'approved_by_role' => (string) $user->role,
+                'on_behalf_of_program_chair' => $decision['on_behalf'],
             ];
 
             if (Schema::hasColumn('reservation_approvals', 'rejection_reason')) {
                 $updatePayload['rejection_reason'] = $rejectionReason;
             }
 
-            $approval->update($updatePayload);
+            $blocked = $this->saveApprovalDecision($approval, $updatePayload);
+            if ($blocked instanceof \Illuminate\Http\JsonResponse) {
+                return $blocked;
+            }
             $this->recordApprovalHistory($approval);
             $this->forgetActionableOfficeCache((int) $approval->reservation_id);
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.rejected');
@@ -677,6 +665,8 @@ class ApprovalController extends Controller
                     $status,
                     (int) $user->user_id,
                     $approvedAt,
+                    (string) $user->role,
+                    false,
                 );
             });
 
@@ -1944,7 +1934,7 @@ class ApprovalController extends Controller
 
         return DB::table('users')
             ->where('office_id', $pfOfficeId)
-            ->whereRaw('LOWER(role) = ?', ['admin'])
+            ->whereRaw('LOWER(role) IN (?, ?, ?)', ['admin', 'pf_admin', 'pfo'])
             ->value('user_id');
     }
 
@@ -2016,26 +2006,103 @@ class ApprovalController extends Controller
             (string) $approval->status,
             $approval->approved_by_user_id ? (int) $approval->approved_by_user_id : null,
             $approval->approved_at,
+            $approval->approved_by_role ?? null,
+            (bool) ($approval->on_behalf_of_program_chair ?? false),
         );
     }
 
-    private function upsertApprovalHistory(int $approvalId, int $reservationId, int $officeId, string $status, ?int $approvedByUserId, $approvedAt): void
+    /**
+     * @return array{allowed: bool, on_behalf: bool, code: string}|\Illuminate\Http\JsonResponse
+     */
+    private function decisionForActor($user, ReservationApproval $approval): array|\Illuminate\Http\JsonResponse
+    {
+        $stage = ProgramChairStageService::authorize($user, $approval);
+
+        if ($stage['code'] === 'already_decided') {
+            return response()->json(['error' => 'This request was already decided.'], 422);
+        }
+
+        if ($stage['code'] !== 'not_program_chair_stage') {
+            if (!$stage['allowed']) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+        } elseif ((int) $approval->office_id !== (int) $user->office_id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        if (
+            !$user->isPhysicalFacilitiesAdmin()
+            && !$this->isOfficeNextPendingApprover((int) $approval->reservation_id, (int) $approval->office_id)
+        ) {
+            return response()->json(['error' => 'This request is waiting for a previous office approval.'], 422);
+        }
+
+        if (!ReservationApprovalWorkflowService::userCanActOnApproval($user, $approval)) {
+            return response()->json(['error' => 'This request is waiting for the item owner who registered the borrowed equipment.'], 403);
+        }
+
+        return [
+            'allowed' => true,
+            'on_behalf' => (bool) $stage['on_behalf'],
+            'code' => $stage['code'],
+        ];
+    }
+
+    private function saveApprovalDecision(ReservationApproval $approval, array $updatePayload): ?\Illuminate\Http\JsonResponse
+    {
+        if (!Schema::hasColumn('reservation_approvals', 'approved_by_role')) {
+            unset($updatePayload['approved_by_role'], $updatePayload['on_behalf_of_program_chair']);
+        }
+
+        $blocked = false;
+
+        DB::transaction(function () use ($approval, $updatePayload, &$blocked): void {
+            $locked = ReservationApproval::query()
+                ->where('approval_id', $approval->approval_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$locked || $locked->approved_at !== null) {
+                $blocked = true;
+
+                return;
+            }
+
+            $locked->update($updatePayload);
+            $approval->setRawAttributes($locked->fresh()->getAttributes(), true);
+        });
+
+        if ($blocked) {
+            return response()->json(['error' => 'This request was already decided.'], 422);
+        }
+
+        return null;
+    }
+
+    private function upsertApprovalHistory(int $approvalId, int $reservationId, int $officeId, string $status, ?int $approvedByUserId, $approvedAt, ?string $approvedByRole = null, bool $onBehalfOfProgramChair = false): void
     {
         if (!Schema::hasTable('reservation_approval_histories')) {
             return;
         }
 
+        $values = [
+            'reservation_id' => $reservationId,
+            'office_id' => $officeId,
+            'approved_by_user_id' => $approvedByUserId,
+            'status' => $status,
+            'approved_at' => $approvedAt,
+            'updated_at' => now(),
+            'created_at' => now(),
+        ];
+
+        if (Schema::hasColumn('reservation_approval_histories', 'approved_by_role')) {
+            $values['approved_by_role'] = $approvedByRole;
+            $values['on_behalf_of_program_chair'] = $onBehalfOfProgramChair;
+        }
+
         DB::table('reservation_approval_histories')->updateOrInsert(
             ['approval_id' => $approvalId],
-            [
-                'reservation_id' => $reservationId,
-                'office_id' => $officeId,
-                'approved_by_user_id' => $approvedByUserId,
-                'status' => $status,
-                'approved_at' => $approvedAt,
-                'updated_at' => now(),
-                'created_at' => now(),
-            ]
+            $values
         );
     }
 
@@ -2862,9 +2929,7 @@ class ApprovalController extends Controller
             return [];
         }
 
-        return DB::table('users')
-            ->where('office_id', $officeId)
-            ->whereRaw('LOWER(role) IN (?, ?, ?)', ['admin', 'pc_admin', 'pf_admin'])
+        return ProgramChairStageService::recipientsForOffice($officeId, 0)
             ->pluck('user_id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -2878,6 +2943,15 @@ class ApprovalController extends Controller
 
         if ($reservation && (int) $reservation->user_id === (int) $user->user_id) {
             return true;
+        }
+
+        if ($user->isDean()) {
+            $officeIds = ProgramChairStageService::programOfficeIdsForDean((string) $user->role);
+
+            return ReservationApproval::query()
+                ->where('reservation_id', $reservationId)
+                ->whereIn('office_id', $officeIds !== [] ? $officeIds : [-1])
+                ->exists();
         }
 
         $officeId = (int) ($user->office_id ?? 0);
