@@ -213,7 +213,7 @@
         textCell(item.item_name),
         textCell(item.reservation_count),
         textCell(item.approved_quantity),
-        textCell(item.requested_quantity)
+        textCell(item.serviceable_stock === null || item.serviceable_stock === undefined ? 'Not recorded' : item.serviceable_stock)
       );
       body.appendChild(row);
     });

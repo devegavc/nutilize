@@ -966,6 +966,7 @@ SQL;
                 'reservation_count' => $reservationCount,
                 'approved_quantity' => (int) $item['approved_quantity'],
                 'requested_quantity' => (int) $item['requested_quantity'],
+                'serviceable_stock' => $serviceable,
                 'issued_quantity' => null,
                 'issued_label' => 'Not recorded',
             ];

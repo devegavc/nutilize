@@ -116,7 +116,7 @@
       <div class="inventory-grid-head analytics-grid-head insight-head">
         <div>
           <h2>Most in-demand items</h2>
-          <p>Approved demand is the planning basis. Requested quantity includes every submitted status.</p>
+          <p>Approved demand is the planning basis. Current quantity is the number of serviceable units on hand.</p>
         </div>
         <div class="equipment-demand-rank" role="group" aria-label="Rank items">
           <button type="button" class="equipment-demand-text-btn" data-demand-rank="reservations">By reservations</button>
@@ -130,7 +130,7 @@
               <th>Item</th>
               <th>Approved reservations</th>
               <th>Approved quantity</th>
-              <th>Requested quantity</th>
+              <th>Current quantity</th>
             </tr>
           </thead>
           <tbody id="equipment-demand-items"></tbody>
