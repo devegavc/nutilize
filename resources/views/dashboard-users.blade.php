@@ -273,6 +273,27 @@
             if (label) label.textContent = input.files?.[0]?.name || 'Choose file';
           });
         </script>
+        @if(session('allowance_notice'))
+          <div class="allowance-notice is-open is-{{ session('allowance_notice.kind') }}" id="allowance-notice" role="dialog" aria-modal="true" aria-labelledby="allowance-notice-title">
+            <div class="allowance-notice-card">
+              <h2 id="allowance-notice-title">{{ session('allowance_notice.title') }}</h2>
+              <p>{{ session('allowance_notice.message') }}</p>
+              <button type="button" id="allowance-notice-close">OK</button>
+            </div>
+          </div>
+          <script>
+            (() => {
+              const notice = document.getElementById('allowance-notice');
+              const close = document.getElementById('allowance-notice-close');
+              const dismiss = () => notice?.remove();
+              close?.addEventListener('click', dismiss);
+              document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') dismiss();
+              });
+              close?.focus();
+            })();
+          </script>
+        @endif
 
         <section class="users-tools-bar" aria-label="User table filters">
           <div class="users-search-wrap">

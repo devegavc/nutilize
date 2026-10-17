@@ -29,11 +29,9 @@ class RegistrationAllowanceController extends Controller
             ]);
         }
 
-        return redirect()
-            ->route('dashboard.users', $this->listQuery($request))
-            ->with('success', $existed
-                ? 'That email is already on the registration list.'
-                : 'Email added to the registration list.');
+        return $this->notice($request, $existed ? 'used' : 'added', $existed
+            ? $normalized.' is already on the registration list.'
+            : $normalized.' was added. That person can now register.');
     }
 
     public function import(Request $request): RedirectResponse
@@ -67,29 +65,47 @@ class RegistrationAllowanceController extends Controller
         }
 
         $message = RegistrationAllowanceService::importMessage($result);
-        $redirect = redirect()
-            ->route('dashboard.users', $this->listQuery($request));
-
-        if ($result['added'] === 0 && $result['already_listed'] === 0) {
-            return $redirect->with('error', $message);
+        $kind = 'added';
+        if ($result['added'] === 0 && $result['already_listed'] > 0 && $result['invalid'] === 0) {
+            $kind = 'used';
+            $message = $result['already_listed'] === 1
+                ? 'That email is already on the registration list.'
+                : $result['already_listed'].' emails are already on the registration list.';
+        } elseif ($result['added'] === 0) {
+            $kind = 'error';
         }
 
-        return $redirect->with('success', $message);
+        return $this->notice($request, $kind, $message);
     }
 
     public function destroy(Request $request, RegistrationAllowance $allowance): RedirectResponse
     {
         try {
+            $email = $allowance->email;
             RegistrationAllowanceService::removeUnused($allowance);
         } catch (InvalidArgumentException $exception) {
-            return redirect()
-                ->route('dashboard.users', $this->listQuery($request))
-                ->with('error', $exception->getMessage());
+            return $this->notice($request, 'used', $exception->getMessage());
         }
+
+        return $this->notice($request, 'removed', $email.' was removed from the registration list.');
+    }
+
+    private function notice(Request $request, string $kind, string $message): RedirectResponse
+    {
+        $title = match ($kind) {
+            'used' => 'Email already used',
+            'removed' => 'Email removed',
+            'error' => 'Nothing was added',
+            default => 'Email added',
+        };
 
         return redirect()
             ->route('dashboard.users', $this->listQuery($request))
-            ->with('success', 'Email removed from the registration list.');
+            ->with('allowance_notice', [
+                'title' => $title,
+                'message' => $message,
+                'kind' => $kind,
+            ]);
     }
 
     /**

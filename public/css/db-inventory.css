@@ -6181,6 +6181,61 @@ body.insight-filtering .insight-kpi:not(.is-active) {
   }
 }
 
+.allowance-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 3600;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(18, 22, 34, 0.5);
+}
+
+.allowance-notice-card {
+  width: min(420px, 92vw);
+  padding: 22px 22px 18px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #d7ddea;
+  box-shadow: 0 16px 34px rgba(20, 26, 48, 0.24);
+  text-align: center;
+}
+
+.allowance-notice-card h2 {
+  margin: 0 0 8px;
+  color: #1f7a36;
+  font-size: 1.25rem;
+}
+
+.allowance-notice.is-used .allowance-notice-card h2,
+.allowance-notice.is-error .allowance-notice-card h2 {
+  color: #9a6700;
+}
+
+.allowance-notice.is-removed .allowance-notice-card h2 {
+  color: #24357f;
+}
+
+.allowance-notice-card p {
+  margin: 0;
+  color: #2f3545;
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.allowance-notice-card button {
+  margin-top: 16px;
+  min-width: 104px;
+  height: 38px;
+  border: 0;
+  border-radius: 9px;
+  background: #24357f;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .user-management-card .users-table .user-status-cell {
   display: flex;
   flex-direction: column;
