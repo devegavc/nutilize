@@ -174,6 +174,7 @@ class DashboardUserController extends Controller
         $data = UserNameService::applyToUserData($data);
 
         $user = null;
+        $createdEmailLogin = false;
 
         try {
             [$user, $token] = DB::transaction(function () use ($data) {
@@ -198,18 +199,18 @@ class DashboardUserController extends Controller
                 return [$user, $token];
             });
 
+            $createdEmailLogin = $this->accountSetup->provisionEmailLogin($user);
             $delivery = $this->accountSetup->deliver($user, $token);
-        } catch (AccountSetupDeliveryException) {
-            if ($user) {
-                try {
-                    $user->delete();
-                } catch (\Throwable) {
-                }
-            }
+        } catch (AccountSetupDeliveryException $exception) {
+            $this->accountSetup->discardCreatedAccount($user, $createdEmailLogin);
+
+            $message = $exception->getMessage() === AccountSetupService::EMAIL_LOGIN_FAILED
+                ? 'Account creation failed because the email login could not be created. No account was created.'
+                : 'Account creation failed because the setup email could not be sent. No account was created.';
 
             return redirect()
                 ->route('dashboard.users')
-                ->with('error', 'Account creation failed because the setup email could not be sent. No account was created.');
+                ->with('error', $message);
         }
 
         if ($actorId = (int) (Auth::id() ?? 0)) {

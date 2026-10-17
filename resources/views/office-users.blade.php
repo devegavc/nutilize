@@ -63,8 +63,12 @@
           <p class="section-subtitle">Manage {{ $programName }} accounts.</p>
         </div>
 
-        @if(session('success'))
-          <div class="alert alert-success">{{ session('success') }}</div>
+        @php
+          $flashSuccess = session('success');
+          $createdUserNotice = is_string($flashSuccess) && str_starts_with($flashSuccess, 'User account created successfully.');
+        @endphp
+        @if($flashSuccess && !$createdUserNotice)
+          <div class="alert alert-success">{{ $flashSuccess }}</div>
         @endif
         @if(session('error'))
           <div class="alert alert-error">{{ session('error') }}</div>
@@ -660,5 +664,19 @@
   </script>
 
   <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
+  @if(!empty($createdUserNotice))
+    <script>
+      // #region agent log
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d19ccb'},body:JSON.stringify({sessionId:'d19ccb',runId:'post-fix',hypothesisId:'A',location:'office-users.blade.php:created-notice',message:'create-user notice popup opened',data:{hasShowAppNotice:typeof showAppNotice==='function'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      if (typeof showAppNotice === 'function') {
+        showAppNotice(@json($flashSuccess), {
+          title: 'User created',
+          variant: 'success',
+          buttonText: 'OK',
+        });
+      }
+    </script>
+  @endif
 </body>
 </html>

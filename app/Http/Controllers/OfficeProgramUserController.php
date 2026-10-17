@@ -47,6 +47,7 @@ class OfficeProgramUserController extends Controller
         ]);
 
         $user = null;
+        $createdEmailLogin = false;
 
         try {
             [$user, $token] = DB::transaction(function () use ($chair, $data) {
@@ -65,18 +66,18 @@ class OfficeProgramUserController extends Controller
                 return [$user, $token];
             });
 
+            $createdEmailLogin = $this->accountSetup->provisionEmailLogin($user);
             $delivery = $this->accountSetup->deliver($user, $token);
-        } catch (AccountSetupDeliveryException) {
-            if ($user) {
-                try {
-                    $user->delete();
-                } catch (\Throwable) {
-                }
-            }
+        } catch (AccountSetupDeliveryException $exception) {
+            $this->accountSetup->discardCreatedAccount($user, $createdEmailLogin);
+
+            $message = $exception->getMessage() === AccountSetupService::EMAIL_LOGIN_FAILED
+                ? 'Account creation failed because the email login could not be created. No account was created.'
+                : 'Account creation failed because the setup email could not be sent. No account was created.';
 
             return redirect()
                 ->route('office.users')
-                ->with('error', 'Account creation failed because the setup email could not be sent. No account was created.');
+                ->with('error', $message);
         }
 
         return redirect()
