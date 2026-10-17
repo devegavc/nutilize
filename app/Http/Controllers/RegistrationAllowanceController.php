@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\RegistrationAllowance;
+use App\Models\User;
 use App\Services\RegistrationAllowanceService;
+use App\Support\SimpleXlsx;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +14,39 @@ use InvalidArgumentException;
 
 class RegistrationAllowanceController extends Controller
 {
+    public function exportRegistered()
+    {
+        $allowances = RegistrationAllowance::query()->orderBy('email')->get(['email']);
+        $emails = $allowances->pluck('email')->all();
+        $users = collect();
+        if ($emails !== []) {
+            $users = User::query()
+                ->whereRaw('LOWER(email) IN ('.implode(', ', array_fill(0, count($emails), '?')).')', $emails)
+                ->get()
+                ->keyBy(fn (User $user): string => RegistrationAllowanceService::normalizeEmail((string) $user->email));
+        }
+
+        $rows = [['Email', 'Name', 'Username']];
+        foreach ($allowances as $allowance) {
+            $user = $users->get($allowance->email);
+            if (!$user instanceof User) {
+                continue;
+            }
+            $rows[] = [
+                (string) $allowance->email,
+                $user->displayName(),
+                (string) $user->username,
+            ];
+        }
+
+        $filename = 'registered-emails-'.now()->format('Y-m-d').'.xlsx';
+
+        return response(SimpleXlsx::binary($rows), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([

@@ -125,6 +125,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/schedule', [DashboardScheduleController::class, 'index'])->name('dashboard.schedule');
             Route::get('/users', [DashboardUserController::class, 'index'])->name('dashboard.users');
             Route::get('/users/export', [DashboardUserController::class, 'exportRegisteredUsers'])->name('dashboard.users.export');
+            Route::get('/users/registration-allowances/export', [RegistrationAllowanceController::class, 'exportRegistered'])->name('dashboard.registration-allowances.export');
             Route::post('/users/registration-allowances', [RegistrationAllowanceController::class, 'store'])->name('dashboard.registration-allowances.store');
             Route::post('/users/registration-allowances/import', [RegistrationAllowanceController::class, 'import'])->name('dashboard.registration-allowances.import');
             Route::delete('/users/registration-allowances/{allowance}', [RegistrationAllowanceController::class, 'destroy'])->name('dashboard.registration-allowances.destroy');

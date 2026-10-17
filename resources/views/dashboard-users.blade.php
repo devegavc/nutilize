@@ -154,7 +154,10 @@
               <h2>Emails allowed to register</h2>
               <p>A person can create an account only when their email is on this list. A later upload adds new addresses and leaves the ones already listed.</p>
             </div>
-            <span class="registration-allowance-count">{{ $allowances->total() }} {{ $allowances->total() === 1 ? 'email' : 'emails' }}</span>
+            <div class="registration-allowance-tools">
+              <a class="users-download-btn" href="{{ route('dashboard.registration-allowances.export') }}"><i class="bi bi-download" aria-hidden="true"></i> Download registered</a>
+              <span class="registration-allowance-count">{{ $allowances->total() }} {{ $allowances->total() === 1 ? 'email' : 'emails' }}</span>
+            </div>
           </header>
 
           <div class="registration-allowance-actions">
