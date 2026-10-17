@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AcademicProgram;
 use App\Models\User;
+use App\Services\RegistrationAllowanceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -56,6 +57,14 @@ class RegisterController extends Controller
                 'confirmed',
             ],
         ]);
+
+        if (!RegistrationAllowanceService::isAllowed($validated['email'])) {
+            return back()
+                ->withErrors([
+                    'email' => 'This email is not authorized to register. Contact Physical Facilities.',
+                ])
+                ->withInput($request->except('password', 'password_confirmation'));
+        }
 
         $middleInitial = isset($validated['middle_initial']) && $validated['middle_initial'] !== ''
             ? strtoupper($validated['middle_initial']).'.'

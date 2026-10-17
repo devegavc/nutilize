@@ -17,6 +17,7 @@ use App\Http\Controllers\OfficeProgramUserController;
 use App\Http\Controllers\OfficeRequestController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegisterController;
+use App\Http\Controllers\RegistrationAllowanceController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -123,6 +124,9 @@ Route::middleware('auth')->group(function () {
             Route::delete('/announcements/{announcementId}', [DashboardAnnouncementController::class, 'destroy'])->name('dashboard.announcements.destroy');
             Route::get('/schedule', [DashboardScheduleController::class, 'index'])->name('dashboard.schedule');
             Route::get('/users', [DashboardUserController::class, 'index'])->name('dashboard.users');
+            Route::post('/users/registration-allowances', [RegistrationAllowanceController::class, 'store'])->name('dashboard.registration-allowances.store');
+            Route::post('/users/registration-allowances/import', [RegistrationAllowanceController::class, 'import'])->name('dashboard.registration-allowances.import');
+            Route::delete('/users/registration-allowances/{allowance}', [RegistrationAllowanceController::class, 'destroy'])->name('dashboard.registration-allowances.destroy');
             Route::post('/users', [DashboardUserController::class, 'store'])->name('dashboard.users.store');
             Route::patch('/users/{userId}', [DashboardUserController::class, 'update'])->name('dashboard.users.update');
             Route::patch('/users/{userId}/status', [DashboardUserController::class, 'toggleStatus'])->name('dashboard.users.toggle-status');

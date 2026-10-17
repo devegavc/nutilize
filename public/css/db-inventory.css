@@ -5873,6 +5873,68 @@ body.insight-filtering .insight-kpi:not(.is-active) {
   line-height: 1.4;
 }
 
+.user-management-card .registration-allowance {
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid #d9e2f7;
+  border-radius: 14px;
+  background: #f8faff;
+}
+
+.user-management-card .registration-allowance-head h2 {
+  margin: 0 0 4px;
+  color: #1b2b6a;
+  font-size: 1rem;
+}
+
+.user-management-card .registration-allowance-head p,
+.user-management-card .registration-allowance-pages {
+  margin: 0;
+  color: #5d6996;
+  font-size: 0.82rem;
+}
+
+.user-management-card .registration-allowance-forms,
+.user-management-card .registration-allowance-search,
+.user-management-card .registration-allowance-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.user-management-card .registration-allowance form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.user-management-card .registration-allowance label {
+  width: 100%;
+  color: #39457f;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.user-management-card .registration-allowance input[type="email"],
+.user-management-card .registration-allowance input[type="search"],
+.user-management-card .registration-allowance input[type="file"] {
+  border: 1px solid #cdd6ee;
+  border-radius: 8px;
+  background: #fff;
+  color: #1b2b6a;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.user-management-card .registration-allowance .table-wrap {
+  margin-top: 12px;
+  max-height: 280px;
+}
+
 .user-management-card .users-table .user-status-cell {
   display: flex;
   flex-direction: column;

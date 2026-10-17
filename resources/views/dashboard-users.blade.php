@@ -147,6 +147,103 @@
           Student and faculty accounts remain active for {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks from activation. Once the period ends, accounts become inactive. Activating an account resets the timer and starts a new {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }}-week period. PC admins can activate or deactivate accounts at any time.
         </p>
 
+        <section class="registration-allowance" aria-label="Registration emails">
+          <div class="registration-allowance-head">
+            <div>
+              <h2>Emails allowed to register</h2>
+              <p>A person can create an account only when their email is on this list. Uploading another file adds new emails and leaves the ones already listed.</p>
+            </div>
+          </div>
+
+          <div class="registration-allowance-forms">
+            <form method="POST" action="{{ route('dashboard.registration-allowances.import') }}" enctype="multipart/form-data">
+              @csrf
+              @if($allowanceSearch !== '')
+                <input type="hidden" name="allowance_q" value="{{ $allowanceSearch }}" />
+              @endif
+              @if($allowances->currentPage() > 1)
+                <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
+              @endif
+              <label for="allowance-file">Upload CSV or Excel</label>
+              <input id="allowance-file" type="file" name="file" accept=".csv,.txt,.xlsx" required />
+              <button class="facilities-add-btn" type="submit">Upload</button>
+            </form>
+            <form method="POST" action="{{ route('dashboard.registration-allowances.store') }}">
+              @csrf
+              @if($allowanceSearch !== '')
+                <input type="hidden" name="allowance_q" value="{{ $allowanceSearch }}" />
+              @endif
+              @if($allowances->currentPage() > 1)
+                <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
+              @endif
+              <label for="allowance-email">Add one email</label>
+              <input id="allowance-email" type="email" name="email" maxlength="100" placeholder="student@school.edu" required />
+              <button class="facilities-add-btn" type="submit">Add email</button>
+            </form>
+          </div>
+
+          <form class="registration-allowance-search" method="GET" action="{{ route('dashboard.users') }}">
+            <label for="allowance-search">Find an email</label>
+            <input id="allowance-search" type="search" name="allowance_q" value="{{ $allowanceSearch }}" placeholder="Search the registration list" />
+            <button class="users-reset-btn" type="submit">Search</button>
+          </form>
+
+          <div class="table-wrap">
+            <table class="inventory-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Account</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @forelse($allowances as $allowance)
+                  @php $hasAccount = $allowanceRegistered->contains($allowance->email); @endphp
+                  <tr>
+                    <td>{{ $allowance->email }}</td>
+                    <td>{{ $hasAccount ? 'Registered' : 'Not registered' }}</td>
+                    <td>
+                      @if(!$hasAccount)
+                        <form method="POST" action="{{ route('dashboard.registration-allowances.destroy', $allowance) }}">
+                          @csrf
+                          @method('DELETE')
+                          @if($allowanceSearch !== '')
+                            <input type="hidden" name="allowance_q" value="{{ $allowanceSearch }}" />
+                          @endif
+                          @if($allowances->currentPage() > 1)
+                            <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
+                          @endif
+                          <button class="users-reset-btn" type="submit">Remove</button>
+                        </form>
+                      @endif
+                    </td>
+                  </tr>
+                @empty
+                  <tr>
+                    <td colspan="3">No emails are allowed to register yet.</td>
+                  </tr>
+                @endforelse
+              </tbody>
+            </table>
+          </div>
+          @if($allowances->hasPages())
+            <div class="registration-allowance-pages">
+              @if($allowances->onFirstPage())
+                <span>Previous</span>
+              @else
+                <a href="{{ $allowances->previousPageUrl() }}">Previous</a>
+              @endif
+              <span>Page {{ $allowances->currentPage() }} of {{ $allowances->lastPage() }}</span>
+              @if($allowances->hasMorePages())
+                <a href="{{ $allowances->nextPageUrl() }}">Next</a>
+              @else
+                <span>Next</span>
+              @endif
+            </div>
+          @endif
+        </section>
+
         <section class="users-tools-bar" aria-label="User table filters">
           <div class="users-search-wrap">
             <i class="bi bi-search" aria-hidden="true"></i>

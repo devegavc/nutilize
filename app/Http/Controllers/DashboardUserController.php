@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\AccountSetupService;
 use App\Services\AdminActivityService;
 use App\Services\ItemOwnerService;
+use App\Services\RegistrationAllowanceService;
 use App\Services\UserAccountStatusService;
 use App\Services\UserNameService;
 use Illuminate\Database\QueryException;
@@ -22,7 +23,7 @@ class DashboardUserController extends Controller
 {
     public function __construct(private AccountSetupService $accountSetup) {}
 
-    public function index()
+    public function index(Request $request)
     {
         $this->applyInactivityPolicySafely();
 
@@ -49,10 +50,25 @@ class DashboardUserController extends Controller
             $itemOwnerOfficeId = null;
         }
 
+        $allowances = RegistrationAllowanceService::page($request->query('allowance_q'));
+        $emails = $allowances->getCollection()->pluck('email')->filter()->values()->all();
+        $registeredEmails = $emails === []
+            ? collect()
+            : \App\Models\User::query()
+                ->whereRaw(
+                    'LOWER(email) IN ('.implode(', ', array_fill(0, count($emails), '?')).')',
+                    $emails
+                )
+                ->pluck('email')
+                ->map(fn ($email) => RegistrationAllowanceService::normalizeEmail((string) $email));
+
         return view('dashboard-users', [
             'users' => $users,
             'offices' => $offices,
             'itemOwnerOfficeId' => $itemOwnerOfficeId,
+            'allowances' => $allowances,
+            'allowanceSearch' => trim((string) $request->query('allowance_q', '')),
+            'allowanceRegistered' => $registeredEmails,
         ]);
     }
 
