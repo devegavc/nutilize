@@ -28,6 +28,7 @@
   data-user-status-managed="{{ $showsAccountStatus ? '1' : '0' }}"
   data-user-created-at="{{ $user->created_at ? $user->created_at->timestamp : 0 }}"
   data-user-office-id="{{ $user->office_id }}"
+  data-role-rank="{{ (int) ($roleRank ?? 0) }}"
 >
   <td><span class="user-cell-text" title="{{ $user->username }}">{{ $user->username }}</span></td>
   <td><span class="user-cell-text" title="{{ $userName }}">{{ $userName }}</span></td>

@@ -92,6 +92,62 @@
           $mobilePool = $users->filter(fn ($user) => !$isStaffRole($user) && !ItemOwnerService::isItemOwnerUser($user));
           $facultyUsers = $mobilePool->filter(fn ($user) => $user->isFaculty())->values();
           $studentUsers = $mobilePool->filter(fn ($user) => !$user->isFaculty())->values();
+          $staffByRoles = function (array $roleOrder) use ($users) {
+              $rank = array_flip($roleOrder);
+
+              return $users
+                  ->filter(fn ($user) => array_key_exists((string) $user->role, $rank))
+                  ->sortBy([
+                      fn ($user) => $rank[(string) $user->role],
+                      fn ($user) => strtolower($user->displayName()),
+                  ])
+                  ->values();
+          };
+          $officeRoleOrder = ['Gen_Ed', 'SDAO', 'Safety', 'Security'];
+          $deanRoleOrder = array_keys(\App\Support\RoleCatalog::DEAN_CHAIRS);
+          $chairRoleOrder = array_keys(\App\Support\RoleCatalog::PROGRAM_OFFICES);
+          $pfoUsers = $staffByRoles(['PFO']);
+          $officeUsers = $staffByRoles($officeRoleOrder);
+          $deanUsers = $staffByRoles($deanRoleOrder);
+          $programChairUsers = $staffByRoles($chairRoleOrder);
+          $placedStaffRoles = array_merge(['PFO'], $officeRoleOrder, $deanRoleOrder, $chairRoleOrder);
+          $otherStaffUsers = $admins
+              ->filter(fn ($user) => !in_array((string) $user->role, $placedStaffRoles, true))
+              ->sortBy(fn ($user) => strtolower((string) $user->role.' '.$user->displayName()))
+              ->values();
+          $userSections = [
+              ['key' => 'pfo', 'label' => 'PFO', 'icon' => 'bi-tools', 'users' => $pfoUsers, 'ranks' => ['PFO' => 0], 'rowClass' => 'admin-row', 'roleBadgeClass' => 'admin-badge', 'deleteConfirm' => 'Delete this user?'],
+              ['key' => 'offices', 'label' => 'Offices', 'icon' => 'bi-building', 'users' => $officeUsers, 'ranks' => array_flip($officeRoleOrder), 'rowClass' => 'admin-row', 'roleBadgeClass' => 'admin-badge', 'deleteConfirm' => 'Delete this user?'],
+              ['key' => 'deans', 'label' => 'Deans', 'icon' => 'bi-bank', 'users' => $deanUsers, 'ranks' => array_flip($deanRoleOrder), 'rowClass' => 'admin-row', 'roleBadgeClass' => 'admin-badge', 'deleteConfirm' => 'Delete this user?'],
+              ['key' => 'program-chairs', 'label' => 'Program Chairs', 'icon' => 'bi-person-badge', 'users' => $programChairUsers, 'ranks' => array_flip($chairRoleOrder), 'rowClass' => 'admin-row', 'roleBadgeClass' => 'admin-badge', 'deleteConfirm' => 'Delete this user?'],
+              ['key' => 'other-staff', 'label' => 'Admins', 'icon' => 'bi-shield-lock', 'users' => $otherStaffUsers, 'ranks' => [], 'rowClass' => 'admin-row', 'roleBadgeClass' => 'admin-badge', 'deleteConfirm' => 'Delete this user?'],
+              ['key' => 'item-owners', 'label' => 'Item Owners', 'icon' => 'bi-box-seam', 'users' => $itemOwners, 'ranks' => [], 'rowClass' => 'admin-row', 'roleBadgeClass' => 'item-owner-badge', 'deleteConfirm' => 'Delete this item owner?'],
+              ['key' => 'faculty', 'label' => 'Faculty', 'icon' => 'bi-mortarboard', 'users' => $facultyUsers, 'ranks' => [], 'rowClass' => 'faculty-row', 'roleBadgeClass' => 'faculty-badge', 'deleteConfirm' => 'Delete this faculty account?'],
+              ['key' => 'students', 'label' => 'Students', 'icon' => 'bi-people', 'users' => $studentUsers, 'ranks' => [], 'rowClass' => 'approver-row', 'roleBadgeClass' => 'approver-badge', 'deleteConfirm' => 'Delete this student?'],
+          ];
+          // #region agent log
+          try {
+              $debugPayload = json_encode([
+                  'sessionId' => '586da0',
+                  'runId' => 'post-fix',
+                  'hypothesisId' => 'A',
+                  'location' => 'dashboard-users.blade.php:userSections',
+                  'message' => 'user section order',
+                  'data' => [
+                      'sections' => array_map(fn ($section) => [
+                          'key' => $section['key'],
+                          'count' => $section['users']->count(),
+                          'roles' => $section['users']->map(fn ($user) => (string) $user->role)->values()->all(),
+                      ], $userSections),
+                  ],
+                  'timestamp' => (int) round(microtime(true) * 1000),
+              ], JSON_UNESCAPED_SLASHES);
+              if (is_string($debugPayload)) {
+                  file_put_contents(base_path('debug-586da0.log'), $debugPayload.PHP_EOL, FILE_APPEND | LOCK_EX);
+              }
+          } catch (\Throwable $exception) {
+          }
+          // #endregion
           $formatUserCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'user' : 'users');
           $formatStudentCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'student' : 'students');
           $activeUsersCount = $users->filter(fn ($user) => UserAccountStatusService::isActive($user))->count();
@@ -343,97 +399,48 @@
                 </tr>
               </thead>
               <tbody id="users-table-body">
-                @if($admins->count() > 0)
-                  <tr class="category-header-row">
-                    <td colspan="7">
-                      <div class="category-header">
-                        <i class="bi bi-shield-lock"></i>
-                        <span>Admins</span>
-                        <span class="category-count" data-group-count>{{ $formatUserCount($admins->count()) }}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  @foreach($admins as $user)
-                    @include('partials.dashboard-user-row', [
-                      'user' => $user,
-                      'resolveUserOffice' => $resolveUserOffice,
-                      'resolveUserName' => $resolveUserName,
-                      'rowClass' => 'admin-row',
-                      'roleBadgeClass' => 'admin-badge',
-                      'roleLabel' => strtoupper(\App\Support\RoleCatalog::label((string) $user->role)).($user->role_needs_review ? ' (NEEDS REVIEW)' : ''),
-                      'deleteConfirm' => 'Delete this user?',
-                    ])
-                  @endforeach
-                @endif
-
-                @if($itemOwners->count() > 0)
-                  <tr class="category-header-row">
-                    <td colspan="7">
-                      <div class="category-header">
-                        <i class="bi bi-box-seam"></i>
-                        <span>Item Owners</span>
-                        <span class="category-count" data-group-count>{{ $formatUserCount($itemOwners->count()) }}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  @foreach($itemOwners as $user)
-                    @include('partials.dashboard-user-row', [
-                      'user' => $user,
-                      'resolveUserOffice' => $resolveUserOffice,
-                      'resolveUserName' => $resolveUserName,
-                      'rowClass' => 'admin-row',
-                      'roleBadgeClass' => 'item-owner-badge',
-                      'roleLabel' => 'ITEM OWNER',
-                      'deleteConfirm' => 'Delete this item owner?',
-                    ])
-                  @endforeach
-                @endif
-
-                @if($facultyUsers->count() > 0)
-                  <tr class="category-header-row" data-group="faculty">
-                    <td colspan="7">
-                      <div class="category-header">
-                        <i class="bi bi-mortarboard"></i>
-                        <span>Faculties</span>
-                        <span class="category-count" data-group-count>{{ $formatUserCount($facultyUsers->count()) }}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  @foreach($facultyUsers as $user)
-                    @include('partials.dashboard-user-row', [
-                      'user' => $user,
-                      'resolveUserOffice' => $resolveUserOffice,
-                      'resolveUserName' => $resolveUserName,
-                      'rowClass' => 'faculty-row',
-                      'roleBadgeClass' => 'faculty-badge',
-                      'roleLabel' => 'FACULTY',
-                      'deleteConfirm' => 'Delete this faculty account?',
-                    ])
-                  @endforeach
-                @endif
-
-                @if($studentUsers->count() > 0)
-                  <tr class="category-header-row" data-group="students">
-                    <td colspan="7">
-                      <div class="category-header">
-                        <i class="bi bi-people"></i>
-                        <span>Students</span>
-                        <span class="category-count" data-group-count>{{ $formatStudentCount($studentUsers->count()) }}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  @foreach($studentUsers as $user)
-                    @include('partials.dashboard-user-row', [
-                      'user' => $user,
-                      'resolveUserOffice' => $resolveUserOffice,
-                      'resolveUserName' => $resolveUserName,
-                      'rowClass' => 'approver-row',
-                      'roleBadgeClass' => 'approver-badge',
-                      'roleLabel' => in_array(strtolower((string) $user->role), ['user', 'student'], true) ? 'STUDENT' : strtoupper((string) $user->role),
-                      'deleteConfirm' => 'Delete this student?',
-                    ])
-                  @endforeach
-                @endif
+                @foreach($userSections as $section)
+                  @if($section['users']->isNotEmpty())
+                    <tr class="category-header-row" data-group="{{ $section['key'] }}">
+                      <td colspan="7">
+                        <div class="category-header">
+                          <i class="bi {{ $section['icon'] }}"></i>
+                          <span>{{ $section['label'] }}</span>
+                          <span class="category-count" data-group-count>{{ $section['key'] === 'students' ? $formatStudentCount($section['users']->count()) : $formatUserCount($section['users']->count()) }}</span>
+                        </div>
+                      </td>
+                    </tr>
+                    @foreach($section['users'] as $user)
+                      @php
+                        $role = (string) $user->role;
+                        if ($section['key'] === 'students') {
+                            $roleLabel = in_array(strtolower($role), ['user', 'student'], true) ? 'STUDENT' : strtoupper($role);
+                        } elseif ($section['key'] === 'faculty') {
+                            $roleLabel = 'FACULTY';
+                        } elseif ($section['key'] === 'item-owners') {
+                            $roleLabel = 'ITEM OWNER';
+                        } elseif (\App\Support\RoleCatalog::isProgramChairCode($role) || strtolower($role) === 'pc_admin') {
+                            $roleLabel = 'PROGRAM CHAIR';
+                        } else {
+                            $roleLabel = strtoupper(\App\Support\RoleCatalog::label($role));
+                        }
+                        if ($user->role_needs_review) {
+                            $roleLabel .= ' (NEEDS REVIEW)';
+                        }
+                      @endphp
+                      @include('partials.dashboard-user-row', [
+                        'user' => $user,
+                        'resolveUserOffice' => $resolveUserOffice,
+                        'resolveUserName' => $resolveUserName,
+                        'rowClass' => $section['rowClass'],
+                        'roleBadgeClass' => $section['roleBadgeClass'],
+                        'roleLabel' => $roleLabel,
+                        'roleRank' => $section['ranks'][$role] ?? 0,
+                        'deleteConfirm' => $section['deleteConfirm'],
+                      ])
+                    @endforeach
+                  @endif
+                @endforeach
 
                 @if($users->isEmpty())
                   <tr class="users-empty-state-row" data-empty-fallback>
@@ -730,6 +737,12 @@
         };
 
         const compareRows = (left, right, sortMode) => {
+          const leftRank = Number.parseInt(left.dataset.roleRank || '0', 10) || 0;
+          const rightRank = Number.parseInt(right.dataset.roleRank || '0', 10) || 0;
+          if (leftRank !== rightRank) {
+            return leftRank - rightRank;
+          }
+
           const leftName = normalizeText(left.dataset.userName)
             || normalizeText(left.dataset.userFullName)
             || normalizeText(left.dataset.userUsername);
@@ -811,6 +824,18 @@
           if (fallbackRow instanceof HTMLTableRowElement) {
             fallbackRow.hidden = true;
           }
+
+          // #region agent log
+          if (!window.__userGroupLogged) {
+            window.__userGroupLogged = true;
+            const headers = groupedSections.map((section) => ({
+              group: section.headerRow.getAttribute('data-group') || '',
+              count: section.rows.length,
+              roles: section.rows.map((row) => row.dataset.userRole || ''),
+            }));
+            fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'586da0'},body:JSON.stringify({sessionId:'586da0',runId:'post-fix',hypothesisId:'B',location:'dashboard-users.blade.php:applyUsersFilters',message:'rendered user groups',data:{headers},timestamp:Date.now()})}).catch(()=>{});
+          }
+          // #endregion
 
           const fragment = document.createDocumentFragment();
           groupedSections.forEach((section) => {
