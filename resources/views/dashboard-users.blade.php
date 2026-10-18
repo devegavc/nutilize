@@ -125,29 +125,6 @@
               ['key' => 'faculty', 'label' => 'Faculty', 'icon' => 'bi-mortarboard', 'users' => $facultyUsers, 'ranks' => [], 'rowClass' => 'faculty-row', 'roleBadgeClass' => 'faculty-badge', 'deleteConfirm' => 'Delete this faculty account?'],
               ['key' => 'students', 'label' => 'Students', 'icon' => 'bi-people', 'users' => $studentUsers, 'ranks' => [], 'rowClass' => 'approver-row', 'roleBadgeClass' => 'approver-badge', 'deleteConfirm' => 'Delete this student?'],
           ];
-          // #region agent log
-          try {
-              $debugPayload = json_encode([
-                  'sessionId' => '586da0',
-                  'runId' => 'post-fix',
-                  'hypothesisId' => 'A',
-                  'location' => 'dashboard-users.blade.php:userSections',
-                  'message' => 'user section order',
-                  'data' => [
-                      'sections' => array_map(fn ($section) => [
-                          'key' => $section['key'],
-                          'count' => $section['users']->count(),
-                          'roles' => $section['users']->map(fn ($user) => (string) $user->role)->values()->all(),
-                      ], $userSections),
-                  ],
-                  'timestamp' => (int) round(microtime(true) * 1000),
-              ], JSON_UNESCAPED_SLASHES);
-              if (is_string($debugPayload)) {
-                  file_put_contents(base_path('debug-586da0.log'), $debugPayload.PHP_EOL, FILE_APPEND | LOCK_EX);
-              }
-          } catch (\Throwable $exception) {
-          }
-          // #endregion
           $formatUserCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'user' : 'users');
           $formatStudentCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'student' : 'students');
           $activeUsersCount = $users->filter(fn ($user) => UserAccountStatusService::isActive($user))->count();
@@ -824,18 +801,6 @@
           if (fallbackRow instanceof HTMLTableRowElement) {
             fallbackRow.hidden = true;
           }
-
-          // #region agent log
-          if (!window.__userGroupLogged) {
-            window.__userGroupLogged = true;
-            const headers = groupedSections.map((section) => ({
-              group: section.headerRow.getAttribute('data-group') || '',
-              count: section.rows.length,
-              roles: section.rows.map((row) => row.dataset.userRole || ''),
-            }));
-            fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'586da0'},body:JSON.stringify({sessionId:'586da0',runId:'post-fix',hypothesisId:'B',location:'dashboard-users.blade.php:applyUsersFilters',message:'rendered user groups',data:{headers},timestamp:Date.now()})}).catch(()=>{});
-          }
-          // #endregion
 
           const fragment = document.createDocumentFragment();
           groupedSections.forEach((section) => {
