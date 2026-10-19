@@ -95,10 +95,48 @@ class LoginController extends Controller
         }
 
         if ($user) {
+            // #region agent log
+            try {
+                file_put_contents(base_path('debug-d19ccb.log'), json_encode([
+                    'sessionId' => 'd19ccb',
+                    'runId' => 'pre-fix',
+                    'hypothesisId' => 'B',
+                    'location' => 'LoginController.php:authenticate',
+                    'message' => 'authenticated before recordLogin',
+                    'data' => [
+                        'user_id' => (int) $user->user_id,
+                        'role' => (string) $user->role,
+                        'status_changed_at_null' => $user->status_changed_at === null,
+                        'is_active' => $user->is_active,
+                    ],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+            } catch (\Throwable $exception) {
+            }
+            // #endregion
             UserAccountStatusService::recordLogin($user);
         }
 
-        return self::redirectAuthenticated($user);
+        $redirect = self::redirectAuthenticated($user);
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-d19ccb.log'), json_encode([
+                'sessionId' => 'd19ccb',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'D',
+                'location' => 'LoginController.php:authenticate',
+                'message' => 'redirect chosen',
+                'data' => [
+                    'user_id' => $user ? (int) $user->user_id : null,
+                    'target' => $redirect->getTargetUrl(),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $exception) {
+        }
+        // #endregion
+
+        return $redirect;
     }
 
     public static function redirectAuthenticated(?User $user): RedirectResponse

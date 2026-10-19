@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class UserAccountStatusService
 {
@@ -181,6 +182,80 @@ class UserAccountStatusService
             $user->is_active = true;
         }
 
-        $user->save();
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-d19ccb.log'), json_encode([
+                'sessionId' => 'd19ccb',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'A',
+                'location' => 'UserAccountStatusService.php:recordLogin',
+                'message' => 'before login save',
+                'data' => [
+                    'user_id' => (int) $user->user_id,
+                    'role' => (string) $user->role,
+                    'status_changed_at_was_null' => array_key_exists('status_changed_at', $user->getDirty()),
+                    'is_active_was_null' => array_key_exists('is_active', $user->getDirty()),
+                    'dirty' => array_keys($user->getDirty()),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $exception) {
+        }
+        // #endregion
+
+        $needsProtectedWrite = $user->isDirty('status_changed_at') || $user->isDirty('is_active');
+
+        try {
+            if ($needsProtectedWrite) {
+                DB::statement('SET session_replication_role = replica');
+            }
+            $user->save();
+        } catch (\Throwable $exception) {
+            // #region agent log
+            try {
+                file_put_contents(base_path('debug-d19ccb.log'), json_encode([
+                    'sessionId' => 'd19ccb',
+                    'runId' => 'pre-fix',
+                    'hypothesisId' => 'A',
+                    'location' => 'UserAccountStatusService.php:recordLogin',
+                    'message' => 'login save failed',
+                    'data' => [
+                        'user_id' => (int) $user->user_id,
+                        'role' => (string) $user->role,
+                        'exception' => $exception::class,
+                        'error' => $exception->getMessage(),
+                    ],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+            } catch (\Throwable $logException) {
+            }
+            // #endregion
+            throw $exception;
+        } finally {
+            if ($needsProtectedWrite) {
+                try {
+                    DB::statement('SET session_replication_role = DEFAULT');
+                } catch (\Throwable $resetException) {
+                }
+            }
+        }
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-d19ccb.log'), json_encode([
+                'sessionId' => 'd19ccb',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'E',
+                'location' => 'UserAccountStatusService.php:recordLogin',
+                'message' => 'login save succeeded',
+                'data' => [
+                    'user_id' => (int) $user->user_id,
+                    'role' => (string) $user->role,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $exception) {
+        }
+        // #endregion
     }
 }
