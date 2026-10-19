@@ -39,6 +39,23 @@ class DashboardUserController extends Controller
             $itemOwnerOfficeId = null;
         }
 
+        $roleOffices = [];
+        foreach (RoleCatalog::assignableValues() as $code) {
+            if ($code === 'item_owner') {
+                $roleOffices[$code] = [
+                    'office_id' => $itemOwnerOfficeId,
+                    'label' => 'Item Owner',
+                ];
+                continue;
+            }
+
+            $office = $this->officeForRole($code, $offices);
+            $roleOffices[$code] = [
+                'office_id' => $office?->office_id,
+                'label' => $office ? Office::publicLabel((string) $office->department_name) : null,
+            ];
+        }
+
         $allowances = RegistrationAllowanceService::page($request->query('allowance_q'));
         $emails = $allowances->getCollection()->pluck('email')->filter()->values()->all();
         $registeredEmails = $emails === []
@@ -55,6 +72,7 @@ class DashboardUserController extends Controller
             'users' => $users,
             'offices' => $offices,
             'itemOwnerOfficeId' => $itemOwnerOfficeId,
+            'roleOffices' => $roleOffices,
             'allowances' => $allowances,
             'allowanceSearch' => trim((string) $request->query('allowance_q', '')),
             'allowanceRegistered' => $registeredEmails,
@@ -362,21 +380,69 @@ class DashboardUserController extends Controller
      */
     private function normalizeRolePayload(array $data): array
     {
-        if (($data['role'] ?? '') !== 'item_owner') {
+        $role = (string) ($data['role'] ?? '');
+
+        if ($role === 'item_owner') {
+            $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
+
+            if (is_null($itemOwnerOfficeId)) {
+                throw ValidationException::withMessages([
+                    'role' => 'The Item Owner office is not configured in the system.',
+                ]);
+            }
+
+            $data['role'] = 'admin';
+            $data['office_id'] = $itemOwnerOfficeId;
+
             return $data;
         }
 
-        $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
+        $canonical = RoleCatalog::canonicalCode($role) ?? $role;
+        $data['role'] = $canonical;
+        $linked = RoleCatalog::linkedOffice($canonical);
 
-        if (is_null($itemOwnerOfficeId)) {
+        if ($linked['kind'] === 'none') {
+            $data['office_id'] = null;
+
+            return $data;
+        }
+
+        $office = $this->officeForRole($canonical);
+        if ($office === null) {
             throw ValidationException::withMessages([
-                'role' => 'The Item Owner office is not configured in the system.',
+                'role' => 'No office is configured for this role.',
             ]);
         }
 
-        $data['role'] = 'admin';
-        $data['office_id'] = $itemOwnerOfficeId;
+        $data['office_id'] = (int) $office->office_id;
 
         return $data;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Office>|null  $offices
+     */
+    private function officeForRole(string $role, $offices = null): ?Office
+    {
+        $linked = RoleCatalog::linkedOffice($role);
+        $offices ??= Office::query()->get();
+
+        if ($linked['kind'] === 'department') {
+            $name = strtolower(trim((string) $linked['department_name']));
+
+            return $offices->first(
+                fn (Office $office): bool => strtolower(trim((string) $office->department_name)) === $name
+            );
+        }
+
+        if ($linked['kind'] === 'short_code') {
+            $short = strtoupper(trim((string) $linked['short_code']));
+
+            return $offices->first(
+                fn (Office $office): bool => strtoupper(trim((string) $office->short_code)) === $short
+            );
+        }
+
+        return null;
     }
 }

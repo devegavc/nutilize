@@ -27,6 +27,7 @@
     window.userStoreEndpoint = '{{ route('dashboard.users.store') }}';
     window.userEndpointBase = '{{ url('/users') }}';
     window.itemOwnerOfficeId = @json($itemOwnerOfficeId);
+    window.roleOffices = @json($roleOffices);
   </script>
 
   <header class="top-header">
@@ -484,13 +485,8 @@
               @endforeach
             </select>
 
-            <label class="facilities-field-label" for="user-office">Office</label>
-            <select id="user-office" class="facilities-input facilities-select" name="office_id">
-              <option value="">No Office</option>
-              @foreach($offices as $office)
-                <option value="{{ $office->office_id }}">{{ \App\Models\Office::publicLabel($office->department_name) }}</option>
-              @endforeach
-            </select>
+            <input type="hidden" name="office_id" id="user-office" value="" />
+            <p class="facilities-input-note" id="user-office-assignment"></p>
             <small class="facilities-input-note" id="item-owner-office-note">
               Item owners are automatically assigned to the Item Owner office and can manage their own equipment inventory.
             </small>
@@ -521,6 +517,7 @@
     const userEmailInput = document.getElementById('user-email');
     const userRoleInput = document.getElementById('user-role');
     const userOfficeInput = document.getElementById('user-office');
+    const userOfficeAssignment = document.getElementById('user-office-assignment');
     const userSetupNote = document.getElementById('user-setup-note');
     const itemOwnerOfficeNote = document.getElementById('item-owner-office-note');
     const itemOwnerOfficeId = window.itemOwnerOfficeId ? String(window.itemOwnerOfficeId) : '';
@@ -547,17 +544,28 @@
     };
 
     const syncRoleOfficeFields = () => {
-      const isItemOwner = userRoleInput.value === 'item_owner';
+      const role = userRoleInput.value;
+      const isItemOwner = role === 'item_owner';
+      const assignment = (window.roleOffices && window.roleOffices[role]) || null;
+      const officeId = assignment && assignment.office_id ? String(assignment.office_id) : '';
+      const officeLabel = assignment && assignment.label ? String(assignment.label) : '';
+
+      if (userOfficeInput) {
+        userOfficeInput.value = officeId;
+      }
 
       if (itemOwnerOfficeNote) {
         itemOwnerOfficeNote.style.display = isItemOwner ? 'block' : 'none';
       }
 
-      if (isItemOwner && itemOwnerOfficeId) {
-        userOfficeInput.value = itemOwnerOfficeId;
-        userOfficeInput.disabled = true;
-      } else {
-        userOfficeInput.disabled = false;
+      if (userOfficeAssignment) {
+        if (isItemOwner) {
+          userOfficeAssignment.textContent = '';
+        } else if (officeLabel) {
+          userOfficeAssignment.textContent = 'Office: ' + officeLabel;
+        } else {
+          userOfficeAssignment.textContent = 'This account is not assigned to an office.';
+        }
       }
     };
 
@@ -587,7 +595,6 @@
       userFullNameInput.value = '';
       userEmailInput.value = '';
       userRoleInput.value = canonicalRole(presetRole);
-      userOfficeInput.value = presetRole === 'item_owner' ? itemOwnerOfficeId : '';
       syncSetupNote(true);
       syncRoleOfficeFields();
     };
@@ -598,7 +605,6 @@
       const fullName = row.dataset.userFullName || row.dataset.userName;
       const email = row.dataset.userEmail;
       const role = canonicalRole(row.dataset.userRole);
-      const officeId = row.dataset.userOfficeId;
 
       userForm.action = `${window.userEndpointBase}/${userId}`;
       userFormMethod.value = 'PATCH';
@@ -607,7 +613,6 @@
       userFullNameInput.value = fullName;
       userEmailInput.value = email;
       userRoleInput.value = role;
-      userOfficeInput.value = officeId || '';
       syncSetupNote(false);
       userModalTitle.textContent = role === 'item_owner' ? 'Edit Item Owner' : 'Edit User';
       syncRoleOfficeFields();
@@ -630,12 +635,6 @@
 
     if (userRoleInput) {
       userRoleInput.addEventListener('change', syncRoleOfficeFields);
-    }
-
-    if (userForm) {
-      userForm.addEventListener('submit', () => {
-        userOfficeInput.disabled = false;
-      });
     }
 
     if (userCancelBtn) {

@@ -264,6 +264,42 @@ class RoleCatalog
         return ['allowed' => false, 'on_behalf' => false, 'code' => 'outside_school'];
     }
 
+    /**
+     * The office this role must use. Students and faculty are not office accounts.
+     *
+     * @return array{kind: 'none'|'department'|'short_code'|'unknown', department_name?: string, short_code?: string}
+     */
+    public static function linkedOffice(string $role): array
+    {
+        $role = self::canonicalCode($role) ?? $role;
+
+        if (in_array($role, [self::STUDENT, self::FACULTY], true)) {
+            return ['kind' => 'none'];
+        }
+
+        if (isset(self::PROGRAM_OFFICES[$role])) {
+            return ['kind' => 'department', 'department_name' => self::PROGRAM_OFFICES[$role]];
+        }
+
+        $shortCode = match ($role) {
+            'Dean_SACE' => 'DEAN_SACE',
+            'Dean_SABM' => 'DEAN_SABM',
+            'Dean_SAHS' => 'DEAN_SAHS',
+            'Gen_Ed' => 'GENED',
+            'SDAO' => 'SDAO',
+            'Safety' => 'DO',
+            'Security' => 'SEC',
+            'PFO' => 'PF',
+            default => null,
+        };
+
+        if ($shortCode !== null) {
+            return ['kind' => 'short_code', 'short_code' => $shortCode];
+        }
+
+        return ['kind' => 'unknown'];
+    }
+
     public static function label(string $role): string
     {
         return match ($role) {
@@ -274,11 +310,11 @@ class RoleCatalog
             'Safety' => 'Safety',
             'Security' => 'Security',
             'PFO' => 'PFO',
-            'Dean_SACE' => 'Dean, SACE',
-            'Dean_SABM' => 'Dean, SABM',
-            'Dean_SAHS' => 'Dean, SAHS',
+            'Dean_SACE' => 'Dean of SACE',
+            'Dean_SABM' => 'Dean of SABM',
+            'Dean_SAHS' => 'Dean of SAHS',
             default => self::isProgramChairCode($role)
-                ? 'Program Chair, '.str_replace('PC_', '', $role)
+                ? 'Program Chair, '.self::PROGRAM_OFFICES[$role]
                 : $role,
         };
     }
