@@ -2597,6 +2597,19 @@ select.office-history-filter-control option {
 	}
 }
 
+/* The queue card was allowed to shrink to just its header and page links,
+   which hid the request rows even when the list had items. */
+body.office-app .office-request-history-card {
+	flex: 1 1 auto;
+	min-height: 280px;
+}
+
+body.office-app .office-request-history-wrap {
+	flex: 1 1 auto;
+	min-height: 220px;
+	overflow: auto;
+}
+
 @media (max-width: 480px) {
 	.office-table-filters,
 	.office-history-filters {

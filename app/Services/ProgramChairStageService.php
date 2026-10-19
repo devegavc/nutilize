@@ -189,7 +189,7 @@ class ProgramChairStageService
             return false;
         }
 
-        $role = (string) $user->role;
+        $role = RoleCatalog::canonicalCode((string) $user->role) ?? (string) $user->role;
         if (RoleCatalog::isProgramChairCode($role)) {
             return RoleCatalog::normalize(RoleCatalog::PROGRAM_OFFICES[$role]) === RoleCatalog::normalize($departmentName);
         }

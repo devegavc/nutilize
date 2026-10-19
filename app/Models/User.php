@@ -99,8 +99,8 @@ class User extends Authenticatable
             return false;
         }
 
-        $role = (string) $this->role;
-        $lower = strtolower($role);
+        $role = RoleCatalog::canonicalCode((string) $this->role) ?? (string) $this->role;
+        $lower = strtolower((string) $this->role);
 
         if (RoleCatalog::isProgramChairCode($role)) {
             return $this->officeMatchesChairRole($role);
@@ -123,13 +123,13 @@ class User extends Authenticatable
             return false;
         }
 
-        $role = (string) $this->role;
+        $role = RoleCatalog::canonicalCode((string) $this->role) ?? (string) $this->role;
 
         if (RoleCatalog::isProgramChairCode($role)) {
             return $this->officeMatchesChairRole($role);
         }
 
-        return strtolower($role) === 'pc_admin' && !is_null($this->office_id);
+        return strtolower((string) $this->role) === 'pc_admin' && !is_null($this->office_id);
     }
 
     private function officeMatchesChairRole(string $role): bool
