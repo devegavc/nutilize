@@ -156,7 +156,7 @@ class ProgramChairStageService
         return DB::table('reservation_approvals')
             ->where('reservation_id', $reservationId)
             ->where('office_id', $officeId)
-            ->where('dean_required', true)
+            ->whereRaw('dean_required = true')
             ->whereNull('approved_at')
             ->exists();
     }

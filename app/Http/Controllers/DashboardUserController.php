@@ -284,25 +284,6 @@ class DashboardUserController extends Controller
 
         UserAccountStatusService::toggle($user);
         $after = UserAccountStatusService::isActive($user);
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-586da0.log'), json_encode([
-                'sessionId' => '586da0',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'F',
-                'location' => 'DashboardUserController.php:toggleStatus',
-                'message' => 'account status toggled',
-                'data' => [
-                    'role' => (string) $user->role,
-                    'tracked' => UserAccountStatusService::isTrackedRole($user),
-                    'is_active' => $after,
-                    'can_approve' => $user->isOfficeApprover(),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $exception) {
-        }
-        // #endregion
         $durationLabel = UserAccountStatusService::statusDurationLabel($user);
         $message = $after ? 'User marked as active.' : 'User marked as inactive.';
 

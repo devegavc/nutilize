@@ -95,70 +95,10 @@ class LoginController extends Controller
         }
 
         if ($user) {
-            // #region agent log
-            try {
-                file_put_contents(base_path('debug-d19ccb.log'), json_encode([
-                    'sessionId' => 'd19ccb',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'B',
-                    'location' => 'LoginController.php:authenticate',
-                    'message' => 'authenticated before recordLogin',
-                    'data' => [
-                        'user_id' => (int) $user->user_id,
-                        'role' => (string) $user->role,
-                        'status_changed_at_null' => $user->status_changed_at === null,
-                        'is_active' => $user->is_active,
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-            } catch (\Throwable $exception) {
-            }
-            // #endregion
             UserAccountStatusService::recordLogin($user);
         }
 
-        $redirect = self::redirectAuthenticated($user);
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-28e049.log'), json_encode([
-                'sessionId' => '28e049',
-                'runId' => 'user-repro',
-                'hypothesisId' => 'H2',
-                'location' => 'LoginController.php:authenticate',
-                'message' => 'login role decision',
-                'data' => [
-                    'user_id' => $user ? (int) $user->user_id : null,
-                    'role' => $user ? (string) $user->role : null,
-                    'office_id' => $user->office_id ?? null,
-                    'is_office_approver' => $user ? $user->isOfficeApprover() : false,
-                    'is_program_chair' => $user ? $user->isProgramChairAdmin() : false,
-                    'canonical_role' => $user ? \App\Support\RoleCatalog::canonicalCode((string) $user->role) : null,
-                    'target' => $redirect->getTargetUrl(),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $exception) {
-        }
-        // #endregion
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-d19ccb.log'), json_encode([
-                'sessionId' => 'd19ccb',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'D',
-                'location' => 'LoginController.php:authenticate',
-                'message' => 'redirect chosen',
-                'data' => [
-                    'user_id' => $user ? (int) $user->user_id : null,
-                    'target' => $redirect->getTargetUrl(),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $exception) {
-        }
-        // #endregion
-
-        return $redirect;
+        return self::redirectAuthenticated($user);
     }
 
     public static function redirectAuthenticated(?User $user): RedirectResponse

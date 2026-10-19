@@ -46,28 +46,6 @@ class OfficeRequestController extends Controller
     {
         $user = Auth::user();
 
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-28e049.log'), json_encode([
-                'sessionId' => '28e049',
-                'runId' => 'user-repro',
-                'hypothesisId' => 'H2',
-                'location' => 'OfficeRequestController.php:index',
-                'message' => 'office home role gate',
-                'data' => [
-                    'user_id' => $user ? (int) $user->user_id : null,
-                    'role' => $user ? (string) $user->role : null,
-                    'office_id' => $user->office_id ?? null,
-                    'is_office_approver' => $user ? $user->isOfficeApprover() : false,
-                    'is_program_chair' => $user ? $user->isProgramChairAdmin() : false,
-                    'is_dean' => $user ? $user->isDean() : false,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $exception) {
-        }
-        // #endregion
-
         if (!$user || !$user->isOfficeApprover()) {
             return redirect('/home')->with('error', 'Unauthorized access.');
         }
@@ -226,7 +204,8 @@ class OfficeRequestController extends Controller
             ->whereIn('reservation_id', $queueFilterReservationIds);
 
         if (ProgramChairStageService::hasDeanRequiredColumn()) {
-            $pendingApprovalQuery->where('dean_required', false);
+            // Bound false becomes 0 when prepares are emulated, and Postgres rejects boolean = integer.
+            $pendingApprovalQuery->whereRaw('COALESCE(dean_required, false) = false');
         }
 
         if (ItemOwnerService::isItemOwnerUser($user)) {
@@ -327,25 +306,6 @@ class OfficeRequestController extends Controller
             OpenReservationScope::apply($pendingQuery, 'reservations.overall_status');
             $pending = $pendingQuery->get();
         }
-
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-586da0.log'), json_encode([
-                'sessionId' => '586da0',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'E',
-                'location' => 'OfficeRequestController.php:buildDeanOfficeHomeData',
-                'message' => 'dean home open pending rows',
-                'data' => [
-                    'role' => (string) $user->role,
-                    'office_ids' => $officeIds,
-                    'open_pending_rows' => $pending->count(),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $exception) {
-        }
-        // #endregion
 
         $reservationIds = $pending->pluck('reservation_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
         $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($reservationIds);

@@ -56,29 +56,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 }
             }
 
-            // #region agent log
-            try {
-                $authUser = $request->user();
-                file_put_contents(base_path('debug-28e049.log'), json_encode([
-                    'sessionId' => '28e049',
-                    'runId' => 'user-repro',
-                    'hypothesisId' => 'H1',
-                    'location' => 'bootstrap/app.php:render',
-                    'message' => 'database exception rendered',
-                    'data' => [
-                        'url' => $request->path(),
-                        'user_id' => $authUser->user_id ?? null,
-                        'role' => $authUser ? (string) $authUser->role : null,
-                        'office_id' => $authUser->office_id ?? null,
-                        'sqlstate' => $e instanceof QueryException ? ($e->errorInfo[0] ?? null) : $e->getCode(),
-                        'error' => substr($e->getMessage(), 0, 400),
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-            } catch (\Throwable $logException) {
-            }
-            // #endregion
-
             $publicMessage = 'A database error occurred. Please try again later.';
 
             if ($request->expectsJson()) {

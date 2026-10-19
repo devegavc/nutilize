@@ -2493,27 +2493,6 @@ class ApprovalController extends Controller
 
         $actionableReservationIds = array_values(array_unique($actionableReservationIds));
 
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-586da0.log'), json_encode([
-                'sessionId' => '586da0',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'B',
-                'location' => 'ApprovalController.php:actionableReservationIdsForDean',
-                'message' => 'dean actionable reservations',
-                'data' => [
-                    'role' => (string) $user->role,
-                    'own_office_id' => $ownOfficeId,
-                    'covered_office_ids' => $coveredOfficeIds,
-                    'candidate_count' => count($candidateReservationIds),
-                    'actionable_count' => count($actionableReservationIds),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (Throwable $exception) {
-        }
-        // #endregion
-
         return $actionableReservationIds;
     }
 
@@ -2750,8 +2729,6 @@ class ApprovalController extends Controller
                     $officeId > 0 ? [$officeId] : []
                 )))
                 : [];
-            $deanKept = 0;
-            $deanDropped = 0;
 
             foreach ($openIds as $reservationId) {
                 $currentOfficeId = isset($actionableOfficeIds[$reservationId])
@@ -2770,11 +2747,6 @@ class ApprovalController extends Controller
                         && ItemOwnerService::itemOwnerHasPendingApproval($user, $reservationId);
                 } elseif ($isDean) {
                     $keep = $currentOfficeId !== null && isset($deanCoveredOffices[$currentOfficeId]);
-                    if ($keep) {
-                        $deanKept++;
-                    } else {
-                        $deanDropped++;
-                    }
                 } else {
                     $keep = $currentOfficeId !== null && $currentOfficeId === $officeId;
                 }
@@ -2783,29 +2755,6 @@ class ApprovalController extends Controller
                     $staleIds[] = $reservationId;
                 }
             }
-
-            // #region agent log
-            if ($isDean) {
-                try {
-                    file_put_contents(base_path('debug-586da0.log'), json_encode([
-                        'sessionId' => '586da0',
-                        'runId' => 'post-fix',
-                        'hypothesisId' => 'A',
-                        'location' => 'ApprovalController.php:pruneStaleApprovalNotificationsForUser',
-                        'message' => 'dean notification keep decision',
-                        'data' => [
-                            'role' => (string) $user->role,
-                            'own_office_id' => $officeId,
-                            'open_count' => count($openIds),
-                            'kept' => $deanKept,
-                            'dropped' => $deanDropped,
-                        ],
-                        'timestamp' => (int) round(microtime(true) * 1000),
-                    ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-                } catch (Throwable $exception) {
-                }
-            }
-            // #endregion
         }
 
         $staleIds = array_values(array_unique(array_filter($staleIds)));
