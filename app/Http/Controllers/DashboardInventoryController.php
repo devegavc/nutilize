@@ -109,38 +109,7 @@ class DashboardInventoryController extends Controller
             ]);
         }
 
-        $siblings = AcademicTerm::query()
-            ->where('academic_year', $term->academic_year)
-            ->where('id', '!=', $term->id)
-            ->get()
-            ->map(static fn (AcademicTerm $sibling): array => [
-                'name' => (string) $sibling->name,
-                'starts_on' => $sibling->starts_on?->toDateString(),
-                'ends_on' => $sibling->ends_on?->toDateString(),
-            ])
-            ->all();
-        $siblings[] = [
-            'name' => (string) $term->name,
-            'starts_on' => $startsOn,
-            'ends_on' => $endsOn,
-        ];
-        $overlap = EquipmentDemandAnalyticsService::overlapMessage($siblings);
-        if ($overlap !== null) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'ends_on' => $overlap,
-            ]);
-        }
-
-        $term->starts_on = $startsOn;
-        $term->ends_on = $endsOn;
-        if ($startsOn !== null && $endsOn !== null) {
-            $term->date_note = null;
-        } elseif ($endsOn === null) {
-            $term->date_note = $term->date_note ?: 'The exact end day is not set.';
-        } else {
-            $term->date_note = $term->date_note ?: 'The exact start day is not set.';
-        }
-        $term->save();
+        $term = EquipmentDemandAnalyticsService::saveTermDates($term, $startsOn, $endsOn);
 
         return response()->json([
             'ok' => true,

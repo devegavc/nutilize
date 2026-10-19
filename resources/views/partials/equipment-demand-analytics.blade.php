@@ -17,7 +17,6 @@
       <label for="equipment-demand-term">Term</label>
       <select id="equipment-demand-term" aria-label="Academic term"></select>
       <span id="equipment-demand-term-length" class="equipment-demand-term-length"></span>
-      <button type="button" class="equipment-demand-text-btn" id="equipment-demand-add-term">Add academic year</button>
       <button type="button" class="equipment-demand-text-btn" id="equipment-demand-edit-term">Edit term</button>
     </div>
   </div>
@@ -40,7 +39,7 @@
           <input type="date" name="ends_on" />
         </label>
       </div>
-      <p class="equipment-demand-note">Leave a date empty when the exact day is not known yet. The break before the next term stays inside the term that just ended.</p>
+      <p class="equipment-demand-note">Changing the start date moves the previous term’s end to the day before. Changing the end date moves the next term’s start to the next day. Leave a date empty when the exact day is not known yet.</p>
     </div>
     <div class="equipment-term-actions">
       <button type="submit" class="equipment-demand-text-btn is-primary" id="equipment-term-submit">Save</button>

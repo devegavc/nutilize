@@ -58,6 +58,9 @@ SQL;
     {
         $rank = ($input['rank'] ?? '') === 'quantity' ? 'quantity' : 'reservations';
         $chartItemId = self::positiveInt($input['chart_item_id'] ?? null);
+        if (($input['mode'] ?? '') === 'term') {
+            self::ensureUpcomingAcademicYears();
+        }
         $terms = self::listTerms();
         $period = self::resolvePeriod($input, $terms);
 
@@ -79,36 +82,13 @@ SQL;
             return [];
         }
 
-        $terms = AcademicTerm::query()
+        return AcademicTerm::query()
             ->whereIn('term_key', self::TERM_KEYS)
             ->orderByDesc('academic_year')
             ->orderBy('term_key')
             ->get()
             ->map(fn (AcademicTerm $term): array => self::presentTerm($term))
             ->all();
-
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-586da0.log'), json_encode([
-                'sessionId' => '586da0',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'A',
-                'location' => 'EquipmentDemandAnalyticsService.php:listTerms',
-                'message' => 'academic terms offered in the menu',
-                'data' => [
-                    'terms' => array_map(static fn (array $term): array => [
-                        'year' => $term['academic_year'],
-                        'key' => $term['term_key'],
-                        'name' => $term['name'],
-                    ], $terms),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $exception) {
-        }
-        // #endregion
-
-        return $terms;
     }
 
     /**
@@ -574,6 +554,336 @@ SQL;
         return null;
     }
 
+    public static function nextAcademicYear(string $academicYear): string
+    {
+        [$start, $end] = array_map('intval', explode('-', $academicYear));
+
+        return ($start + 1).'-'.($end + 1);
+    }
+
+    public static function dayBefore(?string $date): ?string
+    {
+        if ($date === null || $date === '') {
+            return null;
+        }
+
+        return Carbon::parse($date, self::TIMEZONE)->startOfDay()->subDay()->toDateString();
+    }
+
+    public static function dayAfter(?string $date): ?string
+    {
+        if ($date === null || $date === '') {
+            return null;
+        }
+
+        return Carbon::parse($date, self::TIMEZONE)->startOfDay()->addDay()->toDateString();
+    }
+
+    /**
+     * The term that contains $today. An open term (a start and no end) contains
+     * every later day until a following term starts.
+     *
+     * @param  array<int, array<string, mixed>>  $terms
+     * @return array<string, mixed>|null
+     */
+    public static function termContainingDate(array $terms, string $today): ?array
+    {
+        $dated = array_values(array_filter(
+            $terms,
+            static fn (array $term): bool => !empty($term['starts_on'])
+        ));
+        usort($dated, static fn (array $left, array $right): int => strcmp((string) $left['starts_on'], (string) $right['starts_on']));
+
+        $containing = null;
+        foreach ($dated as $index => $term) {
+            if ((string) $term['starts_on'] > $today) {
+                break;
+            }
+
+            $end = $term['ends_on'] ?? null;
+            if ($end === null || $end === '') {
+                $nextStart = null;
+                for ($ahead = $index + 1; $ahead < count($dated); $ahead++) {
+                    if (!empty($dated[$ahead]['starts_on'])) {
+                        $nextStart = (string) $dated[$ahead]['starts_on'];
+                        break;
+                    }
+                }
+                if ($nextStart === null || $today < $nextStart) {
+                    $containing = $term;
+                }
+                continue;
+            }
+
+            if ($today <= (string) $end) {
+                $containing = $term;
+            }
+        }
+
+        return $containing;
+    }
+
+    /**
+     * Create the academic year after the one that contains today, when it is missing.
+     * Existing dates are left as stored. A failure leaves the report on the terms already saved.
+     */
+    public static function ensureUpcomingAcademicYears(?Carbon $today = null): void
+    {
+        if (!Schema::hasTable('academic_terms')) {
+            return;
+        }
+
+        try {
+            $todayString = ($today ?? Carbon::now(self::TIMEZONE))->toDateString();
+            $currentYear = AcademicTerm::query()
+                ->where('term_key', 'term-1')
+                ->whereNotNull('starts_on')
+                ->whereDate('starts_on', '<=', $todayString)
+                ->orderByDesc('starts_on')
+                ->value('academic_year');
+
+            if (!is_string($currentYear) || $currentYear === '') {
+                return;
+            }
+
+            DB::transaction(function () use ($currentYear): void {
+                self::ensureYearCopiedFrom(self::nextAcademicYear($currentYear), $currentYear);
+                self::fillOpenBoundaries();
+            });
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    public static function ensureYearCopiedFrom(string $academicYear, string $sourceYear): void
+    {
+        $source = AcademicTerm::query()
+            ->where('academic_year', $sourceYear)
+            ->whereIn('term_key', self::TERM_KEYS)
+            ->get()
+            ->keyBy(static fn (AcademicTerm $term): string => (string) $term->term_key);
+
+        $templates = $source->isEmpty()
+            ? self::emptyTermSlots()
+            : self::shiftedTermRows($source->map(static fn (AcademicTerm $term): array => [
+                'term_key' => (string) $term->term_key,
+                'name' => (string) $term->name,
+                'starts_on' => $term->starts_on?->toDateString(),
+                'ends_on' => $term->ends_on?->toDateString(),
+                'date_note' => $term->date_note,
+            ])->values()->all());
+
+        $byKey = [];
+        foreach ($templates as $row) {
+            $key = (string) ($row['term_key'] ?? '');
+            if (in_array($key, self::TERM_KEYS, true)) {
+                $byKey[$key] = $row;
+            }
+        }
+        foreach (self::emptyTermSlots() as $slot) {
+            $byKey[$slot['term_key']] ??= $slot;
+        }
+
+        foreach (self::TERM_KEYS as $key) {
+            AcademicTerm::query()->firstOrCreate(
+                ['academic_year' => $academicYear, 'term_key' => $key],
+                $byKey[$key]
+            );
+        }
+    }
+
+    /**
+     * Fill a missing boundary from the next stored start. Stored dates stay put.
+     */
+    public static function fillOpenBoundaries(): void
+    {
+        $terms = AcademicTerm::query()
+            ->whereIn('term_key', self::TERM_KEYS)
+            ->orderBy('academic_year')
+            ->orderBy('term_key')
+            ->get();
+
+        $indexed = [];
+        foreach ($terms as $term) {
+            $indexed[$term->academic_year.'|'.$term->term_key] = $term;
+        }
+
+        foreach ($terms as $term) {
+            $next = self::followingTerm($indexed, (string) $term->academic_year, (string) $term->term_key);
+            if ($next === null || $next->starts_on === null || $term->ends_on !== null) {
+                continue;
+            }
+
+            $end = self::dayBefore($next->starts_on->toDateString());
+            if ($term->starts_on !== null && $end < $term->starts_on->toDateString()) {
+                continue;
+            }
+
+            $term->ends_on = $end;
+            $term->save();
+        }
+    }
+
+    /**
+     * @param  array<string, AcademicTerm>  $indexed
+     */
+    private static function followingTerm(array $indexed, string $academicYear, string $termKey): ?AcademicTerm
+    {
+        $nextKey = match ($termKey) {
+            'term-1' => 'term-2',
+            'term-2' => 'term-3',
+            'term-3' => 'term-1',
+            default => null,
+        };
+        if ($nextKey === null) {
+            return null;
+        }
+
+        $year = $termKey === 'term-3' ? self::nextAcademicYear($academicYear) : $academicYear;
+
+        return $indexed[$year.'|'.$nextKey] ?? null;
+    }
+
+    /**
+     * Moving a start pulls the previous term's end to the day before.
+     * Moving an end pushes the next term's start to the next day.
+     *
+     * @param  array<int, array<string, mixed>>  $terms
+     * @return array<int, array<string, mixed>>
+     */
+    public static function withBoundaryMoves(array $terms, string $academicYear, string $termKey, ?string $startsOn, ?string $endsOn): array
+    {
+        $projected = $terms;
+        foreach ($projected as $index => $term) {
+            if ((string) ($term['academic_year'] ?? '') === $academicYear && (string) ($term['term_key'] ?? '') === $termKey) {
+                $projected[$index]['starts_on'] = $startsOn;
+                $projected[$index]['ends_on'] = $endsOn;
+            }
+        }
+
+        if ($startsOn !== null) {
+            $previous = self::adjacentKey($academicYear, $termKey, false);
+            $projected = self::setProjectedDate($projected, $previous['year'], $previous['key'], 'ends_on', self::dayBefore($startsOn));
+        }
+
+        if ($endsOn !== null) {
+            $next = self::adjacentKey($academicYear, $termKey, true);
+            $projected = self::setProjectedDate($projected, $next['year'], $next['key'], 'starts_on', self::dayAfter($endsOn));
+        }
+
+        return $projected;
+    }
+
+    /**
+     * @return array{year: string, key: string}
+     */
+    public static function adjacentKey(string $academicYear, string $termKey, bool $next): array
+    {
+        $order = self::TERM_KEYS;
+        $index = array_search($termKey, $order, true);
+        if ($index === false) {
+            return ['year' => $academicYear, 'key' => $termKey];
+        }
+
+        if ($next) {
+            if ($index === count($order) - 1) {
+                return ['year' => self::nextAcademicYear($academicYear), 'key' => $order[0]];
+            }
+
+            return ['year' => $academicYear, 'key' => $order[$index + 1]];
+        }
+
+        if ($index === 0) {
+            return ['year' => self::previousAcademicYear($academicYear), 'key' => $order[count($order) - 1]];
+        }
+
+        return ['year' => $academicYear, 'key' => $order[$index - 1]];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $terms
+     * @return array<int, array<string, mixed>>
+     */
+    private static function setProjectedDate(array $terms, string $academicYear, string $termKey, string $field, ?string $value): array
+    {
+        foreach ($terms as $index => $term) {
+            if ((string) ($term['academic_year'] ?? '') === $academicYear && (string) ($term['term_key'] ?? '') === $termKey) {
+                $terms[$index][$field] = $value;
+            }
+        }
+
+        return $terms;
+    }
+
+    public static function saveTermDates(AcademicTerm $term, ?string $startsOn, ?string $endsOn): AcademicTerm
+    {
+        $stored = AcademicTerm::query()
+            ->whereIn('term_key', self::TERM_KEYS)
+            ->get();
+        $rows = $stored->map(static fn (AcademicTerm $row): array => [
+            'id' => (int) $row->id,
+            'academic_year' => (string) $row->academic_year,
+            'term_key' => (string) $row->term_key,
+            'name' => (string) $row->name,
+            'starts_on' => $row->starts_on?->toDateString(),
+            'ends_on' => $row->ends_on?->toDateString(),
+        ])->all();
+
+        $projected = self::withBoundaryMoves($rows, (string) $term->academic_year, (string) $term->term_key, $startsOn, $endsOn);
+
+        foreach ($projected as $row) {
+            if (!empty($row['starts_on']) && !empty($row['ends_on']) && (string) $row['ends_on'] < (string) $row['starts_on']) {
+                throw ValidationException::withMessages([
+                    'starts_on' => $row['name'].' would end before it starts.',
+                ]);
+            }
+        }
+
+        $years = array_values(array_unique(array_map(static fn (array $row): string => (string) $row['academic_year'], $projected)));
+        foreach ($years as $year) {
+            $overlap = self::overlapMessage(array_values(array_filter(
+                $projected,
+                static fn (array $row): bool => (string) $row['academic_year'] === $year
+            )));
+            if ($overlap !== null) {
+                throw ValidationException::withMessages([
+                    'ends_on' => $overlap,
+                ]);
+            }
+        }
+
+        $original = [];
+        foreach ($rows as $row) {
+            $original[(int) $row['id']] = $row;
+        }
+
+        DB::transaction(function () use ($projected, $original): void {
+            foreach ($projected as $row) {
+                $id = (int) ($row['id'] ?? 0);
+                $before = $original[$id] ?? null;
+                if ($before === null) {
+                    continue;
+                }
+                if (($before['starts_on'] ?? null) === ($row['starts_on'] ?? null) && ($before['ends_on'] ?? null) === ($row['ends_on'] ?? null)) {
+                    continue;
+                }
+
+                $model = AcademicTerm::query()->find($id);
+                if ($model === null) {
+                    continue;
+                }
+                $model->starts_on = $row['starts_on'] ?: null;
+                $model->ends_on = $row['ends_on'] ?: null;
+                if ($model->starts_on !== null && $model->ends_on !== null) {
+                    $model->date_note = null;
+                }
+                $model->save();
+            }
+        });
+
+        return $term->refresh();
+    }
+
     public static function createAcademicYear(string $academicYear): void
     {
         $rows = self::officialCalendar($academicYear);
@@ -830,6 +1140,10 @@ SQL;
                     $selected = $term;
                     break;
                 }
+            }
+
+            if ($termId <= 0) {
+                $selected = self::termContainingDate($terms, Carbon::now(self::TIMEZONE)->toDateString());
             }
 
             if ($termId > 0 && $selected === null) {

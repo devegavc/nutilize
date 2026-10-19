@@ -310,8 +310,12 @@
   const renderDashboard = (payload) => {
     lastDashboard = payload;
     terms = Array.isArray(payload.terms) ? payload.terms : [];
+    if (payload.period?.term_id) {
+      state.termId = String(payload.period.term_id);
+      const selectedTerm = terms.find((term) => String(term.id) === state.termId);
+      if (selectedTerm && !state.academicYear) state.academicYear = selectedTerm.academic_year;
+    }
     if (!state.academicYear && terms[0]) state.academicYear = terms[0].academic_year;
-    if (payload.period?.term_id) state.termId = String(payload.period.term_id);
     syncTermControls();
     renderDefinitions(payload.definitions);
     applyMode();
@@ -556,11 +560,6 @@
     loadDashboard();
   });
   document.getElementById('equipment-demand-retry').addEventListener('click', loadDashboard);
-  document.getElementById('equipment-demand-add-term').addEventListener('click', () => {
-    state.mode = 'term';
-    applyMode();
-    showForm(null);
-  });
   document.getElementById('equipment-demand-edit-term').addEventListener('click', () => {
     const term = terms.find((item) => String(item.id) === String(state.termId));
     if (term) showForm(term);

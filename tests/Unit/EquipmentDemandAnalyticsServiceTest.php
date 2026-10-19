@@ -466,4 +466,50 @@ class EquipmentDemandAnalyticsServiceTest extends TestCase
         $this->assertNull($copied[2]['starts_on']);
         $this->assertNull($copied[2]['ends_on']);
     }
+
+    public function test_today_falls_in_the_open_term_and_a_later_start_closes_it(): void
+    {
+        $terms = [
+            ['term_key' => 'term-1', 'academic_year' => '2026-2027', 'starts_on' => '2026-07-13', 'ends_on' => '2026-11-02'],
+            ['term_key' => 'term-2', 'academic_year' => '2026-2027', 'starts_on' => '2026-11-03', 'ends_on' => null],
+            ['term_key' => 'term-3', 'academic_year' => '2026-2027', 'starts_on' => null, 'ends_on' => null],
+        ];
+
+        $duringFirst = EquipmentDemandAnalyticsService::termContainingDate($terms, '2026-10-20');
+        $duringOpenSecond = EquipmentDemandAnalyticsService::termContainingDate($terms, '2026-12-01');
+
+        $this->assertSame('term-1', $duringFirst['term_key']);
+        $this->assertSame('term-2', $duringOpenSecond['term_key']);
+
+        $closed = $terms;
+        $closed[1]['ends_on'] = '2027-02-20';
+        $closed[2]['starts_on'] = '2027-02-21';
+        $closed[2]['ends_on'] = '2027-07-12';
+        $duringThird = EquipmentDemandAnalyticsService::termContainingDate($closed, '2027-03-01');
+
+        $this->assertSame('term-3', $duringThird['term_key']);
+    }
+
+    public function test_changing_a_start_moves_only_the_previous_term_end(): void
+    {
+        $terms = [
+            ['academic_year' => '2026-2027', 'term_key' => 'term-1', 'name' => '1st Term', 'starts_on' => '2026-07-13', 'ends_on' => '2026-11-02'],
+            ['academic_year' => '2026-2027', 'term_key' => 'term-2', 'name' => '2nd Term', 'starts_on' => '2026-11-03', 'ends_on' => null],
+            ['academic_year' => '2026-2027', 'term_key' => 'term-3', 'name' => '3rd Term', 'starts_on' => null, 'ends_on' => null],
+        ];
+
+        $moved = EquipmentDemandAnalyticsService::withBoundaryMoves($terms, '2026-2027', 'term-2', '2026-11-10', null);
+        $byKey = [];
+        foreach ($moved as $term) {
+            $byKey[$term['term_key']] = $term;
+        }
+
+        $this->assertSame('2026-11-09', $byKey['term-1']['ends_on']);
+        $this->assertSame('2026-07-13', $byKey['term-1']['starts_on']);
+        $this->assertSame('2026-11-10', $byKey['term-2']['starts_on']);
+        $this->assertNull($byKey['term-2']['ends_on']);
+        $this->assertNull($byKey['term-3']['starts_on']);
+        $this->assertSame('2026-11-09', EquipmentDemandAnalyticsService::dayBefore('2026-11-10'));
+        $this->assertSame('2026-11-11', EquipmentDemandAnalyticsService::dayAfter('2026-11-10'));
+    }
 }
