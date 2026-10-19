@@ -177,7 +177,7 @@ class ApprovalController extends Controller
     {
         $payload = [
             'sessionId' => 'd19ccb',
-            'runId' => 'pre-fix',
+            'runId' => 'post-fix',
             'hypothesisId' => $hypothesisId,
             'location' => 'ApprovalController.php:approve',
             'message' => $message,
@@ -2176,7 +2176,7 @@ class ApprovalController extends Controller
 
         if (Schema::hasColumn('reservation_approval_histories', 'approved_by_role')) {
             $values['approved_by_role'] = $approvedByRole;
-            $values['on_behalf_of_program_chair'] = $onBehalfOfProgramChair;
+            $values['on_behalf_of_program_chair'] = DB::raw($onBehalfOfProgramChair ? 'true' : 'false');
         }
 
         DB::table('reservation_approval_histories')->updateOrInsert(
