@@ -2141,8 +2141,18 @@ class ApprovalController extends Controller
                 return;
             }
 
-            $locked->update($updatePayload);
-            $approval->setRawAttributes($locked->fresh()->getAttributes(), true);
+            $payload = $updatePayload;
+            foreach (['on_behalf_of_program_chair', 'dean_required'] as $booleanColumn) {
+                if (array_key_exists($booleanColumn, $payload)) {
+                    $payload[$booleanColumn] = DB::raw($payload[$booleanColumn] ? 'true' : 'false');
+                }
+            }
+            $payload['updated_at'] = now();
+            DB::table('reservation_approvals')
+                ->where('approval_id', $locked->approval_id)
+                ->update($payload);
+            $fresh = ReservationApproval::query()->find($locked->approval_id);
+            $approval->setRawAttributes($fresh->getAttributes(), true);
         });
 
         if ($blocked) {
