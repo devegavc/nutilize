@@ -123,9 +123,6 @@
               </tbody>
             </table>
           </div>
-          <div class="office-request-pagination" id="office-request-pagination">
-            {{ $requests->links() }}
-          </div>
         </section>
       </section>
     </section>

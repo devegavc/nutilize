@@ -80,7 +80,7 @@ class OfficeRequestController extends Controller
                 'waitingOnByReservation' => $viewData['waitingOnByReservation'] ?? [],
                 'showWaitingQueueContext' => $viewData['showWaitingQueueContext'] ?? false,
             ])->render(),
-            'pagination_html' => $viewData['requests']->links()->toHtml(),
+            'pagination_html' => '',
         ]);
     }
 
@@ -227,7 +227,7 @@ class OfficeRequestController extends Controller
             ->with(['reservation.user', 'reservation.details'])
             ->orderByDesc('created_at');
 
-        $requests = $requestsQuery->paginate(10);
+        $requests = $requestsQuery->get();
 
         $waitingOnByReservation = [];
         $showWaitingQueueContext = $user->isProgramChairAdmin();
@@ -274,7 +274,7 @@ class OfficeRequestController extends Controller
             'showWaitingQueueContext' => $showWaitingQueueContext,
             'totalRequests' => count($actionableReservationIds),
             'pendingRequests' => $showWaitingQueueContext
-                ? $requests->total()
+                ? $requests->count()
                 : count($actionableReservationIds),
             'approvedRequests' => $this->cachedOfficeDecisionCount((int) $user->office_id, 'approved'),
             'rejectedRequests' => $this->cachedOfficeDecisionCount((int) $user->office_id, 'rejected'),
@@ -323,9 +323,9 @@ class OfficeRequestController extends Controller
             ->whereIn('reservation_id', $actionableReservationIds !== [] ? $actionableReservationIds : [-1])
             ->with(['reservation.user', 'reservation.details'])
             ->orderByDesc('created_at')
-            ->paginate(10);
+            ->get();
 
-        $requests->getCollection()->transform(function ($approval) {
+        $requests->each(function ($approval) {
             $required = (bool) ($approval->dean_required ?? false);
             $approval->dean_queue_label = $required
                 ? 'Program Chair submitted this request. Your approval is required.'
