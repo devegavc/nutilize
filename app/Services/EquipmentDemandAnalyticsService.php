@@ -21,6 +21,9 @@ class EquipmentDemandAnalyticsService
 {
     public const TIMEZONE = 'Asia/Manila';
 
+    /** @var array<int, string> */
+    public const TERM_KEYS = ['term-1', 'term-2', 'term-3'];
+
     /**
      * Post-approval statuses observed in this app.
      * overdue and "to return" have an approved approval chain and are still
@@ -76,12 +79,36 @@ SQL;
             return [];
         }
 
-        return AcademicTerm::query()
+        $terms = AcademicTerm::query()
+            ->whereIn('term_key', self::TERM_KEYS)
             ->orderByDesc('academic_year')
             ->orderBy('term_key')
             ->get()
             ->map(fn (AcademicTerm $term): array => self::presentTerm($term))
             ->all();
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-586da0.log'), json_encode([
+                'sessionId' => '586da0',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'A',
+                'location' => 'EquipmentDemandAnalyticsService.php:listTerms',
+                'message' => 'academic terms offered in the menu',
+                'data' => [
+                    'terms' => array_map(static fn (array $term): array => [
+                        'year' => $term['academic_year'],
+                        'key' => $term['term_key'],
+                        'name' => $term['name'],
+                    ], $terms),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $exception) {
+        }
+        // #endregion
+
+        return $terms;
     }
 
     /**
@@ -554,6 +581,7 @@ SQL;
             $previous = self::previousAcademicYear($academicYear);
             $existing = AcademicTerm::query()
                 ->where('academic_year', $previous)
+                ->whereIn('term_key', self::TERM_KEYS)
                 ->orderBy('term_key')
                 ->get()
                 ->map(static fn (AcademicTerm $term): array => [
