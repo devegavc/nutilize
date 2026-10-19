@@ -2597,17 +2597,36 @@ select.office-history-filter-control option {
 	}
 }
 
-/* The queue card was allowed to shrink to just its header and page links,
-   which hid the request rows even when the list had items. */
+/* Match the program-chair queue: the list fills the card, rows stay inside
+   the table, and the page links sit under the list instead of on the rows. */
 body.office-app .office-request-history-card {
 	flex: 1 1 auto;
-	min-height: 280px;
+	min-height: 0;
+	overflow: hidden;
 }
 
 body.office-app .office-request-history-wrap {
 	flex: 1 1 auto;
-	min-height: 220px;
+	min-height: 0;
 	overflow: auto;
+}
+
+body.office-app .office-request-pagination {
+	flex: 0 0 auto;
+	position: relative;
+	z-index: 1;
+	background: #f5f7fe;
+}
+
+body.office-app .office-request-history-table .office-queue-status-stack {
+	max-width: 240px;
+	margin: 0 auto;
+}
+
+body.office-app .office-request-history-table .badge {
+	white-space: normal;
+	max-width: 100%;
+	text-align: center;
 }
 
 @media (max-width: 480px) {
