@@ -23,20 +23,6 @@ class RejectUnsafeQueryValues
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->query->has('v') && !$this->isAllowedCacheBuster($request->query('v'))) {
-            // #region agent log
-            try {
-                file_put_contents(base_path('debug-28e049.log'), json_encode([
-                    'sessionId' => '28e049',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'H4',
-                    'location' => 'RejectUnsafeQueryValues.php:handle',
-                    'message' => 'cache buster rejected',
-                    'data' => ['path' => $request->path()],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-            } catch (\Throwable $exception) {
-            }
-            // #endregion
             return $this->reject();
         }
 
@@ -80,24 +66,6 @@ class RejectUnsafeQueryValues
             : $request->query->get('_token');
 
         if (!is_string($token) || preg_match('/^[A-Za-z0-9]{1,255}$/', $token) !== 1) {
-            // #region agent log
-            try {
-                file_put_contents(base_path('debug-28e049.log'), json_encode([
-                    'sessionId' => '28e049',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'H3',
-                    'location' => 'RejectUnsafeQueryValues.php:rejectMalformedCsrfToken',
-                    'message' => 'csrf token rejected',
-                    'data' => [
-                        'is_string' => is_string($token),
-                        'length' => is_string($token) ? strlen($token) : null,
-                        'matches' => is_string($token) && preg_match('/^[A-Za-z0-9]{1,255}$/', $token) === 1,
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-            } catch (\Throwable $exception) {
-            }
-            // #endregion
             return $this->reject();
         }
 
@@ -117,47 +85,10 @@ class RejectUnsafeQueryValues
             !is_string($username)
             || ($username !== '' && (preg_match(self::LOGIN_IDENTIFIER, $username) !== 1 || $this->containsSqlBoolean($username)))
         ) {
-            // #region agent log
-            try {
-                file_put_contents(base_path('debug-28e049.log'), json_encode([
-                    'sessionId' => '28e049',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'H1',
-                    'location' => 'RejectUnsafeQueryValues.php:rejectSqlShapedLogin',
-                    'message' => 'login username rejected',
-                    'data' => [
-                        'is_string' => is_string($username),
-                        'length' => is_string($username) ? strlen($username) : null,
-                        'has_space' => is_string($username) && str_contains($username, ' '),
-                        'matches_identifier' => is_string($username) && preg_match(self::LOGIN_IDENTIFIER, $username) === 1,
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-            } catch (\Throwable $exception) {
-            }
-            // #endregion
             return $this->reject();
         }
 
         if (!is_string($password) || strlen($password) > 255 || $this->containsSqlBoolean($password)) {
-            // #region agent log
-            try {
-                file_put_contents(base_path('debug-28e049.log'), json_encode([
-                    'sessionId' => '28e049',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'H2',
-                    'location' => 'RejectUnsafeQueryValues.php:rejectSqlShapedLogin',
-                    'message' => 'login password rejected',
-                    'data' => [
-                        'is_string' => is_string($password),
-                        'length' => is_string($password) ? strlen($password) : null,
-                        'sql_shape' => is_string($password) && $this->containsSqlBoolean($password),
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-            } catch (\Throwable $exception) {
-            }
-            // #endregion
             return $this->reject();
         }
 
