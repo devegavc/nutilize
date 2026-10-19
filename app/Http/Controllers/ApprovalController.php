@@ -172,32 +172,52 @@ class ApprovalController extends Controller
         ]);
     }
 
+    // #region agent log
+    private function agentDebug(string $hypothesisId, string $message, array $data): void
+    {
+        $payload = [
+            'sessionId' => 'd19ccb',
+            'runId' => 'pre-fix',
+            'hypothesisId' => $hypothesisId,
+            'location' => 'ApprovalController.php:approve',
+            'message' => $message,
+            'data' => $data,
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ];
+
+        try {
+            file_put_contents(base_path('debug-d19ccb.log'), json_encode($payload, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (Throwable $exception) {
+        }
+
+        try {
+            DB::table('agent_debug_logs')->insert([
+                'session_id' => 'd19ccb',
+                'hypothesis_id' => $hypothesisId,
+                'message' => $message,
+                'context' => json_encode($data, JSON_UNESCAPED_SLASHES),
+                'created_at' => now(),
+            ]);
+        } catch (Throwable $exception) {
+        }
+    }
+    // #endregion
+
     public function approve($approvalId)
     {
         try {
             $user = Auth::user();
 
             // #region agent log
-            try {
-                $existing = ReservationApproval::query()->find($approvalId);
-                file_put_contents(base_path('debug-d19ccb.log'), json_encode([
-                    'sessionId' => 'd19ccb',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'A',
-                    'location' => 'ApprovalController.php:approve',
-                    'message' => 'approve request received',
-                    'data' => [
-                        'approval_id' => (int) $approvalId,
-                        'reservation_id' => $existing ? (int) $existing->reservation_id : null,
-                        'office_id' => $existing ? (int) $existing->office_id : null,
-                        'actor_user_id' => $user ? (int) $user->user_id : null,
-                        'already_has_approved_at' => $existing ? $existing->approved_at !== null : null,
-                        'status' => $existing ? (string) $existing->status : null,
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-            } catch (Throwable $exception) {
-            }
+            $existing = ReservationApproval::query()->find($approvalId);
+            $this->agentDebug('A', 'approve request received', [
+                'approval_id' => (int) $approvalId,
+                'reservation_id' => $existing ? (int) $existing->reservation_id : null,
+                'office_id' => $existing ? (int) $existing->office_id : null,
+                'actor_user_id' => $user ? (int) $user->user_id : null,
+                'already_has_approved_at' => $existing ? $existing->approved_at !== null : null,
+                'status' => $existing ? (string) $existing->status : null,
+            ]);
             // #endregion
 
             if (!$user->isOfficeApprover()) {
@@ -234,6 +254,14 @@ class ApprovalController extends Controller
             if ($blocked instanceof \Illuminate\Http\JsonResponse) {
                 return $blocked;
             }
+            // #region agent log
+            $this->agentDebug('D', 'decision saved', [
+                'approval_id' => (int) $approval->approval_id,
+                'reservation_id' => (int) $approval->reservation_id,
+                'model_approved_at_null' => $approval->approved_at === null,
+                'status' => (string) $approval->status,
+            ]);
+            // #endregion
             $this->recordApprovalHistory($approval);
             $this->forgetActionableOfficeCache((int) $approval->reservation_id);
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.approved');
@@ -254,12 +282,27 @@ class ApprovalController extends Controller
                 }
             })->afterResponse();
 
+            // #region agent log
+            $this->agentDebug('E', 'approve returning success', [
+                'approval_id' => (int) $approval->approval_id,
+                'reservation_id' => (int) $approval->reservation_id,
+            ]);
+            // #endregion
+
             return response()->json([
                 'success' => true,
                 'message' => 'Request approved successfully.',
                 'approval' => $approval,
             ]);
         } catch (Throwable $throwable) {
+            // #region agent log
+            $this->agentDebug('B', 'approve threw', [
+                'approval_id' => (int) $approvalId,
+                'exception' => $throwable::class,
+                'error' => substr($throwable->getMessage(), 0, 300),
+                'at' => $throwable->getLine(),
+            ]);
+            // #endregion
             report($throwable);
 
             return response()->json([
@@ -2043,22 +2086,11 @@ class ApprovalController extends Controller
 
         if ($stage['code'] === 'already_decided') {
             // #region agent log
-            try {
-                file_put_contents(base_path('debug-d19ccb.log'), json_encode([
-                    'sessionId' => 'd19ccb',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'B',
-                    'location' => 'ApprovalController.php:decisionForActor',
-                    'message' => 'blocked before save',
-                    'data' => [
-                        'approval_id' => (int) $approval->approval_id,
-                        'reservation_id' => (int) $approval->reservation_id,
-                        'actor_user_id' => (int) $user->user_id,
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-            } catch (Throwable $exception) {
-            }
+            $this->agentDebug('C', 'blocked before save', [
+                'approval_id' => (int) $approval->approval_id,
+                'reservation_id' => (int) $approval->reservation_id,
+                'actor_user_id' => (int) $user->user_id,
+            ]);
             // #endregion
             return response()->json(['error' => 'This request was already decided.'], 422);
         }
@@ -2115,21 +2147,10 @@ class ApprovalController extends Controller
 
         if ($blocked) {
             // #region agent log
-            try {
-                file_put_contents(base_path('debug-d19ccb.log'), json_encode([
-                    'sessionId' => 'd19ccb',
-                    'runId' => 'pre-fix',
-                    'hypothesisId' => 'C',
-                    'location' => 'ApprovalController.php:saveApprovalDecision',
-                    'message' => 'blocked while saving',
-                    'data' => [
-                        'approval_id' => (int) $approval->approval_id,
-                        'reservation_id' => (int) $approval->reservation_id,
-                    ],
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-            } catch (Throwable $exception) {
-            }
+            $this->agentDebug('C', 'blocked while saving', [
+                'approval_id' => (int) $approval->approval_id,
+                'reservation_id' => (int) $approval->reservation_id,
+            ]);
             // #endregion
             return response()->json(['error' => 'This request was already decided.'], 422);
         }
