@@ -177,6 +177,29 @@ class ApprovalController extends Controller
         try {
             $user = Auth::user();
 
+            // #region agent log
+            try {
+                $existing = ReservationApproval::query()->find($approvalId);
+                file_put_contents(base_path('debug-d19ccb.log'), json_encode([
+                    'sessionId' => 'd19ccb',
+                    'runId' => 'pre-fix',
+                    'hypothesisId' => 'A',
+                    'location' => 'ApprovalController.php:approve',
+                    'message' => 'approve request received',
+                    'data' => [
+                        'approval_id' => (int) $approvalId,
+                        'reservation_id' => $existing ? (int) $existing->reservation_id : null,
+                        'office_id' => $existing ? (int) $existing->office_id : null,
+                        'actor_user_id' => $user ? (int) $user->user_id : null,
+                        'already_has_approved_at' => $existing ? $existing->approved_at !== null : null,
+                        'status' => $existing ? (string) $existing->status : null,
+                    ],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+            } catch (Throwable $exception) {
+            }
+            // #endregion
+
             if (!$user->isOfficeApprover()) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
@@ -2019,6 +2042,24 @@ class ApprovalController extends Controller
         $stage = ProgramChairStageService::authorize($user, $approval);
 
         if ($stage['code'] === 'already_decided') {
+            // #region agent log
+            try {
+                file_put_contents(base_path('debug-d19ccb.log'), json_encode([
+                    'sessionId' => 'd19ccb',
+                    'runId' => 'pre-fix',
+                    'hypothesisId' => 'B',
+                    'location' => 'ApprovalController.php:decisionForActor',
+                    'message' => 'blocked before save',
+                    'data' => [
+                        'approval_id' => (int) $approval->approval_id,
+                        'reservation_id' => (int) $approval->reservation_id,
+                        'actor_user_id' => (int) $user->user_id,
+                    ],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+            } catch (Throwable $exception) {
+            }
+            // #endregion
             return response()->json(['error' => 'This request was already decided.'], 422);
         }
 
@@ -2073,6 +2114,23 @@ class ApprovalController extends Controller
         });
 
         if ($blocked) {
+            // #region agent log
+            try {
+                file_put_contents(base_path('debug-d19ccb.log'), json_encode([
+                    'sessionId' => 'd19ccb',
+                    'runId' => 'pre-fix',
+                    'hypothesisId' => 'C',
+                    'location' => 'ApprovalController.php:saveApprovalDecision',
+                    'message' => 'blocked while saving',
+                    'data' => [
+                        'approval_id' => (int) $approval->approval_id,
+                        'reservation_id' => (int) $approval->reservation_id,
+                    ],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+            } catch (Throwable $exception) {
+            }
+            // #endregion
             return response()->json(['error' => 'This request was already decided.'], 422);
         }
 
@@ -3077,24 +3135,6 @@ class ApprovalController extends Controller
         $requesterType = $this->requesterTypeLabel($requester);
         $requesterProgram = trim((string) ($requester?->academicProgram?->name ?? ''));
         $attachmentHeading = $requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent';
-
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-d19ccb.log'), json_encode([
-                'sessionId' => 'd19ccb',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'A',
-                'location' => 'ApprovalController.php:getReservationDetails',
-                'message' => 'requester program on approval details',
-                'data' => [
-                    'reservation_id' => (int) $reservationId,
-                    'has_program' => $requesterProgram !== '',
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (Throwable $exception) {
-        }
-        // #endregion
 
         $resourceRows = DB::table('reservation_details as details')
             ->leftJoin('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
