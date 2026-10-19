@@ -2597,24 +2597,27 @@ select.office-history-filter-control option {
 	}
 }
 
-/* Match the program-chair queue: the list fills the card, rows stay inside
-   the table, and the page links sit under the list instead of on the rows. */
+/* The queue list was collapsing to zero height, so the page links sat under
+   the yellow bar and the rows disappeared. Keep a real table row, then the links. */
 body.office-app .office-request-history-card {
+	display: grid;
+	grid-template-rows: auto minmax(240px, 1fr) auto;
 	flex: 1 1 auto;
-	min-height: 0;
+	min-height: 420px;
 	overflow: hidden;
 }
 
 body.office-app .office-request-history-wrap {
-	flex: 1 1 auto;
-	min-height: 0;
+	min-height: 240px;
+	height: auto;
+	max-height: none;
 	overflow: auto;
+	flex: none;
 }
 
 body.office-app .office-request-pagination {
-	flex: 0 0 auto;
-	position: relative;
-	z-index: 1;
+	position: static;
+	z-index: auto;
 	background: #f5f7fe;
 }
 
