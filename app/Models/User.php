@@ -159,6 +159,18 @@ class User extends Authenticatable
         return ItemOwnerService::isItemOwnerUser($this);
     }
 
+    public function getAuthPassword()
+    {
+        $password = (string) $this->password;
+
+        // PHP reports $2a$ and $2b$ bcrypt hashes as an unknown algorithm, and login then crashes.
+        if (preg_match('/^\$2[abx]\$/', $password) === 1) {
+            return '$2y$'.substr($password, 4);
+        }
+
+        return $password;
+    }
+
     public function shouldSelectProgram(): bool
     {
         if (!is_null($this->office_id)) {
