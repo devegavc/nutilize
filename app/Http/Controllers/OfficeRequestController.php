@@ -290,14 +290,40 @@ class OfficeRequestController extends Controller
             $pendingColumns[] = 'dean_required';
         }
 
-        $pending = $officeIds === []
-            ? collect()
-            : ReservationApproval::query()
-                ->whereIn('office_id', $officeIds)
-                ->whereNull('approved_at')
-                ->orderByDesc('created_at')
+        $pending = collect();
+        if ($officeIds !== []) {
+            $pendingQuery = ReservationApproval::query()
+                ->join('reservations', 'reservations.reservation_id', '=', 'reservation_approvals.reservation_id')
+                ->whereIn('reservation_approvals.office_id', $officeIds)
+                ->whereNull('reservation_approvals.approved_at')
+                ->orderByDesc('reservation_approvals.created_at')
                 ->limit(self::WORKFLOW_SCAN_LIMIT)
-                ->get($pendingColumns);
+                ->select(array_map(
+                    static fn (string $column): string => 'reservation_approvals.'.$column,
+                    $pendingColumns
+                ));
+            OpenReservationScope::apply($pendingQuery, 'reservations.overall_status');
+            $pending = $pendingQuery->get();
+        }
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-586da0.log'), json_encode([
+                'sessionId' => '586da0',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'E',
+                'location' => 'OfficeRequestController.php:buildDeanOfficeHomeData',
+                'message' => 'dean home open pending rows',
+                'data' => [
+                    'role' => (string) $user->role,
+                    'office_ids' => $officeIds,
+                    'open_pending_rows' => $pending->count(),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $exception) {
+        }
+        // #endregion
 
         $reservationIds = $pending->pluck('reservation_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
         $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($reservationIds);

@@ -19,12 +19,33 @@ class UserAccountStatusService
 
     public static function isTrackedRole(User $user): bool
     {
-        return in_array(strtolower((string) $user->role), self::TRACKED_ROLES, true);
+        return self::roleUsesActivityWindow((string) $user->role);
+    }
+
+    public static function roleUsesActivityWindow(string $role): bool
+    {
+        return in_array(strtolower($role), self::TRACKED_ROLES, true);
+    }
+
+    /**
+     * Students and faculty follow the 14-week window.
+     * Program chairs, deans, and office accounts can be deactivated by hand when the person in that role changes.
+     */
+    public static function roleCanBeDeactivated(string $role): bool
+    {
+        if (self::roleUsesActivityWindow($role)) {
+            return true;
+        }
+
+        return \App\Support\RoleCatalog::isProgramChairCode($role)
+            || \App\Support\RoleCatalog::isDeanCode($role)
+            || \App\Support\RoleCatalog::isOfficeRoleCode($role)
+            || in_array(strtolower($role), ['pc_admin', 'pf_admin'], true);
     }
 
     public static function isStatusManaged(User $user): bool
     {
-        return self::isTrackedRole($user);
+        return self::roleCanBeDeactivated((string) $user->role);
     }
 
     public static function isActive(User $user): bool

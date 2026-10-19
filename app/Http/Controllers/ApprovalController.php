@@ -2320,6 +2320,10 @@ class ApprovalController extends Controller
      */
     private function getActionableReservationIdsForApprover(\App\Models\User $user): array
     {
+        if ($user->isDean()) {
+            return $this->actionableReservationIdsForDean($user);
+        }
+
         $officeId = (int) $user->office_id;
         if ($officeId <= 0) {
             return [];
@@ -2435,6 +2439,82 @@ class ApprovalController extends Controller
         }
 
         return array_values(array_unique($actionableReservationIds));
+    }
+
+    /**
+     * A dean covers every program office in their school, not the office stored on their account.
+     * Any other user with the same dean role covers that same set.
+     *
+     * @return array<int, int>
+     */
+    private function actionableReservationIdsForDean(\App\Models\User $user): array
+    {
+        $coveredOfficeIds = ProgramChairStageService::programOfficeIdsForDean((string) $user->role);
+        $ownOfficeId = (int) ($user->office_id ?? 0);
+        if ($ownOfficeId > 0) {
+            $coveredOfficeIds[] = $ownOfficeId;
+        }
+        $coveredOfficeIds = array_values(array_unique(array_filter(
+            array_map('intval', $coveredOfficeIds),
+            static fn (int $officeId): bool => $officeId > 0
+        )));
+
+        if ($coveredOfficeIds === []) {
+            return [];
+        }
+
+        $query = ReservationApproval::query()
+            ->join('reservations', 'reservations.reservation_id', '=', 'reservation_approvals.reservation_id')
+            ->whereIn('reservation_approvals.office_id', $coveredOfficeIds)
+            ->whereNull('reservation_approvals.approved_at');
+        \App\Support\OpenReservationScope::apply($query, 'reservations.overall_status');
+
+        $candidateReservationIds = $query
+            ->orderByDesc('reservations.created_at')
+            ->limit(80)
+            ->pluck('reservation_approvals.reservation_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($candidateReservationIds === []) {
+            return [];
+        }
+
+        $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($candidateReservationIds);
+        $coveredLookup = array_flip($coveredOfficeIds);
+        $actionableReservationIds = [];
+        foreach ($actionableOfficeIds as $reservationId => $actionableOfficeId) {
+            if (isset($coveredLookup[(int) $actionableOfficeId])) {
+                $actionableReservationIds[] = (int) $reservationId;
+            }
+        }
+
+        $actionableReservationIds = array_values(array_unique($actionableReservationIds));
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-586da0.log'), json_encode([
+                'sessionId' => '586da0',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'B',
+                'location' => 'ApprovalController.php:actionableReservationIdsForDean',
+                'message' => 'dean actionable reservations',
+                'data' => [
+                    'role' => (string) $user->role,
+                    'own_office_id' => $ownOfficeId,
+                    'covered_office_ids' => $coveredOfficeIds,
+                    'candidate_count' => count($candidateReservationIds),
+                    'actionable_count' => count($actionableReservationIds),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (Throwable $exception) {
+        }
+        // #endregion
+
+        return $actionableReservationIds;
     }
 
     /**
@@ -2663,6 +2743,15 @@ class ApprovalController extends Controller
             }
 
             $isItemOwner = ItemOwnerService::isItemOwnerUser($user);
+            $isDean = $user->isDean();
+            $deanCoveredOffices = $isDean
+                ? array_flip(array_filter(array_merge(
+                    ProgramChairStageService::programOfficeIdsForDean((string) $user->role),
+                    $officeId > 0 ? [$officeId] : []
+                )))
+                : [];
+            $deanKept = 0;
+            $deanDropped = 0;
 
             foreach ($openIds as $reservationId) {
                 $currentOfficeId = isset($actionableOfficeIds[$reservationId])
@@ -2679,6 +2768,13 @@ class ApprovalController extends Controller
                     $keep = $currentOfficeId !== null
                         && $currentOfficeId === $officeId
                         && ItemOwnerService::itemOwnerHasPendingApproval($user, $reservationId);
+                } elseif ($isDean) {
+                    $keep = $currentOfficeId !== null && isset($deanCoveredOffices[$currentOfficeId]);
+                    if ($keep) {
+                        $deanKept++;
+                    } else {
+                        $deanDropped++;
+                    }
                 } else {
                     $keep = $currentOfficeId !== null && $currentOfficeId === $officeId;
                 }
@@ -2687,6 +2783,29 @@ class ApprovalController extends Controller
                     $staleIds[] = $reservationId;
                 }
             }
+
+            // #region agent log
+            if ($isDean) {
+                try {
+                    file_put_contents(base_path('debug-586da0.log'), json_encode([
+                        'sessionId' => '586da0',
+                        'runId' => 'post-fix',
+                        'hypothesisId' => 'A',
+                        'location' => 'ApprovalController.php:pruneStaleApprovalNotificationsForUser',
+                        'message' => 'dean notification keep decision',
+                        'data' => [
+                            'role' => (string) $user->role,
+                            'own_office_id' => $officeId,
+                            'open_count' => count($openIds),
+                            'kept' => $deanKept,
+                            'dropped' => $deanDropped,
+                        ],
+                        'timestamp' => (int) round(microtime(true) * 1000),
+                    ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+                } catch (Throwable $exception) {
+                }
+            }
+            // #endregion
         }
 
         $staleIds = array_values(array_unique(array_filter($staleIds)));

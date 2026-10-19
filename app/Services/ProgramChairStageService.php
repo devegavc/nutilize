@@ -122,6 +122,7 @@ class ProgramChairStageService
         $staff = User::query()
             ->where('office_id', $officeId)
             ->get()
+            ->filter(fn (User $user) => UserAccountStatusService::isActive($user))
             ->filter(fn (User $user) => self::userStaffsOffice($user, $officeId, (string) $office->department_name, (string) ($office->short_code ?? '')))
             ->values();
 
@@ -133,7 +134,9 @@ class ProgramChairStageService
 
         $deans = $deanRole === null
             ? collect()
-            : User::query()->where('role', $deanRole)->get();
+            : User::query()->where('role', $deanRole)->get()
+                ->filter(fn (User $user) => UserAccountStatusService::isActive($user))
+                ->values();
 
         $deanRequired = self::reservationRequiresDean($reservationId, $officeId);
 

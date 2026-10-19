@@ -9,7 +9,9 @@
   $userOffice = $resolveUserOffice($user);
   $userName = $resolveUserName($user);
   $roleKey = ItemOwnerService::isItemOwnerUser($user) ? 'item_owner' : (string) $user->role;
-  $statusDuration = $showsAccountStatus ? UserAccountStatusService::statusDurationLabel($user) : '';
+  $statusDuration = $showsAccountStatus && UserAccountStatusService::isTrackedRole($user)
+      ? UserAccountStatusService::statusDurationLabel($user)
+      : '';
   $rowClass = $rowClass ?? 'admin-row';
   $roleBadgeClass = $roleBadgeClass ?? 'admin-badge';
   $roleLabel = $roleLabel ?? strtoupper((string) $user->role);
@@ -56,7 +58,7 @@
           data-user-confirm-form="status"
           data-confirm-title="{{ $userStatus === 'active' ? 'Deactivate account' : 'Activate account' }}"
           data-confirm-message="{{ $userStatus === 'active' ? 'Are you sure you want to deactivate this account?' : 'Are you sure you want to activate this account?' }}"
-          data-confirm-note="{{ $userStatus === 'active' ? 'They will not be able to sign in until reactivated.' : '' }}"
+          data-confirm-note="{{ $userStatus === 'active' ? 'They will not be able to sign in or approve requests until reactivated.' : '' }}"
           data-confirm-text="{{ $userStatus === 'active' ? 'Deactivate' : 'Activate' }}"
           data-confirm-variant="{{ $userStatus === 'active' ? 'danger' : 'success' }}"
         >

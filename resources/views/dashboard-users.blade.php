@@ -181,7 +181,7 @@
         </section>
 
         <p class="users-policy-note">
-          Student and faculty accounts remain active for {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks from activation. Once the period ends, accounts become inactive. Activating an account resets the timer and starts a new {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }}-week period. PC admins can activate or deactivate accounts at any time.
+          Student and faculty accounts remain active for {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks from activation. Once the period ends, accounts become inactive. Activating an account resets the timer and starts a new {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }}-week period. Program chair, dean, and office accounts stay active until you deactivate them. Deactivate the old account when that person leaves, then add the new one. The old account stays on record and cannot sign in or approve.
         </p>
 
         <section class="registration-allowance" aria-label="Registration emails">
@@ -932,7 +932,7 @@
           );
           statusForm.setAttribute(
             'data-confirm-note',
-            isActive ? 'They will not be able to sign in until reactivated.' : ''
+            isActive ? 'They will not be able to sign in or approve requests until reactivated.' : ''
           );
           statusForm.setAttribute('data-confirm-text', isActive ? 'Deactivate' : 'Activate');
           statusForm.setAttribute('data-confirm-variant', isActive ? 'danger' : 'success');

@@ -68,6 +68,10 @@ class User extends Authenticatable
 
     public function isPhysicalFacilitiesAdmin()
     {
+        if (!\App\Services\UserAccountStatusService::isActive($this)) {
+            return false;
+        }
+
         if ((string) $this->role === 'PFO') {
             return true;
         }
@@ -83,6 +87,10 @@ class User extends Authenticatable
 
     public function isOfficeApprover()
     {
+        if (!\App\Services\UserAccountStatusService::isActive($this)) {
+            return false;
+        }
+
         if ($this->isDean()) {
             return true;
         }
@@ -111,6 +119,10 @@ class User extends Authenticatable
 
     public function isProgramChairAdmin(): bool
     {
+        if (!\App\Services\UserAccountStatusService::isActive($this)) {
+            return false;
+        }
+
         $role = (string) $this->role;
 
         if (RoleCatalog::isProgramChairCode($role)) {
