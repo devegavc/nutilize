@@ -3044,7 +3044,7 @@ class ApprovalController extends Controller
             ], 403);
         }
 
-        $reservation = Reservation::with(['user'])->findOrFail($reservationId);
+        $reservation = Reservation::with(['user.academicProgram'])->findOrFail($reservationId);
 
         if (!$this->userCanViewReservation($user, (int) $reservationId, $reservation)) {
             return response()->json([
@@ -3075,7 +3075,26 @@ class ApprovalController extends Controller
         $proofOfConsentUrls = $this->parseProofOfConsentUrls($rawProofOfConsent);
         $proofOfConsentUrl = $proofOfConsentUrls[0] ?? '';
         $requesterType = $this->requesterTypeLabel($requester);
+        $requesterProgram = trim((string) ($requester?->academicProgram?->name ?? ''));
         $attachmentHeading = $requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent';
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-d19ccb.log'), json_encode([
+                'sessionId' => 'd19ccb',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'A',
+                'location' => 'ApprovalController.php:getReservationDetails',
+                'message' => 'requester program on approval details',
+                'data' => [
+                    'reservation_id' => (int) $reservationId,
+                    'has_program' => $requesterProgram !== '',
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (Throwable $exception) {
+        }
+        // #endregion
 
         $resourceRows = DB::table('reservation_details as details')
             ->leftJoin('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
@@ -3128,6 +3147,7 @@ class ApprovalController extends Controller
             'requester_email' => (string) ($requester?->email ?? 'N/A'),
             'requester_phone' => (string) ($requester?->phone_number ?? $requester?->contact_number ?? 'N/A'),
             'requester_type' => $requesterType,
+            'requester_program' => $requesterProgram !== '' ? $requesterProgram : 'N/A',
             'requested_date' => $reservation->created_at
                 ? $reservation->created_at->format('M d, Y h:i A')
                 : 'N/A',

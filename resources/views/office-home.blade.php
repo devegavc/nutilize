@@ -753,21 +753,6 @@
 
       initOfficeQueueReloadButton();
 
-      // #region agent log
-      window.setTimeout(() => {
-        const card = document.querySelector('.office-request-history-card');
-        const wrap = document.querySelector('.office-request-history-wrap');
-        const pagination = document.getElementById('office-request-pagination');
-        const rows = queueBody ? Array.from(queueBody.querySelectorAll('tr')) : [];
-        const lastRow = rows.length ? rows[rows.length - 1] : null;
-        const cardBox = card ? card.getBoundingClientRect() : null;
-        const wrapBox = wrap ? wrap.getBoundingClientRect() : null;
-        const pageBox = pagination ? pagination.getBoundingClientRect() : null;
-        const rowBox = lastRow ? lastRow.getBoundingClientRect() : null;
-        fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d19ccb'},body:JSON.stringify({sessionId:'d19ccb',runId:'pre-fix',hypothesisId:'A',location:'office-home.blade.php:layout',message:'queue layout boxes',data:{role:window.authUser&&window.authUser.role,rowCount:rows.length,cardHeight:cardBox?Math.round(cardBox.height):null,wrapHeight:wrapBox?Math.round(wrapBox.height):null,wrapScrollHeight:wrap?wrap.scrollHeight:null,paginationTop:pageBox?Math.round(pageBox.top):null,lastRowBottom:rowBox?Math.round(rowBox.bottom):null,overlap:!!(rowBox&&pageBox&&rowBox.bottom>pageBox.top+2),gapBelowPagination:pageBox&&cardBox?Math.round(cardBox.bottom-pageBox.bottom):null},timestamp:Date.now()})}).catch(()=>{});
-      }, 400);
-      // #endregion
-
       window.setInterval(() => {
         if (!document.hidden) {
           softRefreshQueue();

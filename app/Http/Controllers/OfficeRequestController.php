@@ -224,7 +224,7 @@ class OfficeRequestController extends Controller
 
         $requestsQuery = ReservationApproval::query()
             ->whereIn('approval_id', $distinctPendingApprovalIds !== [] ? $distinctPendingApprovalIds : [-1])
-            ->with(['reservation.user', 'reservation.details'])
+            ->with(['reservation.user.academicProgram', 'reservation.details'])
             ->orderByDesc('created_at');
 
         $requests = $requestsQuery->get();
@@ -321,7 +321,7 @@ class OfficeRequestController extends Controller
         $requests = ReservationApproval::query()
             ->whereIn('approval_id', $pending->pluck('approval_id')->all() ?: [-1])
             ->whereIn('reservation_id', $actionableReservationIds !== [] ? $actionableReservationIds : [-1])
-            ->with(['reservation.user', 'reservation.details'])
+            ->with(['reservation.user.academicProgram', 'reservation.details'])
             ->orderByDesc('created_at')
             ->get();
 

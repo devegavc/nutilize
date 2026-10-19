@@ -491,10 +491,30 @@
 }
 
 .office-request-history-table .office-queue-requester {
-	max-width: 180px;
+	max-width: 220px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: normal;
+}
+
+.office-queue-requester-name,
+.office-queue-program {
+	display: block;
+}
+
+.office-queue-requester-name {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.office-queue-program {
+	margin-top: 2px;
+	font-size: 0.78rem;
+	font-weight: 700;
+	line-height: 1.25;
+	color: #32408a;
+	white-space: normal;
 }
 
 .office-request-history-table .office-queue-activity {

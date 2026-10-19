@@ -1573,6 +1573,10 @@ function showReservationDetailsModal(reservation, options = {}) {
                   <span>${escapeReservationDetailsHtml(requesterType)}</span>
                 </div>
                 <div class="info-row">
+                  <strong>Program</strong>
+                  <span>${escapeReservationDetailsHtml(reservation.requester_program || 'N/A')}</span>
+                </div>
+                <div class="info-row">
                   <strong>Email</strong>
                   <span>${escapeReservationDetailsHtml(reservation.requester_email || 'N/A')}</span>
                 </div>
