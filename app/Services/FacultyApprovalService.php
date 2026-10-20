@@ -97,13 +97,32 @@ class FacultyApprovalService
             ->whereIn('r.reservation_id', $missing)
             ->get(['r.reservation_id', 'u.role', 'r.faculty_approved_at', 'r.faculty_rejected_at']);
 
-        $heldNow = 0;
         foreach ($rows as $row) {
             $role = strtolower(trim((string) $row->role));
             $student = $role === strtolower(RoleCatalog::STUDENT) || in_array($role, ['user', 'student'], true);
             $approved = $row->faculty_approved_at !== null && $row->faculty_rejected_at === null;
             if ($student && !$approved) {
                 self::$held[(int) $row->reservation_id] = true;
+            }
+        }
+
+        if (self::$held !== [] && $missing !== []) {
+            $alreadyApproved = DB::table('reservation_approvals as ra')
+                ->join('users as actor', 'actor.user_id', '=', 'ra.approved_by_user_id')
+                ->whereIn('ra.reservation_id', array_keys(self::$held))
+                ->whereRaw("LOWER(actor.role) = 'faculty'")
+                ->whereNotNull('ra.approved_at')
+                ->whereRaw("LOWER(COALESCE(ra.status, '')) = 'approved'")
+                ->pluck('ra.reservation_id');
+
+            foreach ($alreadyApproved as $reservationId) {
+                unset(self::$held[(int) $reservationId]);
+            }
+        }
+
+        $heldNow = 0;
+        foreach ($missing as $id) {
+            if (isset(self::$held[$id])) {
                 $heldNow++;
             }
         }
