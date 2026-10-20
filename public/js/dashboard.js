@@ -2887,6 +2887,18 @@ async function refreshRequestListPreservingTab(explicitUrl) {
   }
 
   requestListWrap.innerHTML = data.html;
+  if (typeof applyCspPresentation === 'function') {
+    applyCspPresentation();
+  }
+
+  // #region agent log
+  try {
+    const timeline = requestListWrap.querySelector('[data-timeline-steps]');
+    const steps = timeline instanceof HTMLElement ? timeline.style.getPropertyValue('--timeline-steps') : '';
+    const columns = timeline instanceof HTMLElement ? getComputedStyle(timeline).gridAutoFlow : '';
+    fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d19ccb'},body:JSON.stringify({sessionId:'d19ccb',runId:'post-fix',hypothesisId:'A',location:'dashboard.js:refreshRequestListPreservingTab',message:'request list replaced',data:{timelineCount:requestListWrap.querySelectorAll('[data-timeline-steps]').length,steps:steps,gridAutoFlow:columns},timestamp:Date.now()})}).catch(()=>{});
+  } catch (_error) {}
+  // #endregion
 
   if (typeof explicitUrl === 'string' && explicitUrl.trim() !== '') {
     const parsedUrl = new URL(explicitUrl, window.location.origin);
@@ -8079,6 +8091,12 @@ if (requestListWrap) {
 
     if (!isAlreadySelected) {
       item.classList.add('is-selected');
+      // #region agent log
+      const timeline = item.querySelector('[data-timeline-steps]');
+      const steps = timeline instanceof HTMLElement ? getComputedStyle(timeline).getPropertyValue('--timeline-steps').trim() : '';
+      const flow = timeline instanceof HTMLElement ? getComputedStyle(timeline).gridAutoFlow : '';
+      fetch('http://127.0.0.1:7591/ingest/35e57a72-783b-42fe-bb4e-563f8b0a56b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d19ccb'},body:JSON.stringify({sessionId:'d19ccb',runId:'post-fix',hypothesisId:'A',location:'dashboard.js:requestSelect',message:'request progress opened',data:{dataSteps:timeline instanceof HTMLElement ? timeline.getAttribute('data-timeline-steps') : '',cssSteps:steps,gridAutoFlow:flow},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
     }
   });
 
