@@ -125,25 +125,6 @@ class UserAccountStatusService
         $user->status_changed_at = $at;
         $user->syncOriginalAttribute('is_active');
         $user->syncOriginalAttribute('status_changed_at');
-
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-28e049.log'), json_encode([
-                'sessionId' => '28e049',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'H1',
-                'location' => 'UserAccountStatusService.php:writeProtectedStatus',
-                'message' => 'protected status write',
-                'data' => [
-                    'user_id' => (int) $user->user_id,
-                    'role' => (string) $user->role,
-                    'active' => $active,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $exception) {
-        }
-        // #endregion
     }
 
     public static function toggle(User $user): User
