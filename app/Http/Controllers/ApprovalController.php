@@ -1503,6 +1503,9 @@ class ApprovalController extends Controller
                 }
 
                 if ($status !== 'approved' || is_null($approval?->approved_at)) {
+                    if (\App\Services\FacultyApprovalService::blocksOffice($reservationId, $officeId)) {
+                        continue 2;
+                    }
                     $actionableOfficeIds[$reservationId] = (int) $officeId;
                     continue 2;
                 }
@@ -2017,6 +2020,10 @@ class ApprovalController extends Controller
     private function decisionForActor($user, ReservationApproval $approval): array|\Illuminate\Http\JsonResponse
     {
         $stage = ProgramChairStageService::authorize($user, $approval);
+
+        if (\App\Services\FacultyApprovalService::blocksOffice((int) $approval->reservation_id, (int) $approval->office_id)) {
+            return response()->json(['error' => 'This request is waiting for faculty approval.'], 422);
+        }
 
         if ($stage['code'] === 'already_decided') {
             return response()->json(['error' => 'This request was already decided.'], 422);

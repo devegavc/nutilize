@@ -107,6 +107,10 @@ class LoginController extends Controller
             return redirect()->route('dashboard.home');
         }
 
+        if ($user && $user->isFaculty()) {
+            return redirect()->route('faculty.requests');
+        }
+
         if ($user && $user->isOfficeApprover()) {
             return redirect()->route('office.home');
         }

@@ -817,6 +817,9 @@ class DashboardRequestController extends Controller
                 }
 
                 if ($status !== 'approved' || is_null($approval?->approved_at)) {
+                    if (\App\Services\FacultyApprovalService::blocksOffice($reservationId, $officeId)) {
+                        continue 2;
+                    }
                     $actionableOfficeIds[$reservationId] = (int) $officeId;
                     continue 2;
                 }

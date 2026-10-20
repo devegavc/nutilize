@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Reservation;
 use App\Models\ReservationApproval;
 use App\Services\ReservationApprovalNotifier;
+use App\Services\FacultyApprovalService;
 use App\Services\ProgramChairOfficeResolver;
 use App\Services\ProgramChairStageService;
 use App\Support\RoleCatalog;
@@ -107,10 +108,13 @@ class OfficeRequestController extends Controller
                 ->map(fn ($id) => (int) $id)
                 ->all();
         } elseif ($user->isProgramChairAdmin()) {
-            $programReservationIds = $this->capReservationIds(
-                $this->reservationIdsWithApprovalRows(
-                    ProgramChairOfficeResolver::openReservationIdsForProgramOffice($officeId)
-                )
+            $programReservationIds = FacultyApprovalService::withoutFacultyHold(
+                $this->capReservationIds(
+                    $this->reservationIdsWithApprovalRows(
+                        ProgramChairOfficeResolver::openReservationIdsForProgramOffice($officeId)
+                    )
+                ),
+                $officeId
             );
 
             $reconcileIds = ProgramChairOfficeResolver::reservationIdsWithPendingPcApprovalsForProgram(
@@ -496,10 +500,13 @@ class OfficeRequestController extends Controller
                         continue 2;
                     }
 
-                    if ($status !== 'approved' || is_null($approval?->approved_at)) {
-                        $actionableOfficeIds[$reservationId] = (int) $officeId;
+                if ($status !== 'approved' || is_null($approval?->approved_at)) {
+                    if (FacultyApprovalService::blocksOffice($reservationId, $officeId)) {
                         continue 2;
                     }
+                    $actionableOfficeIds[$reservationId] = (int) $officeId;
+                    continue 2;
+                }
                 }
             }
 

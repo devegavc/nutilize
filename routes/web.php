@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountSetupController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\FacultyApprovalController;
 use App\Http\Controllers\DashboardAnnouncementController;
 use App\Http\Controllers\DashboardFeedbackController;
 use App\Http\Controllers\DashboardHomeController;
@@ -80,6 +81,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/profile/email/verify', [ProfileController::class, 'verifyEmail'])
         ->middleware('throttle:8,1')
         ->name('dashboard.profile.email.verify');
+    Route::get('/faculty/requests', [FacultyApprovalController::class, 'index'])->name('faculty.requests');
+    Route::patch('/faculty/requests/{reservationId}', [FacultyApprovalController::class, 'approve'])
+        ->whereNumber('reservationId')
+        ->name('faculty.requests.approve');
+    Route::patch('/faculty/requests/{reservationId}/reject', [FacultyApprovalController::class, 'reject'])
+        ->whereNumber('reservationId')
+        ->name('faculty.requests.reject');
     Route::get('/office/home', [OfficeRequestController::class, 'index'])->name('office.home');
     Route::get('/office/requests', fn () => redirect()->route('office.home'))->name('office.requests');
     Route::get('/office/requests/snapshot', [OfficeRequestController::class, 'queueSnapshot'])->name('office.requests.snapshot');
