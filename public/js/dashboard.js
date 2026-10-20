@@ -1406,41 +1406,6 @@ if (reportTableBody instanceof HTMLElement) {
   });
 }
 
-function normalizeReservationProofUrlList(value) {
-  if (Array.isArray(value)) {
-    return value
-      .map((url) => String(url || '').trim())
-      .filter((url) => /^https?:\/\//i.test(url));
-  }
-
-  const raw = String(value || '').trim();
-  if (!raw) {
-    return [];
-  }
-
-  if (raw.startsWith('[')) {
-    try {
-      const decoded = JSON.parse(raw);
-      if (Array.isArray(decoded)) {
-        return normalizeReservationProofUrlList(decoded);
-      }
-    } catch (_error) {
-      return [];
-    }
-  }
-
-  return /^https?:\/\//i.test(raw) ? [raw] : [];
-}
-
-function parseReservationProofUrls(reservation) {
-  const fromList = normalizeReservationProofUrlList(reservation?.proof_of_consent_urls);
-  if (fromList.length) {
-    return fromList;
-  }
-
-  return normalizeReservationProofUrlList(reservation?.proof_of_consent_url);
-}
-
 function showReservationDetailsModal(reservation, options = {}) {
   const resources = Array.isArray(reservation.resources) && reservation.resources.length
     ? reservation.resources
@@ -1479,11 +1444,7 @@ function showReservationDetailsModal(reservation, options = {}) {
     : '';
   const reservationCode = reservation.reservation_code
     || (reservation.id ? `NU-${String(reservation.id).padStart(6, '0')}` : 'Reservation');
-  const proofUrls = parseReservationProofUrls(reservation);
-  const proofUrl = proofUrls[0] || '';
   const requesterType = String(reservation.requester_type || '').trim() || 'Unknown';
-  const attachmentHeading = String(reservation.attachment_heading || '').trim()
-    || (requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent');
   const scheduleLabel = reservation.event_schedule
     || [
       reservation.event_date || reservation.start_date,
@@ -1500,43 +1461,6 @@ function showReservationDetailsModal(reservation, options = {}) {
       </div>
     `
     : '';
-
-  const proofMarkup = proofUrls.length
-    ? `
-      <section class="reservation-details-panel reservation-proof-panel">
-        <div class="reservation-panel-heading">
-          <h3>${escapeReservationDetailsHtml(attachmentHeading)}</h3>
-          ${proofUrls.length > 1
-            ? `<span class="reservation-proof-count" data-proof-counter>1 / ${proofUrls.length}</span>`
-            : `<a class="reservation-proof-open" href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">Open full image</a>`}
-        </div>
-        <div class="reservation-proof-viewer">
-          ${proofUrls.length > 1 ? `
-            <button type="button" class="reservation-proof-nav is-prev" data-proof-nav="-1" aria-label="Previous image">
-              <i class="bi bi-chevron-left"></i>
-            </button>
-          ` : ''}
-          <a class="reservation-proof-frame" data-proof-link href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">
-            <img data-proof-image src="${escapeReservationDetailsHtml(proofUrl)}" alt="${escapeReservationDetailsHtml(attachmentHeading)} for ${escapeReservationDetailsHtml(reservationCode)}" />
-          </a>
-          ${proofUrls.length > 1 ? `
-            <button type="button" class="reservation-proof-nav is-next" data-proof-nav="1" aria-label="Next image">
-              <i class="bi bi-chevron-right"></i>
-            </button>
-          ` : ''}
-        </div>
-      </section>
-    `
-    : `
-      <section class="reservation-details-panel reservation-proof-panel is-empty">
-        <div class="reservation-panel-heading">
-          <h3>${escapeReservationDetailsHtml(attachmentHeading)}</h3>
-        </div>
-        <p class="reservation-empty-note">${requesterType === 'Teacher'
-          ? 'No attachment was added to this request.'
-          : 'No letter of consent was attached to this request.'}</p>
-      </section>
-    `;
 
   const modal = document.createElement('div');
   modal.className = 'reservation-details-modal';
@@ -1605,8 +1529,6 @@ function showReservationDetailsModal(reservation, options = {}) {
                 </div>
               </div>
             </section>
-
-            ${proofMarkup}
           </div>
 
           <section class="reservation-details-panel reservation-resources-panel">
@@ -1623,48 +1545,15 @@ function showReservationDetailsModal(reservation, options = {}) {
 
   const closeBtn = modal.querySelector('.reservation-details-close');
   const overlay = modal.querySelector('.reservation-details-overlay');
-  let proofIndex = 0;
 
-  const showProofAt = (index) => {
-    if (!proofUrls.length) {
-      return;
-    }
-
-    proofIndex = (index + proofUrls.length) % proofUrls.length;
-    const url = proofUrls[proofIndex];
-    const proofImage = modal.querySelector('[data-proof-image]');
-    const proofLink = modal.querySelector('[data-proof-link]');
-    const proofCounter = modal.querySelector('[data-proof-counter]');
-
-    if (proofImage instanceof HTMLImageElement) {
-      proofImage.src = url;
-      proofImage.alt = `${attachmentHeading} ${proofIndex + 1} of ${proofUrls.length} for ${reservationCode}`;
-    }
-    if (proofLink instanceof HTMLAnchorElement) {
-      proofLink.href = url;
-    }
-    if (proofCounter instanceof HTMLElement) {
-      proofCounter.textContent = `${proofIndex + 1} / ${proofUrls.length}`;
-    }
-  };
-
-  const onProofKeydown = (event) => {
+  const onModalKeydown = (event) => {
     if (event.key === 'Escape') {
       closeModal();
-      return;
-    }
-    if (proofUrls.length < 2) {
-      return;
-    }
-    if (event.key === 'ArrowLeft') {
-      showProofAt(proofIndex - 1);
-    } else if (event.key === 'ArrowRight') {
-      showProofAt(proofIndex + 1);
     }
   };
 
   const closeModal = () => {
-    document.removeEventListener('keydown', onProofKeydown);
+    document.removeEventListener('keydown', onModalKeydown);
     modal.remove();
   };
 
@@ -1675,16 +1564,7 @@ function showReservationDetailsModal(reservation, options = {}) {
     }
   });
 
-  modal.querySelectorAll('[data-proof-nav]').forEach((button) => {
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const step = Number.parseInt(button.getAttribute('data-proof-nav') || '0', 10) || 0;
-      showProofAt(proofIndex + step);
-    });
-  });
-
-  document.addEventListener('keydown', onProofKeydown);
+  document.addEventListener('keydown', onModalKeydown);
 
   if (canAct && typeof options.onAction === 'function') {
     modal.querySelectorAll('[data-modal-action]').forEach((button) => {
