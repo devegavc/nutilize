@@ -279,8 +279,19 @@ class DashboardUserController extends Controller
     public function toggleStatus(Request $request, int $userId)
     {
         $user = User::findOrFail($userId);
+        $actor = $request->user();
 
-        if (Auth::id() === $user->user_id) {
+        if (!$actor || !$actor->isPhysicalFacilitiesAdmin()) {
+            $message = 'Only a Physical Facilities admin can activate or deactivate accounts.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['ok' => false, 'message' => $message], 403);
+            }
+
+            return redirect()->route('dashboard.users')->with('error', $message);
+        }
+
+        if ((int) $actor->user_id === (int) $user->user_id) {
             $message = 'You cannot change the status of your own account.';
 
             if ($request->expectsJson() || $request->ajax()) {
