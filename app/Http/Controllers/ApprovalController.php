@@ -380,13 +380,57 @@ class ApprovalController extends Controller
             ->value('order_sequence');
         $mySequence = is_null($mySequence) ? 999999 : (int) $mySequence;
 
-        $earlierPending = DB::table('reservation_approvals as ra')
+        $workflowOfficeIds = array_map('intval', $this->resolveWorkflowOfficeIds($reservationId, true));
+        $earlierRows = DB::table('reservation_approvals as ra')
             ->join('offices as offices', 'offices.office_id', '=', 'ra.office_id')
             ->where('ra.reservation_id', $reservationId)
             ->where('ra.office_id', '<>', $officeId)
             ->whereNull('ra.approved_at')
             ->whereRaw('COALESCE(offices.order_sequence, 999999) < ?', [$mySequence])
-            ->exists();
+            ->get(['ra.office_id', 'offices.short_code', 'offices.order_sequence']);
+
+        $blockingOfficeIds = [];
+        $ignoredOfficeIds = [];
+        foreach ($earlierRows as $earlierRow) {
+            $earlierOfficeId = (int) $earlierRow->office_id;
+            if ($workflowOfficeIds !== [] && !in_array($earlierOfficeId, $workflowOfficeIds, true)) {
+                $ignoredOfficeIds[] = $earlierOfficeId;
+                continue;
+            }
+            $blockingOfficeIds[] = $earlierOfficeId;
+        }
+        $earlierPending = $blockingOfficeIds !== [];
+
+        // #region agent log
+        try {
+            $debugPayload = [
+                'sessionId' => 'd19ccb',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'A',
+                'location' => 'ApprovalController.php:isOfficeNextPendingApprover',
+                'message' => 'previous office check',
+                'data' => [
+                    'reservation_id' => $reservationId,
+                    'office_id' => $officeId,
+                    'workflow_office_ids' => $workflowOfficeIds,
+                    'blocking_office_ids' => $blockingOfficeIds,
+                    'ignored_office_ids' => $ignoredOfficeIds,
+                    'allowed' => !$earlierPending,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ];
+            file_put_contents(base_path('debug-d19ccb.log'), json_encode($debugPayload, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+            DB::statement('create table if not exists agent_debug_logs (id bigserial primary key, session_id text not null, hypothesis_id text null, message text not null, context jsonb null, created_at timestamptz not null default now())');
+            DB::table('agent_debug_logs')->insert([
+                'session_id' => 'd19ccb',
+                'hypothesis_id' => 'A',
+                'message' => 'previous office check',
+                'context' => json_encode($debugPayload['data'], JSON_UNESCAPED_SLASHES),
+                'created_at' => now(),
+            ]);
+        } catch (Throwable $exception) {
+        }
+        // #endregion
 
         if (!$earlierPending) {
             Cache::put($cacheKey, $officeId, now()->addMinutes(2));
