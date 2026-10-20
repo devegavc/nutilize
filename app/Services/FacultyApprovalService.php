@@ -119,31 +119,6 @@ class FacultyApprovalService
                 unset(self::$held[(int) $reservationId]);
             }
         }
-
-        $heldNow = 0;
-        foreach ($missing as $id) {
-            if (isset(self::$held[$id])) {
-                $heldNow++;
-            }
-        }
-
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-28e049.log'), json_encode([
-                'sessionId' => '28e049',
-                'runId' => 'faculty-gate',
-                'hypothesisId' => 'H1',
-                'location' => 'FacultyApprovalService.php:prime',
-                'message' => 'faculty hold evaluated',
-                'data' => [
-                    'checked' => count($missing),
-                    'held' => $heldNow,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $exception) {
-        }
-        // #endregion
     }
 
     public static function facultyMatchesReservation(User $faculty, int $reservationId): bool
