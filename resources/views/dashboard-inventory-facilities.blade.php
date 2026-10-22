@@ -21,7 +21,9 @@
   </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
-      <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
+      <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" alt="NU-TILIZE" class="toolbar-logo" />
+
+      @include('partials.office-user-guide')
 
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
@@ -65,7 +67,7 @@
             <table class="inventory-table facilities-inventory-table">
               <thead>
                 <tr>
-                  <th><i class="bi bi-credit-card-2-front-fill"></i> Asset ID</th>
+                  <th><i class="bi bi-credit-card-2-front-fill"></i> ID</th>
                   <th>Room Number</th>
                   <th>Classification</th>
                   <th>Table Type</th>

@@ -8,8 +8,11 @@ use App\Models\User;
 use App\Services\AccountSetupService;
 use App\Services\AdminActivityService;
 use App\Services\ItemOwnerService;
+use App\Services\RegistrationAllowanceService;
 use App\Services\UserAccountStatusService;
 use App\Services\UserNameService;
+use App\Support\RoleCatalog;
+use App\Support\SimpleXlsx;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -22,24 +25,11 @@ class DashboardUserController extends Controller
 {
     public function __construct(private AccountSetupService $accountSetup) {}
 
-    public function index()
+    public function index(Request $request)
     {
         $this->applyInactivityPolicySafely();
 
-        $relations = ['office'];
-        if (Schema::hasTable('academic_programs') && Schema::hasColumn('users', 'program_id')) {
-            $relations[] = 'academicProgram.office';
-        }
-
-        $orderColumn = Schema::hasColumn('users', 'created_at') ? 'created_at' : 'user_id';
-
-        try {
-            $users = User::with($relations)
-                ->orderBy($orderColumn, 'desc')
-                ->get();
-        } catch (QueryException) {
-            $users = User::query()->orderBy($orderColumn, 'desc')->get();
-        }
+        $users = $this->managedUsers();
 
         $offices = Office::orderBy('department_name', 'asc')->get();
 
@@ -49,11 +39,137 @@ class DashboardUserController extends Controller
             $itemOwnerOfficeId = null;
         }
 
+        $roleOffices = [];
+        foreach (RoleCatalog::assignableValues() as $code) {
+            if ($code === 'item_owner') {
+                $roleOffices[$code] = [
+                    'office_id' => $itemOwnerOfficeId,
+                    'label' => 'Item Owner',
+                ];
+                continue;
+            }
+
+            $office = $this->officeForRole($code, $offices);
+            $roleOffices[$code] = [
+                'office_id' => $office?->office_id,
+                'label' => $office ? Office::publicLabel((string) $office->department_name) : null,
+            ];
+        }
+
+        $allowances = RegistrationAllowanceService::page($request->query('allowance_q'));
+        $emails = $allowances->getCollection()->pluck('email')->filter()->values()->all();
+        $registeredEmails = $emails === []
+            ? collect()
+            : \App\Models\User::query()
+                ->whereRaw(
+                    'LOWER(email) IN ('.implode(', ', array_fill(0, count($emails), '?')).')',
+                    $emails
+                )
+                ->pluck('email')
+                ->map(fn ($email) => RegistrationAllowanceService::normalizeEmail((string) $email));
+
         return view('dashboard-users', [
             'users' => $users,
             'offices' => $offices,
             'itemOwnerOfficeId' => $itemOwnerOfficeId,
+            'roleOffices' => $roleOffices,
+            'allowances' => $allowances,
+            'allowanceSearch' => trim((string) $request->query('allowance_q', '')),
+            'allowanceRegistered' => $registeredEmails,
         ]);
+    }
+
+    public function exportRegisteredUsers()
+    {
+        $this->applyInactivityPolicySafely();
+
+        $rows = [[
+            'Email',
+            'Name',
+            'Username',
+            'Role',
+            'Office',
+            'Status',
+        ]];
+
+        foreach ($this->managedUsers() as $user) {
+            $rows[] = [
+                (string) $user->email,
+                $user->displayName(),
+                (string) $user->username,
+                $this->exportRoleLabel($user),
+                $this->exportOfficeLabel($user),
+                $this->exportStatusLabel($user),
+            ];
+        }
+
+        $filename = 'registered-users-'.now()->format('Y-m-d').'.xlsx';
+
+        return response(SimpleXlsx::binary($rows), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    private function managedUsers()
+    {
+        $relations = ['office'];
+        if (Schema::hasTable('academic_programs') && Schema::hasColumn('users', 'program_id')) {
+            $relations[] = 'academicProgram.office';
+        }
+
+        $orderColumn = Schema::hasColumn('users', 'created_at') ? 'created_at' : 'user_id';
+
+        try {
+            return User::with($relations)
+                ->orderBy($orderColumn, 'desc')
+                ->get();
+        } catch (QueryException) {
+            return User::query()->orderBy($orderColumn, 'desc')->get();
+        }
+    }
+
+    private function exportRoleLabel(User $user): string
+    {
+        if (ItemOwnerService::isItemOwnerUser($user)) {
+            return 'ITEM OWNER';
+        }
+
+        $label = strtoupper(RoleCatalog::label((string) $user->role));
+        if ($user->role_needs_review) {
+            $label .= ' (NEEDS REVIEW)';
+        }
+
+        return $label;
+    }
+
+    private function exportOfficeLabel(User $user): string
+    {
+        $officeName = Office::publicLabel((string) ($user->office?->department_name ?? ''));
+        if ($officeName !== '') {
+            return $officeName;
+        }
+
+        $programOfficeName = Office::publicLabel((string) ($user->academicProgram?->office?->department_name ?? ''));
+        if ($programOfficeName !== '') {
+            return $programOfficeName;
+        }
+
+        $programName = trim((string) ($user->academicProgram?->name ?? ''));
+        if ($programName !== '') {
+            return $programName;
+        }
+
+        return 'No Office';
+    }
+
+    private function exportStatusLabel(User $user): string
+    {
+        if (!UserAccountStatusService::isStatusManaged($user)) {
+            return '—';
+        }
+
+        return UserAccountStatusService::isActive($user) ? 'Active' : 'Inactive';
     }
 
     public function store(Request $request)
@@ -65,7 +181,7 @@ class DashboardUserController extends Controller
         $data = $request->validate([
             'username' => 'required|string|max:50|unique:users,username',
             'email' => 'required|email|max:100|unique:users,email',
-            'role' => ['required', Rule::in(['user', 'student', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
+            'role' => ['required', Rule::in(RoleCatalog::assignableValues())],
             'full_name' => 'nullable|string|max:255',
             'office_id' => ['nullable', 'exists:offices,office_id'],
         ]);
@@ -74,6 +190,7 @@ class DashboardUserController extends Controller
         $data = UserNameService::applyToUserData($data);
 
         $user = null;
+        $createdEmailLogin = false;
 
         try {
             [$user, $token] = DB::transaction(function () use ($data) {
@@ -98,18 +215,18 @@ class DashboardUserController extends Controller
                 return [$user, $token];
             });
 
+            $createdEmailLogin = $this->accountSetup->provisionEmailLogin($user);
             $delivery = $this->accountSetup->deliver($user, $token);
-        } catch (AccountSetupDeliveryException) {
-            if ($user) {
-                try {
-                    $user->delete();
-                } catch (\Throwable) {
-                }
-            }
+        } catch (AccountSetupDeliveryException $exception) {
+            $this->accountSetup->discardCreatedAccount($user, $createdEmailLogin);
+
+            $message = $exception->getMessage() === AccountSetupService::EMAIL_LOGIN_FAILED
+                ? 'Account creation failed because the email login could not be created. No account was created.'
+                : 'Account creation failed because the setup email could not be sent. No account was created.';
 
             return redirect()
                 ->route('dashboard.users')
-                ->with('error', 'Account creation failed because the setup email could not be sent. No account was created.');
+                ->with('error', $message);
         }
 
         if ($actorId = (int) (Auth::id() ?? 0)) {
@@ -132,7 +249,7 @@ class DashboardUserController extends Controller
         $data = $request->validate([
             'username' => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($user->user_id, 'user_id')],
             'email' => ['required', 'email', 'max:100', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
-            'role' => ['required', Rule::in(['user', 'student', 'faculty', 'admin', 'pf_admin', 'pc_admin', 'item_owner'])],
+            'role' => ['required', Rule::in(RoleCatalog::assignableValues())],
             'full_name' => 'nullable|string|max:255',
             'office_id' => ['nullable', 'exists:offices,office_id'],
         ]);
@@ -162,8 +279,19 @@ class DashboardUserController extends Controller
     public function toggleStatus(Request $request, int $userId)
     {
         $user = User::findOrFail($userId);
+        $actor = $request->user();
 
-        if (Auth::id() === $user->user_id) {
+        if (!$actor || !$actor->isPhysicalFacilitiesAdmin()) {
+            $message = 'Only a Physical Facilities admin can activate or deactivate accounts.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['ok' => false, 'message' => $message], 403);
+            }
+
+            return redirect()->route('dashboard.users')->with('error', $message);
+        }
+
+        if ((int) $actor->user_id === (int) $user->user_id) {
             $message = 'You cannot change the status of your own account.';
 
             if ($request->expectsJson() || $request->ajax()) {
@@ -174,7 +302,7 @@ class DashboardUserController extends Controller
         }
 
         if (!UserAccountStatusService::isStatusManaged($user)) {
-            $message = 'Admin accounts do not use active/inactive status.';
+            $message = 'This account cannot be activated or deactivated.';
 
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['ok' => false, 'message' => $message], 422);
@@ -263,21 +391,69 @@ class DashboardUserController extends Controller
      */
     private function normalizeRolePayload(array $data): array
     {
-        if (($data['role'] ?? '') !== 'item_owner') {
+        $role = (string) ($data['role'] ?? '');
+
+        if ($role === 'item_owner') {
+            $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
+
+            if (is_null($itemOwnerOfficeId)) {
+                throw ValidationException::withMessages([
+                    'role' => 'The Item Owner office is not configured in the system.',
+                ]);
+            }
+
+            $data['role'] = 'admin';
+            $data['office_id'] = $itemOwnerOfficeId;
+
             return $data;
         }
 
-        $itemOwnerOfficeId = ItemOwnerService::itemOwnerOfficeId();
+        $canonical = RoleCatalog::canonicalCode($role) ?? $role;
+        $data['role'] = $canonical;
+        $linked = RoleCatalog::linkedOffice($canonical);
 
-        if (is_null($itemOwnerOfficeId)) {
+        if ($linked['kind'] === 'none') {
+            $data['office_id'] = null;
+
+            return $data;
+        }
+
+        $office = $this->officeForRole($canonical);
+        if ($office === null) {
             throw ValidationException::withMessages([
-                'role' => 'The Item Owner office is not configured in the system.',
+                'role' => 'No office is configured for this role.',
             ]);
         }
 
-        $data['role'] = 'admin';
-        $data['office_id'] = $itemOwnerOfficeId;
+        $data['office_id'] = (int) $office->office_id;
 
         return $data;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Office>|null  $offices
+     */
+    private function officeForRole(string $role, $offices = null): ?Office
+    {
+        $linked = RoleCatalog::linkedOffice($role);
+        $offices ??= Office::query()->get();
+
+        if ($linked['kind'] === 'department') {
+            $name = strtolower(trim((string) $linked['department_name']));
+
+            return $offices->first(
+                fn (Office $office): bool => strtolower(trim((string) $office->department_name)) === $name
+            );
+        }
+
+        if ($linked['kind'] === 'short_code') {
+            $short = strtoupper(trim((string) $linked['short_code']));
+
+            return $offices->first(
+                fn (Office $office): bool => strtoupper(trim((string) $office->short_code)) === $short
+            );
+        }
+
+        return null;
     }
 }

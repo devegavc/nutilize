@@ -26,7 +26,9 @@
   </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
-      <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
+      <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" alt="NU-TILIZE" class="toolbar-logo" />
+
+      @include('partials.office-user-guide')
 
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
@@ -56,7 +58,7 @@
           </div>
           <div class="request-date-row">
             <span class="today">Today</span>
-            <span class="date">{{ now()->format('F j, Y') }}</span>
+            <span class="date">{{ now('Asia/Manila')->format('F j, Y') }}</span>
           </div>
         </section>
 
@@ -79,6 +81,21 @@
       </header>
       <div class="inventory-confirm-body">
         <p id="inventory-confirm-message">Are you sure you want to perform this action? This action cannot be undone.</p>
+        <div class="inventory-confirm-targets" id="inventory-confirm-targets" hidden>
+          <p class="inventory-confirm-targets-label" id="inventory-confirm-targets-label">Which item was damaged?</p>
+          <div class="inventory-confirm-target-list" id="inventory-confirm-target-list"></div>
+        </div>
+        <div class="inventory-confirm-proof" id="inventory-confirm-proof" hidden>
+          <label class="inventory-confirm-proof-label" for="inventory-confirm-proof-input">
+            Damage proof photo <span>(optional)</span>
+          </label>
+          <input id="inventory-confirm-proof-input"
+                 class="inventory-confirm-proof-input"
+                 type="file"
+                 accept="image/jpeg,image/png,image/webp,image/gif">
+          <p class="inventory-confirm-proof-hint" id="inventory-confirm-proof-hint">JPG, PNG, WEBP, or GIF up to 5 MB. You can continue without a photo.</p>
+          <img id="inventory-confirm-proof-preview" class="inventory-confirm-proof-preview" alt="" hidden>
+        </div>
       </div>
       <div class="inventory-confirm-actions">
         <button type="button" class="inventory-confirm-btn cancel" id="inventory-confirm-cancel">Cancel</button>

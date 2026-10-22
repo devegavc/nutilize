@@ -483,15 +483,47 @@ body:has(.home-dashboard-card) .home-dashboard-card {
 }
 
 .quick-report-footer-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
   margin-right: auto;
+  padding: 8px 14px;
+  border: 1px solid #d5dced;
+  border-radius: 8px;
+  background: #f4f6fb;
   color: #2f3f88;
+  font-family: inherit;
   font-size: 0.9rem;
   font-weight: 700;
+  line-height: 1.2;
   text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.quick-report-footer-link i {
+  flex: 0 0 auto;
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .quick-report-footer-link:hover {
-  text-decoration: underline;
+  background: #e7ebf8;
+  border-color: #c5cee4;
+  color: #243274;
+}
+
+.quick-report-footer-link:focus-visible {
+  outline: 2px solid #38479c;
+  outline-offset: 2px;
+}
+
+.quick-report-footer-link:active {
+  background: #dde3f4;
+  border-color: #b7c2de;
 }
 
 .quick-report-footer-close {
@@ -525,7 +557,8 @@ body:has(.home-dashboard-card) .home-dashboard-card {
   }
 
   .quick-report-footer-link {
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     margin-right: 0;
   }
 }

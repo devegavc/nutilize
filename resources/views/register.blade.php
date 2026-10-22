@@ -32,7 +32,7 @@
     <!-- Register card -->
     <div class="login-card mx-auto">
       <div class="brand-area text-center">
-        <img src="/img/nutilize_logo.png" 
+        <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" 
              alt="NUTilize Logo" 
              class="brand-logo">
         <p class="brand-subtitle mt-2 mb-4">

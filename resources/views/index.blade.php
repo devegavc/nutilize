@@ -12,23 +12,20 @@
   <link rel="preload" href="/fonts/poppins-800.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="/fonts/poppins-400.woff2" as="font" type="font/woff2" crossorigin />
 
-  <link rel="stylesheet" href="/css/landing.css?v=11" />
+  <link rel="stylesheet" href="/css/landing.css?v=13" />
 </head>
 <body>
   <header class="top-header">
     <div class="header-inner">
       <a href="/" class="brand" aria-label="NU-TILIZE home">
-        <picture>
-          <source srcset="/img/nutilize_logo.webp" type="image/webp" />
-          <img
-            src="/img/nutilize_logo.png"
+        <img
+            src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}"
             alt="NU-TILIZE"
             class="brand-logo"
             width="146"
             height="49"
             decoding="async"
           />
-        </picture>
       </a>
 
       <button
@@ -48,7 +45,7 @@
         <a href="#facilities" class="nav-link">Facilities</a>
         <a href="#about" class="nav-link">About</a>
         <a href="#contact" class="nav-link">Contact</a>
-        <a href="/login" class="login-btn">Login</a>
+        <a href="/data-privacy" class="login-btn">Login</a>
       </nav>
     </div>
   </header>
@@ -77,7 +74,7 @@
       </div>
 
       <div class="hero-actions">
-        <a href="/login" class="cta-btn">Get Started</a>
+        <a href="/data-privacy" class="cta-btn">Get Started</a>
         <a
           href="https://play.google.com/apps/internaltest/4701385867618457904"
           class="cta-btn cta-btn-secondary"
@@ -140,24 +137,21 @@
             </div>
           </div>
 
-          <!-- Computer Lab Card -->
+          <!-- Student Lobby Card -->
           <div class="facility-card">
             <div class="facility-image">
-              <picture>
-                <source srcset="/img/nu_comlab.webp" type="image/webp" />
-                <img
-                  src="/img/nu_comlab.jpg"
-                  alt="Computer Lab"
-                  width="800"
-                  height="600"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </picture>
+              <img
+                src="/img/nu_lobby.jpg"
+                alt="Student Lobby"
+                width="480"
+                height="480"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
             <div class="facility-info">
-              <h3 class="facility-name">COMPUTER LAB</h3>
-              <p class="facility-description">Technology-equipped computer laboratories designed to support programming, research, multimedia activities, and collaborative learning sessions.</p>
+              <h3 class="facility-name">STUDENT LOBBY</h3>
+              <p class="facility-description">A welcoming common area where students can gather, wait between classes, and interact, providing a convenient space for everyday campus activities.</p>
             </div>
           </div>
         </div>

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AcademicTerm;
 use App\Services\DashboardInventoryCacheService;
+use App\Services\EquipmentDemandAnalyticsService;
 use App\Services\ItemOwnerService;
 use App\Services\ItemUnitService;
 use App\Support\InventoryInput;
@@ -20,6 +22,14 @@ class DashboardInventoryController extends Controller
 {
     private ?array $equipmentCategoriesCache = null;
 
+    private function formatMaintenanceDate(mixed $raw): string
+    {
+        $rawString = ($raw !== null && $raw !== '') ? (string) $raw : '';
+        $timestamp = $rawString !== '' ? strtotime($rawString) : false;
+
+        return $timestamp ? date('m/d/Y', $timestamp) : date('m/d/Y');
+    }
+
     public function index()
     {
         return view('dashboard-inventory', DashboardInventoryCacheService::getInventoryData());
@@ -31,6 +41,97 @@ class DashboardInventoryController extends Controller
         $compareMonth = $this->resolveCompareMonth($request->query('compare'), $selectedMonth);
 
         return view('dashboard-inventory-analytics', DashboardInventoryCacheService::getAnalyticsData($selectedMonth, $compareMonth));
+    }
+
+    public function equipmentDemand(Request $request): JsonResponse
+    {
+        return $this->equipmentDemandResponse(function () use ($request) {
+            return EquipmentDemandAnalyticsService::dashboard($request->query());
+        });
+    }
+
+    public function storeAcademicYear(Request $request): JsonResponse
+    {
+        $academicYear = trim((string) $request->validate([
+            'academic_year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
+        ])['academic_year']);
+
+        [$start, $end] = array_map('intval', explode('-', $academicYear));
+        if ($end !== $start + 1) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'academic_year' => 'Use a year span such as 2026-2027.',
+            ]);
+        }
+
+        if (AcademicTerm::query()->where('academic_year', $academicYear)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'academic_year' => 'That academic year already has its three terms.',
+            ]);
+        }
+
+        EquipmentDemandAnalyticsService::createAcademicYear($academicYear);
+        $terms = EquipmentDemandAnalyticsService::listTerms();
+        $created = array_values(array_filter(
+            $terms,
+            static fn (array $term): bool => $term['academic_year'] === $academicYear
+        ));
+
+        return response()->json([
+            'ok' => true,
+            'term' => $created[0] ?? null,
+            'terms' => $terms,
+        ]);
+    }
+
+    public function updateAcademicTerm(Request $request, AcademicTerm $term): JsonResponse
+    {
+        $validated = $request->validate([
+            'starts_on' => ['nullable', 'date'],
+            'ends_on' => ['nullable', 'date'],
+        ]);
+
+        $startsOn = !empty($validated['starts_on'])
+            ? Carbon::parse($validated['starts_on'])->toDateString()
+            : null;
+        $endsOn = !empty($validated['ends_on'])
+            ? Carbon::parse($validated['ends_on'])->toDateString()
+            : null;
+
+        if ($startsOn !== null && $endsOn !== null && $endsOn < $startsOn) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'ends_on' => 'The end date must be on or after the start date.',
+            ]);
+        }
+
+        if ($startsOn !== null && $endsOn !== null && Carbon::parse($startsOn)->diffInDays(Carbon::parse($endsOn), true) > 800) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'ends_on' => 'A term cannot be longer than 800 days.',
+            ]);
+        }
+
+        $term = EquipmentDemandAnalyticsService::saveTermDates($term, $startsOn, $endsOn);
+
+        return response()->json([
+            'ok' => true,
+            'term' => EquipmentDemandAnalyticsService::presentTerm($term),
+            'terms' => EquipmentDemandAnalyticsService::listTerms(),
+        ]);
+    }
+
+    private function equipmentDemandResponse(callable $callback): JsonResponse
+    {
+        try {
+            return response()->json($callback());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'ok' => false,
+                'message' => 'The equipment report could not be loaded.',
+            ], 500);
+        }
     }
 
     private function resolveMonth(?string $monthValue): Carbon
@@ -462,6 +563,7 @@ class DashboardInventoryController extends Controller
             ->leftJoin('items', 'items.item_id', '=', 'item_units.item_id')
             ->select([
                 'item_units.unit_id',
+                'item_units.item_id',
                 'item_units.unit_code',
                 'item_units.status',
                 'item_units.condition_notes',
@@ -487,6 +589,7 @@ class DashboardInventoryController extends Controller
         $unitsNeedingAttention = $unitQuery
             ->orderByDesc('item_units.updated_at')
             ->get();
+        $reportersByUnit = $this->reporterNamesForUnits($unitsNeedingAttention);
 
         foreach ($unitsNeedingAttention as $unit) {
             $category = $this->normalizeCategory((string) ($unit->category ?? $unit->category_key ?? $unit->category_display ?? 'multimedia'));
@@ -494,7 +597,7 @@ class DashboardInventoryController extends Controller
             $tab = $isDamaged ? 'damaged' : 'maintenance';
 
             $dateSource = $unit->last_maintenance_at ?? $unit->unit_updated_at ?? $unit->unit_created_at;
-            $dateLabel = $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y');
+            $dateLabel = $this->formatMaintenanceDate($dateSource);
 
             $rowsByTab[$tab][] = [
                 'row_type' => 'unit',
@@ -507,6 +610,7 @@ class DashboardInventoryController extends Controller
                 'statusClass' => $isDamaged ? 'damaged' : 'maintenance',
                 'location' => $this->locationFromCategory($category),
                 'reason' => (string) ($unit->condition_notes ?? ''),
+                'reporter' => $reportersByUnit[(int) $unit->unit_id] ?? '',
             ];
         }
 
@@ -525,10 +629,12 @@ class DashboardInventoryController extends Controller
                     'issues.status',
                     'issues.created_at',
                     'reservations.activity_name',
-                    'users.full_name as reporter_full_name',
-                    'users.first_name as reporter_first_name',
-                    'users.last_name as reporter_last_name',
-                    'users.username as reporter_username',
+                    'users.first_name',
+                    'users.middle_initial',
+                    'users.last_name',
+                    'users.suffix',
+                    'users.full_name',
+                    'users.username',
                 ])
                 ->orderByDesc('issues.created_at');
 
@@ -540,20 +646,12 @@ class DashboardInventoryController extends Controller
             }
 
             $issueRows = $issueQuery->limit(100)->get();
+            $namesByEmail = $this->personNamesByEmail($issueRows->pluck('reported_by')->all());
 
             foreach ($issueRows as $issue) {
                 $description = trim((string) ($issue->description ?? ''));
                 $itemLabel = $this->itemLabelFromReservationIssue($description, (string) ($issue->activity_name ?? ''));
-
-                $reporterName = trim((string) ($issue->reporter_full_name ?? ''));
-                if ($reporterName === '') {
-                    $first = trim((string) ($issue->reporter_first_name ?? ''));
-                    $last = trim((string) ($issue->reporter_last_name ?? ''));
-                    $reporterName = trim("{$first} {$last}");
-                }
-                if ($reporterName === '') {
-                    $reporterName = trim((string) ($issue->reported_by ?? $issue->reporter_username ?? 'Unknown'));
-                }
+                $reporterName = $this->reporterNameFromRow($issue, $namesByEmail);
 
                 $proofUrl = trim((string) ($issue->image_url ?? ''));
                 if ($proofUrl !== '' && !preg_match('#^https?://#i', $proofUrl)) {
@@ -574,7 +672,7 @@ class DashboardInventoryController extends Controller
                     'id' => $displayId,
                     'item' => $itemLabel,
                     'count' => '1',
-                    'date' => $dateValue ? date('d/m/Y', strtotime((string) $dateValue)) : date('d/m/Y'),
+                    'date' => $this->formatMaintenanceDate($dateValue),
                     'status' => 'Reported',
                     'statusClass' => 'reported',
                     'location' => 'Reservation',
@@ -600,28 +698,24 @@ class DashboardInventoryController extends Controller
                         'issues.status',
                         'issues.created_at',
                         'reservations.activity_name',
-                        'users.full_name as reporter_full_name',
-                        'users.first_name as reporter_first_name',
-                        'users.last_name as reporter_last_name',
-                        'users.username as reporter_username',
+                        'users.first_name',
+                        'users.middle_initial',
+                        'users.last_name',
+                        'users.suffix',
+                        'users.full_name',
+                        'users.username',
                     ])
                     ->whereRaw("LOWER(COALESCE(issues.status, '')) IN ('resolved', 'solved', 'fixed', 'closed', 'done', 'dismissed', 'addressed')")
                     ->orderByDesc('issues.created_at')
                     ->limit(100);
 
-                foreach ($addressedIssueQuery->get() as $issue) {
+                $addressedIssueRows = $addressedIssueQuery->get();
+                $addressedNamesByEmail = $this->personNamesByEmail($addressedIssueRows->pluck('reported_by')->all());
+
+                foreach ($addressedIssueRows as $issue) {
                     $description = trim((string) ($issue->description ?? ''));
                     $itemLabel = $this->itemLabelFromReservationIssue($description, (string) ($issue->activity_name ?? ''));
-
-                    $reporterName = trim((string) ($issue->reporter_full_name ?? ''));
-                    if ($reporterName === '') {
-                        $first = trim((string) ($issue->reporter_first_name ?? ''));
-                        $last = trim((string) ($issue->reporter_last_name ?? ''));
-                        $reporterName = trim("{$first} {$last}");
-                    }
-                    if ($reporterName === '') {
-                        $reporterName = trim((string) ($issue->reported_by ?? $issue->reporter_username ?? 'Unknown'));
-                    }
+                    $reporterName = $this->reporterNameFromRow($issue, $addressedNamesByEmail);
 
                     $proofUrl = trim((string) ($issue->image_url ?? ''));
                     if ($proofUrl !== '' && !preg_match('#^https?://#i', $proofUrl)) {
@@ -642,7 +736,7 @@ class DashboardInventoryController extends Controller
                         'id' => $displayId,
                         'item' => $itemLabel,
                         'count' => '1',
-                        'date' => $dateValue ? date('d/m/Y', strtotime((string) $dateValue)) : date('d/m/Y'),
+                        'date' => $this->formatMaintenanceDate($dateValue),
                         'status' => 'Addressed',
                         'statusClass' => 'addressed',
                         'location' => 'Reservation',
@@ -710,11 +804,15 @@ class DashboardInventoryController extends Controller
                 }
 
                 $proofUrl = trim((string) ($report->proof_image_url ?? ''));
-                if ($proofUrl !== '' && !str_starts_with($proofUrl, 'http')) {
+                $isLocalDamageProof = $proofUrl !== '' && str_contains($proofUrl, '/uploads/damage-proofs/');
+                if ($proofUrl !== '' && !$isLocalDamageProof && !str_starts_with($proofUrl, 'http')) {
                     $proofUrl = '';
                 }
 
-                if ($proofUrl !== '') {
+                if ($isLocalDamageProof) {
+                    $proofPath = parse_url($proofUrl, PHP_URL_PATH);
+                    $proofUrl = is_string($proofPath) && $proofPath !== '' ? $proofPath : $proofUrl;
+                } elseif ($proofUrl !== '') {
                     $filename = basename(parse_url($proofUrl, PHP_URL_PATH) ?: '');
                     if ($filename !== '') {
                         $proofUrl = route('dashboard.storage.proof', ['filename' => $filename]);
@@ -730,7 +828,7 @@ class DashboardInventoryController extends Controller
                     'id' => 'report_' . (int) $report->report_id,
                     'item' => $itemLabel,
                     'count' => '1',
-                    'date' => $dateValue ? date('d/m/Y', strtotime((string) $dateValue)) : date('d/m/Y'),
+                    'date' => $this->formatMaintenanceDate($dateValue),
                     'status' => 'Reported',
                     'statusClass' => 'reported',
                     'location' => strpos($itemLabel, 'Room ') === 0 ? 'Room' : 'Reported',
@@ -760,7 +858,7 @@ class DashboardInventoryController extends Controller
 
             foreach ($roomMaintenanceRows as $row) {
                 $dateSource = $row->updated_at ?? $row->created_at;
-                $dateLabel = $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y');
+                $dateLabel = $this->formatMaintenanceDate($dateSource);
 
                 $rowsByTab['damaged'][] = [
                     'row_type' => 'room',
@@ -784,7 +882,7 @@ class DashboardInventoryController extends Controller
 
             foreach ($roomRows as $room) {
                 $dateSource = $room->updated_at ?? $room->created_at;
-                $dateLabel = $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y');
+                $dateLabel = $this->formatMaintenanceDate($dateSource);
 
                 $rowsByTab['maintenance'][] = [
                     'row_type' => 'room',
@@ -845,7 +943,7 @@ class DashboardInventoryController extends Controller
                     'id' => ($isRoom ? 'room_' : 'mnt_') . (int) $row->maintenance_id,
                     'item' => $itemLabel,
                     'count' => '1',
-                    'date' => $dateSource ? date('d/m/Y', strtotime((string) $dateSource)) : date('d/m/Y'),
+                    'date' => $this->formatMaintenanceDate($dateSource),
                     'status' => 'Addressed',
                     'statusClass' => 'addressed',
                     'location' => $isRoom ? 'Room' : 'Item',
@@ -946,7 +1044,7 @@ class DashboardInventoryController extends Controller
                 'id' => (string) $unit->unit_code,
                 'item' => (string) $unit->item_name,
                 'count' => '1',
-                'date' => date('d/m/Y'),
+                'date' => $this->formatMaintenanceDate(null),
                 'status' => $isDamaged ? 'Damaged' : 'Maintenance',
                 'statusClass' => $isDamaged ? 'damaged' : 'maintenance',
                 'location' => $this->locationFromCategory($normalizedCategory),
@@ -1004,7 +1102,7 @@ class DashboardInventoryController extends Controller
                 'id' => 'room_' . $roomId,
                 'item' => 'Room ' . trim((string) ($room->room_number ?? '')),
                 'count' => '1',
-                'date' => date('d/m/Y'),
+                'date' => $this->formatMaintenanceDate(null),
                 'status' => $isFixed ? 'Good' : ($validated['status'] === 'damaged' ? 'Damaged' : 'Maintenance'),
                 'statusClass' => $isFixed ? 'maintenance' : ($validated['status'] === 'damaged' ? 'damaged' : 'maintenance'),
                 'location' => 'Room',
@@ -1644,6 +1742,202 @@ class DashboardInventoryController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Person who filed an issue against each unit, keyed by unit_id.
+     *
+     * @param  \Illuminate\Support\Collection<int, object>  $units
+     * @return array<int, string>
+     */
+    private function reporterNamesForUnits($units): array
+    {
+        if ($units->isEmpty() || !Schema::hasTable('reservation_issues')) {
+            return [];
+        }
+
+        $issueQuery = DB::table('reservation_issues as issues')
+            ->leftJoin('users as users', 'users.user_id', '=', 'issues.user_id')
+            ->select([
+                'issues.issue_id',
+                'issues.reservation_id',
+                'issues.reported_by',
+                'issues.description',
+                'users.first_name',
+                'users.middle_initial',
+                'users.last_name',
+                'users.suffix',
+                'users.full_name',
+                'users.username',
+            ])
+            ->orderByDesc('issues.created_at')
+            ->limit(200);
+
+        if (Schema::hasColumn('reservation_issues', 'reported_items')) {
+            $issueQuery->addSelect('issues.reported_items');
+        }
+
+        $issues = $issueQuery->get();
+        if ($issues->isEmpty()) {
+            return [];
+        }
+
+        $namesByEmail = $this->personNamesByEmail($issues->pluck('reported_by')->all());
+        $nameByIssue = [];
+        foreach ($issues as $issue) {
+            $nameByIssue[(int) $issue->issue_id] = $this->reporterNameFromRow($issue, $namesByEmail);
+        }
+
+        $nameByItem = [];
+        if (Schema::hasTable('reservation_details') && Schema::hasTable('reservation_items')) {
+            $reservationIds = $issues
+                ->pluck('reservation_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn (int $id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($reservationIds !== []) {
+                $newestIssueByReservation = [];
+                foreach ($issues as $issue) {
+                    $reservationId = (int) ($issue->reservation_id ?? 0);
+                    if ($reservationId > 0 && !isset($newestIssueByReservation[$reservationId])) {
+                        $newestIssueByReservation[$reservationId] = $issue;
+                    }
+                }
+
+                $lines = DB::table('reservation_details as details')
+                    ->join('reservation_items as booked', 'booked.reservation_items_id', '=', 'details.reservation_items_id')
+                    ->whereIn('details.reservation_id', $reservationIds)
+                    ->get(['details.reservation_id', 'booked.item_id']);
+
+                foreach ($lines as $line) {
+                    $itemId = (int) ($line->item_id ?? 0);
+                    $issue = $newestIssueByReservation[(int) ($line->reservation_id ?? 0)] ?? null;
+                    if ($itemId <= 0 || !$issue || isset($nameByItem[$itemId])) {
+                        continue;
+                    }
+
+                    $name = $nameByIssue[(int) $issue->issue_id] ?? '';
+                    if ($name !== '') {
+                        $nameByItem[$itemId] = $name;
+                    }
+                }
+            }
+        }
+
+        $names = [];
+        foreach ($units as $unit) {
+            $unitId = (int) ($unit->unit_id ?? 0);
+            if ($unitId <= 0) {
+                continue;
+            }
+
+            $itemId = (int) ($unit->item_id ?? 0);
+            if ($itemId > 0 && !empty($nameByItem[$itemId])) {
+                $names[$unitId] = $nameByItem[$itemId];
+                continue;
+            }
+
+            $unitCode = strtolower(trim((string) ($unit->unit_code ?? '')));
+            $itemName = strtolower(trim((string) ($unit->item_name ?? '')));
+            foreach ($issues as $issue) {
+                $haystack = strtolower(trim(
+                    (string) ($issue->description ?? '') . ' ' . (string) ($issue->reported_items ?? '')
+                ));
+                $codeHit = $unitCode !== '' && str_contains($haystack, $unitCode);
+                $nameHit = $itemName !== '' && mb_strlen($itemName) >= 4 && str_contains($haystack, $itemName);
+                if (!$codeHit && !$nameHit) {
+                    continue;
+                }
+
+                $name = $nameByIssue[(int) $issue->issue_id] ?? '';
+                if ($name !== '') {
+                    $names[$unitId] = $name;
+                }
+                break;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param  array<int, mixed>  $emails
+     * @return array<string, string>
+     */
+    private function personNamesByEmail(array $emails): array
+    {
+        $emails = array_values(array_unique(array_filter(array_map(static function ($email): string {
+            $email = strtolower(trim((string) $email));
+
+            return str_contains($email, '@') ? $email : '';
+        }, $emails))));
+
+        if ($emails === [] || !Schema::hasTable('users')) {
+            return [];
+        }
+
+        $users = DB::table('users')
+            ->where(function ($query) use ($emails) {
+                $query->whereIn(DB::raw('LOWER(email)'), $emails)
+                    ->orWhereIn(DB::raw('LOWER(username)'), $emails);
+            })
+            ->get(['first_name', 'middle_initial', 'last_name', 'suffix', 'full_name', 'username', 'email']);
+
+        $names = [];
+        foreach ($users as $user) {
+            $name = trim(\App\Models\User::formatDisplayName($user, ''));
+            if (!$this->isPersonName($name)) {
+                continue;
+            }
+
+            foreach (['email', 'username'] as $field) {
+                $key = strtolower(trim((string) ($user->{$field} ?? '')));
+                if ($key !== '' && str_contains($key, '@')) {
+                    $names[$key] = $name;
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param  array<string, string>  $namesByEmail
+     */
+    private function reporterNameFromRow(object $row, array $namesByEmail = []): string
+    {
+        $name = trim(\App\Models\User::formatDisplayName($row, ''));
+        if ($this->isPersonName($name)) {
+            return $name;
+        }
+
+        $stored = trim((string) ($row->reported_by ?? ''));
+        if ($this->isPersonName($stored)) {
+            return $stored;
+        }
+
+        $email = str_contains($stored, '@')
+            ? strtolower($stored)
+            : (str_contains($name, '@') ? strtolower($name) : '');
+        if ($email !== '' && $this->isPersonName($namesByEmail[$email] ?? '')) {
+            return $namesByEmail[$email];
+        }
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        return $stored !== '' ? $stored : 'Unknown';
+    }
+
+    private function isPersonName(string $name): bool
+    {
+        $name = trim($name);
+
+        return $name !== '' && strcasecmp($name, 'Unknown') !== 0 && !str_contains($name, '@');
     }
 
     private function itemLabelFromReservationIssue(string $description, string $activityName = ''): string

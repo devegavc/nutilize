@@ -35,7 +35,7 @@ class DashboardInventoryCacheService
         $monthEnd = $selectedMonth->copy()->endOfMonth();
         $compareStart = $compareMonth->copy()->startOfMonth();
         $compareEnd = $compareMonth->copy()->endOfMonth();
-        $cacheKey = 'dashboard.inventory.analytics.v5.'
+        $cacheKey = 'dashboard.inventory.analytics.v6.'
             . $monthStart->format('Y-m') . '.'
             . $compareStart->format('Y-m');
 
@@ -59,6 +59,9 @@ class DashboardInventoryCacheService
             $compareNewUsers = self::countNewUsers($compareStart, $compareEnd);
 
             [$yearLabels, $trendCounts] = self::getMonthlyTrend($selectedMonth);
+            $roomCurrent = RoomInsightsService::build($monthStart, $monthEnd);
+            $roomCompare = RoomInsightsService::build($compareStart, $compareEnd);
+            $roomTrendCounts = RoomInsightsService::monthlyTrend($selectedMonth);
 
             return array_merge([
                 'periodLabel' => $monthStart->format('F Y'),
@@ -113,7 +116,9 @@ class DashboardInventoryCacheService
                 'topItems' => self::getTopBorrowedItems(8, $monthStart, $monthEnd),
                 'shareItems' => self::getShareBorrowedItems(8, $monthStart, $monthEnd),
                 'topBorrowers' => self::getTopBorrowers(8, $monthStart, $monthEnd),
-            ], InventoryInsightsService::build($monthStart, $monthEnd));
+                'roomCompareBookings' => $roomCompare['roomBookings'] ?? null,
+                'roomTrendCounts' => $roomTrendCounts,
+            ], InventoryInsightsService::build($monthStart, $monthEnd), $roomCurrent);
         });
 
         $canGoNext = $monthStart->lt(now()->startOfMonth());
@@ -576,6 +581,7 @@ class DashboardInventoryCacheService
                 Cache::forget('dashboard.inventory.analytics.v3.' . $monthKey . '.' . $compareKey);
                 Cache::forget('dashboard.inventory.analytics.v4.' . $monthKey . '.' . $compareKey);
                 Cache::forget('dashboard.inventory.analytics.v5.' . $monthKey . '.' . $compareKey);
+                Cache::forget('dashboard.inventory.analytics.v6.' . $monthKey . '.' . $compareKey);
             }
 
             $cursor->subMonth();

@@ -9,6 +9,7 @@ use App\Models\AccountSetupTokenRedemption;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -26,6 +27,8 @@ class AccountSetupService
     public const TOKEN_EXPIRED = 'expired';
 
     public const TOKEN_USED = 'used';
+
+    public const EMAIL_LOGIN_FAILED = 'email_login_failed';
 
     private const SETUP_SETTING = 'nutilize.setup_token';
 
@@ -82,6 +85,76 @@ class AccountSetupService
         }
 
         return self::DELIVERY_SENT;
+    }
+
+    /**
+     * Create the Supabase email login for an admin-created account.
+     * Returns true when a new auth user was inserted.
+     */
+    public function provisionEmailLogin(User $user): bool
+    {
+        $email = strtolower(trim((string) $user->email));
+
+        try {
+            $existed = $this->findAuthUserId($email) !== '';
+            $this->syncMobileLogin($user, $this->unknownPassword());
+        } catch (AccountSetupDeliveryException) {
+            throw new AccountSetupDeliveryException(self::EMAIL_LOGIN_FAILED);
+        } catch (QueryException) {
+            throw new AccountSetupDeliveryException(self::EMAIL_LOGIN_FAILED);
+        }
+
+        return !$existed;
+    }
+
+    public function discardCreatedAccount(?User $user, bool $createdEmailLogin): void
+    {
+        if (!$user) {
+            return;
+        }
+
+        $deleted = false;
+
+        try {
+            $user->delete();
+            $deleted = true;
+        } catch (\Throwable) {
+        }
+
+        if ($deleted && $createdEmailLogin) {
+            $this->removeEmailLogin($user);
+        }
+    }
+
+    private function removeEmailLogin(User $user): void
+    {
+        $email = strtolower(trim((string) $user->email));
+        $authUserId = $this->findAuthUserId($email);
+        $base = rtrim((string) config('services.supabase.url'), '/');
+        $key = (string) config('services.supabase.service_role_key');
+
+        if ($authUserId === '' || $base === '' || $key === '') {
+            return;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'apikey' => $key,
+                'Authorization' => 'Bearer '.$key,
+            ])->acceptJson()->timeout(20)->delete($base.'/auth/v1/admin/users/'.$authUserId);
+
+            if (!$response->successful()) {
+                Log::warning('Email login could not be removed after account creation failed.', [
+                    'user_id' => $user->user_id,
+                    'status' => $response->status(),
+                ]);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Email login could not be removed after account creation failed.', [
+                'user_id' => $user->user_id,
+                'exception' => $exception::class,
+            ]);
+        }
     }
 
     public function successMessage(string $delivery): string
@@ -178,6 +251,8 @@ class AccountSetupService
 
                 DB::select('select set_config(?, ?, true)', [self::SETUP_SETTING, $token]);
 
+                $this->syncMobileLogin($user, $password);
+
                 $user->password = $password;
                 $user->save();
 
@@ -197,6 +272,59 @@ class AccountSetupService
 
             throw new AccountSetupDeliveryException('save_failed');
         }
+    }
+
+    private function syncMobileLogin(User $user, string $password): string
+    {
+        $base = rtrim((string) config('services.supabase.url'), '/');
+        $key = (string) config('services.supabase.service_role_key');
+        $email = strtolower(trim((string) $user->email));
+
+        if ($base === '' || $key === '' || $email === '') {
+            throw new AccountSetupDeliveryException('save_failed');
+        }
+
+        $existingId = $this->findAuthUserId($email);
+
+        $request = Http::withHeaders([
+            'apikey' => $key,
+            'Authorization' => 'Bearer '.$key,
+        ])->acceptJson()->asJson()->timeout(20);
+
+        if ($existingId !== '') {
+            $response = $request->put($base.'/auth/v1/admin/users/'.$existingId, [
+                'password' => $password,
+                'email_confirm' => true,
+            ]);
+            $authUserId = $existingId;
+        } else {
+            $response = $request->post($base.'/auth/v1/admin/users', [
+                'email' => $email,
+                'password' => $password,
+                'email_confirm' => true,
+            ]);
+            $authUserId = (string) $response->json('id');
+        }
+
+        if (!$response->successful() || $authUserId === '') {
+            throw new AccountSetupDeliveryException('save_failed');
+        }
+
+        return $authUserId;
+    }
+
+    private function findAuthUserId(string $email): string
+    {
+        if ($email === '') {
+            return '';
+        }
+
+        $existing = DB::selectOne(
+            'select id::text as id from auth.users where lower(email) = ? limit 1',
+            [$email]
+        );
+
+        return is_object($existing) ? (string) ($existing->id ?? '') : '';
     }
 
     private function tokenFormatIsValid(string $token): bool

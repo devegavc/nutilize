@@ -26,4 +26,20 @@ class Office extends Model
     {
         return strtolower($this->department_name) === 'physical facilities';
     }
+
+    public static function publicLabel(?string $label): string
+    {
+        $value = trim((string) $label);
+        $key = strtolower($value);
+
+        if (in_array($key, ['do', 'sdo', 'student discipline office', 'discipline office'], true)) {
+            return 'Safety';
+        }
+
+        if (in_array($key, ['do admin', 'sdo admin'], true)) {
+            return 'Safety Admin';
+        }
+
+        return $value;
+    }
 }

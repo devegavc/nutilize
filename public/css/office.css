@@ -1,4 +1,4 @@
-@import url("./dashboard.css?v=20260929-office-card-align");
+@import url("./dashboard.css?v=20261020-hide-consent");
 
 :root {
 	--office-panel-bg: linear-gradient(180deg, #f4f6ff 0%, #e8ebf8 100%);
@@ -491,10 +491,30 @@
 }
 
 .office-request-history-table .office-queue-requester {
-	max-width: 180px;
+	max-width: 220px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: normal;
+}
+
+.office-queue-requester-name,
+.office-queue-program {
+	display: block;
+}
+
+.office-queue-requester-name {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.office-queue-program {
+	margin-top: 2px;
+	font-size: 0.78rem;
+	font-weight: 700;
+	line-height: 1.25;
+	color: #32408a;
+	white-space: normal;
 }
 
 .office-request-history-table .office-queue-activity {
@@ -2595,6 +2615,41 @@ select.office-history-filter-control option {
 		flex: 1 1 auto;
 		white-space: nowrap;
 	}
+}
+
+/* The queue list was collapsing to zero height, so the page links sat under
+   the yellow bar and the rows disappeared. Keep a real table row, then the links. */
+body.office-app .office-request-history-card {
+	display: grid;
+	grid-template-rows: auto minmax(240px, 1fr);
+	flex: 1 1 auto;
+	min-height: 420px;
+	overflow: hidden;
+}
+
+body.office-app .office-request-history-wrap {
+	min-height: 240px;
+	height: auto;
+	max-height: none;
+	overflow: auto;
+	flex: none;
+}
+
+body.office-app .office-request-pagination {
+	position: static;
+	z-index: auto;
+	background: #f5f7fe;
+}
+
+body.office-app .office-request-history-table .office-queue-status-stack {
+	max-width: 240px;
+	margin: 0 auto;
+}
+
+body.office-app .office-request-history-table .badge {
+	white-space: normal;
+	max-width: 100%;
+	text-align: center;
 }
 
 @media (max-width: 480px) {

@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Reservation;
 use App\Models\ReservationApproval;
 use App\Services\ReservationApprovalNotifier;
+use App\Services\FacultyApprovalService;
 use App\Services\ProgramChairOfficeResolver;
+use App\Services\ProgramChairStageService;
+use App\Support\RoleCatalog;
 use App\Services\ItemOwnerService;
 use App\Services\ReservationApprovalWorkflowService;
 use App\Services\ReservationApprovalDeduper;
@@ -19,6 +22,9 @@ use Illuminate\Support\Facades\Schema;
 class OfficeRequestController extends Controller
 {
     private const WORKFLOW_BATCH_LIMIT = 12;
+
+    /** Pending rows scanned before deciding whose turn it is. Newer rows waiting on another office must not hide an older request that is already this office's job. */
+    private const WORKFLOW_SCAN_LIMIT = 80;
 
     private ?array $officeIdsByShortCodeCache = null;
     private ?int $physicalFacilitiesOfficeIdCache = null;
@@ -75,19 +81,23 @@ class OfficeRequestController extends Controller
                 'waitingOnByReservation' => $viewData['waitingOnByReservation'] ?? [],
                 'showWaitingQueueContext' => $viewData['showWaitingQueueContext'] ?? false,
             ])->render(),
-            'pagination_html' => $viewData['requests']->links()->toHtml(),
+            'pagination_html' => '',
         ]);
     }
 
     private function buildOfficeHomeData($user): array
     {
+        if ($user->isDean()) {
+            return $this->buildDeanOfficeHomeData($user);
+        }
+
         $actionableReservationIds = [];
         $actionableOfficeIds = [];
         $queueReservationIds = null;
         $officeId = (int) $user->office_id;
         $shouldSync = $this->shouldSyncOfficeHomeWorkflow($user);
 
-        $candidateReservationIds = $this->recentPendingReservationIdsForOffice($officeId, self::WORKFLOW_BATCH_LIMIT);
+        $candidateReservationIds = $this->recentPendingReservationIdsForOffice($officeId, self::WORKFLOW_SCAN_LIMIT);
 
         if ($user->isPhysicalFacilitiesAdmin()) {
             $actionableReservationIds = Reservation::query()
@@ -98,8 +108,13 @@ class OfficeRequestController extends Controller
                 ->map(fn ($id) => (int) $id)
                 ->all();
         } elseif ($user->isProgramChairAdmin()) {
-            $programReservationIds = $this->capReservationIds(
-                ProgramChairOfficeResolver::openReservationIdsForProgramOffice($officeId)
+            $programReservationIds = FacultyApprovalService::withoutFacultyHold(
+                $this->capReservationIds(
+                    $this->reservationIdsWithApprovalRows(
+                        ProgramChairOfficeResolver::openReservationIdsForProgramOffice($officeId)
+                    )
+                ),
+                $officeId
             );
 
             $reconcileIds = ProgramChairOfficeResolver::reservationIdsWithPendingPcApprovalsForProgram(
@@ -192,6 +207,11 @@ class OfficeRequestController extends Controller
             ->whereNull('approved_at')
             ->whereIn('reservation_id', $queueFilterReservationIds);
 
+        if (ProgramChairStageService::hasDeanRequiredColumn()) {
+            // Bound false becomes 0 when prepares are emulated, and Postgres rejects boolean = integer.
+            $pendingApprovalQuery->whereRaw('COALESCE(dean_required, false) = false');
+        }
+
         if (ItemOwnerService::isItemOwnerUser($user)) {
             ItemOwnerService::applyItemOwnerPendingApprovalScope($pendingApprovalQuery, $user);
         }
@@ -208,10 +228,10 @@ class OfficeRequestController extends Controller
 
         $requestsQuery = ReservationApproval::query()
             ->whereIn('approval_id', $distinctPendingApprovalIds !== [] ? $distinctPendingApprovalIds : [-1])
-            ->with(['reservation.user', 'reservation.details'])
+            ->with(['reservation.user.academicProgram', 'reservation.details'])
             ->orderByDesc('created_at');
 
-        $requests = $requestsQuery->paginate(10);
+        $requests = $requestsQuery->get();
 
         $waitingOnByReservation = [];
         $showWaitingQueueContext = $user->isProgramChairAdmin();
@@ -258,12 +278,85 @@ class OfficeRequestController extends Controller
             'showWaitingQueueContext' => $showWaitingQueueContext,
             'totalRequests' => count($actionableReservationIds),
             'pendingRequests' => $showWaitingQueueContext
-                ? $requests->total()
+                ? $requests->count()
                 : count($actionableReservationIds),
             'approvedRequests' => $this->cachedOfficeDecisionCount((int) $user->office_id, 'approved'),
             'rejectedRequests' => $this->cachedOfficeDecisionCount((int) $user->office_id, 'rejected'),
             'authUser' => $user,
             'officeName' => $user->office?->department_name ?? null,
+        ];
+    }
+
+    private function buildDeanOfficeHomeData($user): array
+    {
+        $officeIds = ProgramChairStageService::programOfficeIdsForDean((string) $user->role);
+        $pendingColumns = ['approval_id', 'reservation_id', 'office_id'];
+        if (ProgramChairStageService::hasDeanRequiredColumn()) {
+            $pendingColumns[] = 'dean_required';
+        }
+
+        $pending = collect();
+        if ($officeIds !== []) {
+            $pendingQuery = ReservationApproval::query()
+                ->join('reservations', 'reservations.reservation_id', '=', 'reservation_approvals.reservation_id')
+                ->whereIn('reservation_approvals.office_id', $officeIds)
+                ->whereNull('reservation_approvals.approved_at')
+                ->orderByDesc('reservation_approvals.created_at')
+                ->limit(self::WORKFLOW_SCAN_LIMIT)
+                ->select(array_map(
+                    static fn (string $column): string => 'reservation_approvals.'.$column,
+                    $pendingColumns
+                ));
+            OpenReservationScope::apply($pendingQuery, 'reservations.overall_status');
+            $pending = $pendingQuery->get();
+        }
+
+        $reservationIds = $pending->pluck('reservation_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($reservationIds);
+        $actionableReservationIds = [];
+
+        foreach ($pending as $row) {
+            $reservationId = (int) $row->reservation_id;
+            if ((int) ($actionableOfficeIds[$reservationId] ?? 0) === (int) $row->office_id) {
+                $actionableReservationIds[] = $reservationId;
+            }
+        }
+
+        $requests = ReservationApproval::query()
+            ->whereIn('approval_id', $pending->pluck('approval_id')->all() ?: [-1])
+            ->whereIn('reservation_id', $actionableReservationIds !== [] ? $actionableReservationIds : [-1])
+            ->with(['reservation.user.academicProgram', 'reservation.details'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        $requests->each(function ($approval) {
+            $required = (bool) ($approval->dean_required ?? false);
+            $approval->dean_queue_label = $required
+                ? 'Program Chair submitted this request. Your approval is required.'
+                : 'You may approve on behalf of the program chair.';
+
+            return $approval;
+        });
+
+        $user->loadMissing('office');
+
+        return [
+            'requests' => $requests,
+            'actionableReservationIds' => $actionableReservationIds,
+            'waitingOnByReservation' => [],
+            'showWaitingQueueContext' => false,
+            'totalRequests' => count($actionableReservationIds),
+            'pendingRequests' => count($actionableReservationIds),
+            'approvedRequests' => ReservationApproval::query()
+                ->where('approved_by_user_id', (int) $user->user_id)
+                ->where('status', 'approved')
+                ->count(),
+            'rejectedRequests' => ReservationApproval::query()
+                ->where('approved_by_user_id', (int) $user->user_id)
+                ->where('status', 'rejected')
+                ->count(),
+            'authUser' => $user,
+            'officeName' => RoleCatalog::label((string) $user->role),
         ];
     }
 
@@ -367,7 +460,11 @@ class OfficeRequestController extends Controller
             return [];
         }
 
-        $reservationIds = $this->capReservationIds($reservationIds);
+        $reservationIds = array_slice(
+            array_values(array_unique(array_map('intval', $reservationIds))),
+            0,
+            self::WORKFLOW_SCAN_LIMIT
+        );
 
         $this->warmBatchWorkflowLookups($reservationIds);
 
@@ -387,9 +484,12 @@ class OfficeRequestController extends Controller
                     continue;
                 }
 
-                $approvals = ReservationApprovalDeduper::collapseByOfficeId(
-                    $approvalsByReservation->get($reservationId) ?? collect()
-                );
+                $approvalRows = $approvalsByReservation->get($reservationId) ?? collect();
+                if ($approvalRows->isEmpty()) {
+                    continue;
+                }
+
+                $approvals = ReservationApprovalDeduper::collapseByOfficeId($approvalRows);
 
                 foreach ($actionSequence as $officeId) {
                     $officeId = (int) $officeId;
@@ -400,10 +500,13 @@ class OfficeRequestController extends Controller
                         continue 2;
                     }
 
-                    if ($status !== 'approved' || is_null($approval?->approved_at)) {
-                        $actionableOfficeIds[$reservationId] = (int) $officeId;
+                if ($status !== 'approved' || is_null($approval?->approved_at)) {
+                    if (FacultyApprovalService::blocksOffice($reservationId, $officeId)) {
                         continue 2;
                     }
+                    $actionableOfficeIds[$reservationId] = (int) $officeId;
+                    continue 2;
+                }
                 }
             }
 
@@ -525,15 +628,6 @@ class OfficeRequestController extends Controller
                 $actionableOfficeId,
                 $pfOfficeId,
             );
-
-            if (!is_null($pfOfficeId)) {
-                ReservationApprovalNotifier::notifyOfficeIfRelevant(
-                    $reservation,
-                    (int) $pfOfficeId,
-                    $actionableOfficeId,
-                    $pfOfficeId,
-                );
-            }
         }
     }
 
@@ -760,6 +854,36 @@ class OfficeRequestController extends Controller
     }
 
     /**
+     * Empty reservation shells have no approval workflow, so they must not
+     * occupy the queue window ahead of requests that are still pending.
+     *
+     * @param  array<int, int>  $reservationIds
+     * @return array<int, int>
+     */
+    private function reservationIdsWithApprovalRows(array $reservationIds): array
+    {
+        $reservationIds = array_values(array_unique(array_filter(array_map('intval', $reservationIds))));
+        if ($reservationIds === []) {
+            return [];
+        }
+
+        $withRows = array_fill_keys(
+            DB::table('reservation_approvals')
+                ->whereIn('reservation_id', $reservationIds)
+                ->distinct()
+                ->pluck('reservation_id')
+                ->map(fn ($id) => (int) $id)
+                ->all(),
+            true
+        );
+
+        return array_values(array_filter(
+            $reservationIds,
+            static fn (int $id): bool => isset($withRows[$id])
+        ));
+    }
+
+    /**
      * @return array<int, int>
      */
     private function recentPendingReservationIdsForOffice(int $officeId, int $limit): array
@@ -874,7 +998,7 @@ class OfficeRequestController extends Controller
             'IO' => 'Item Owner',
             'PC' => 'Program Chair',
             'SDAO' => 'SDAO',
-            'DO' => 'Discipline Office',
+            'DO' => 'Safety',
             'SEC' => 'Security',
             'PF' => 'Physical Facilities',
             'GENED' => 'General Education',
@@ -963,7 +1087,7 @@ class OfficeRequestController extends Controller
 
         return DB::table('users')
             ->where('office_id', $pfOfficeId)
-            ->whereRaw('LOWER(role) = ?', ['admin'])
+            ->whereRaw('LOWER(role) IN (?, ?, ?)', ['admin', 'pf_admin', 'pfo'])
             ->value('user_id');
     }
 

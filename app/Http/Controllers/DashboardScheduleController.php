@@ -264,13 +264,15 @@ class DashboardScheduleController extends Controller
         return $reservation->approvals
             ->sortBy(fn ($approval) => $approval->office?->order_sequence ?? $approval->office_id)
             ->map(function ($approval) {
-                $officeLabel = trim((string) ($approval->office?->short_code ?? $approval->office?->department_name ?? 'Office'));
+                $officeLabel = \App\Models\Office::publicLabel(
+                    (string) ($approval->office?->short_code ?? $approval->office?->department_name ?? 'Office')
+                );
 
                 return [
                     'office' => $officeLabel !== '' ? $officeLabel : 'Office',
                     'status' => ucfirst((string) ($approval->status ?? 'approved')),
                     'approved_at' => !is_null($approval->approved_at)
-                        ? Carbon::parse($approval->approved_at)->format('M j, Y')
+                        ? Carbon::parse($approval->approved_at)->format('M j, Y g:i A')
                         : '-',
                 ];
             })

@@ -35,7 +35,9 @@
 
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
-      <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
+      <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" alt="NU-TILIZE" class="toolbar-logo" />
+
+      @include('partials.office-user-guide')
 
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
@@ -61,8 +63,12 @@
           <p class="section-subtitle">Manage {{ $programName }} accounts.</p>
         </div>
 
-        @if(session('success'))
-          <div class="alert alert-success">{{ session('success') }}</div>
+        @php
+          $flashSuccess = session('success');
+          $createdUserNotice = is_string($flashSuccess) && str_starts_with($flashSuccess, 'User account created successfully.');
+        @endphp
+        @if($flashSuccess && !$createdUserNotice)
+          <div class="alert alert-success">{{ $flashSuccess }}</div>
         @endif
         @if(session('error'))
           <div class="alert alert-error">{{ session('error') }}</div>
@@ -79,9 +85,10 @@
 
         @php
           $normalizeUserRole = fn ($user) => strtolower(trim((string) ($user->role ?? '')));
-          $programChairUsers = $users->filter(fn ($user) => $normalizeUserRole($user) === 'pc_admin')->values();
-          $facultyUsers = $users->filter(fn ($user) => $normalizeUserRole($user) === 'faculty')->values();
-          $students = $users->filter(fn ($user) => !in_array($normalizeUserRole($user), ['pc_admin', 'faculty'], true))->values();
+          $isChair = fn ($user) => \App\Support\RoleCatalog::isProgramChairCode((string) $user->role) || $normalizeUserRole($user) === 'pc_admin';
+          $programChairUsers = $users->filter($isChair)->values();
+          $facultyUsers = $users->filter(fn ($user) => $user->isFaculty())->values();
+          $students = $users->filter(fn ($user) => !$isChair($user) && !$user->isFaculty())->values();
           $resolveUserStatus = function ($user): string {
               $rawStatus = strtolower(trim((string) ($user->status ?? $user->account_status ?? '')));
 
@@ -104,7 +111,7 @@
           $rowRoleValue = function ($user) use ($normalizeUserRole): string {
               $role = $normalizeUserRole($user);
 
-              if ($role === 'pc_admin') {
+              if ($role === 'pc_admin' || str_starts_with((string) $user->role, 'PC_')) {
                   return 'pc_admin';
               }
 
@@ -658,5 +665,16 @@
   </script>
 
   <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
+  @if(!empty($createdUserNotice))
+    <script>
+      if (typeof showAppNotice === 'function') {
+        showAppNotice(@json($flashSuccess), {
+          title: 'User created',
+          variant: 'success',
+          buttonText: 'OK',
+        });
+      }
+    </script>
+  @endif
 </body>
 </html>

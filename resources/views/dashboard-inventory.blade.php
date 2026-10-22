@@ -23,7 +23,9 @@
   </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
-      <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
+      <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" alt="NU-TILIZE" class="toolbar-logo" />
+
+      @include('partials.office-user-guide')
 
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
@@ -81,7 +83,7 @@
             <table class="inventory-table most-requested-table">
               <thead>
                 <tr>
-                  <th class="col-asset-id">Asset ID</th>
+                  <th class="col-asset-id">ID</th>
                   <th class="col-item-name">Item Name</th>
                   <th class="col-owner">Owner</th>
                   <th class="col-category">Category</th>

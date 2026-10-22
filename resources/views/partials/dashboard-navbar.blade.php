@@ -11,8 +11,8 @@
     || $currentUsername === 'io_admin'
     || $currentOfficeCode === 'io'
     || ($currentRole === 'admin' && $currentOfficeCode === 'io');
-  $isPcAdmin = $currentRole === 'pc_admin';
-  $isPfAdminUser = in_array($currentRole, ['admin', 'pf_admin'], true);
+  $isPcAdmin = ($authUser && $authUser->isProgramChairAdmin()) || $currentRole === 'pc_admin';
+  $isPfAdminUser = ($authUser && $authUser->isPhysicalFacilitiesAdmin()) || in_array($currentRole, ['admin', 'pf_admin', 'pfo'], true);
 @endphp
 
 <div id="navbar-container" data-nav-server-rendered="1">
@@ -94,6 +94,11 @@
       <a class="nav-item" data-nav="history" href="/history">
         <i class="bi bi-clock-history"></i>
         <span>History</span>
+      </a>
+
+      <a class="nav-item" data-nav="feedback" href="/feedback">
+        <i class="bi bi-chat-square-heart-fill"></i>
+        <span>Feedback</span>
       </a>
 
       <a class="nav-item" data-nav="maintenance" href="/maintenance">

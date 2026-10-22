@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\AccountSetupController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\FacultyApprovalController;
 use App\Http\Controllers\DashboardAnnouncementController;
+use App\Http\Controllers\DashboardFeedbackController;
 use App\Http\Controllers\DashboardHomeController;
 use App\Http\Controllers\DashboardHistoryController;
 use App\Http\Controllers\DashboardInventoryController;
@@ -16,6 +18,7 @@ use App\Http\Controllers\OfficeProgramUserController;
 use App\Http\Controllers\OfficeRequestController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegisterController;
+use App\Http\Controllers\RegistrationAllowanceController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -25,10 +28,19 @@ Route::view('/', 'index')
     ->name('index')
     ->middleware(['redirect.authenticated', 'cache.headers:private;no_cache']);
 
+Route::get('/data-privacy', [LoginController::class, 'showPrivacyNotice'])
+    ->name('data-privacy')
+    ->middleware('redirect.authenticated');
+Route::post('/data-privacy', [LoginController::class, 'acceptPrivacyNotice'])
+    ->name('data-privacy.accept')
+    ->middleware('redirect.authenticated');
+
 Route::view('/login', 'login')
     ->name('login')
-    ->middleware('redirect.authenticated');
-Route::post('/login', [LoginController::class, 'authenticate'])->name('login.authenticate');
+    ->middleware(['redirect.authenticated', 'privacy.accepted']);
+Route::post('/login', [LoginController::class, 'authenticate'])
+    ->name('login.authenticate')
+    ->middleware('privacy.accepted');
 
 Route::get('/register', [RegisterController::class, 'create'])->name('register');
 Route::post('/register', [RegisterController::class, 'store'])->name('register.store');
@@ -69,6 +81,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/profile/email/verify', [ProfileController::class, 'verifyEmail'])
         ->middleware('throttle:8,1')
         ->name('dashboard.profile.email.verify');
+    Route::get('/faculty/requests', [FacultyApprovalController::class, 'index'])->name('faculty.requests');
+    Route::patch('/faculty/requests/{reservationId}', [FacultyApprovalController::class, 'approve'])
+        ->whereNumber('reservationId')
+        ->name('faculty.requests.approve');
+    Route::patch('/faculty/requests/{reservationId}/reject', [FacultyApprovalController::class, 'reject'])
+        ->whereNumber('reservationId')
+        ->name('faculty.requests.reject');
     Route::get('/office/home', [OfficeRequestController::class, 'index'])->name('office.home');
     Route::get('/office/requests', fn () => redirect()->route('office.home'))->name('office.requests');
     Route::get('/office/requests/snapshot', [OfficeRequestController::class, 'queueSnapshot'])->name('office.requests.snapshot');
@@ -89,6 +108,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/home', [DashboardHomeController::class, 'index'])->name('dashboard.home');
             Route::get('/inventory', [DashboardInventoryController::class, 'index'])->name('dashboard.inventory');
             Route::get('/inventory/analytics', [DashboardInventoryController::class, 'analytics'])->name('dashboard.inventory.analytics');
+            Route::get('/inventory/analytics/equipment', [DashboardInventoryController::class, 'equipmentDemand'])->name('dashboard.inventory.analytics.equipment');
+            Route::post('/inventory/academic-years', [DashboardInventoryController::class, 'storeAcademicYear'])->name('dashboard.academic-years.store');
+            Route::patch('/inventory/academic-terms/{term}', [DashboardInventoryController::class, 'updateAcademicTerm'])->name('dashboard.academic-terms.update');
             Route::get('/inventory/equipments', [DashboardInventoryController::class, 'equipments'])->name('dashboard.inventory.equipments');
             Route::post('/inventory/equipment-categories', [DashboardInventoryController::class, 'storeEquipmentCategory'])->name('dashboard.inventory.equipment-categories.store');
             Route::patch('/inventory/equipment-categories/{categoryId}', [DashboardInventoryController::class, 'updateEquipmentCategory'])->name('dashboard.inventory.equipment-categories.update');
@@ -110,11 +132,17 @@ Route::middleware('auth')->group(function () {
             Route::delete('/announcements/{announcementId}', [DashboardAnnouncementController::class, 'destroy'])->name('dashboard.announcements.destroy');
             Route::get('/schedule', [DashboardScheduleController::class, 'index'])->name('dashboard.schedule');
             Route::get('/users', [DashboardUserController::class, 'index'])->name('dashboard.users');
+            Route::get('/users/export', [DashboardUserController::class, 'exportRegisteredUsers'])->name('dashboard.users.export');
+            Route::get('/users/registration-allowances/export', [RegistrationAllowanceController::class, 'exportRegistered'])->name('dashboard.registration-allowances.export');
+            Route::post('/users/registration-allowances', [RegistrationAllowanceController::class, 'store'])->name('dashboard.registration-allowances.store');
+            Route::post('/users/registration-allowances/import', [RegistrationAllowanceController::class, 'import'])->name('dashboard.registration-allowances.import');
+            Route::delete('/users/registration-allowances/{allowance}', [RegistrationAllowanceController::class, 'destroy'])->name('dashboard.registration-allowances.destroy');
             Route::post('/users', [DashboardUserController::class, 'store'])->name('dashboard.users.store');
             Route::patch('/users/{userId}', [DashboardUserController::class, 'update'])->name('dashboard.users.update');
             Route::patch('/users/{userId}/status', [DashboardUserController::class, 'toggleStatus'])->name('dashboard.users.toggle-status');
             Route::delete('/users/{userId}', [DashboardUserController::class, 'destroy'])->name('dashboard.users.destroy');
             Route::get('/history', [DashboardHistoryController::class, 'index'])->name('dashboard.history');
+            Route::get('/feedback', [DashboardFeedbackController::class, 'index'])->name('dashboard.feedback');
             Route::post('/history/email', [DashboardHistoryController::class, 'sendReport'])->name('dashboard.history.email');
         });
         Route::get('/profile', [ProfileController::class, 'show'])->name('dashboard.profile');
@@ -137,7 +165,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/request/{reservationId}/final-approve', [ApprovalController::class, 'finalApproveReservation'])->name('request.final.approve');
         Route::patch('/request/{reservationId}/final-reject', [ApprovalController::class, 'finalRejectReservation'])->name('request.final.reject');
         Route::patch('/request/{reservationId}/final-return', [ApprovalController::class, 'finalReturnReservation'])->name('request.final.return');
-        Route::patch('/request/{reservationId}/final-damaged', [ApprovalController::class, 'finalDamagedReservation'])->name('request.final.damaged');
+        Route::match(['patch', 'post'], '/request/{reservationId}/final-damaged', [ApprovalController::class, 'finalDamagedReservation'])->name('request.final.damaged');
         Route::patch('/request/{reservationId}/cancel', [ApprovalController::class, 'cancelReservation'])->name('request.cancel');
 });
 

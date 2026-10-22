@@ -117,7 +117,7 @@ return new class extends Migration
             $table->unsignedBigInteger('reservation_id');
             $table->unsignedBigInteger('office_id');
             $table->string('status', 255);
-            $table->date('approved_at')->nullable();
+            $table->dateTime('approved_at')->nullable();
             $table->boolean('follow_up_requested')->default(false);
             $table->timestamp('follow_up_requested_at')->nullable();
             $table->unsignedBigInteger('follow_up_requested_by')->nullable();

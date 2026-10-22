@@ -14,6 +14,13 @@
 </head>
 <body class="page-insights">
   <script>
+    try {
+      if (sessionStorage.getItem('nutilize.analyticsView') === 'rooms') {
+        document.body.classList.add('analytics-view-rooms');
+      }
+    } catch (error) {}
+  </script>
+  <script>
     window.authUser = {
       id: @json(auth()->user()->user_id),
       username: @json(auth()->user()->username ?? 'User'),
@@ -24,7 +31,9 @@
   </script>
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
-      <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
+      <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" alt="NU-TILIZE" class="toolbar-logo" />
+
+      @include('partials.office-user-guide')
 
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
@@ -46,6 +55,24 @@
         <div class="dashboard-page-header-top insights-header-top">
           <div class="insights-header-copy">
             <h1 class="section-title">ANALYTICS</h1>
+            <div class="insights-view-switch" role="tablist" aria-label="Analytics report">
+              <button
+                type="button"
+                class="insights-view-tab"
+                role="tab"
+                id="analytics-view-equipment"
+                data-analytics-view="equipment"
+                aria-selected="true"
+              >Equipment</button>
+              <button
+                type="button"
+                class="insights-view-tab"
+                role="tab"
+                id="analytics-view-rooms"
+                data-analytics-view="rooms"
+                aria-selected="false"
+              >Rooms</button>
+            </div>
           </div>
 
           @php
@@ -53,6 +80,7 @@
             $selectedYear = (int) $selectedYear;
             $selectedMonthNum = (int) $selectedMonthNum;
           @endphp
+<<<<<<< HEAD
           @php
             [$compareYear, $compareMonthNum] = explode('-', $compareMonthKey);
             $compareYear = (int) $compareYear;
@@ -85,11 +113,325 @@
                 @endfor
               </select>
             </div>
+=======
+          <div class="insights-month-jump" data-analytics-panel="rooms" aria-label="Jump to month">
+            <label for="analytics-month-select">Jump to</label>
+            <select id="analytics-month-select" aria-label="Select month">
+              @foreach ([1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'] as $monthNumber => $monthName)
+                <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonthNum === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
+              @endforeach
+            </select>
+            <select id="analytics-year-select" aria-label="Select year">
+              @for ($year = $selectedYear - 3; $year <= $selectedYear + 1; $year++)
+                <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
+              @endfor
+            </select>
+>>>>>>> 64c2d3799e8325b059579b8c8e7e0e98cf76066e
           </div>
         </div>
 
-        {{-- Month comparison + trend side by side --}}
-        <section class="insight-charts-row">
+        @php
+          $roomPayload = (isset($roomInsights) && is_array($roomInsights)) ? $roomInsights : [];
+          $roomSummaryPayload = (isset($roomSummary) && is_array($roomSummary)) ? $roomSummary : [];
+          if (isset($roomPayload['summary']) && is_array($roomPayload['summary'])) {
+              $roomSummaryPayload = array_merge($roomSummaryPayload, $roomPayload['summary']);
+          }
+
+          $roomInsightsReady = $roomPayload !== []
+              || $roomSummaryPayload !== []
+              || isset($roomBookings)
+              || isset($roomsUsed)
+              || isset($roomsUnderMaintenance)
+              || isset($underMaintenance)
+              || isset($mostUsedRooms)
+              || isset($roomUsage)
+              || isset($roomShareItems)
+              || isset($roomShare)
+              || isset($roomTypeDemand)
+              || isset($typeDemand)
+              || isset($idleRooms)
+              || isset($roomCondition)
+              || isset($roomTrendCounts)
+              || isset($roomMonthComparison);
+
+          $roomValue = function (array $sources) {
+              foreach ($sources as $value) {
+                  if ($value !== null && $value !== '') {
+                      return $value;
+                  }
+              }
+
+              return null;
+          };
+
+          $roomList = function (array $candidates): array {
+              foreach ($candidates as $value) {
+                  if (is_array($value)) {
+                      return array_values($value);
+                  }
+              }
+
+              return [];
+          };
+
+          $roomText = function (array $row, array $keys, string $fallback = '—'): string {
+              foreach ($keys as $key) {
+                  $value = trim((string) ($row[$key] ?? ''));
+                  if ($value !== '') {
+                      return $value;
+                  }
+              }
+
+              return $fallback;
+          };
+
+          $roomNumber = function (array $row, array $keys) {
+              foreach ($keys as $key) {
+                  if (array_key_exists($key, $row) && $row[$key] !== null && $row[$key] !== '') {
+                      return $row[$key];
+                  }
+              }
+
+              return null;
+          };
+
+          $roomBookingsValue = $roomValue([
+              $roomBookings ?? null,
+              $roomPayload['roomBookings'] ?? null,
+              $roomPayload['room_bookings'] ?? null,
+              $roomPayload['bookings'] ?? null,
+              $roomSummaryPayload['roomBookings'] ?? null,
+              $roomSummaryPayload['room_bookings'] ?? null,
+              $roomSummaryPayload['bookings'] ?? null,
+          ]);
+
+          $roomsUsedValue = $roomValue([
+              $roomsUsed ?? null,
+              $roomPayload['roomsUsed'] ?? null,
+              $roomPayload['rooms_used'] ?? null,
+              $roomSummaryPayload['roomsUsed'] ?? null,
+              $roomSummaryPayload['rooms_used'] ?? null,
+          ]);
+
+          $roomsMaintenanceValue = $roomValue([
+              $roomsUnderMaintenance ?? null,
+              $underMaintenance ?? null,
+              $roomPayload['roomsUnderMaintenance'] ?? null,
+              $roomPayload['underMaintenance'] ?? null,
+              $roomPayload['under_maintenance'] ?? null,
+              $roomSummaryPayload['roomsUnderMaintenance'] ?? null,
+              $roomSummaryPayload['underMaintenance'] ?? null,
+              $roomSummaryPayload['under_maintenance'] ?? null,
+          ]);
+
+          $roomShareRows = $roomList([
+              $roomShareItems ?? null,
+              $roomShare ?? null,
+              $roomPayload['roomShareItems'] ?? null,
+              $roomPayload['shareItems'] ?? null,
+              $roomPayload['roomShare'] ?? null,
+              $roomPayload['share'] ?? null,
+          ]);
+
+          $roomTypeRows = $roomList([
+              $roomTypeDemand ?? null,
+              $typeDemand ?? null,
+              $demandByType ?? null,
+              $roomPayload['roomTypeDemand'] ?? null,
+              $roomPayload['typeDemand'] ?? null,
+              $roomPayload['demandByType'] ?? null,
+          ]);
+
+          $mostUsedRoomRows = $roomList([
+              $mostUsedRooms ?? null,
+              $roomUsage ?? null,
+              $roomPayload['mostUsedRooms'] ?? null,
+              $roomPayload['roomUsage'] ?? null,
+              $roomPayload['usage'] ?? null,
+          ]);
+
+          $idleRoomRows = $roomList([
+              $idleRooms ?? null,
+              $roomPayload['idleRooms'] ?? null,
+              $roomPayload['idle'] ?? null,
+          ]);
+
+          $roomConditionRows = $roomList([
+              $roomCondition ?? null,
+              $roomPayload['roomCondition'] ?? null,
+              $roomPayload['condition'] ?? null,
+          ]);
+
+          $idleRoomCountValue = $roomValue([
+              $idleRoomCount ?? null,
+              $roomPayload['idleRoomCount'] ?? null,
+              $roomPayload['idle_room_count'] ?? null,
+              $roomSummaryPayload['idleRoomCount'] ?? null,
+              $roomSummaryPayload['idle_rooms'] ?? null,
+              $roomSummaryPayload['idleRooms'] ?? null,
+          ]);
+
+          if ($idleRoomCountValue === null && $roomInsightsReady) {
+              $idleRoomCountValue = count($idleRoomRows);
+          }
+
+          $roomShareNormalized = [];
+          foreach ($roomShareRows as $row) {
+              if (! is_array($row)) {
+                  continue;
+              }
+
+              $count = $roomNumber($row, ['booking_count', 'bookings', 'usage_count', 'count']);
+              $roomShareNormalized[] = [
+                  'label' => $roomText($row, ['room_number', 'room_name', 'name', 'label', 'item_name'], 'Room'),
+                  'count' => $count === null ? 0 : (int) $count,
+                  'share_percent' => $roomNumber($row, ['share_percent', 'share']),
+              ];
+          }
+
+          $roomShareTotal = array_sum(array_column($roomShareNormalized, 'count'));
+          foreach ($roomShareNormalized as &$roomShareRow) {
+              if ($roomShareRow['share_percent'] === null) {
+                  $roomShareRow['share_percent'] = $roomShareTotal > 0
+                      ? round(($roomShareRow['count'] / $roomShareTotal) * 100, 1)
+                      : 0;
+              } else {
+                  $roomShareRow['share_percent'] = round((float) $roomShareRow['share_percent'], 1);
+              }
+          }
+          unset($roomShareRow);
+
+          $roomTypeNormalized = [];
+          foreach ($roomTypeRows as $row) {
+              if (! is_array($row)) {
+                  continue;
+              }
+
+              $count = $roomNumber($row, ['booking_count', 'bookings', 'demand_qty', 'count']);
+              $roomTypeNormalized[] = [
+                  'room_type' => $roomText($row, ['room_type', 'type', 'category', 'label'], 'Unspecified'),
+                  'count' => $count === null ? 0 : (int) $count,
+                  'share_percent' => $roomNumber($row, ['share_percent', 'share']),
+              ];
+          }
+
+          $roomTypeCounts = array_column($roomTypeNormalized, 'count');
+          $roomTypeMax = max(1, $roomTypeCounts === [] ? 0 : max($roomTypeCounts));
+          $roomTypeSum = array_sum($roomTypeCounts);
+          foreach ($roomTypeNormalized as &$roomTypeRow) {
+              if ($roomTypeRow['share_percent'] === null) {
+                  $roomTypeRow['share_percent'] = $roomTypeSum > 0
+                      ? round(($roomTypeRow['count'] / $roomTypeSum) * 100, 1)
+                      : 0;
+              } else {
+                  $roomTypeRow['share_percent'] = round((float) $roomTypeRow['share_percent'], 1);
+              }
+          }
+          unset($roomTypeRow);
+
+          $roomComparisonPayload = null;
+          if (isset($roomMonthComparison) && is_array($roomMonthComparison) && ! empty($roomMonthComparison['metrics'])) {
+              $roomComparisonPayload = $roomMonthComparison;
+          } elseif (isset($roomPayload['monthComparison']) && is_array($roomPayload['monthComparison']) && ! empty($roomPayload['monthComparison']['metrics'])) {
+              $roomComparisonPayload = $roomPayload['monthComparison'];
+          } else {
+              $embeddedRoomMetrics = array_values(array_filter(
+                  $monthComparison['metrics'] ?? [],
+                  static fn ($row) => in_array($row['key'] ?? '', ['room_bookings', 'roomBookings', 'rooms'], true)
+              ));
+
+              if ($embeddedRoomMetrics !== []) {
+                  $roomComparisonPayload = [
+                      'currentLabel' => $monthComparison['currentLabel'] ?? '',
+                      'compareLabel' => $monthComparison['compareLabel'] ?? '',
+                      'metrics' => $embeddedRoomMetrics,
+                  ];
+              }
+          }
+
+          $roomCompareBookingsValue = $roomValue([
+              $roomCompareBookings ?? null,
+              $roomPayload['compareBookings'] ?? null,
+              $roomPayload['compare_bookings'] ?? null,
+          ]);
+
+          if ($roomComparisonPayload === null && $roomBookingsValue !== null && $roomCompareBookingsValue !== null) {
+              $roomComparisonPayload = [
+                  'currentLabel' => $monthComparison['currentLabel'] ?? '',
+                  'compareLabel' => $monthComparison['compareLabel'] ?? '',
+                  'metrics' => [[
+                      'key' => 'room_bookings',
+                      'label' => 'Room Bookings',
+                      'current' => (int) $roomBookingsValue,
+                      'compare' => (int) $roomCompareBookingsValue,
+                  ]],
+              ];
+          }
+
+          $roomTrendPayload = null;
+          if (isset($roomTrendCounts) && is_array($roomTrendCounts)) {
+              $roomTrendPayload = array_values($roomTrendCounts);
+          } elseif (isset($roomPayload['trendCounts']) && is_array($roomPayload['trendCounts'])) {
+              $roomTrendPayload = array_values($roomPayload['trendCounts']);
+          } elseif (isset($roomPayload['roomTrendCounts']) && is_array($roomPayload['roomTrendCounts'])) {
+              $roomTrendPayload = array_values($roomPayload['roomTrendCounts']);
+          }
+
+          $formatRoomKpi = function ($value): string {
+              if ($value === null || $value === '') {
+                  return '—';
+              }
+
+              return number_format((int) $value);
+          };
+
+          $formatRoomCount = function ($value): string {
+              if ($value === null || $value === '') {
+                  return '—';
+              }
+
+              return number_format((int) $value);
+          };
+
+          $formatRoomOccupancy = function ($value): string {
+              if ($value === null || $value === '') {
+                  return '—';
+              }
+
+              if (is_string($value) && str_contains($value, '%')) {
+                  return $value;
+              }
+
+              if (! is_numeric($value)) {
+                  return '—';
+              }
+
+              $number = min(100, max(0, (float) $value));
+              $decimals = abs($number - round($number)) < 0.05 ? 0 : 1;
+
+              return number_format($number, $decimals).'%';
+          };
+
+          $roomConditionClass = function (string $condition): string {
+              $normalized = strtolower(trim($condition));
+              if (str_contains($normalized, 'maintenance')) {
+                  return 'maintenance';
+              }
+              if (str_contains($normalized, 'unavailable')) {
+                  return 'unavailable';
+              }
+
+              return 'available';
+          };
+
+          $roomUnavailableCopy = 'Room usage is not available for this month.';
+          $sharePalette = ['#3a4f9c', '#2bb3a8', '#e09a00', '#e85a5a', '#6a58c4', '#2f9fc2', '#3fa06c', '#e07000'];
+        @endphp
+
+        @include('partials.equipment-demand-analytics')
+
+        {{-- Rooms stay month-scoped. Equipment demand is loaded separately. --}}
+        <section class="insight-charts-row" data-analytics-panel="rooms">
           <article class="insight-panel insight-mom-chart-panel">
             <div class="insight-mom-head">
               <div>
@@ -99,320 +441,168 @@
             </div>
             <div class="insight-chart-frame insight-mom-frame">
               <canvas id="monthComparisonChart"></canvas>
+              <p id="monthComparisonEmpty" class="insight-empty-inline analytics-chart-empty" hidden>Room booking comparison is not available for this month.</p>
             </div>
           </article>
 
           <article class="insight-panel">
-            <h3 class="insight-card-title">12-Month Booking Trend</h3>
-            <p class="insight-panel-hint">Approved reservations ending {{ $monthLabel }}</p>
+            <h3 class="insight-card-title" id="monthlyTrendTitle">
+              <span class="analytics-equipment-copy">12-Month Booking Trend</span>
+              <span class="analytics-rooms-copy">12-Month Room Booking Trend</span>
+            </h3>
+            <p class="insight-panel-hint" id="monthlyTrendHint">
+              <span class="analytics-equipment-copy">Approved reservations ending {{ $monthLabel }}</span>
+              <span class="analytics-rooms-copy">Room bookings ending {{ $monthLabel }}</span>
+            </p>
             <div class="insight-chart-frame insight-trend-frame">
               <canvas id="monthlyTrendChart"></canvas>
+              <p id="monthlyTrendEmpty" class="insight-empty-inline analytics-chart-empty" hidden>Room booking trend is not available for this month.</p>
             </div>
           </article>
         </section>
 
-        {{-- Procurement signal strip --}}
-        <section class="insight-kpi-strip" aria-label="Procurement signals">
-          <button
-            type="button"
-            class="insight-kpi insight-kpi-critical {{ $restockSummary['critical'] > 0 ? 'is-critical' : '' }}"
-            data-insight-filter="critical"
-            aria-pressed="false"
-          >
-            <span class="insight-kpi-icon"><i class="bi bi-exclamation-octagon-fill"></i></span>
+
+        <section class="insight-kpi-strip" data-analytics-panel="rooms" aria-label="Room usage">
+          <div class="insight-kpi insight-kpi-gap">
+            <span class="insight-kpi-icon"><i class="bi bi-calendar2-check-fill"></i></span>
             <div class="insight-kpi-body">
-              <strong>{{ $restockSummary['critical'] }}</strong>
-              <span class="insight-kpi-label">Critical shortages</span>
-              <em class="insight-kpi-hint">{{ $restockSummary['critical_hint'] ?? 'none right now' }}</em>
+              <strong>{{ $formatRoomKpi($roomBookingsValue) }}</strong>
+              <span class="insight-kpi-label">Room bookings</span>
+              <em class="insight-kpi-hint">Reservations that include a room</em>
             </div>
-          </button>
-
-          <button
-            type="button"
-            class="insight-kpi insight-kpi-procure {{ $restockSummary['units_to_procure'] > 0 ? 'is-action' : '' }}"
-            data-insight-filter="procure"
-            aria-pressed="false"
-          >
-            <span class="insight-kpi-icon"><i class="bi bi-cart-plus-fill"></i></span>
-            <div class="insight-kpi-body">
-              <strong>+{{ $restockSummary['units_to_procure'] }}</strong>
-              <span class="insight-kpi-label">Buy plan (units)</span>
-              <em class="insight-kpi-hint">{{ $restockSummary['procure_hint'] ?? '' }}</em>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            class="insight-kpi insight-kpi-gap"
-            data-insight-filter="unmet"
-            aria-pressed="false"
-          >
-            <span class="insight-kpi-icon"><i class="bi bi-clipboard-data"></i></span>
-            <div class="insight-kpi-body">
-              <strong>{{ $restockSummary['unmet_units'] }}</strong>
-              <span class="insight-kpi-label">Shortage gap</span>
-              <em class="insight-kpi-hint">{{ $restockSummary['unmet_hint'] ?? '' }}</em>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            class="insight-kpi insight-kpi-idle"
-            data-insight-filter="idle"
-            aria-pressed="false"
-          >
-            <span class="insight-kpi-icon"><i class="bi bi-box-seam"></i></span>
-            <div class="insight-kpi-body">
-              <strong>{{ $restockSummary['idle_items'] }}</strong>
-              <span class="insight-kpi-label">Idle stock items</span>
-              <em class="insight-kpi-hint">{{ $restockSummary['idle_hint'] ?? '' }}</em>
-            </div>
-          </button>
-        </section>
-
-        {{-- How the buy suggestion works --}}
-        <section class="insight-how-it-works">
-          <h3><i class="bi bi-lightbulb-fill"></i> How buy suggestions work</h3>
-          <ol>
-            <li><strong>Shortage</strong> — more units are out or were borrowed than you own → buy the difference <em>plus 1 spare</em>.</li>
-            <li><strong>All units out</strong> — every unit is currently borrowed → buy 1 spare for the next request.</li>
-            <li><strong>High demand</strong> — borrowed units reached 80%+ of stock, or bookings exceed stock → buy 1 spare.</li>
-          </ol>
-        </section>
-
-        {{-- Headline feature: what to restock --}}
-        <section id="insight-restock-section" class="inventory-grid analytics-table-grid insight-section" data-insight-target="restock">
-          <div class="inventory-grid-head analytics-grid-head insight-head">
-            <div>
-              <h2>Restock Recommendations</h2>
-              <p>Items where borrowing demand exceeds what you have on hand</p>
-            </div>
-            @if ($restockSummary['items_needing_action'] > 0)
-              <span class="insight-head-badge">{{ $restockSummary['items_needing_action'] }} need attention</span>
-            @endif
           </div>
-          <div class="table-wrap">
-            <table class="inventory-table analytics-table restock-table">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>On Hand</th>
-                  <th>Times Borrowed</th>
-                  <th>Units Borrowed</th>
-                  <th>Currently Out</th>
-                  <th>Recommendation</th>
-                  <th>Priority</th>
-                </tr>
-              </thead>
-              <tbody>
-                @forelse ($restockRecommendations as $item)
-                  <tr
-                    data-insight-row="restock"
-                    data-priority="{{ $item['priority'] }}"
-                    data-suggested="{{ $item['suggested_qty'] }}"
-                    data-gap="{{ $item['gap'] }}"
-                  >
-                    <td>
-                      <div class="restock-item-name">{{ $item['item_name'] }}</div>
-                      <div class="restock-item-meta">
-                        <span class="asset-id">{{ $item['asset_id'] }}</span>
-                        <span>{{ $item['category'] }}</span>
-                      </div>
-                      <div class="restock-reason">{{ $item['reason'] }}</div>
-                    </td>
-                    <td>
-                      <strong>{{ $item['serviceable'] }}</strong>
-                      @if ($item['unavailable_units'] > 0)
-                        <span class="restock-sub">{{ $item['unavailable_units'] }} in maintenance</span>
-                      @endif
-                    </td>
-                    <td><strong>{{ $item['times_borrowed'] }}</strong></td>
-                    <td><strong>{{ $item['units_borrowed'] }}</strong></td>
-                    <td>
-                      <strong>{{ $item['in_use'] }}</strong>
-                      @if ($item['over_allocated'])
-                        <span class="restock-sub over-allocated">exceeds stock</span>
-                      @endif
-                    </td>
-                    <td>
-                      @if ($item['suggested_qty'] > 0)
-                        <span class="restock-suggestion">
-                          <i class="bi bi-plus-circle-fill"></i>
-                          Buy {{ $item['suggested_qty'] }} more
-                        </span>
-                        @if ($item['suggestion_formula'])
-                          <span class="restock-formula">{{ $item['suggestion_formula'] }}</span>
-                        @endif
-                      @else
-                        <span class="restock-ok">Adequate</span>
-                      @endif
-                    </td>
-                    <td>
-                      <span class="priority-pill {{ $item['priority'] }}">{{ $item['priority_label'] }}</span>
-                    </td>
-                  </tr>
-                @empty
-                  <tr>
-                    <td colspan="7" class="insight-empty">
-                      <i class="bi bi-check-circle"></i>
-                      Every item currently has enough stock to cover demand.
-                    </td>
-                  </tr>
-                @endforelse
-              </tbody>
-            </table>
+
+          <div class="insight-kpi">
+            <span class="insight-kpi-icon"><i class="bi bi-door-open-fill"></i></span>
+            <div class="insight-kpi-body">
+              <strong>{{ $formatRoomKpi($roomsUsedValue) }}</strong>
+              <span class="insight-kpi-label">Rooms used</span>
+              <em class="insight-kpi-hint">Distinct rooms booked</em>
+            </div>
+          </div>
+
+          <div class="insight-kpi insight-kpi-critical {{ is_numeric($roomsMaintenanceValue) && (int) $roomsMaintenanceValue > 0 ? 'is-critical' : '' }}">
+            <span class="insight-kpi-icon"><i class="bi bi-tools"></i></span>
+            <div class="insight-kpi-body">
+              <strong>{{ $formatRoomKpi($roomsMaintenanceValue) }}</strong>
+              <span class="insight-kpi-label">Under maintenance</span>
+              <em class="insight-kpi-hint">Flagged rooms or open jobs</em>
+            </div>
+          </div>
+
+          <div class="insight-kpi insight-kpi-idle">
+            <span class="insight-kpi-icon"><i class="bi bi-building-slash"></i></span>
+            <div class="insight-kpi-body">
+              <strong>{{ $formatRoomKpi($idleRoomCountValue) }}</strong>
+              <span class="insight-kpi-label">Idle rooms</span>
+              <em class="insight-kpi-hint">No bookings this month</em>
+            </div>
           </div>
         </section>
 
-        {{-- Borrowed units: doughnut + color-matched list --}}
-        <section class="analytics-top-row">
-          <article class="analytics-chart-card borrowed-share-card" aria-label="Share of Borrowed Units">
-            <h3 class="insight-card-title">Share of Borrowed Units</h3>
-            <p class="insight-panel-hint">Top items borrowed in {{ $monthLabel }}</p>
 
-            @php
-              $sharePalette = ['#3a4f9c', '#2bb3a8', '#e09a00', '#e85a5a', '#6a58c4', '#2f9fc2', '#3fa06c', '#e07000'];
-            @endphp
+        <section class="analytics-top-row room-analytics-top" data-analytics-panel="rooms">
+          <article class="analytics-chart-card borrowed-share-card room-share-card" aria-label="Share of room bookings">
+            <h3 class="insight-card-title">Share of Room Bookings</h3>
+            <p class="insight-panel-hint">Top rooms booked in {{ $monthLabel }}</p>
 
-            @if (count($shareItems ?? $topItems) > 0)
-              @php $shareRows = $shareItems ?? $topItems; @endphp
+            @if (! $roomInsightsReady)
+              <p class="insight-empty-inline">{{ $roomUnavailableCopy }}</p>
+            @elseif (count($roomShareNormalized) > 0)
               <div class="borrowed-share-layout">
                 <div class="borrowed-share-chart-wrap">
-                  <canvas id="topItemsChart"></canvas>
+                  <canvas id="roomShareChart"></canvas>
                 </div>
 
                 <ul class="borrowed-share-list">
-                  @foreach ($shareRows as $index => $item)
+                  @foreach ($roomShareNormalized as $index => $room)
                     @php $swatch = $sharePalette[$index % count($sharePalette)]; @endphp
                     <li class="borrowed-share-row">
                       <span class="borrowed-share-swatch" data-swatch="{{ $swatch }}" aria-hidden="true"></span>
                       <div class="borrowed-share-copy">
-                        <span class="borrowed-share-name" title="{{ $item['item_name'] }}">{{ $item['item_name'] }}</span>
-                        <span class="borrowed-share-meta">{{ number_format($item['share_percent'] ?? 0, 1) }}% of borrowed units</span>
+                        <span class="borrowed-share-name" title="{{ $room['label'] }}">{{ $room['label'] }}</span>
+                        <span class="borrowed-share-meta">{{ number_format((float) $room['share_percent'], 1) }}% of room bookings</span>
                       </div>
-                      <strong class="borrowed-share-count">{{ number_format($item['usage_count']) }}</strong>
+                      <strong class="borrowed-share-count">{{ number_format($room['count']) }}</strong>
                     </li>
                   @endforeach
                 </ul>
               </div>
             @else
-              <p class="insight-empty-inline">No borrowing activity to show yet.</p>
+              <p class="insight-empty-inline">No room bookings to show yet.</p>
             @endif
           </article>
 
-          <article class="analytics-kpi-card" aria-label="Month comparison metrics">
-            <p>
-              <span>Approved Bookings</span>
-              <strong>{{ number_format($approvedBookings) }}</strong>
-              <em class="{{ $bookingsDelta >= 0 ? 'up' : 'down' }}">
-                @if ($bookingsDelta > 0)↑ @elseif ($bookingsDelta < 0)↓ @endif{{ $bookingsDelta > 0 ? '+' : '' }}{{ number_format($bookingsDelta) }}
-              </em>
-            </p>
-            <p>
-              <span>Unique Borrowers</span>
-              <strong>{{ number_format($totalBorrowers) }}</strong>
-              <em class="{{ $borrowersDelta >= 0 ? 'up' : 'down' }}">
-                @if ($borrowersDelta > 0)↑ @elseif ($borrowersDelta < 0)↓ @endif{{ $borrowersDelta > 0 ? '+' : '' }}{{ number_format($borrowersDelta) }}
-              </em>
-            </p>
-            <p>
-              <span>Units Borrowed</span>
-              <strong>{{ number_format($engagementCount) }}</strong>
-              <em class="{{ $engagementDelta >= 0 ? 'up' : 'down' }}">
-                @if ($engagementDelta > 0)↑ @elseif ($engagementDelta < 0)↓ @endif{{ $engagementDelta > 0 ? '+' : '' }}{{ number_format($engagementDelta) }}
-              </em>
-            </p>
-            <p>
-              <span>New Users</span>
-              <strong>{{ number_format($newUsers) }}</strong>
-              <em class="{{ $newUsersDelta >= 0 ? 'up' : 'down' }}">
-                @if ($newUsersDelta > 0)↑ @elseif ($newUsersDelta < 0)↓ @endif{{ $newUsersDelta > 0 ? '+' : '' }}{{ number_format($newUsersDelta) }}
-              </em>
-            </p>
-          </article>
+          <article class="analytics-category-card" aria-label="Demand by room type">
+            <h3 class="insight-card-title">Demand by Room Type</h3>
+            <p class="insight-panel-hint">Where room bookings landed in {{ $monthLabel }}</p>
 
-          @php
-            $categoryRows = collect($categoryDemand ?? [])
-              ->filter(fn ($row) => (int) ($row['demand_qty'] ?? 0) > 0)
-              ->take(5)
-              ->values();
-            $categoryDemandMax = max(1, (int) $categoryRows->max('demand_qty'));
-            $categoryDemandTotal = max(
-              1,
-              (int) collect($categoryDemand ?? [])->sum('demand_qty')
-            );
-          @endphp
-
-          <article class="analytics-category-card" aria-label="Demand by category">
-            <h3 class="insight-card-title">Demand by Category</h3>
-            <p class="insight-panel-hint">Where units were borrowed in {{ $monthLabel }}</p>
-
-            @if ($categoryRows->isNotEmpty())
+            @if (! $roomInsightsReady)
+              <p class="insight-empty-inline">{{ $roomUnavailableCopy }}</p>
+            @elseif (count($roomTypeNormalized) > 0)
               <ul class="analytics-category-list">
-                @foreach ($categoryRows as $category)
+                @foreach ($roomTypeNormalized as $roomType)
                   @php
-                    $demandQty = (int) ($category['demand_qty'] ?? 0);
-                    $barPercent = (int) round(($demandQty / $categoryDemandMax) * 100);
-                    $sharePercent = round(($demandQty / $categoryDemandTotal) * 100, 1);
+                    $typeCount = (int) $roomType['count'];
+                    $typeBarPercent = (int) round(($typeCount / $roomTypeMax) * 100);
                   @endphp
                   <li class="analytics-category-row">
                     <div class="analytics-category-head">
-                      <strong class="analytics-category-name" title="{{ $category['category'] }}">{{ $category['category'] }}</strong>
-                      <span class="analytics-category-count">{{ number_format($demandQty) }}</span>
+                      <strong class="analytics-category-name" title="{{ $roomType['room_type'] }}">{{ $roomType['room_type'] }}</strong>
+                      <span class="analytics-category-count">{{ number_format($typeCount) }}</span>
                     </div>
                     <div class="analytics-category-bar" aria-hidden="true">
-                      <span class="analytics-category-fill" data-bar-width="{{ $barPercent }}"></span>
+                      <span class="analytics-category-fill" data-bar-width="{{ $typeBarPercent }}"></span>
                     </div>
                     <div class="analytics-category-meta">
-                      <span>{{ $sharePercent }}% of borrowed units</span>
-                      <span>{{ number_format((int) ($category['stock'] ?? 0)) }} in stock</span>
+                      <span>{{ number_format((float) $roomType['share_percent'], 1) }}% of room bookings</span>
                     </div>
                   </li>
                 @endforeach
               </ul>
             @else
-              <p class="insight-empty-inline">No category demand in this month yet.</p>
+              <p class="insight-empty-inline">No room type demand in this month yet.</p>
             @endif
           </article>
         </section>
 
-        <section class="inventory-grid analytics-table-grid insight-section">
+
+        <section class="inventory-grid analytics-table-grid insight-section" data-analytics-panel="rooms">
           <div class="inventory-grid-head analytics-grid-head insight-head">
             <div>
-              <h2>Top Leading Borrowed Items</h2>
-              <p>Most requested items this month, and how many people borrowed each one</p>
+              <h2>Most Used Rooms</h2>
+              <p>Bookings, activity days, occupancy, and requesters in {{ $monthLabel }}</p>
             </div>
           </div>
           <div class="table-wrap">
-            <table class="inventory-table analytics-table leading-items-table">
+            <table class="inventory-table analytics-table most-used-rooms-table">
               <thead>
                 <tr>
-                  <th>Item Name</th>
-                  <th>Owner</th>
-                  <th>ID</th>
+                  <th>Room Number</th>
+                  <th>Type</th>
                   <th>Bookings</th>
-                  <th>Units Borrowed</th>
-                  <th>People Who Borrowed</th>
+                  <th>Activity Days</th>
+                  <th>Occupancy</th>
+                  <th>Requesters</th>
                 </tr>
               </thead>
               <tbody>
-                @forelse ($topItems as $item)
-                  <tr>
-                    <td>{{ $item['item_name'] }}</td>
-                    <td>{{ $item['owner'] ?? $item['location'] ?? '—' }}</td>
-                    <td class="asset-id">{{ $item['asset_id'] }}</td>
-                    <td>{{ $item['booking_count'] }}</td>
-                    <td><strong>{{ $item['usage_count'] }}</strong></td>
-                    <td>
-                      <strong>{{ number_format($item['borrower_count'] ?? 0) }}</strong>
-                      <span class="restock-sub">
-                        {{ ($item['borrower_count'] ?? 0) === 1 ? 'person' : 'people' }}
-                      </span>
-                    </td>
-                  </tr>
+                @forelse ($mostUsedRoomRows as $room)
+                  @if (is_array($room))
+                    <tr>
+                      <td>{{ $roomText($room, ['room_number', 'room_name', 'name', 'label'], 'Room') }}</td>
+                      <td>{{ $roomText($room, ['room_type', 'type', 'category'], 'Unspecified') }}</td>
+                      <td><strong>{{ $formatRoomCount($roomNumber($room, ['bookings', 'booking_count', 'usage_count'])) }}</strong></td>
+                      <td>{{ $formatRoomCount($roomNumber($room, ['activity_days', 'activityDays'])) }}</td>
+                      <td>{{ $formatRoomOccupancy($roomNumber($room, ['occupancy', 'occupancy_percent', 'occupancyPercent'])) }}</td>
+                      <td>{{ $formatRoomCount($roomNumber($room, ['requesters', 'requester_count', 'requesterCount'])) }}</td>
+                    </tr>
+                  @endif
                 @empty
                   <tr>
-                    <td colspan="6" class="insight-empty">No borrowed items in this period yet.</td>
+                    <td colspan="6" class="insight-empty">
+                      {{ $roomInsightsReady ? 'No rooms were booked in this period yet.' : $roomUnavailableCopy }}
+                    </td>
                   </tr>
                 @endforelse
               </tbody>
@@ -420,134 +610,81 @@
           </div>
         </section>
 
-        {{-- Demand context: busiest days + top borrowers --}}
-        <section class="insight-activity-section">
-          <div class="insight-activity-grid">
-            <article class="insight-panel insight-activity-card">
-              <h3 class="insight-card-title">Busiest Booking Days</h3>
-              <p class="insight-panel-hint">Days with the most approved bookings in {{ $monthLabel }}</p>
 
-              @if (count($peakPeriods['weekdays']) > 0)
-                <ul class="weekday-list">
-                  @foreach ($peakPeriods['weekdays'] as $day)
-                    <li>
-                      <span class="weekday-label">{{ $day['label'] }}</span>
-                      <span class="weekday-bar">
-                        <span class="weekday-fill" data-bar-width="{{ $day['percent'] }}"></span>
-                      </span>
-                      <span class="weekday-count">{{ $day['count'] }}</span>
-                    </li>
-                  @endforeach
-                </ul>
-              @else
-                <p class="insight-empty-inline">Not enough booking history yet.</p>
-              @endif
-
-              @if (count($peakPeriods['busiest_dates']) > 0)
-                <h4 class="insight-subhead">Heaviest activity dates</h4>
-                <ul class="busy-date-list">
-                  @foreach ($peakPeriods['busiest_dates'] as $date)
-                    <li>
-                      <span>{{ $date['date'] }}</span>
-                      <strong>{{ $date['count'] }} booking{{ $date['count'] === 1 ? '' : 's' }}</strong>
-                    </li>
-                  @endforeach
-                </ul>
-              @endif
-            </article>
-
-            <article class="insight-panel insight-activity-card">
-              <h3 class="insight-card-title">Top Borrowers</h3>
-              <p class="insight-panel-hint">People driving demand in {{ $monthLabel }}</p>
-
-              @if (count($topBorrowers ?? []) > 0)
-                <ul class="top-borrower-list">
-                  @foreach ($topBorrowers as $index => $borrower)
-                    <li class="top-borrower-row">
-                      <span class="top-borrower-rank">{{ $index + 1 }}</span>
-                      <div class="top-borrower-main">
-                        <div class="top-borrower-name-row">
-                          <span class="top-borrower-name">{{ $borrower['name'] }}</span>
-                          <strong class="top-borrower-units">{{ number_format($borrower['units_borrowed']) }} units</strong>
-                        </div>
-                        <div class="top-borrower-meta">
-                          <span>{{ $borrower['booking_count'] }} booking{{ $borrower['booking_count'] === 1 ? '' : 's' }}</span>
-                          <span class="top-borrower-item">Most used: {{ $borrower['top_item'] }}</span>
-                        </div>
-                        <div class="top-borrower-bar" aria-hidden="true">
-                          <span class="top-borrower-fill" data-bar-width="{{ $borrower['usage_percent'] }}"></span>
-                        </div>
-                      </div>
-                    </li>
-                  @endforeach
-                </ul>
-              @else
-                <p class="insight-empty-inline">No borrower activity in this month yet.</p>
-              @endif
-            </article>
-          </div>
-        </section>
-
-        {{-- Cost-saving and reliability signals --}}
-        <section class="insight-split">
-          <article id="insight-idle-section" class="insight-panel" data-insight-target="idle">
-            <h3 class="insight-card-title">Idle Stock</h3>
-            <p class="insight-panel-hint">Owned but never requested — avoid buying more of these</p>
-            @if (count($idleStock) > 0)
+        <section class="insight-split" data-analytics-panel="rooms">
+          <article class="insight-panel" aria-label="Idle rooms">
+            <h3 class="insight-card-title">Idle Rooms</h3>
+            <p class="insight-panel-hint">Rooms with no bookings in {{ $monthLabel }}</p>
+            @if (! $roomInsightsReady)
+              <p class="insight-empty-inline">{{ $roomUnavailableCopy }}</p>
+            @elseif (count($idleRoomRows) > 0)
               <div class="table-wrap">
-              <table class="inventory-table analytics-table idle-stock-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Category</th>
-                    <th>Units Idle</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @foreach ($idleStock as $item)
-                    <tr data-insight-row="idle">
-                      <td>{{ $item['item_name'] }}</td>
-                      <td>{{ $item['category'] }}</td>
-                      <td><strong>{{ $item['stock'] }}</strong></td>
+                <table class="inventory-table analytics-table idle-rooms-table">
+                  <thead>
+                    <tr>
+                      <th>Room</th>
+                      <th>Type</th>
                     </tr>
-                  @endforeach
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @foreach ($idleRoomRows as $room)
+                      @if (is_array($room))
+                        <tr>
+                          <td>{{ $roomText($room, ['room_number', 'room_name', 'name', 'label'], 'Room') }}</td>
+                          <td>{{ $roomText($room, ['room_type', 'type', 'category'], 'Unspecified') }}</td>
+                        </tr>
+                      @endif
+                    @endforeach
+                  </tbody>
+                </table>
               </div>
             @else
-              <p class="insight-empty-inline">Every item has seen activity — no dead stock.</p>
+              <p class="insight-empty-inline">Every room was booked this month.</p>
             @endif
           </article>
 
-          <article class="insight-panel">
-            <h3 class="insight-card-title">Maintenance Watch</h3>
-            <p class="insight-panel-hint">Downtime reduces usable stock and drives shortages</p>
-            @if (count($maintenanceWatch) > 0)
+          <article class="insight-panel" aria-label="Room maintenance and condition">
+            <h3 class="insight-card-title">Maintenance and Condition</h3>
+            <p class="insight-panel-hint">Open jobs, incidents this month, and what to repair</p>
+            @if (! $roomInsightsReady)
+              <p class="insight-empty-inline">{{ $roomUnavailableCopy }}</p>
+            @elseif (count($roomConditionRows) > 0)
               <div class="table-wrap">
-              <table class="inventory-table analytics-table maintenance-watch-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Down</th>
-                    <th>Suggested Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @foreach ($maintenanceWatch as $item)
+                <table class="inventory-table analytics-table room-condition-table">
+                  <thead>
                     <tr>
-                      <td>{{ $item['item_name'] }}</td>
-                      <td>
-                        <strong>{{ $item['unavailable_units'] }}</strong>
-                        <span class="restock-sub">{{ $item['downtime_percent'] }}% of stock</span>
-                      </td>
-                      <td>{{ $item['action'] }}</td>
+                      <th>Room</th>
+                      <th>Condition</th>
+                      <th>Open Jobs</th>
+                      <th>Incidents This Month</th>
+                      <th>Suggested Action</th>
                     </tr>
-                  @endforeach
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @foreach ($roomConditionRows as $room)
+                      @if (is_array($room))
+                        @php
+                          $conditionLabel = $roomText($room, ['condition', 'status'], 'Available');
+                          $incidentValue = $roomNumber($room, ['incidents', 'incident_count', 'incidents_this_month']);
+                          $openJobsValue = $roomNumber($room, ['open_jobs', 'openJobs']);
+                          $actionLabel = $roomText($room, ['action', 'suggested_action', 'suggestedAction'], '—');
+                        @endphp
+                        <tr>
+                          <td>{{ $roomText($room, ['room_number', 'room_name', 'name', 'label'], 'Room') }}</td>
+                          <td>
+                            <span class="priority-pill {{ $roomConditionClass($conditionLabel) }}">{{ $conditionLabel }}</span>
+                          </td>
+                          <td>{{ $formatRoomCount($openJobsValue) }}</td>
+                          <td>{{ $formatRoomCount($incidentValue) }}</td>
+                          <td>{{ $actionLabel }}</td>
+                        </tr>
+                      @endif
+                    @endforeach
+                  </tbody>
+                </table>
               </div>
             @else
-              <p class="insight-empty-inline">No items are currently out of service.</p>
+              <p class="insight-empty-inline">Nothing to report for room condition this month.</p>
             @endif
           </article>
         </section>
@@ -564,96 +701,180 @@
   <script>
     (function () {
       const monthComparison = @json($monthComparison);
+      const roomComparison = @json($roomComparisonPayload);
+      const roomTrendCounts = @json($roomTrendPayload);
+      const roomShareItems = @json($roomShareNormalized);
       const comparisonCanvas = document.getElementById('monthComparisonChart');
-
-      if (comparisonCanvas && monthComparison.metrics.length > 0) {
-        const labels = monthComparison.metrics.map((row) => row.label);
-        const currentData = monthComparison.metrics.map((row) => row.current);
-        const compareData = monthComparison.metrics.map((row) => row.compare);
-
-        new Chart(comparisonCanvas.getContext('2d'), {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [
-              {
-                label: monthComparison.compareLabel,
-                data: compareData,
-                backgroundColor: '#c7d0ea',
-                borderRadius: 6
-              },
-              {
-                label: monthComparison.currentLabel,
-                data: currentData,
-                backgroundColor: '#4457ab',
-                borderRadius: 6
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-              y: { beginAtZero: true, ticks: { precision: 0 } }
-            },
-            plugins: {
-              legend: {
-                position: 'top',
-                align: 'end',
-                labels: { usePointStyle: true, boxWidth: 8, padding: 14, font: { size: 11 } }
-              }
-            },
-            layout: {
-              padding: { top: 2, right: 6, bottom: 2, left: 2 }
-            }
-          }
-        });
-      }
-
+      const comparisonEmpty = document.getElementById('monthComparisonEmpty');
       const yearLabels = @json($yearLabels);
       const trendCounts = @json($trendCounts);
       const trendCanvas = document.getElementById('monthlyTrendChart');
-
-      if (trendCanvas && yearLabels.length > 0) {
-        new Chart(trendCanvas.getContext('2d'), {
-          type: 'line',
-          data: {
-            labels: yearLabels,
-            datasets: [{
-              label: 'Approved bookings',
-              data: trendCounts,
-              borderColor: '#4457ab',
-              backgroundColor: 'rgba(68, 87, 171, 0.12)',
-              fill: true,
-              tension: 0.35,
-              pointRadius: 4,
-              pointBackgroundColor: '#4457ab'
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: { grid: { display: false } },
-              y: { beginAtZero: true, ticks: { precision: 0 } }
-            },
-            plugins: {
-              legend: { display: false }
-            },
-            layout: {
-              padding: { top: 6, right: 8, bottom: 4, left: 2 }
-            }
-          }
-        });
-      }
-
+      const trendEmpty = document.getElementById('monthlyTrendEmpty');
       const sharePalette = ['#3a4f9c', '#2bb3a8', '#e09a00', '#e85a5a', '#6a58c4', '#2f9fc2', '#3fa06c', '#e07000'];
       const shareItems = @json($shareItems ?? $topItems);
       const topItemsCanvas = document.getElementById('topItemsChart');
+      const roomShareCanvas = document.getElementById('roomShareChart');
+      const roomMetricKeys = new Set(['room_bookings', 'roomBookings', 'rooms']);
+      const equipmentMetrics = (monthComparison.metrics || []).filter((row) => !roomMetricKeys.has(row.key));
+      let comparisonChart = null;
+      let trendChart = null;
+      let topItemsChart = null;
+      let roomShareChart = null;
 
-      if (topItemsCanvas && shareItems.length > 0) {
-        new Chart(topItemsCanvas.getContext('2d'), {
+      const barChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true, ticks: { precision: 0 } }
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            align: 'end',
+            labels: { usePointStyle: true, boxWidth: 8, padding: 14, font: { size: 11 } }
+          }
+        },
+        layout: {
+          padding: { top: 2, right: 6, bottom: 2, left: 2 }
+        }
+      };
+
+      const lineChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { precision: 0 } }
+        },
+        plugins: {
+          legend: { display: false }
+        },
+        layout: {
+          padding: { top: 6, right: 8, bottom: 4, left: 2 }
+        }
+      };
+
+      const doughnutOptions = (unitLabel) => ({
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '48%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1f2a5a',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            displayColors: true,
+            boxPadding: 4,
+            callbacks: {
+              title: (items) => items[0]?.label || '',
+              label: (context) => ` ${context.parsed} ${unitLabel}`
+            }
+          }
+        }
+      });
+
+      const setChartVisibility = (canvas, emptyEl, visible) => {
+        if (canvas) canvas.hidden = !visible;
+        if (emptyEl) emptyEl.hidden = visible;
+      };
+
+      const renderComparison = (view) => {
+        if (!comparisonCanvas) return;
+
+        const rooms = view === 'rooms';
+        const metrics = rooms
+          ? (roomComparison && Array.isArray(roomComparison.metrics) ? roomComparison.metrics : [])
+          : equipmentMetrics;
+
+        if (metrics.length === 0) {
+          if (rooms) setChartVisibility(comparisonCanvas, comparisonEmpty, false);
+          return;
+        }
+
+        setChartVisibility(comparisonCanvas, comparisonEmpty, true);
+        const labels = metrics.map((row) => row.label);
+        const currentData = metrics.map((row) => Number(row.current) || 0);
+        const compareData = metrics.map((row) => Number(row.compare) || 0);
+        const currentLabel = (rooms && roomComparison && roomComparison.currentLabel) || monthComparison.currentLabel;
+        const compareLabel = (rooms && roomComparison && roomComparison.compareLabel) || monthComparison.compareLabel;
+
+        if (!comparisonChart) {
+          comparisonChart = new Chart(comparisonCanvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+              labels,
+              datasets: [
+                { label: compareLabel, data: compareData, backgroundColor: '#c7d0ea', borderRadius: 6 },
+                { label: currentLabel, data: currentData, backgroundColor: '#4457ab', borderRadius: 6 }
+              ]
+            },
+            options: barChartOptions
+          });
+        } else {
+          comparisonChart.data.labels = labels;
+          comparisonChart.data.datasets[0].label = compareLabel;
+          comparisonChart.data.datasets[0].data = compareData;
+          comparisonChart.data.datasets[1].label = currentLabel;
+          comparisonChart.data.datasets[1].data = currentData;
+          comparisonChart.update();
+        }
+
+        requestAnimationFrame(() => comparisonChart && comparisonChart.resize());
+      };
+
+      const renderTrend = (view) => {
+        if (!trendCanvas) return;
+
+        const rooms = view === 'rooms';
+        const counts = rooms ? roomTrendCounts : trendCounts;
+        const available = Array.isArray(counts) && counts.length > 0 && yearLabels.length > 0;
+
+        if (!available) {
+          if (rooms) setChartVisibility(trendCanvas, trendEmpty, false);
+          return;
+        }
+
+        setChartVisibility(trendCanvas, trendEmpty, true);
+        const label = rooms ? 'Room bookings' : 'Approved bookings';
+
+        if (!trendChart) {
+          trendChart = new Chart(trendCanvas.getContext('2d'), {
+            type: 'line',
+            data: {
+              labels: yearLabels,
+              datasets: [{
+                label,
+                data: counts,
+                borderColor: '#4457ab',
+                backgroundColor: 'rgba(68, 87, 171, 0.12)',
+                fill: true,
+                tension: 0.35,
+                pointRadius: 4,
+                pointBackgroundColor: '#4457ab'
+              }]
+            },
+            options: lineChartOptions
+          });
+        } else {
+          trendChart.data.labels = yearLabels;
+          trendChart.data.datasets[0].label = label;
+          trendChart.data.datasets[0].data = counts;
+          trendChart.update();
+        }
+
+        requestAnimationFrame(() => trendChart && trendChart.resize());
+      };
+
+      const ensureTopItemsChart = () => {
+        if (!topItemsCanvas || shareItems.length === 0) return;
+        if (topItemsChart) {
+          topItemsChart.resize();
+          return;
+        }
+
+        topItemsChart = new Chart(topItemsCanvas.getContext('2d'), {
           type: 'doughnut',
           data: {
             labels: shareItems.map((item) => item.item_name),
@@ -666,27 +887,41 @@
               hoverOffset: 4
             }]
           },
-          options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            cutout: '48%',
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: '#1f2a5a',
-                titleColor: '#fff',
-                bodyColor: '#fff',
-                displayColors: true,
-                boxPadding: 4,
-                callbacks: {
-                  title: (items) => items[0]?.label || '',
-                  label: (context) => ` ${context.parsed} unit(s)`
-                }
-              }
-            }
-          }
+          options: doughnutOptions('unit(s)')
         });
-      }
+      };
+
+      const ensureRoomShareChart = () => {
+        if (!roomShareCanvas || roomShareItems.length === 0) return;
+        if (roomShareChart) {
+          roomShareChart.resize();
+          return;
+        }
+
+        roomShareChart = new Chart(roomShareCanvas.getContext('2d'), {
+          type: 'doughnut',
+          data: {
+            labels: roomShareItems.map((item) => item.label),
+            datasets: [{
+              data: roomShareItems.map((item) => item.count),
+              backgroundColor: sharePalette.slice(0, roomShareItems.length),
+              borderColor: sharePalette.slice(0, roomShareItems.length),
+              borderWidth: 0,
+              hoverBorderWidth: 0,
+              hoverOffset: 4
+            }]
+          },
+          options: doughnutOptions('booking(s)')
+        });
+      };
+
+      const activeAnalyticsView = () => (
+        document.body.classList.contains('analytics-view-rooms') ? 'rooms' : 'equipment'
+      );
+
+      const startingView = activeAnalyticsView();
+      renderComparison(startingView);
+      renderTrend(startingView);
 
       const monthSelect = document.getElementById('analytics-month-select');
       const yearSelect = document.getElementById('analytics-year-select');
@@ -810,9 +1045,66 @@
       filterButtons.forEach((btn) => {
         btn.addEventListener('click', () => applyFilter(btn.dataset.insightFilter));
       });
+
+      const viewTabs = Array.from(document.querySelectorAll('.insights-view-tab'));
+
+      const applyAnalyticsView = (view, persist) => {
+        const rooms = view === 'rooms';
+        document.body.classList.toggle('analytics-view-rooms', rooms);
+        viewTabs.forEach((tab) => {
+          const selected = tab.dataset.analyticsView === view;
+          tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+          tab.tabIndex = selected ? 0 : -1;
+        });
+        document.dispatchEvent(new CustomEvent('analytics-view-changed', { detail: { view } }));
+        renderComparison(view);
+        renderTrend(view);
+
+        if (rooms) {
+          clearHighlights();
+          requestAnimationFrame(() => ensureRoomShareChart());
+        } else {
+          requestAnimationFrame(() => ensureTopItemsChart());
+        }
+
+        if (persist) {
+          try {
+            sessionStorage.setItem('nutilize.analyticsView', view);
+          } catch (error) {}
+        }
+      };
+
+      viewTabs.forEach((tab) => {
+        const selected = tab.dataset.analyticsView === startingView;
+        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+        tab.tabIndex = selected ? 0 : -1;
+        tab.addEventListener('click', () => {
+          const view = tab.dataset.analyticsView === 'rooms' ? 'rooms' : 'equipment';
+          if (view === activeAnalyticsView()) return;
+          applyAnalyticsView(view, true);
+        });
+      });
+
+      const viewSwitch = document.querySelector('.insights-view-switch');
+      if (viewSwitch) {
+        viewSwitch.addEventListener('keydown', (event) => {
+          if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+          event.preventDefault();
+          const view = event.key === 'ArrowRight' ? 'rooms' : 'equipment';
+          applyAnalyticsView(view, true);
+          document.getElementById(view === 'rooms' ? 'analytics-view-rooms' : 'analytics-view-equipment')?.focus();
+        });
+      }
+
+      if (startingView === 'rooms') {
+        requestAnimationFrame(() => ensureRoomShareChart());
+      } else {
+        ensureTopItemsChart();
+      }
     })();
   </script>
 
+  <script src="/js/equipment-demand.js?v={{ filemtime(public_path('js/equipment-demand.js')) }}"></script>
   <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
 </body>
 </html>

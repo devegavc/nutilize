@@ -133,7 +133,7 @@ class OfficeArchiveController extends Controller
         $rejectedCount = $allStatuses->filter(fn ($status) => $status === 'rejected')->count();
 
         $todayQuery = DB::table('reservation_approval_histories')
-            ->whereDate('approved_at', now()->toDateString())
+            ->whereDate('approved_at', \App\Support\ApprovalClock::now()->toDateString())
             ->whereIn(DB::raw("LOWER(COALESCE(status, ''))"), ['approved', 'rejected']);
 
         if ($isItemOwner) {

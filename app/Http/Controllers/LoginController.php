@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\UserAccountStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
@@ -15,6 +16,24 @@ class LoginController extends Controller
     private const LOGIN_MAX_ATTEMPTS = 5;
 
     private const LOGIN_DECAY_SECONDS = 300;
+
+    public function showPrivacyNotice(): View
+    {
+        return view('data-privacy');
+    }
+
+    public function acceptPrivacyNotice(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'privacy_agreement' => ['accepted'],
+        ], [
+            'privacy_agreement.accepted' => 'Check the box to agree to the NUtilize Data Privacy Notice before continuing.',
+        ]);
+
+        $request->session()->put('nutilize_privacy_accepted', true);
+
+        return redirect()->route('login');
+    }
 
     public function authenticate(Request $request): RedirectResponse
     {
@@ -84,6 +103,18 @@ class LoginController extends Controller
 
     public static function redirectAuthenticated(?User $user): RedirectResponse
     {
+        if ($user && $user->isPhysicalFacilitiesAdmin()) {
+            return redirect()->route('dashboard.home');
+        }
+
+        if ($user && $user->isFaculty()) {
+            return redirect()->route('faculty.requests');
+        }
+
+        if ($user && $user->isOfficeApprover()) {
+            return redirect()->route('office.home');
+        }
+
         if ($user && (int) $user->user_id === 8) {
             return redirect()->route('office.home');
         }

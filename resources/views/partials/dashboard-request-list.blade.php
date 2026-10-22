@@ -6,7 +6,9 @@
   @php
     $reservation = $requestData['reservation'];
     $user = $reservation->user;
-    $requesterName = $user->full_name ?? $user->username ?? 'User';
+    $requesterName = $user?->displayName() ?: 'User';
+    $requesterEmail = trim((string) ($user?->email ?? ''));
+    $showRequesterEmail = $requesterEmail !== '' && strcasecmp($requesterEmail, $requesterName) !== 0;
     $displayPhone = $user->phone_number ?? $user->contact_number ?? 'N/A';
     $cssVisibilityClass = $requestData['tab'] === 'final'
       ? 'final-only'
@@ -28,7 +30,7 @@
       <span>#NU-{{ str_pad((string) $reservation->reservation_id, 6, '0', STR_PAD_LEFT) }}</span>
       <span class="status-dots">
         @foreach($requestData['workflow_steps'] as $step)
-          <i class="bi {{ $step['icon_class'] ?? 'bi-building' }} {{ $step['dot_class'] }}" title="{{ $step['office_code'] }} - {{ $step['office_name'] }}"></i>
+          <i class="bi {{ $step['icon_class'] ?? 'bi-building' }} {{ $step['dot_class'] }}" title="{{ $step['stage_label'] ?? $step['office_name'] }}"></i>
         @endforeach
       </span>
     </div>
@@ -53,17 +55,21 @@
     <div class="request-main-col">
       <h3 class="request-block-title">Request details</h3>
       <p class="request-owner">{{ $requesterName }}</p>
-      @if(!empty($user->email))
-        <p class="request-email">{{ $user->email }}</p>
+      @if($showRequesterEmail)
+        <p class="request-email">{{ $requesterEmail }}</p>
       @endif
       <p class="request-phone">{{ $displayPhone }}</p>
       <div class="request-event-row">
         <strong>Event Name</strong>
         <span>{{ $reservation->activity_name ?? 'Untitled Activity' }}</span>
       </div>
+      @php
+        $eventStart = $reservation->Start_of_activity ?? $reservation->Date_of_Activity;
+        $eventEnd = $reservation->End_of_Activity ?? $reservation->end_of_activity;
+      @endphp
       <div class="request-meta-row">
-        <span>Date: {{ optional($reservation->Start_of_activity ?? $reservation->Date_of_Activity)->format('d/m/Y') ?? 'N/A' }}</span>
-        <span>Time: {{ optional($reservation->Start_of_activity ?? $reservation->Date_of_Activity)->format('g:i A') ?? 'N/A' }}</span>
+        <span>Start: {{ $eventStart ? $eventStart->format('d/m/Y g:i A') : 'N/A' }}</span>
+        <span>End: {{ $eventEnd ? $eventEnd->format('d/m/Y g:i A') : 'N/A' }}</span>
       </div>
     </div>
 
@@ -78,6 +84,9 @@
           <span><i class="bi bi-box-seam"></i> No resources listed</span>
         @endforelse
       </div>
+      @if(($requestData['damaged_item_note'] ?? '') !== '')
+        <p class="request-damage-note">{{ $requestData['damaged_item_note'] }}</p>
+      @endif
       <div class="request-action-stack">
         @if($requestData['tab'] === 'return')
           <button class="return-btn confirm-action-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="returned"
@@ -86,11 +95,23 @@
                   data-confirm-text="Return">
             Returned
           </button>
+          @php
+            $damageTargets = collect($requestData['resources'] ?? [])
+                ->filter(fn ($resource) => (int) ($resource['target_id'] ?? 0) > 0)
+                ->map(fn ($resource) => [
+                    'type' => ($resource['target_type'] ?? '') === 'room' ? 'room' : 'item',
+                    'id' => (int) $resource['target_id'],
+                    'label' => ((int) ($resource['quantity'] ?? 1)).' x '.($resource['label'] ?? 'Resource'),
+                ])
+                ->unique(fn ($resource) => $resource['type'].'-'.$resource['id'])
+                ->values();
+          @endphp
           <button class="damage-btn confirm-action-btn" type="button" data-reservation-id="{{ $reservation->reservation_id }}" data-return-action="damaged"
                   data-confirm-title="Confirm Damage"
-                  data-confirm-message="Mark this request as damaged? This action cannot be undone."
+                  data-confirm-message="Choose the damaged item. Only the items you check are recorded as damaged. A photo is optional."
                   data-confirm-text="Damage"
-                  data-confirm-variant="danger">
+                  data-confirm-variant="danger"
+                  data-damage-targets="{{ $damageTargets->toJson() }}">
             Damaged
           </button>
         @elseif($requestData['tab'] === 'final')
@@ -114,7 +135,7 @@
           {{ $requesterName }}'s request
           {{ $displayBadge === 'Pending' ? 'is pending' : ($displayBadge === 'Waiting Return' ? 'is waiting for return' : 'has been ' . strtolower($displayBadge)) }}
         </p>
-        <p class="request-decision-text"></p>
+        <p class="request-decision-text">{{ $requestData['damaged_item_note'] ?? '' }}</p>
         <span class="request-decision-badge">{{ $displayBadge }}</span>
       </div>
     </div>

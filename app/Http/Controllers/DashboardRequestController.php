@@ -80,8 +80,8 @@ class DashboardRequestController extends Controller
 
         $reservationsQuery = Reservation::query()
             ->with([
-                'user:user_id,full_name,username,email,phone_number,contact_number',
-                'approvals:approval_id,reservation_id,office_id,owner_id,status,approved_at',
+                'user:user_id,first_name,middle_initial,last_name,suffix,full_name,username,email,phone_number,contact_number',
+                'approvals:approval_id,reservation_id,office_id,owner_id,status,rejection_reason,approved_at',
             ])
             ->orderByDesc('created_at');
 
@@ -127,7 +127,7 @@ class DashboardRequestController extends Controller
 
         if ($didSync) {
             $reservations->getCollection()->load([
-                'approvals:approval_id,reservation_id,office_id,owner_id,status,approved_at',
+                'approvals:approval_id,reservation_id,office_id,owner_id,status,rejection_reason,approved_at',
             ]);
         }
 
@@ -165,6 +165,12 @@ class DashboardRequestController extends Controller
                 && !$isWaitingReturn
                 && !$isClosed;
             $resources = $resourceMap[$reservation->reservation_id] ?? [];
+            $damagedItemNote = '';
+            if ($overallStatus === 'damaged') {
+                $damagedItemNote = collect($reservation->approvals ?? [])
+                    ->map(fn ($approval) => trim((string) ($approval->rejection_reason ?? '')))
+                    ->first(fn ($note) => str_starts_with($note, 'Damaged:')) ?? '';
+            }
             $currentActionableOfficeId = $actionableOfficeIds[(int) $reservation->reservation_id] ?? null;
             $workflow = $this->buildWorkflowForReservation($reservation, $currentActionableOfficeId);
             $workflowSteps = collect($workflow['steps']);
@@ -177,13 +183,13 @@ class DashboardRequestController extends Controller
                 ? 'return'
                 : ($isFinalDecision ? 'rejected' : ($isFinal ? 'final' : 'pending')));
 
-
             return [
                 'reservation' => $reservation,
                 'tab' => $tab,
                 'workflow_steps' => $workflow['steps'],
                 'current_stage_label' => $currentStageLabel,
                 'resources' => $resources,
+                'damaged_item_note' => $damagedItemNote,
                 'decision_badge' => $tab === 'return'
                     ? 'Waiting Return'
                     : ($tab === 'closed' ? ucfirst($overallStatus) : ($tab === 'rejected' ? 'Rejected' : (!$isFinal ? 'Pending' : 'Final Review'))),
@@ -220,7 +226,9 @@ class DashboardRequestController extends Controller
             ->select([
                 'details.reservation_id',
                 'details.quantity',
+                'rooms.room_id',
                 'rooms.room_number',
+                'items.item_id',
                 'items.item_name',
             ])
             ->get();
@@ -232,10 +240,14 @@ class DashboardRequestController extends Controller
             $name = $isRoom ? ('Room ' . $row->room_number) : ($row->item_name ?? 'Resource');
             $quantity = max(1, (int) $row->quantity);
 
+            $targetId = $isRoom ? (int) ($row->room_id ?? 0) : (int) ($row->item_id ?? 0);
+
             $resourceMap[$row->reservation_id][] = [
                 'label' => $name,
                 'icon' => $isRoom ? 'bi-house-door-fill' : 'bi-box-seam',
                 'quantity' => $quantity,
+                'target_type' => $isRoom ? 'room' : 'item',
+                'target_id' => $targetId,
             ];
         }
 
@@ -522,7 +534,7 @@ class DashboardRequestController extends Controller
 
         return DB::table('users')
             ->where('office_id', $pfOfficeId)
-            ->whereRaw('LOWER(role) = ?', ['admin'])
+            ->whereRaw('LOWER(role) IN (?, ?, ?)', ['admin', 'pf_admin', 'pfo'])
             ->value('user_id');
     }
 
@@ -585,7 +597,7 @@ class DashboardRequestController extends Controller
                 'IO' => 'Item Owner',
                 'PC' => $officeMap[$officeId]['name'] ?? 'Program Chair',
                 'SDAO' => 'Student Development and Activities Office',
-                'DO' => 'Discipline Office',
+                'DO' => 'Safety',
                 'SEC' => 'Security',
                 'PF' => 'Physical Facilities',
                 default => $officeMap[$officeId]['name'] ?? 'Office',
@@ -788,9 +800,12 @@ class DashboardRequestController extends Controller
                 continue;
             }
 
-            $approvals = ReservationApprovalDeduper::collapseByOfficeId(
-                $approvalsByReservation->get($reservationId) ?? collect()
-            );
+            $approvalRows = $approvalsByReservation->get($reservationId) ?? collect();
+            if ($approvalRows->isEmpty()) {
+                continue;
+            }
+
+            $approvals = ReservationApprovalDeduper::collapseByOfficeId($approvalRows);
 
             foreach ($actionSequence as $officeId) {
                 $officeId = (int) $officeId;
@@ -802,6 +817,9 @@ class DashboardRequestController extends Controller
                 }
 
                 if ($status !== 'approved' || is_null($approval?->approved_at)) {
+                    if (\App\Services\FacultyApprovalService::blocksOffice($reservationId, $officeId)) {
+                        continue 2;
+                    }
                     $actionableOfficeIds[$reservationId] = (int) $officeId;
                     continue 2;
                 }

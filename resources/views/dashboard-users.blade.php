@@ -27,11 +27,14 @@
     window.userStoreEndpoint = '{{ route('dashboard.users.store') }}';
     window.userEndpointBase = '{{ url('/users') }}';
     window.itemOwnerOfficeId = @json($itemOwnerOfficeId);
+    window.roleOffices = @json($roleOffices);
   </script>
 
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
-      <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
+      <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" alt="NU-TILIZE" class="toolbar-logo" />
+
+      @include('partials.office-user-guide')
 
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
@@ -54,8 +57,12 @@
           <h1 class="section-title">Manage Users</h1>
         </div>
 
-        @if(session('success'))
-          <div class="alert alert-success">{{ session('success') }}</div>
+        @php
+          $flashSuccess = session('success');
+          $createdUserNotice = is_string($flashSuccess) && str_starts_with($flashSuccess, 'User account created successfully.');
+        @endphp
+        @if($flashSuccess && !$createdUserNotice)
+          <div class="alert alert-success">{{ $flashSuccess }}</div>
         @endif
         @if(session('error'))
           <div class="alert alert-error">{{ session('error') }}</div>
@@ -74,29 +81,62 @@
           use App\Services\ItemOwnerService;
           use App\Services\UserAccountStatusService;
 
-          $adminRoles = ['admin', 'pf_admin', 'pc_admin'];
+          $isStaffRole = function ($user): bool {
+              if (ItemOwnerService::isItemOwnerUser($user)) {
+                  return false;
+              }
+
+              return \App\Support\RoleCatalog::isStaffRole((string) $user->role);
+          };
           $itemOwners = $users->filter(fn ($user) => ItemOwnerService::isItemOwnerUser($user))->values();
-          $admins = $users->filter(function ($user) use ($adminRoles) {
-              return in_array(strtolower((string) $user->role), $adminRoles, true)
-                  && !ItemOwnerService::isItemOwnerUser($user);
-          })->values();
-          $mobilePool = $users->filter(function ($user) use ($adminRoles) {
-              return !in_array(strtolower((string) $user->role), $adminRoles, true)
-                  && !ItemOwnerService::isItemOwnerUser($user);
-          });
-          $facultyUsers = $mobilePool->filter(fn ($user) => strtolower((string) $user->role) === 'faculty')->values();
-          $studentUsers = $mobilePool->filter(fn ($user) => strtolower((string) $user->role) !== 'faculty')->values();
+          $admins = $users->filter(fn ($user) => $isStaffRole($user))->values();
+          $mobilePool = $users->filter(fn ($user) => !$isStaffRole($user) && !ItemOwnerService::isItemOwnerUser($user));
+          $facultyUsers = $mobilePool->filter(fn ($user) => $user->isFaculty())->values();
+          $studentUsers = $mobilePool->filter(fn ($user) => !$user->isFaculty())->values();
+          $staffByRoles = function (array $roleOrder) use ($users) {
+              $rank = array_flip($roleOrder);
+
+              return $users
+                  ->filter(fn ($user) => array_key_exists((string) $user->role, $rank))
+                  ->sortBy([
+                      fn ($user) => $rank[(string) $user->role],
+                      fn ($user) => strtolower($user->displayName()),
+                  ])
+                  ->values();
+          };
+          $officeRoleOrder = ['Gen_Ed', 'SDAO', 'Safety', 'Security'];
+          $deanRoleOrder = array_keys(\App\Support\RoleCatalog::DEAN_CHAIRS);
+          $chairRoleOrder = array_keys(\App\Support\RoleCatalog::PROGRAM_OFFICES);
+          $pfoUsers = $staffByRoles(['PFO']);
+          $officeUsers = $staffByRoles($officeRoleOrder);
+          $deanUsers = $staffByRoles($deanRoleOrder);
+          $programChairUsers = $staffByRoles($chairRoleOrder);
+          $placedStaffRoles = array_merge(['PFO'], $officeRoleOrder, $deanRoleOrder, $chairRoleOrder);
+          $otherStaffUsers = $admins
+              ->filter(fn ($user) => !in_array((string) $user->role, $placedStaffRoles, true))
+              ->sortBy(fn ($user) => strtolower((string) $user->role.' '.$user->displayName()))
+              ->values();
+          $userSections = [
+              ['key' => 'pfo', 'label' => 'PFO', 'icon' => 'bi-tools', 'users' => $pfoUsers, 'ranks' => ['PFO' => 0], 'rowClass' => 'admin-row', 'roleBadgeClass' => 'admin-badge', 'deleteConfirm' => 'Delete this user?'],
+              ['key' => 'offices', 'label' => 'Offices', 'icon' => 'bi-building', 'users' => $officeUsers, 'ranks' => array_flip($officeRoleOrder), 'rowClass' => 'admin-row', 'roleBadgeClass' => 'admin-badge', 'deleteConfirm' => 'Delete this user?'],
+              ['key' => 'deans', 'label' => 'Deans', 'icon' => 'bi-bank', 'users' => $deanUsers, 'ranks' => array_flip($deanRoleOrder), 'rowClass' => 'admin-row', 'roleBadgeClass' => 'admin-badge', 'deleteConfirm' => 'Delete this user?'],
+              ['key' => 'program-chairs', 'label' => 'Program Chairs', 'icon' => 'bi-person-badge', 'users' => $programChairUsers, 'ranks' => array_flip($chairRoleOrder), 'rowClass' => 'admin-row', 'roleBadgeClass' => 'admin-badge', 'deleteConfirm' => 'Delete this user?'],
+              ['key' => 'other-staff', 'label' => 'Admins', 'icon' => 'bi-shield-lock', 'users' => $otherStaffUsers, 'ranks' => [], 'rowClass' => 'admin-row', 'roleBadgeClass' => 'admin-badge', 'deleteConfirm' => 'Delete this user?'],
+              ['key' => 'item-owners', 'label' => 'Item Owners', 'icon' => 'bi-box-seam', 'users' => $itemOwners, 'ranks' => [], 'rowClass' => 'admin-row', 'roleBadgeClass' => 'item-owner-badge', 'deleteConfirm' => 'Delete this item owner?'],
+              ['key' => 'faculty', 'label' => 'Faculty', 'icon' => 'bi-mortarboard', 'users' => $facultyUsers, 'ranks' => [], 'rowClass' => 'faculty-row', 'roleBadgeClass' => 'faculty-badge', 'deleteConfirm' => 'Delete this faculty account?'],
+              ['key' => 'students', 'label' => 'Students', 'icon' => 'bi-people', 'users' => $studentUsers, 'ranks' => [], 'rowClass' => 'approver-row', 'roleBadgeClass' => 'approver-badge', 'deleteConfirm' => 'Delete this student?'],
+          ];
           $formatUserCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'user' : 'users');
           $formatStudentCount = fn (int $count) => $count . ' ' . ($count === 1 ? 'student' : 'students');
           $activeUsersCount = $users->filter(fn ($user) => UserAccountStatusService::isActive($user))->count();
           $resolveUserName = fn ($user) => $user->displayName();
           $resolveUserOffice = function ($user): string {
-              $officeName = trim((string) ($user->office?->department_name ?? ''));
+              $officeName = \App\Models\Office::publicLabel((string) ($user->office?->department_name ?? ''));
               if ($officeName !== '') {
                   return $officeName;
               }
 
-              $programOfficeName = trim((string) ($user->academicProgram?->office?->department_name ?? ''));
+              $programOfficeName = \App\Models\Office::publicLabel((string) ($user->academicProgram?->office?->department_name ?? ''));
               if ($programOfficeName !== '') {
                   return $programOfficeName;
               }
@@ -142,8 +182,138 @@
         </section>
 
         <p class="users-policy-note">
-          Student and faculty accounts remain active for {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks from activation. Once the period ends, accounts become inactive. Activating an account resets the timer and starts a new {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }}-week period. PC admins can activate or deactivate accounts at any time.
+          Student and faculty accounts remain active for {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }} weeks from activation. Once the period ends, accounts become inactive. Activating an account resets the timer and starts a new {{ \App\Services\UserAccountStatusService::INACTIVITY_WEEKS }}-week period. Program chair, dean, and office accounts stay active until you deactivate them. Deactivate the old account when that person leaves, then add the new one. The old account stays on record and cannot sign in or approve.
         </p>
+
+        <section class="registration-allowance" aria-label="Registration emails">
+          <header class="registration-allowance-head">
+            <span class="registration-allowance-icon" aria-hidden="true"><i class="bi bi-envelope-check-fill"></i></span>
+            <div>
+              <h2>Emails allowed to register</h2>
+              <p>A person can create an account only when their email is on this list. A later upload adds new addresses and leaves the ones already listed.</p>
+            </div>
+            <div class="registration-allowance-tools">
+              <a class="users-download-btn" href="{{ route('dashboard.registration-allowances.export') }}"><i class="bi bi-download" aria-hidden="true"></i> Download registered</a>
+              <span class="registration-allowance-count">{{ $allowances->total() }} {{ $allowances->total() === 1 ? 'email' : 'emails' }}</span>
+            </div>
+          </header>
+
+          <div class="registration-allowance-actions">
+            <form class="registration-allowance-card" method="POST" action="{{ route('dashboard.registration-allowances.import') }}" enctype="multipart/form-data">
+              @csrf
+              @if($allowanceSearch !== '')
+                <input type="hidden" name="allowance_q" value="{{ $allowanceSearch }}" />
+              @endif
+              @if($allowances->currentPage() > 1)
+                <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
+              @endif
+              <span class="registration-allowance-kicker"><i class="bi bi-file-earmark-spreadsheet"></i> Upload a list</span>
+              <p>Use a CSV or Excel file with a column named Email.</p>
+              <label class="registration-allowance-file" for="allowance-file">
+                <input id="allowance-file" type="file" name="file" accept=".csv,.txt,.xlsx" required />
+                <i class="bi bi-upload" aria-hidden="true"></i>
+                <span data-file-label>Choose file</span>
+              </label>
+              <button class="facilities-add-btn" type="submit">Upload</button>
+            </form>
+
+            <form class="registration-allowance-card" method="POST" action="{{ route('dashboard.registration-allowances.store') }}">
+              @csrf
+              @if($allowanceSearch !== '')
+                <input type="hidden" name="allowance_q" value="{{ $allowanceSearch }}" />
+              @endif
+              @if($allowances->currentPage() > 1)
+                <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
+              @endif
+              <label class="registration-allowance-kicker" for="allowance-email"><i class="bi bi-person-plus"></i> Add one email</label>
+              <p>For a new student or a transfer who is not in the file.</p>
+              <input id="allowance-email" type="email" name="email" maxlength="100" placeholder="name@students.nu-lipa.edu.ph" required />
+              <button class="facilities-add-btn" type="submit">Add email</button>
+            </form>
+          </div>
+
+          <form class="registration-allowance-search" method="GET" action="{{ route('dashboard.users') }}">
+            <label class="visually-hidden" for="allowance-search">Find an email</label>
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input id="allowance-search" type="search" name="allowance_q" value="{{ $allowanceSearch }}" placeholder="Search the registration list" />
+            <button class="users-reset-btn" type="submit">Search</button>
+            @if($allowanceSearch !== '')
+              <a class="users-reset-btn" href="{{ route('dashboard.users') }}">Clear</a>
+            @endif
+          </form>
+
+          <div class="table-wrap registration-allowance-table">
+            <table class="inventory-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Account</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @forelse($allowances as $allowance)
+                  @php $hasAccount = $allowanceRegistered->contains($allowance->email); @endphp
+                  <tr>
+                    <td class="registration-allowance-email">{{ $allowance->email }}</td>
+                    <td>
+                      <span class="registration-allowance-status {{ $hasAccount ? 'is-registered' : 'is-waiting' }}">
+                        {{ $hasAccount ? 'Registered' : 'Not registered' }}
+                      </span>
+                    </td>
+                    <td class="registration-allowance-action">
+                      @if(!$hasAccount)
+                        <form method="POST" action="{{ route('dashboard.registration-allowances.destroy', $allowance) }}">
+                          @csrf
+                          @method('DELETE')
+                          @if($allowanceSearch !== '')
+                            <input type="hidden" name="allowance_q" value="{{ $allowanceSearch }}" />
+                          @endif
+                          @if($allowances->currentPage() > 1)
+                            <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
+                          @endif
+                          <button type="submit">Remove</button>
+                        </form>
+                      @endif
+                    </td>
+                  </tr>
+                @empty
+                  <tr>
+                    <td colspan="3">
+                      <div class="registration-allowance-empty">
+                        <i class="bi bi-inbox" aria-hidden="true"></i>
+                        <strong>{{ $allowanceSearch !== '' ? 'No matching email' : 'No emails yet' }}</strong>
+                        <span>{{ $allowanceSearch !== '' ? 'Try another search.' : 'Upload a file or add the first address.' }}</span>
+                      </div>
+                    </td>
+                  </tr>
+                @endforelse
+              </tbody>
+            </table>
+          </div>
+          @if($allowances->hasPages())
+            <div class="registration-allowance-pages">
+              @if($allowances->onFirstPage())
+                <span>Previous</span>
+              @else
+                <a href="{{ $allowances->previousPageUrl() }}">Previous</a>
+              @endif
+              <span>Page {{ $allowances->currentPage() }} of {{ $allowances->lastPage() }}</span>
+              @if($allowances->hasMorePages())
+                <a href="{{ $allowances->nextPageUrl() }}">Next</a>
+              @else
+                <span>Next</span>
+              @endif
+            </div>
+          @endif
+        </section>
+        <script>
+          document.getElementById('allowance-file')?.addEventListener('change', (event) => {
+            const input = event.currentTarget;
+            const label = input.parentElement?.querySelector('[data-file-label]');
+            if (label) label.textContent = input.files?.[0]?.name || 'Choose file';
+          });
+        </script>
 
         <section class="users-tools-bar" aria-label="User table filters">
           <div class="users-search-wrap">
@@ -156,10 +326,13 @@
               <label for="users-role-filter">Role</label>
               <select id="users-role-filter">
                 <option value="all">All Roles</option>
-                <option value="admin">Admin</option>
-                <option value="item_owner">Item Owner</option>
-                <option value="faculty">Faculty</option>
-                <option value="student">Student</option>
+                @foreach(\App\Support\RoleCatalog::groupedAssignable() as $group => $options)
+                  <optgroup label="{{ $group }}">
+                    @foreach($options as $code => $label)
+                      <option value="{{ $code }}">{{ $label }}</option>
+                    @endforeach
+                  </optgroup>
+                @endforeach
               </select>
             </div>
 
@@ -185,6 +358,7 @@
             <button class="users-reset-btn" id="users-reset-filters" type="button">Reset</button>
           </div>
 
+          <a class="users-download-btn" href="{{ route('dashboard.users.export') }}"><i class="bi bi-download" aria-hidden="true"></i> Download Excel</a>
           <button class="facilities-add-btn" id="user-add-btn" type="button"><span class="btn-icon">+</span> Add User</button>
         </section>
 
@@ -203,97 +377,48 @@
                 </tr>
               </thead>
               <tbody id="users-table-body">
-                @if($admins->count() > 0)
-                  <tr class="category-header-row">
-                    <td colspan="7">
-                      <div class="category-header">
-                        <i class="bi bi-shield-lock"></i>
-                        <span>Admins</span>
-                        <span class="category-count" data-group-count>{{ $formatUserCount($admins->count()) }}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  @foreach($admins as $user)
-                    @include('partials.dashboard-user-row', [
-                      'user' => $user,
-                      'resolveUserOffice' => $resolveUserOffice,
-                      'resolveUserName' => $resolveUserName,
-                      'rowClass' => 'admin-row',
-                      'roleBadgeClass' => 'admin-badge',
-                      'roleLabel' => strtoupper((string) $user->role),
-                      'deleteConfirm' => 'Delete this user?',
-                    ])
-                  @endforeach
-                @endif
-
-                @if($itemOwners->count() > 0)
-                  <tr class="category-header-row">
-                    <td colspan="7">
-                      <div class="category-header">
-                        <i class="bi bi-box-seam"></i>
-                        <span>Item Owners</span>
-                        <span class="category-count" data-group-count>{{ $formatUserCount($itemOwners->count()) }}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  @foreach($itemOwners as $user)
-                    @include('partials.dashboard-user-row', [
-                      'user' => $user,
-                      'resolveUserOffice' => $resolveUserOffice,
-                      'resolveUserName' => $resolveUserName,
-                      'rowClass' => 'admin-row',
-                      'roleBadgeClass' => 'item-owner-badge',
-                      'roleLabel' => 'ITEM OWNER',
-                      'deleteConfirm' => 'Delete this item owner?',
-                    ])
-                  @endforeach
-                @endif
-
-                @if($facultyUsers->count() > 0)
-                  <tr class="category-header-row" data-group="faculty">
-                    <td colspan="7">
-                      <div class="category-header">
-                        <i class="bi bi-mortarboard"></i>
-                        <span>Faculties</span>
-                        <span class="category-count" data-group-count>{{ $formatUserCount($facultyUsers->count()) }}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  @foreach($facultyUsers as $user)
-                    @include('partials.dashboard-user-row', [
-                      'user' => $user,
-                      'resolveUserOffice' => $resolveUserOffice,
-                      'resolveUserName' => $resolveUserName,
-                      'rowClass' => 'faculty-row',
-                      'roleBadgeClass' => 'faculty-badge',
-                      'roleLabel' => 'FACULTY',
-                      'deleteConfirm' => 'Delete this faculty account?',
-                    ])
-                  @endforeach
-                @endif
-
-                @if($studentUsers->count() > 0)
-                  <tr class="category-header-row" data-group="students">
-                    <td colspan="7">
-                      <div class="category-header">
-                        <i class="bi bi-people"></i>
-                        <span>Students</span>
-                        <span class="category-count" data-group-count>{{ $formatStudentCount($studentUsers->count()) }}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  @foreach($studentUsers as $user)
-                    @include('partials.dashboard-user-row', [
-                      'user' => $user,
-                      'resolveUserOffice' => $resolveUserOffice,
-                      'resolveUserName' => $resolveUserName,
-                      'rowClass' => 'approver-row',
-                      'roleBadgeClass' => 'approver-badge',
-                      'roleLabel' => in_array(strtolower((string) $user->role), ['user', 'student'], true) ? 'STUDENT' : strtoupper((string) $user->role),
-                      'deleteConfirm' => 'Delete this student?',
-                    ])
-                  @endforeach
-                @endif
+                @foreach($userSections as $section)
+                  @if($section['users']->isNotEmpty())
+                    <tr class="category-header-row" data-group="{{ $section['key'] }}">
+                      <td colspan="7">
+                        <div class="category-header">
+                          <i class="bi {{ $section['icon'] }}"></i>
+                          <span>{{ $section['label'] }}</span>
+                          <span class="category-count" data-group-count>{{ $section['key'] === 'students' ? $formatStudentCount($section['users']->count()) : $formatUserCount($section['users']->count()) }}</span>
+                        </div>
+                      </td>
+                    </tr>
+                    @foreach($section['users'] as $user)
+                      @php
+                        $role = (string) $user->role;
+                        if ($section['key'] === 'students') {
+                            $roleLabel = in_array(strtolower($role), ['user', 'student'], true) ? 'STUDENT' : strtoupper($role);
+                        } elseif ($section['key'] === 'faculty') {
+                            $roleLabel = 'FACULTY';
+                        } elseif ($section['key'] === 'item-owners') {
+                            $roleLabel = 'ITEM OWNER';
+                        } elseif (\App\Support\RoleCatalog::isProgramChairCode($role) || strtolower($role) === 'pc_admin') {
+                            $roleLabel = 'PROGRAM CHAIR';
+                        } else {
+                            $roleLabel = strtoupper(\App\Support\RoleCatalog::label($role));
+                        }
+                        if ($user->role_needs_review) {
+                            $roleLabel .= ' (NEEDS REVIEW)';
+                        }
+                      @endphp
+                      @include('partials.dashboard-user-row', [
+                        'user' => $user,
+                        'resolveUserOffice' => $resolveUserOffice,
+                        'resolveUserName' => $resolveUserName,
+                        'rowClass' => $section['rowClass'],
+                        'roleBadgeClass' => $section['roleBadgeClass'],
+                        'roleLabel' => $roleLabel,
+                        'roleRank' => $section['ranks'][$role] ?? 0,
+                        'deleteConfirm' => $section['deleteConfirm'],
+                      ])
+                    @endforeach
+                  @endif
+                @endforeach
 
                 @if($users->isEmpty())
                   <tr class="users-empty-state-row" data-empty-fallback>
@@ -351,19 +476,17 @@
           <section class="equipment-form-section">
             <label class="facilities-field-label" for="user-role">Role</label>
             <select id="user-role" class="facilities-input facilities-select" name="role" required>
-              <option value="student">STUDENT</option>
-              <option value="faculty">FACULTY</option>
-              <option value="admin">ADMIN</option>
-              <option value="item_owner">ITEM OWNER</option>
-            </select>
-
-            <label class="facilities-field-label" for="user-office">Office</label>
-            <select id="user-office" class="facilities-input facilities-select" name="office_id">
-              <option value="">No Office</option>
-              @foreach($offices as $office)
-                <option value="{{ $office->office_id }}">{{ $office->department_name }}</option>
+              @foreach(\App\Support\RoleCatalog::groupedAssignable() as $group => $options)
+                <optgroup label="{{ $group }}">
+                  @foreach($options as $code => $label)
+                    <option value="{{ $code }}">{{ $label }}</option>
+                  @endforeach
+                </optgroup>
               @endforeach
             </select>
+
+            <input type="hidden" name="office_id" id="user-office" value="" />
+            <p class="facilities-input-note" id="user-office-assignment"></p>
             <small class="facilities-input-note" id="item-owner-office-note">
               Item owners are automatically assigned to the Item Owner office and can manage their own equipment inventory.
             </small>
@@ -394,6 +517,7 @@
     const userEmailInput = document.getElementById('user-email');
     const userRoleInput = document.getElementById('user-role');
     const userOfficeInput = document.getElementById('user-office');
+    const userOfficeAssignment = document.getElementById('user-office-assignment');
     const userSetupNote = document.getElementById('user-setup-note');
     const itemOwnerOfficeNote = document.getElementById('item-owner-office-note');
     const itemOwnerOfficeId = window.itemOwnerOfficeId ? String(window.itemOwnerOfficeId) : '';
@@ -420,17 +544,28 @@
     };
 
     const syncRoleOfficeFields = () => {
-      const isItemOwner = userRoleInput.value === 'item_owner';
+      const role = userRoleInput.value;
+      const isItemOwner = role === 'item_owner';
+      const assignment = (window.roleOffices && window.roleOffices[role]) || null;
+      const officeId = assignment && assignment.office_id ? String(assignment.office_id) : '';
+      const officeLabel = assignment && assignment.label ? String(assignment.label) : '';
+
+      if (userOfficeInput) {
+        userOfficeInput.value = officeId;
+      }
 
       if (itemOwnerOfficeNote) {
         itemOwnerOfficeNote.style.display = isItemOwner ? 'block' : 'none';
       }
 
-      if (isItemOwner && itemOwnerOfficeId) {
-        userOfficeInput.value = itemOwnerOfficeId;
-        userOfficeInput.disabled = true;
-      } else {
-        userOfficeInput.disabled = false;
+      if (userOfficeAssignment) {
+        if (isItemOwner) {
+          userOfficeAssignment.textContent = '';
+        } else if (officeLabel) {
+          userOfficeAssignment.textContent = 'Office: ' + officeLabel;
+        } else {
+          userOfficeAssignment.textContent = 'This account is not assigned to an office.';
+        }
       }
     };
 
@@ -440,7 +575,18 @@
       }
     };
 
-    const resetModal = (presetRole = 'student') => {
+    const canonicalRole = (role) => {
+      const value = String(role || '');
+      if (value === 'user' || value === 'student') {
+        return 'Student';
+      }
+      if (value === 'faculty') {
+        return 'Faculty';
+      }
+      return value;
+    };
+
+    const resetModal = (presetRole = 'Student') => {
       userForm.action = window.userStoreEndpoint;
       userFormMethod.value = 'POST';
       userModalTitle.textContent = presetRole === 'item_owner' ? 'Add Item Owner' : 'Add User';
@@ -448,8 +594,7 @@
       userUsernameInput.value = '';
       userFullNameInput.value = '';
       userEmailInput.value = '';
-      userRoleInput.value = presetRole === 'user' ? 'student' : presetRole;
-      userOfficeInput.value = presetRole === 'item_owner' ? itemOwnerOfficeId : '';
+      userRoleInput.value = canonicalRole(presetRole);
       syncSetupNote(true);
       syncRoleOfficeFields();
     };
@@ -459,8 +604,7 @@
       const username = row.dataset.userUsername;
       const fullName = row.dataset.userFullName || row.dataset.userName;
       const email = row.dataset.userEmail;
-      const role = row.dataset.userRole === 'user' ? 'student' : row.dataset.userRole;
-      const officeId = row.dataset.userOfficeId;
+      const role = canonicalRole(row.dataset.userRole);
 
       userForm.action = `${window.userEndpointBase}/${userId}`;
       userFormMethod.value = 'PATCH';
@@ -469,7 +613,6 @@
       userFullNameInput.value = fullName;
       userEmailInput.value = email;
       userRoleInput.value = role;
-      userOfficeInput.value = officeId || '';
       syncSetupNote(false);
       userModalTitle.textContent = role === 'item_owner' ? 'Edit Item Owner' : 'Edit User';
       syncRoleOfficeFields();
@@ -492,12 +635,6 @@
 
     if (userRoleInput) {
       userRoleInput.addEventListener('change', syncRoleOfficeFields);
-    }
-
-    if (userForm) {
-      userForm.addEventListener('submit', () => {
-        userOfficeInput.disabled = false;
-      });
     }
 
     if (userCancelBtn) {
@@ -564,22 +701,24 @@
             return rowRole === 'item_owner';
           }
 
-          if (selectedRole === 'admin') {
-            return ['admin', 'pf_admin', 'pc_admin'].includes(rowRole);
-          }
-
-          if (selectedRole === 'faculty') {
+          if (selectedRole === 'Faculty') {
             return rowRole === 'faculty';
           }
 
-          if (selectedRole === 'student') {
+          if (selectedRole === 'Student') {
             return rowRole === 'student' || rowRole === 'user';
           }
 
-          return rowRole === selectedRole;
+          return rowRole === selectedRole.toLowerCase();
         };
 
         const compareRows = (left, right, sortMode) => {
+          const leftRank = Number.parseInt(left.dataset.roleRank || '0', 10) || 0;
+          const rightRank = Number.parseInt(right.dataset.roleRank || '0', 10) || 0;
+          if (leftRank !== rightRank) {
+            return leftRank - rightRank;
+          }
+
           const leftName = normalizeText(left.dataset.userName)
             || normalizeText(left.dataset.userFullName)
             || normalizeText(left.dataset.userUsername);
@@ -706,6 +845,17 @@
   </script>
 
   <script src="/js/dashboard.js?v={{ filemtime(public_path('js/dashboard.js')) }}"></script>
+  @if(!empty($createdUserNotice))
+    <script>
+      if (typeof showAppNotice === 'function') {
+        showAppNotice(@json($flashSuccess), {
+          title: 'User created',
+          variant: 'success',
+          buttonText: 'OK',
+        });
+      }
+    </script>
+  @endif
   <script>
     (() => {
       const confirmFn = typeof window.showAppConfirm === 'function' ? window.showAppConfirm : null;
@@ -781,7 +931,7 @@
           );
           statusForm.setAttribute(
             'data-confirm-note',
-            isActive ? 'They will not be able to sign in until reactivated.' : ''
+            isActive ? 'They will not be able to sign in or approve requests until reactivated.' : ''
           );
           statusForm.setAttribute('data-confirm-text', isActive ? 'Deactivate' : 'Activate');
           statusForm.setAttribute('data-confirm-variant', isActive ? 'danger' : 'success');
@@ -928,5 +1078,48 @@
       });
     })();
   </script>
+  @php $allowanceNotice = session('allowance_notice'); @endphp
+  @if(is_array($allowanceNotice))
+    <div class="allowance-notice is-{{ $allowanceNotice['kind'] ?? 'added' }}" id="allowance-notice" role="dialog" aria-modal="true" aria-labelledby="allowance-notice-title">
+      <button type="button" class="allowance-notice-backdrop" data-allowance-close aria-label="Close"></button>
+      <article class="allowance-notice-card">
+        <header class="allowance-notice-head">
+          <span class="allowance-notice-icon" aria-hidden="true">
+            @if(($allowanceNotice['kind'] ?? '') === 'used')
+              <i class="bi bi-envelope-exclamation-fill"></i>
+            @elseif(($allowanceNotice['kind'] ?? '') === 'removed')
+              <i class="bi bi-envelope-x-fill"></i>
+            @elseif(($allowanceNotice['kind'] ?? '') === 'error')
+              <i class="bi bi-exclamation-circle-fill"></i>
+            @else
+              <i class="bi bi-envelope-check-fill"></i>
+            @endif
+          </span>
+          <h2 id="allowance-notice-title">{{ $allowanceNotice['title'] ?? 'Email added' }}</h2>
+        </header>
+        <div class="allowance-notice-body">
+          @if(!empty($allowanceNotice['email']))
+            <p class="allowance-notice-email">{{ $allowanceNotice['email'] }}</p>
+          @endif
+          <p>{{ $allowanceNotice['message'] ?? '' }}</p>
+        </div>
+        <footer class="allowance-notice-actions">
+          <button type="button" id="allowance-notice-close">OK</button>
+        </footer>
+      </article>
+    </div>
+    <script>
+      (() => {
+        const notice = document.getElementById('allowance-notice');
+        const dismiss = () => notice?.remove();
+        document.getElementById('allowance-notice-close')?.addEventListener('click', dismiss);
+        notice?.querySelector('[data-allowance-close]')?.addEventListener('click', dismiss);
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') dismiss();
+        });
+        document.getElementById('allowance-notice-close')?.focus();
+      })();
+    </script>
+  @endif
 </body>
 </html>

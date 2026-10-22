@@ -57,9 +57,8 @@ html,
 body {
   margin: 0;
   font-family: "Poppins", sans-serif;
-  height: 100%;
+  min-height: 100%;
   max-width: 100%;
-  overflow-x: hidden;
 }
 
 /* smooth scrolling for in-page anchors */
@@ -73,8 +72,7 @@ body {
     radial-gradient(circle at 84% 20%, rgba(246, 197, 14, 0.15) 0%, rgba(246, 197, 14, 0) 40%),
     linear-gradient(180deg, #f8f9ff 0%, #eff2fb 100%);
   color: var(--text-dark);
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow-x: clip;
 }
 
 .top-header {

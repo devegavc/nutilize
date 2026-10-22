@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
   <!-- Custom styles -->
-  <link rel="stylesheet" href="/css/auth.css?v=login-6">
+  <link rel="stylesheet" href="/css/auth.css?v=login-8">
 </head>
 <body class="login-page">
 
@@ -35,7 +35,7 @@
     <div class="login-card mx-auto">
       <div class="login-card-inner">
         <div class="brand-area text-center">
-          <img src="/img/nutilize_logo.png" 
+          <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" 
                alt="NUTilize Logo" 
                class="brand-logo">
           <p class="brand-subtitle">

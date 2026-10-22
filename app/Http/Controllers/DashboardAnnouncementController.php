@@ -47,8 +47,6 @@ class DashboardAnnouncementController extends Controller
         ]);
 
         try {
-            Announcement::purgeExpired();
-
             $now = now();
             $announcerName = $this->resolveAnnouncerName($validated['announcer_name']);
 
@@ -65,10 +63,6 @@ class DashboardAnnouncementController extends Controller
 
             if (Announcement::hasAnnouncementsColumn('announcer_name')) {
                 $payload['announcer_name'] = $announcerName;
-            }
-
-            if (Announcement::hasAnnouncementsColumn('expires_at')) {
-                $payload['expires_at'] = $now->copy()->addDays(Announcement::DEFAULT_TTL_DAYS);
             }
 
             DB::table('announcements')->insert($payload);

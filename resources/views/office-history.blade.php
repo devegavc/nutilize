@@ -30,7 +30,9 @@
 
   <header class="top-header">
     <div class="top-header-inner toolbar-card">
-      <img src="/img/nutilize_logo.png" alt="NU-TILIZE" class="toolbar-logo" />
+      <img src="/img/nutilize_wordmark.png?v={{ filemtime(public_path('img/nutilize_wordmark.png')) }}" alt="NU-TILIZE" class="toolbar-logo" />
+
+      @include('partials.office-user-guide')
 
       <button class="toolbar-icon" type="button" aria-label="Messages">
         <i class="bi bi-chat-fill"></i>
@@ -194,12 +196,8 @@
             data-total="{{ $historyTotal }}"
             data-server-per-page="{{ $historyServerPerPage }}"
             data-server-page="{{ $historyServerPage }}"
-            @if($historyTotal <= 50) hidden @endif
-          >
-            @if($historyTotal > 0)
-              {{ $historyRows->links() }}
-            @endif
-          </div>
+            hidden
+          ></div>
         </section>
       </section>
     </section>

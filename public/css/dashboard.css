@@ -90,7 +90,6 @@ body {
   width: 100%;
   z-index: 1000;
   box-shadow: 0 10px 20px rgba(15, 24, 66, 0.3);
-  backdrop-filter: blur(6px);
 }
 
 .top-header-inner {
@@ -126,6 +125,9 @@ body {
   height: auto;
   margin-left: 30px;
   margin-right: auto;
+  isolation: isolate;
+  mix-blend-mode: normal;
+  color-interpolation: sRGB;
 }
 
 .toolbar-icon,
@@ -550,6 +552,33 @@ body {
   gap: 12px;
   box-shadow: 0 10px 20px rgba(27, 38, 93, 0.14);
   height: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: #9aa3bc transparent;
+}
+
+.side-nav:has(.nav-submenu.is-open) {
+  padding: 10px 14px;
+  gap: 5px;
+}
+
+.side-nav::-webkit-scrollbar {
+  width: 8px;
+}
+
+.side-nav::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 10px 0;
+}
+
+.side-nav::-webkit-scrollbar-thumb {
+  background: #9aa3bc;
+  border-radius: 999px;
+}
+
+.side-nav::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .nav-item {
@@ -1898,7 +1927,7 @@ body {
 
 .reservation-details-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(240px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   margin-bottom: 14px;
 }
@@ -2364,6 +2393,40 @@ body.office-app .content-card > .inventory-grid > .table-wrap {
   overflow-y: auto;
   overscroll-behavior: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+body.office-app .workspace-grid > .content-card.office-archive-card {
+  align-self: stretch;
+  height: 100%;
+  max-height: 100%;
+}
+
+body.office-app .office-archive-history-card {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+body.office-app .office-archive-wrap {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.office-archive-history-card > .office-request-pagination {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+.office-archive-history-card > .office-request-pagination nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.office-archive-history-card > .office-request-pagination p {
+  margin: 0;
 }
 
 body.office-app .content-card > .inventory-grid {

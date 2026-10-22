@@ -122,6 +122,12 @@ class ReservationApprovalNotifier
             ->values()
             ->all();
 
+        $deanIds = ProgramChairStageService::recipientsForOffice($officeId, $reservationId)
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $userIds = array_values(array_unique(array_merge($userIds, $deanIds)));
+
         if ($userIds === []) {
             return;
         }
@@ -139,9 +145,8 @@ class ReservationApprovalNotifier
     }
 
     /**
-     * Notify admins in $officeId when that office should be alerted:
-     * - it is the current actionable approver, or
-     * - it is the Physical Facilities office (PF visibility across requests).
+     * Notify admins in $officeId only when that office is the current approver.
+     * Requests still with another office stay on the PF home list and are not alerted yet.
      * Skips users who already have an unread/read row for this reservation and type (idempotent).
      */
     public static function notifyOfficeIfRelevant(
@@ -159,24 +164,13 @@ class ReservationApprovalNotifier
         $actionableOfficeId = !is_null($actionableOfficeId) ? (int) $actionableOfficeId : null;
         $pfOfficeId = !is_null($pfOfficeId) ? (int) $pfOfficeId : null;
 
-        $shouldNotify = ($actionableOfficeId !== null && $officeId === $actionableOfficeId)
-            || ($pfOfficeId !== null && $officeId === $pfOfficeId);
+        $shouldNotify = $actionableOfficeId !== null && $officeId === $actionableOfficeId;
 
         if (!$shouldNotify) {
             return;
         }
 
-        $isPfOffice = $pfOfficeId !== null && $officeId === $pfOfficeId;
-
-        $adminUsers = User::query()
-            ->where('office_id', $officeId)
-            ->where(function ($query) use ($isPfOffice) {
-                $query->whereRaw('LOWER(role) IN (?, ?)', ['admin', 'pc_admin']);
-                if ($isPfOffice) {
-                    $query->orWhereRaw('LOWER(role) = ?', ['pf_admin']);
-                }
-            })
-            ->get();
+        $adminUsers = ProgramChairStageService::recipientsForOffice($officeId, (int) $reservation->reservation_id);
 
         if ($adminUsers->isEmpty()) {
             return;
@@ -268,17 +262,8 @@ class ReservationApprovalNotifier
 
         $targetOfficeId = (int) $targetOfficeId;
         $pfOfficeId = !is_null($pfOfficeId) ? (int) $pfOfficeId : null;
-        $isPfOffice = $pfOfficeId !== null && $targetOfficeId === $pfOfficeId;
 
-        $adminUsers = User::query()
-            ->where('office_id', $targetOfficeId)
-            ->where(function ($query) use ($isPfOffice) {
-                $query->whereRaw('LOWER(role) IN (?, ?)', ['admin', 'pc_admin']);
-                if ($isPfOffice) {
-                    $query->orWhereRaw('LOWER(role) = ?', ['pf_admin']);
-                }
-            })
-            ->get();
+        $adminUsers = ProgramChairStageService::recipientsForOffice($targetOfficeId, (int) $reservation->reservation_id);
 
         if ($adminUsers->isEmpty()) {
             return;
@@ -353,17 +338,17 @@ class ReservationApprovalNotifier
                 'PC' => 'Program Chair',
                 'SDAO' => 'Student Development and Activities Office',
                 'IO' => 'Inventory Office',
-                'DO' => 'Discipline Office',
+                'DO' => 'Safety',
                 'SEC' => 'Security',
                 'PF' => 'Physical Facilities',
                 'GENED' => 'General Education',
-                default => $code,
+                default => \App\Models\Office::publicLabel($code),
             };
         }
 
         $name = trim((string) ($office->department_name ?? ''));
 
-        return $name !== '' ? $name : 'Previous office';
+        return $name !== '' ? \App\Models\Office::publicLabel($name) : 'Previous office';
     }
 
     private static function timestampForReservation(Reservation $reservation, $fallback)

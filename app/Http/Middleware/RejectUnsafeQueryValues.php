@@ -16,7 +16,7 @@ class RejectUnsafeQueryValues
      */
     private const CACHE_BUSTER = '/^(?:[0-9]{1,12}|login-[0-9]{1,4}|[0-9]{8,12}-[A-Za-z][A-Za-z0-9_-]{0,48})$/';
 
-    private const LOGIN_IDENTIFIER = '/^[A-Za-z0-9._@+\-]{1,50}$/';
+    private const LOGIN_IDENTIFIER = '/^[A-Za-z0-9._@+\- ]{1,50}$/';
 
     private const SQL_BOOLEAN = '/\b(?:and|or)\b\s+[\'"]?[0-9]+[\'"]?\s*=\s*[\'"]?[0-9]+/i';
 
@@ -81,7 +81,10 @@ class RejectUnsafeQueryValues
         $username = $request->request->get('username');
         $password = $request->request->get('password');
 
-        if (!is_string($username) || ($username !== '' && preg_match(self::LOGIN_IDENTIFIER, $username) !== 1)) {
+        if (
+            !is_string($username)
+            || ($username !== '' && (preg_match(self::LOGIN_IDENTIFIER, $username) !== 1 || $this->containsSqlBoolean($username)))
+        ) {
             return $this->reject();
         }
 

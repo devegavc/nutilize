@@ -1363,7 +1363,7 @@ function showQuickReportDetailsModal(report) {
         </div>
 
         <footer class="quick-report-details-footer">
-          <a class="quick-report-footer-link" href="/maintenance">Open Item Maintenance</a>
+          <a class="quick-report-footer-link" href="/maintenance"><i class="bi bi-wrench" aria-hidden="true"></i><span>Item Maintenance.</span></a>
         </footer>
       </article>
     </div>
@@ -1406,41 +1406,6 @@ if (reportTableBody instanceof HTMLElement) {
   });
 }
 
-function normalizeReservationProofUrlList(value) {
-  if (Array.isArray(value)) {
-    return value
-      .map((url) => String(url || '').trim())
-      .filter((url) => /^https?:\/\//i.test(url));
-  }
-
-  const raw = String(value || '').trim();
-  if (!raw) {
-    return [];
-  }
-
-  if (raw.startsWith('[')) {
-    try {
-      const decoded = JSON.parse(raw);
-      if (Array.isArray(decoded)) {
-        return normalizeReservationProofUrlList(decoded);
-      }
-    } catch (_error) {
-      return [];
-    }
-  }
-
-  return /^https?:\/\//i.test(raw) ? [raw] : [];
-}
-
-function parseReservationProofUrls(reservation) {
-  const fromList = normalizeReservationProofUrlList(reservation?.proof_of_consent_urls);
-  if (fromList.length) {
-    return fromList;
-  }
-
-  return normalizeReservationProofUrlList(reservation?.proof_of_consent_url);
-}
-
 function showReservationDetailsModal(reservation, options = {}) {
   const resources = Array.isArray(reservation.resources) && reservation.resources.length
     ? reservation.resources
@@ -1479,11 +1444,7 @@ function showReservationDetailsModal(reservation, options = {}) {
     : '';
   const reservationCode = reservation.reservation_code
     || (reservation.id ? `NU-${String(reservation.id).padStart(6, '0')}` : 'Reservation');
-  const proofUrls = parseReservationProofUrls(reservation);
-  const proofUrl = proofUrls[0] || '';
   const requesterType = String(reservation.requester_type || '').trim() || 'Unknown';
-  const attachmentHeading = String(reservation.attachment_heading || '').trim()
-    || (requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent');
   const scheduleLabel = reservation.event_schedule
     || [
       reservation.event_date || reservation.start_date,
@@ -1500,43 +1461,6 @@ function showReservationDetailsModal(reservation, options = {}) {
       </div>
     `
     : '';
-
-  const proofMarkup = proofUrls.length
-    ? `
-      <section class="reservation-details-panel reservation-proof-panel">
-        <div class="reservation-panel-heading">
-          <h3>${escapeReservationDetailsHtml(attachmentHeading)}</h3>
-          ${proofUrls.length > 1
-            ? `<span class="reservation-proof-count" data-proof-counter>1 / ${proofUrls.length}</span>`
-            : `<a class="reservation-proof-open" href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">Open full image</a>`}
-        </div>
-        <div class="reservation-proof-viewer">
-          ${proofUrls.length > 1 ? `
-            <button type="button" class="reservation-proof-nav is-prev" data-proof-nav="-1" aria-label="Previous image">
-              <i class="bi bi-chevron-left"></i>
-            </button>
-          ` : ''}
-          <a class="reservation-proof-frame" data-proof-link href="${escapeReservationDetailsHtml(proofUrl)}" target="_blank" rel="noopener noreferrer">
-            <img data-proof-image src="${escapeReservationDetailsHtml(proofUrl)}" alt="${escapeReservationDetailsHtml(attachmentHeading)} for ${escapeReservationDetailsHtml(reservationCode)}" />
-          </a>
-          ${proofUrls.length > 1 ? `
-            <button type="button" class="reservation-proof-nav is-next" data-proof-nav="1" aria-label="Next image">
-              <i class="bi bi-chevron-right"></i>
-            </button>
-          ` : ''}
-        </div>
-      </section>
-    `
-    : `
-      <section class="reservation-details-panel reservation-proof-panel is-empty">
-        <div class="reservation-panel-heading">
-          <h3>${escapeReservationDetailsHtml(attachmentHeading)}</h3>
-        </div>
-        <p class="reservation-empty-note">${requesterType === 'Teacher'
-          ? 'No attachment was added to this request.'
-          : 'No letter of consent was attached to this request.'}</p>
-      </section>
-    `;
 
   const modal = document.createElement('div');
   modal.className = 'reservation-details-modal';
@@ -1573,6 +1497,10 @@ function showReservationDetailsModal(reservation, options = {}) {
                   <span>${escapeReservationDetailsHtml(requesterType)}</span>
                 </div>
                 <div class="info-row">
+                  <strong>Program</strong>
+                  <span>${escapeReservationDetailsHtml(reservation.requester_program || 'N/A')}</span>
+                </div>
+                <div class="info-row">
                   <strong>Email</strong>
                   <span>${escapeReservationDetailsHtml(reservation.requester_email || 'N/A')}</span>
                 </div>
@@ -1601,8 +1529,6 @@ function showReservationDetailsModal(reservation, options = {}) {
                 </div>
               </div>
             </section>
-
-            ${proofMarkup}
           </div>
 
           <section class="reservation-details-panel reservation-resources-panel">
@@ -1619,48 +1545,15 @@ function showReservationDetailsModal(reservation, options = {}) {
 
   const closeBtn = modal.querySelector('.reservation-details-close');
   const overlay = modal.querySelector('.reservation-details-overlay');
-  let proofIndex = 0;
 
-  const showProofAt = (index) => {
-    if (!proofUrls.length) {
-      return;
-    }
-
-    proofIndex = (index + proofUrls.length) % proofUrls.length;
-    const url = proofUrls[proofIndex];
-    const proofImage = modal.querySelector('[data-proof-image]');
-    const proofLink = modal.querySelector('[data-proof-link]');
-    const proofCounter = modal.querySelector('[data-proof-counter]');
-
-    if (proofImage instanceof HTMLImageElement) {
-      proofImage.src = url;
-      proofImage.alt = `${attachmentHeading} ${proofIndex + 1} of ${proofUrls.length} for ${reservationCode}`;
-    }
-    if (proofLink instanceof HTMLAnchorElement) {
-      proofLink.href = url;
-    }
-    if (proofCounter instanceof HTMLElement) {
-      proofCounter.textContent = `${proofIndex + 1} / ${proofUrls.length}`;
-    }
-  };
-
-  const onProofKeydown = (event) => {
+  const onModalKeydown = (event) => {
     if (event.key === 'Escape') {
       closeModal();
-      return;
-    }
-    if (proofUrls.length < 2) {
-      return;
-    }
-    if (event.key === 'ArrowLeft') {
-      showProofAt(proofIndex - 1);
-    } else if (event.key === 'ArrowRight') {
-      showProofAt(proofIndex + 1);
     }
   };
 
   const closeModal = () => {
-    document.removeEventListener('keydown', onProofKeydown);
+    document.removeEventListener('keydown', onModalKeydown);
     modal.remove();
   };
 
@@ -1671,16 +1564,7 @@ function showReservationDetailsModal(reservation, options = {}) {
     }
   });
 
-  modal.querySelectorAll('[data-proof-nav]').forEach((button) => {
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const step = Number.parseInt(button.getAttribute('data-proof-nav') || '0', 10) || 0;
-      showProofAt(proofIndex + step);
-    });
-  });
-
-  document.addEventListener('keydown', onProofKeydown);
+  document.addEventListener('keydown', onModalKeydown);
 
   if (canAct && typeof options.onAction === 'function') {
     modal.querySelectorAll('[data-modal-action]').forEach((button) => {
@@ -2190,8 +2074,9 @@ function applyMaintenanceFilters() {
   maintenanceTableBody.removeAttribute('aria-busy');
   maintenanceTableBody.innerHTML = filteredRows
     .map((row) => {
+      const reporterLabel = escapeReservationDetailsHtml(row.reporter || '');
       const reporterCell = showReporter
-        ? `<td>${row.reporter ? `<span class="maintenance-reporter-cell">${row.reporter}</span>` : '<span class="maintenance-reporter-cell muted">—</span>'}</td>`
+        ? `<td>${reporterLabel ? `<span class="maintenance-reporter-cell">${reporterLabel}</span>` : '<span class="maintenance-reporter-cell muted">—</span>'}</td>`
         : '';
       const locationCell = showLocation ? `<td>${row.location || ''}</td>` : '';
 
@@ -2202,7 +2087,7 @@ function applyMaintenanceFilters() {
         data-room-id="${row.room_id || ''}"
         data-report-id="${row.report_id || ''}"
         data-maintenance-reason="${String(row.reason || '').replace(/"/g, '&quot;')}"
-        data-reporter="${String(row.reporter || '').replace(/"/g, '&quot;')}"
+        data-reporter="${escapeReservationDetailsHtml(row.reporter || '')}"
         data-description="${String(row.description || '').replace(/"/g, '&quot;')}"
         data-proof-image="${String(row.proof_image_url || '').replace(/"/g, '&quot;')}"
       >
@@ -2936,9 +2821,10 @@ function getRequestDecisionConfirmConfig(status) {
     case 'damaged':
       return {
         title: 'Confirm Damage',
-        message: 'Mark this request as damaged? This action cannot be undone.',
+        message: 'Choose the damaged item. Only the items you check are recorded as damaged. A photo is optional.',
         confirmText: 'Damage',
         variant: 'danger',
+        allowProof: true,
       };
     default:
       return {
@@ -2950,8 +2836,11 @@ function getRequestDecisionConfirmConfig(status) {
   }
 }
 
-async function confirmRequestDecision(status) {
+async function confirmRequestDecision(status, damageTargets = []) {
   const config = getRequestDecisionConfirmConfig(status);
+  if (status === 'damaged') {
+    config.damageTargets = damageTargets;
+  }
   return openInventoryConfirmModal(config);
 }
 
@@ -2998,6 +2887,9 @@ async function refreshRequestListPreservingTab(explicitUrl) {
   }
 
   requestListWrap.innerHTML = data.html;
+  if (typeof applyCspPresentation === 'function') {
+    applyCspPresentation();
+  }
 
   if (typeof explicitUrl === 'string' && explicitUrl.trim() !== '') {
     const parsedUrl = new URL(explicitUrl, window.location.origin);
@@ -3369,7 +3261,29 @@ async function submitReturnDecision(item, button, status) {
     return;
   }
 
-  const confirmed = await confirmRequestDecision(status);
+  let damageTargets = [];
+  let damageTargetParseFailed = false;
+  const damageTargetsRaw = status === 'damaged' ? String(button.dataset.damageTargets || '') : '';
+  if (status === 'damaged' && damageTargetsRaw) {
+    try {
+      const parsedTargets = JSON.parse(damageTargetsRaw);
+      damageTargets = Array.isArray(parsedTargets) ? parsedTargets : [];
+    } catch (error) {
+      damageTargets = [];
+      damageTargetParseFailed = true;
+    }
+  }
+
+  if (status === 'damaged' && damageTargetParseFailed) {
+    showAppNotice('The item list could not be read. Refresh the page and try again.');
+    return;
+  }
+
+  const confirmation = await confirmRequestDecision(status, damageTargets);
+  const confirmed = confirmation === true || (confirmation && confirmation.confirmed === true);
+  const proofFile = confirmation && confirmation.file instanceof File ? confirmation.file : null;
+  const damagedItemIds = confirmation && Array.isArray(confirmation.damagedItemIds) ? confirmation.damagedItemIds : [];
+  const damagedRoomIds = confirmation && Array.isArray(confirmation.damagedRoomIds) ? confirmation.damagedRoomIds : [];
   if (!confirmed) {
     return;
   }
@@ -3384,15 +3298,34 @@ async function submitReturnDecision(item, button, status) {
     let finalStatus = 0;
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
-      response = await fetch(`/request/${reservationId}/final-${action}`, {
+      const requestHeaders = {
+        'X-CSRF-TOKEN': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+      };
+      const requestInit = {
         method: 'PATCH',
-        headers: {
-          'X-CSRF-TOKEN': csrfToken,
-          'X-Requested-With': 'XMLHttpRequest',
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
+        headers: requestHeaders,
+      };
+
+      if (status === 'damaged' && proofFile) {
+        const formData = new FormData();
+        formData.append('proof_photo', proofFile);
+        damagedItemIds.forEach((itemId) => formData.append('damaged_item_ids[]', String(itemId)));
+        damagedRoomIds.forEach((roomId) => formData.append('damaged_room_ids[]', String(roomId)));
+        requestInit.method = 'POST';
+        requestInit.body = formData;
+      } else {
+        requestHeaders['Content-Type'] = 'application/json';
+        if (status === 'damaged') {
+          requestInit.body = JSON.stringify({
+            damaged_item_ids: damagedItemIds,
+            damaged_room_ids: damagedRoomIds,
+          });
+        }
+      }
+
+      response = await fetch(`/request/${reservationId}/final-${action}`, requestInit);
 
       finalStatus = response.status || 0;
       const responseText = await response.text();
@@ -3424,7 +3357,7 @@ async function submitReturnDecision(item, button, status) {
       status === 'returned' ? { badgeLabel: 'Returned' } : { badgeLabel: 'Damaged' },
     );
     showRequestDecisionToast(
-      status === 'returned' ? 'Request marked as returned.' : 'Request marked as damaged.',
+      status === 'returned' ? 'Request marked as returned.' : (data.message || 'Request marked as damaged.'),
       status === 'returned' ? 'approved' : 'rejected',
     );
     await refreshRequestListSafely();
@@ -4288,14 +4221,106 @@ function showSaveSuccessToast(message) {
   });
 }
 
+let damageProofPreviewUrl = '';
+
+function renderDamageTargets(targets) {
+  const wrap = document.getElementById('inventory-confirm-targets');
+  const list = document.getElementById('inventory-confirm-target-list');
+
+  if (!(wrap instanceof HTMLElement) || !(list instanceof HTMLElement)) {
+    return;
+  }
+
+  list.replaceChildren();
+  const rows = Array.isArray(targets) ? targets.filter((target) => target && Number(target.id) > 0) : [];
+
+  if (!rows.length) {
+    wrap.hidden = true;
+    return;
+  }
+
+  rows.forEach((target) => {
+    const label = document.createElement('label');
+    label.className = 'inventory-confirm-target';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = String(target.id);
+    input.dataset.targetType = target.type === 'room' ? 'room' : 'item';
+    input.checked = rows.length === 1;
+
+    const text = document.createElement('span');
+    text.textContent = String(target.label || 'Resource');
+
+    label.append(input, text);
+    list.append(label);
+  });
+
+  wrap.hidden = false;
+}
+
+function selectedDamageTargets() {
+  return Array.from(document.querySelectorAll('#inventory-confirm-target-list input[type="checkbox"]:checked'))
+    .filter((input) => input instanceof HTMLInputElement)
+    .map((input) => ({
+      type: input.dataset.targetType === 'room' ? 'room' : 'item',
+      id: Number.parseInt(input.value, 10),
+    }))
+    .filter((target) => target.id > 0);
+}
+
+function resetDamageProofField() {
+  const targetWrap = document.getElementById('inventory-confirm-targets');
+  const targetList = document.getElementById('inventory-confirm-target-list');
+  if (targetWrap) {
+    targetWrap.hidden = true;
+  }
+  if (targetList) {
+    targetList.replaceChildren();
+  }
+  const targetLabel = document.getElementById('inventory-confirm-targets-label');
+  if (targetLabel) {
+    targetLabel.textContent = 'Which item was damaged?';
+  }
+
+  const proofWrap = document.getElementById('inventory-confirm-proof');
+  const proofInput = document.getElementById('inventory-confirm-proof-input');
+  const proofPreview = document.getElementById('inventory-confirm-proof-preview');
+  const proofHint = document.getElementById('inventory-confirm-proof-hint');
+
+  if (proofWrap) {
+    proofWrap.hidden = true;
+  }
+
+  if (proofInput instanceof HTMLInputElement) {
+    proofInput.value = '';
+  }
+
+  if (proofPreview instanceof HTMLImageElement) {
+    proofPreview.hidden = true;
+    proofPreview.removeAttribute('src');
+  }
+
+  if (damageProofPreviewUrl) {
+    URL.revokeObjectURL(damageProofPreviewUrl);
+    damageProofPreviewUrl = '';
+  }
+
+  if (proofHint) {
+    proofHint.textContent = 'JPG, PNG, WEBP, or GIF up to 5 MB. You can continue without a photo.';
+  }
+}
+
 function closeInventoryConfirmModal() {
   if (!(inventoryConfirmModal instanceof HTMLElement)) {
     return;
   }
 
+  resetDamageProofField();
   inventoryConfirmModal.classList.remove('is-open');
   inventoryConfirmModal.setAttribute('aria-hidden', 'true');
   inventoryConfirmModal.dataset.confirmVariant = '';
+  inventoryConfirmModal.dataset.allowProof = '';
   inventoryConfirmResolver = null;
 }
 
@@ -4317,6 +4342,8 @@ function openInventoryConfirmModal(options = {}) {
     message = 'Are you sure you want to delete this item? This cannot be undone.',
     confirmText = 'Delete',
     variant = 'delete',
+    allowProof = false,
+    damageTargets = [],
   } = options;
 
   inventoryConfirmTitle.textContent = title;
@@ -4333,6 +4360,15 @@ function openInventoryConfirmModal(options = {}) {
   }
 
   inventoryConfirmModal.dataset.confirmVariant = variant;
+  inventoryConfirmModal.dataset.allowProof = allowProof ? '1' : '';
+  resetDamageProofField();
+  if (allowProof) {
+    renderDamageTargets(damageTargets);
+  }
+  const proofWrap = document.getElementById('inventory-confirm-proof');
+  if (proofWrap) {
+    proofWrap.hidden = !allowProof;
+  }
   inventoryConfirmModal.classList.add('is-open');
   inventoryConfirmModal.setAttribute('aria-hidden', 'false');
 
@@ -4589,7 +4625,12 @@ function buildPreviewTemporaryUnitCodes(totalCount) {
     return [];
   }
 
-  const itemId = activeEquipmentEditingRow?.dataset?.itemId || '0000';
+  const itemId = activeEquipmentEditingRow?.dataset?.itemId || '';
+
+  if (!itemId) {
+    return [];
+  }
+
   const paddedId = String(itemId).padStart(4, '0');
 
   return Array.from({ length: parsedTotal }, (_, index) => `#TMP-${paddedId}-U${String(index + 1).padStart(3, '0')}`);
@@ -4700,6 +4741,11 @@ function previewTemporaryEquipmentUnitCodes() {
 
   if (totalCount <= 0) {
     showAppNotice('Set Total Count first before previewing temporary codes.');
+    return;
+  }
+
+  if (!activeEquipmentEditingRow?.dataset?.itemId) {
+    showAppNotice('A free temporary code is assigned when you save this item. Leave the unit code blank.');
     return;
   }
 
@@ -4959,6 +5005,8 @@ function setActiveNavByPage() {
     navTarget = 'maintenance';
   } else if (path === '/history') {
     navTarget = 'history';
+  } else if (path === '/feedback') {
+    navTarget = 'feedback';
   } else if (path === '/schedule') {
     navTarget = 'schedule';
   } else if (path === '/requests' || path === '/request' || path.startsWith('/request/')) {
@@ -5103,8 +5151,8 @@ async function loadNavbar() {
         || currentUsername === 'io_admin'
         || currentOfficeCode === 'io'
         || (currentRole === 'admin' && currentOfficeCode === 'io');
-      const isPfAdmin = ['admin', 'pf_admin'].includes(currentRole);
-      const isPcAdmin = currentRole === 'pc_admin';
+      const isPfAdmin = ['admin', 'pf_admin', 'pfo'].includes(currentRole) || window.authUser?.is_pf_admin === true;
+      const isPcAdmin = currentRole === 'pc_admin' || currentRole.startsWith('pc_') || window.authUser?.is_program_chair === true;
 
       navbarContainer.querySelectorAll('[data-visible-for="io-admin"]').forEach((item) => {
         if (!isIoAdmin) {
@@ -5377,9 +5425,10 @@ function positionProfilePopover(button) {
 function buildProfilePopover() {
   const panel = document.createElement('div');
   panel.className = 'profile-popover';
-  const userName = (window.authUser && (window.authUser.full_name || window.authUser.username))
+  const rawUserName = (window.authUser && (window.authUser.full_name || window.authUser.username))
     ? (window.authUser.full_name || window.authUser.username)
     : 'User';
+  const userName = /^\s*do admin\s*$/i.test(rawUserName) ? 'Safety Admin' : rawUserName;
   panel.innerHTML = `
     <button type="button" class="profile-action" data-profile-action="account">${userName}</button>
     <button type="button" class="profile-action logout" data-profile-action="logout">Logout</button>
@@ -7727,7 +7776,66 @@ if (inventoryConfirmModal instanceof HTMLElement) {
   }
 
   if (inventoryConfirmSubmit instanceof HTMLButtonElement) {
-    inventoryConfirmSubmit.addEventListener('click', () => finalizeInventoryConfirm(true));
+    inventoryConfirmSubmit.addEventListener('click', () => {
+      if (inventoryConfirmModal.dataset.allowProof === '1') {
+        const proofInput = document.getElementById('inventory-confirm-proof-input');
+        const proofFile = proofInput instanceof HTMLInputElement && proofInput.files ? proofInput.files[0] : null;
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+        if (proofFile && (!allowedTypes.includes(proofFile.type) || proofFile.size > 5 * 1024 * 1024)) {
+          const proofHint = document.getElementById('inventory-confirm-proof-hint');
+          if (proofHint) {
+            proofHint.textContent = 'Use a JPG, PNG, WEBP, or GIF photo under 5 MB, or leave the photo empty.';
+          }
+          return;
+        }
+
+        const targetWrap = document.getElementById('inventory-confirm-targets');
+        const selectedTargets = selectedDamageTargets();
+        if (targetWrap instanceof HTMLElement && !targetWrap.hidden && selectedTargets.length === 0) {
+          const targetHint = document.getElementById('inventory-confirm-targets-label');
+          if (targetHint) {
+            targetHint.textContent = 'Choose at least one damaged item.';
+          }
+          return;
+        }
+
+        finalizeInventoryConfirm({
+          confirmed: true,
+          file: proofFile || null,
+          damagedItemIds: selectedTargets.filter((target) => target.type === 'item').map((target) => target.id),
+          damagedRoomIds: selectedTargets.filter((target) => target.type === 'room').map((target) => target.id),
+        });
+        return;
+      }
+
+      finalizeInventoryConfirm(true);
+    });
+  }
+
+  const damageProofInput = document.getElementById('inventory-confirm-proof-input');
+  if (damageProofInput instanceof HTMLInputElement) {
+    damageProofInput.addEventListener('change', () => {
+      const preview = document.getElementById('inventory-confirm-proof-preview');
+      const selected = damageProofInput.files ? damageProofInput.files[0] : null;
+
+      if (damageProofPreviewUrl) {
+        URL.revokeObjectURL(damageProofPreviewUrl);
+        damageProofPreviewUrl = '';
+      }
+
+      if (!(preview instanceof HTMLImageElement) || !selected) {
+        if (preview instanceof HTMLImageElement) {
+          preview.hidden = true;
+          preview.removeAttribute('src');
+        }
+        return;
+      }
+
+      damageProofPreviewUrl = URL.createObjectURL(selected);
+      preview.src = damageProofPreviewUrl;
+      preview.hidden = false;
+    });
   }
 
   document.addEventListener('click', (event) => {

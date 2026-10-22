@@ -32,7 +32,10 @@
   @endphp
   <tr class="{{ $hasOutsideParticipants ? 'office-queue-has-outsider' : '' }}" data-request-date="{{ $eventDate !== 'N/A' ? $eventDate : '' }}" data-outside-participants="{{ $hasOutsideParticipants ? '1' : '0' }}">
     <td>#{{ $request->reservation_id }}</td>
-    <td class="office-queue-requester">{{ $reservation?->user?->full_name ?? $reservation?->user?->username ?? 'Unknown' }}</td>
+    <td class="office-queue-requester">
+      <span class="office-queue-requester-name">{{ $reservation?->user?->full_name ?? $reservation?->user?->username ?? 'Unknown' }}</span>
+      <span class="office-queue-program">{{ $reservation?->user?->academicProgram?->name ?: 'No program' }}</span>
+    </td>
     <td class="office-queue-activity">
       <span class="office-queue-activity-name">{{ $reservation?->activity_name ?? 'N/A' }}</span>
     </td>
@@ -41,6 +44,9 @@
     <td>
       <div class="office-queue-status-stack">
         <span class="badge {{ $badgeClass }}">{{ $badgeText }}</span>
+        @if(!empty($request->dean_queue_label))
+          <span class="badge pending" title="{{ $request->dean_queue_label }}">{{ $request->dean_queue_label }}</span>
+        @endif
         @if($hasOutsideParticipants)
           <span class="badge outsider office-queue-outsider-badge" title="This event includes outside participants">Outsider involved</span>
         @endif

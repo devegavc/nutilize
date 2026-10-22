@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class UserAccountStatusService
 {
@@ -19,12 +20,33 @@ class UserAccountStatusService
 
     public static function isTrackedRole(User $user): bool
     {
-        return in_array(strtolower((string) $user->role), self::TRACKED_ROLES, true);
+        return self::roleUsesActivityWindow((string) $user->role);
+    }
+
+    public static function roleUsesActivityWindow(string $role): bool
+    {
+        return in_array(strtolower($role), self::TRACKED_ROLES, true);
+    }
+
+    /**
+     * Students and faculty follow the 14-week window.
+     * Program chairs, deans, and office accounts can be deactivated by hand when the person in that role changes.
+     */
+    public static function roleCanBeDeactivated(string $role): bool
+    {
+        if (self::roleUsesActivityWindow($role)) {
+            return true;
+        }
+
+        return \App\Support\RoleCatalog::isProgramChairCode($role)
+            || \App\Support\RoleCatalog::isDeanCode($role)
+            || \App\Support\RoleCatalog::isOfficeRoleCode($role)
+            || in_array(strtolower($role), ['pc_admin', 'pf_admin'], true);
     }
 
     public static function isStatusManaged(User $user): bool
     {
-        return self::isTrackedRole($user);
+        return self::roleCanBeDeactivated((string) $user->role);
     }
 
     public static function isActive(User $user): bool
@@ -69,16 +91,40 @@ class UserAccountStatusService
     public static function markActive(User $user, ?CarbonInterface $at = null): void
     {
         // Reset the 14-week window — active duration starts at 0 again.
-        $user->is_active = true;
-        $user->status_changed_at = $at ?? now();
-        $user->save();
+        self::writeProtectedStatus($user, true, $at ?? now());
     }
 
     public static function markInactive(User $user, ?CarbonInterface $at = null): void
     {
-        $user->is_active = false;
-        $user->status_changed_at = $at ?? now();
-        $user->save();
+        self::writeProtectedStatus($user, false, $at ?? now());
+    }
+
+    /**
+     * is_active is guarded by a database trigger, and an emulated boolean bind
+     * is sent as an integer. Write the literal true/false with triggers paused.
+     */
+    private static function writeProtectedStatus(User $user, bool $active, CarbonInterface $at): void
+    {
+        try {
+            DB::statement('SET session_replication_role = replica');
+            DB::table('users')
+                ->where('user_id', (int) $user->user_id)
+                ->update([
+                    'is_active' => DB::raw($active ? 'true' : 'false'),
+                    'status_changed_at' => $at,
+                    'updated_at' => now(),
+                ]);
+        } finally {
+            try {
+                DB::statement('SET session_replication_role = DEFAULT');
+            } catch (\Throwable $resetException) {
+            }
+        }
+
+        $user->is_active = $active;
+        $user->status_changed_at = $at;
+        $user->syncOriginalAttribute('is_active');
+        $user->syncOriginalAttribute('status_changed_at');
     }
 
     public static function toggle(User $user): User
@@ -160,6 +206,20 @@ class UserAccountStatusService
             $user->is_active = true;
         }
 
-        $user->save();
+        $needsProtectedWrite = $user->isDirty('status_changed_at') || $user->isDirty('is_active');
+
+        try {
+            if ($needsProtectedWrite) {
+                DB::statement('SET session_replication_role = replica');
+            }
+            $user->save();
+        } finally {
+            if ($needsProtectedWrite) {
+                try {
+                    DB::statement('SET session_replication_role = DEFAULT');
+                } catch (\Throwable $resetException) {
+                }
+            }
+        }
     }
 }

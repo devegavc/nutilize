@@ -39,8 +39,14 @@ class ItemUnitService
             $provided = ItemAsset::normalizeCode((string) ($rawCodes[$index] ?? ''));
             $existing = ItemAsset::normalizeCode((string) ($existingCodes[$index] ?? ''));
 
-            if ($provided !== '') {
+            if ($provided !== '' && !self::isForeignTemporaryCode($provided, $itemId)) {
                 $resolved[$index] = $provided;
+                continue;
+            }
+
+            if ($provided !== '') {
+                $needsTemporary[$index] = $index + 1;
+                $resolved[$index] = '';
                 continue;
             }
 
@@ -66,6 +72,23 @@ class ItemUnitService
         self::assertUnitCodesAreValid($resolved, $itemId, $ignoreItemId);
 
         return $resolved;
+    }
+
+    /**
+     * Client previews use #TMP-0000 before the item exists. Those are placeholders,
+     * not codes the admin chose, and must not block a new item.
+     */
+    private static function isForeignTemporaryCode(string $code, int $itemId): bool
+    {
+        if (!ItemAsset::isTemporaryCode($code)) {
+            return false;
+        }
+
+        if (!preg_match('/^#TMP-(\d+)-U\d+(?:-.+)?$/i', ItemAsset::normalizeCode($code), $matches)) {
+            return false;
+        }
+
+        return (int) $matches[1] !== $itemId;
     }
 
     /**

@@ -5,16 +5,21 @@ namespace App\Http\Controllers;
 use App\Models\Notification;
 use App\Models\Office;
 use App\Models\Reservation;
+use App\Services\ProgramChairStageService;
 use App\Services\ReservationApprovalNotifier;
 use App\Services\ProgramChairOfficeResolver;
 use App\Services\ItemOwnerService;
 use App\Services\ItemUnitService;
 use App\Services\ReservationApprovalWorkflowService;
 use App\Services\ReservationApprovalDeduper;
+use App\Support\ApprovalClock;
 use App\Models\ReservationApproval;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -177,28 +182,18 @@ class ApprovalController extends Controller
             }
 
             $approval = ReservationApproval::findOrFail($approvalId);
-
-            if ((int) $approval->office_id !== (int) $user->office_id) {
-                return response()->json(['error' => 'Unauthorized'], 403);
+            $decision = $this->decisionForActor($user, $approval);
+            if ($decision instanceof \Illuminate\Http\JsonResponse) {
+                return $decision;
             }
 
-            // Fast order_sequence check — avoid the full workflow warmBatch on Hostinger.
-            if (
-                !$user->isPhysicalFacilitiesAdmin()
-                && !$this->isOfficeNextPendingApprover((int) $approval->reservation_id, (int) $user->office_id)
-            ) {
-                return response()->json(['error' => 'This request is waiting for a previous office approval.'], 422);
-            }
-
-            if (!ReservationApprovalWorkflowService::userCanActOnApproval($user, $approval)) {
-                return response()->json(['error' => 'This request is waiting for the item owner who registered the borrowed equipment.'], 403);
-            }
-
-            $now = now();
+            $now = ApprovalClock::now();
             $updatePayload = [
                 'status' => 'approved',
                 'approved_at' => $now,
                 'approved_by_user_id' => (int) $user->user_id,
+                'approved_by_role' => (string) $user->role,
+                'on_behalf_of_program_chair' => $decision['on_behalf'],
             ];
 
             $isItemOwnerApprover = ItemOwnerService::isItemOwnerUser($user);
@@ -212,7 +207,10 @@ class ApprovalController extends Controller
                 }
             }
 
-            $approval->update($updatePayload);
+            $blocked = $this->saveApprovalDecision($approval, $updatePayload);
+            if ($blocked instanceof \Illuminate\Http\JsonResponse) {
+                return $blocked;
+            }
             $this->recordApprovalHistory($approval);
             $this->forgetActionableOfficeCache((int) $approval->reservation_id);
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.approved');
@@ -257,20 +255,9 @@ class ApprovalController extends Controller
             }
 
             $approval = ReservationApproval::findOrFail($approvalId);
-
-            if ((int) $approval->office_id !== (int) $user->office_id) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
-
-            if (
-                !$user->isPhysicalFacilitiesAdmin()
-                && !$this->isOfficeNextPendingApprover((int) $approval->reservation_id, (int) $user->office_id)
-            ) {
-                return response()->json(['error' => 'This request is waiting for a previous office approval.'], 422);
-            }
-
-            if (!ReservationApprovalWorkflowService::userCanActOnApproval($user, $approval)) {
-                return response()->json(['error' => 'This request is waiting for the item owner who registered the borrowed equipment.'], 403);
+            $decision = $this->decisionForActor($user, $approval);
+            if ($decision instanceof \Illuminate\Http\JsonResponse) {
+                return $decision;
             }
 
             $rejectionReason = trim((string) request()->input('rejection_reason', ''));
@@ -284,15 +271,20 @@ class ApprovalController extends Controller
 
             $updatePayload = [
                 'status' => 'rejected',
-                'approved_at' => now(),
+                'approved_at' => ApprovalClock::now(),
                 'approved_by_user_id' => (int) $user->user_id,
+                'approved_by_role' => (string) $user->role,
+                'on_behalf_of_program_chair' => $decision['on_behalf'],
             ];
 
             if (Schema::hasColumn('reservation_approvals', 'rejection_reason')) {
                 $updatePayload['rejection_reason'] = $rejectionReason;
             }
 
-            $approval->update($updatePayload);
+            $blocked = $this->saveApprovalDecision($approval, $updatePayload);
+            if ($blocked instanceof \Illuminate\Http\JsonResponse) {
+                return $blocked;
+            }
             $this->recordApprovalHistory($approval);
             $this->forgetActionableOfficeCache((int) $approval->reservation_id);
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.rejected');
@@ -388,13 +380,24 @@ class ApprovalController extends Controller
             ->value('order_sequence');
         $mySequence = is_null($mySequence) ? 999999 : (int) $mySequence;
 
-        $earlierPending = DB::table('reservation_approvals as ra')
+        $workflowOfficeIds = array_map('intval', $this->resolveWorkflowOfficeIds($reservationId, true));
+        $earlierOfficeIds = DB::table('reservation_approvals as ra')
             ->join('offices as offices', 'offices.office_id', '=', 'ra.office_id')
             ->where('ra.reservation_id', $reservationId)
             ->where('ra.office_id', '<>', $officeId)
             ->whereNull('ra.approved_at')
             ->whereRaw('COALESCE(offices.order_sequence, 999999) < ?', [$mySequence])
-            ->exists();
+            ->pluck('ra.office_id');
+
+        $earlierPending = false;
+        foreach ($earlierOfficeIds as $earlierOfficeId) {
+            $earlierOfficeId = (int) $earlierOfficeId;
+            if ($workflowOfficeIds !== [] && !in_array($earlierOfficeId, $workflowOfficeIds, true)) {
+                continue;
+            }
+            $earlierPending = true;
+            break;
+        }
 
         if (!$earlierPending) {
             Cache::put($cacheKey, $officeId, now()->addMinutes(2));
@@ -418,12 +421,192 @@ class ApprovalController extends Controller
         return $this->finalizePhysicalFacilitiesDecision($reservationId, 'returned');
     }
 
-    public function finalDamagedReservation($reservationId)
+    public function finalDamagedReservation(Request $request, $reservationId)
     {
-        return $this->finalizePhysicalFacilitiesDecision($reservationId, 'damaged');
+        $proofImageUrl = null;
+        $damageSelection = $this->damageSelectionFromRequest($request, (int) $reservationId);
+
+        if (is_array($damageSelection) && ($damageSelection['invalid'] ?? false) === true) {
+            return response()->json([
+                'error' => 'Choose at least one item that was damaged.',
+            ], 422);
+        }
+
+        if ($request->hasFile('proof_photo')) {
+            $request->validate([
+                'proof_photo' => ['file', 'image', 'mimes:jpeg,jpg,png,webp,gif', 'max:5120'],
+            ]);
+
+            $proofImageUrl = $this->storeDamageProofPhoto($request->file('proof_photo'));
+
+            if ($proofImageUrl === null) {
+                return response()->json([
+                    'error' => 'The proof photo could not be saved. You can mark this request as damaged without a photo.',
+                ], 422);
+            }
+        }
+
+        return $this->finalizePhysicalFacilitiesDecision($reservationId, 'damaged', $proofImageUrl, $damageSelection);
     }
 
-    private function finalizePhysicalFacilitiesDecision($reservationId, string $status)
+    /**
+     * @return array{items: array<int, int>, rooms: array<int, int>, invalid?: bool}|null
+     */
+    private function damageSelectionFromRequest(Request $request, int $reservationId): ?array
+    {
+        if (!$request->exists('damaged_item_ids') && !$request->exists('damaged_room_ids')) {
+            return null;
+        }
+
+        $itemIds = collect($request->input('damaged_item_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        $roomIds = collect($request->input('damaged_room_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        $allowed = $this->reservationResourceIds($reservationId);
+        $itemIds = array_values(array_intersect($itemIds, $allowed['items']));
+        $roomIds = array_values(array_intersect($roomIds, $allowed['rooms']));
+
+        if ($itemIds === [] && $roomIds === [] && ($allowed['items'] !== [] || $allowed['rooms'] !== [])) {
+            return ['items' => [], 'rooms' => [], 'invalid' => true];
+        }
+
+        return ['items' => $itemIds, 'rooms' => $roomIds];
+    }
+
+    /**
+     * @return array{items: array<int, int>, rooms: array<int, int>}
+     */
+    private function reservationResourceIds(int $reservationId): array
+    {
+        $itemIds = [];
+        $roomIds = [];
+
+        if (Schema::hasTable('reservation_details') && Schema::hasTable('reservation_items') && Schema::hasTable('items')) {
+            $itemIds = DB::table('reservation_details as details')
+                ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
+                ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+                ->where('details.reservation_id', $reservationId)
+                ->pluck('items.item_id')
+                ->map(fn ($itemId) => (int) $itemId)
+                ->filter(fn ($itemId) => $itemId > 0)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        if (Schema::hasTable('reservation_details') && Schema::hasTable('reservation_rooms') && Schema::hasTable('rooms')) {
+            $roomIds = DB::table('reservation_details as details')
+                ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+                ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+                ->where('details.reservation_id', $reservationId)
+                ->pluck('rooms.room_id')
+                ->map(fn ($roomId) => (int) $roomId)
+                ->filter(fn ($roomId) => $roomId > 0)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return ['items' => $itemIds, 'rooms' => $roomIds];
+    }
+
+    /**
+     * @param  array{items?: array<int, int>, rooms?: array<int, int>}  $damageSelection
+     */
+    private function damageItemNote(int $reservationId, array $damageSelection): ?string
+    {
+        $labels = [];
+
+        $itemIds = $damageSelection['items'] ?? [];
+        if ($itemIds !== [] && Schema::hasTable('items')) {
+            $names = DB::table('reservation_details as details')
+                ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
+                ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+                ->where('details.reservation_id', $reservationId)
+                ->whereIn('items.item_id', $itemIds)
+                ->orderBy('items.item_name')
+                ->pluck('items.item_name');
+
+            foreach ($names as $name) {
+                $label = trim((string) $name);
+                if ($label !== '') {
+                    $labels[$label] = $label;
+                }
+            }
+        }
+
+        $roomIds = $damageSelection['rooms'] ?? [];
+        if ($roomIds !== [] && Schema::hasTable('rooms')) {
+            $numbers = DB::table('reservation_details as details')
+                ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
+                ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
+                ->where('details.reservation_id', $reservationId)
+                ->whereIn('rooms.room_id', $roomIds)
+                ->orderBy('rooms.room_number')
+                ->pluck('rooms.room_number');
+
+            foreach ($numbers as $number) {
+                $label = 'Room '.trim((string) $number);
+                $labels[$label] = $label;
+            }
+        }
+
+        if ($labels === []) {
+            return null;
+        }
+
+        return mb_substr('Damaged: '.implode(', ', array_values($labels)), 0, 500);
+    }
+
+    private function storeDamageProofPhoto(UploadedFile $file): ?string
+    {
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+            $extension = 'jpg';
+        }
+
+        $filename = 'damage-'.bin2hex(random_bytes(16)).'.'.$extension;
+        $mime = $file->getMimeType() ?: 'application/octet-stream';
+        $serviceKey = (string) config('services.supabase.service_role_key');
+        $supabaseUrl = rtrim((string) config('services.supabase.url'), '/');
+
+        if ($serviceKey !== '' && $supabaseUrl !== '') {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer '.$serviceKey,
+                'apikey' => $serviceKey,
+                'Content-Type' => $mime,
+                'x-upsert' => 'false',
+            ])->withBody((string) file_get_contents($file->getRealPath()), $mime)
+                ->timeout(20)
+                ->post($supabaseUrl.'/storage/v1/object/assets/issues/'.$filename);
+
+            if ($response->successful()) {
+                $proofUrl = $supabaseUrl.'/storage/v1/object/public/assets/issues/'.$filename;
+            }
+        }
+
+        if (!isset($proofUrl)) {
+            $directory = public_path('uploads/damage-proofs');
+            if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
+                $proofUrl = null;
+            } else {
+                $file->move($directory, $filename);
+                $proofUrl = url('uploads/damage-proofs/'.$filename);
+            }
+        }
+
+        return $proofUrl ?? null;
+    }
+
+    private function finalizePhysicalFacilitiesDecision($reservationId, string $status, ?string $proofImageUrl = null, ?array $damageSelection = null)
     {
         try {
             $user = Auth::user();
@@ -436,26 +619,35 @@ class ApprovalController extends Controller
             $reservation = Reservation::query()->findOrFail($reservationId);
             $physicalFacilitiesOfficeId = $this->getPhysicalFacilitiesOfficeId();
             $now = now();
+            $approvedAt = ApprovalClock::now();
+            $damageNote = ($status === 'damaged' && is_array($damageSelection))
+                ? $this->damageItemNote((int) $reservation->reservation_id, $damageSelection)
+                : null;
 
             // Keep the hot path to status + PF approval row only.
             // Return/damage inventory work and notifications run after the response.
-            DB::transaction(function () use ($reservation, $physicalFacilitiesOfficeId, $status, $user, $now) {
+            DB::transaction(function () use ($reservation, $physicalFacilitiesOfficeId, $status, $user, $now, $approvedAt, $damageNote) {
                 $reservation->update(['overall_status' => $status]);
 
                 if (is_null($physicalFacilitiesOfficeId)) {
                     return;
                 }
 
+                $approvalUpdate = [
+                    'status' => $status,
+                    'approved_at' => $approvedAt,
+                    'approved_by_user_id' => (int) $user->user_id,
+                    'updated_at' => $now,
+                ];
+                if (is_string($damageNote) && $damageNote !== '' && Schema::hasColumn('reservation_approvals', 'rejection_reason')) {
+                    $approvalUpdate['rejection_reason'] = $damageNote;
+                }
+
                 DB::table('reservation_approvals')
                     ->where('reservation_id', $reservation->reservation_id)
                     ->where('office_id', $physicalFacilitiesOfficeId)
                     ->whereNull('approved_at')
-                    ->update([
-                        'status' => $status,
-                        'approved_at' => $now,
-                        'approved_by_user_id' => (int) $user->user_id,
-                        'updated_at' => $now,
-                    ]);
+                    ->update($approvalUpdate);
 
                 $pfApproval = DB::table('reservation_approvals')
                     ->where('reservation_id', $reservation->reservation_id)
@@ -464,26 +656,17 @@ class ApprovalController extends Controller
                     ->first();
 
                 if (!$pfApproval) {
-                    $approvalId = (int) DB::table('reservation_approvals')->insertGetId([
+                    $approvalId = (int) DB::table('reservation_approvals')->insertGetId(array_merge($approvalUpdate, [
                         'reservation_id' => $reservation->reservation_id,
                         'office_id' => $physicalFacilitiesOfficeId,
-                        'status' => $status,
-                        'approved_at' => $now,
-                        'approved_by_user_id' => (int) $user->user_id,
                         'created_at' => $now,
-                        'updated_at' => $now,
-                    ]);
+                    ]));
                 } else {
                     $approvalId = (int) $pfApproval->approval_id;
 
                     DB::table('reservation_approvals')
                         ->where('approval_id', $approvalId)
-                        ->update([
-                            'status' => $status,
-                            'approved_at' => $now,
-                            'approved_by_user_id' => (int) $user->user_id,
-                            'updated_at' => $now,
-                        ]);
+                        ->update($approvalUpdate);
                 }
 
                 $this->upsertApprovalHistory(
@@ -492,18 +675,20 @@ class ApprovalController extends Controller
                     (int) $physicalFacilitiesOfficeId,
                     $status,
                     (int) $user->user_id,
-                    $now,
+                    $approvedAt,
+                    (string) $user->role,
+                    false,
                 );
             });
 
             $this->forgetActionableOfficeCache((int) $reservation->reservation_id);
 
             $finalReservationId = (int) $reservation->reservation_id;
-            dispatch(function () use ($finalReservationId, $status) {
+            dispatch(function () use ($finalReservationId, $status, $proofImageUrl, $damageSelection) {
                 try {
                     /** @var self $self */
                     $self = app(self::class);
-                    $self->runFinalDecisionSideEffects($finalReservationId, $status);
+                    $self->runFinalDecisionSideEffects($finalReservationId, $status, $proofImageUrl, $damageSelection);
                 } catch (Throwable $throwable) {
                     report($throwable);
                 }
@@ -515,7 +700,7 @@ class ApprovalController extends Controller
                     'approved' => 'Request approved successfully.',
                     'rejected' => 'Request rejected.',
                     'returned' => 'Request marked as returned.',
-                    'damaged' => 'Request marked as damaged.',
+                    'damaged' => $damageNote ?: 'Request marked as damaged.',
                     default => 'Request updated successfully.',
                 },
                 'reservation_id' => $reservation->reservation_id,
@@ -532,7 +717,7 @@ class ApprovalController extends Controller
     /**
      * Inventory / notification work after a PF final decision. Public for afterResponse.
      */
-    public function runFinalDecisionSideEffects(int $reservationId, string $status): void
+    public function runFinalDecisionSideEffects(int $reservationId, string $status, ?string $proofImageUrl = null, ?array $damageSelection = null): void
     {
         $reservation = Reservation::query()->find($reservationId);
         if (!$reservation) {
@@ -544,8 +729,14 @@ class ApprovalController extends Controller
         }
 
         if ($status === 'damaged') {
-            $this->applyReservationDamageToMaintenance($reservation);
-            $this->createDamageReportsForReservation($reservation);
+            $this->applyReservationDamageToMaintenance($reservation, $damageSelection);
+            $this->createDamageReportsForReservation($reservation, $proofImageUrl, $damageSelection);
+            if (is_array($damageSelection)) {
+                $allowed = $this->reservationResourceIds($reservationId);
+                $releaseItems = array_values(array_diff($allowed['items'], $damageSelection['items'] ?? []));
+                $releaseRooms = array_values(array_diff($allowed['rooms'], $damageSelection['rooms'] ?? []));
+                $this->releaseReservationInventory($reservationId, $releaseItems, $releaseRooms);
+            }
         }
 
         if ($status === 'approved') {
@@ -649,6 +840,21 @@ class ApprovalController extends Controller
         }
 
         if (is_null($nextActionableOfficeId)) {
+            $reservation->unsetRelation('approvals');
+            $pfReady = !is_null($pfOfficeId)
+                && !is_null($fromApprovingOfficeId)
+                && (int) $fromApprovingOfficeId !== (int) $pfOfficeId
+                && $this->isReadyForFinalPhysicalFacilitiesApproval($reservation, (int) $pfOfficeId);
+
+            if ($pfReady) {
+                ReservationApprovalNotifier::notifyOfficeAfterPriorApproval(
+                    $reservation,
+                    (int) $pfOfficeId,
+                    (int) $fromApprovingOfficeId,
+                    $pfOfficeId,
+                );
+            }
+
             return;
         }
 
@@ -859,7 +1065,7 @@ class ApprovalController extends Controller
         return $this->pickUnitsForReservationUsage($itemId, $quantity, Reservation::query()->find($reservationId));
     }
 
-    private function releaseReservationInventory(int $reservationId): void
+    private function releaseReservationInventory(int $reservationId, ?array $onlyItemIds = null, ?array $onlyRoomIds = null): void
     {
         $itemIdsToSync = [];
 
@@ -877,6 +1083,10 @@ class ApprovalController extends Controller
                 $itemId = (int) $row->item_id;
 
                 if ($unitId <= 0 || $itemId <= 0) {
+                    continue;
+                }
+
+                if (is_array($onlyItemIds) && !in_array($itemId, $onlyItemIds, true)) {
                     continue;
                 }
 
@@ -902,6 +1112,9 @@ class ApprovalController extends Controller
                 ->join('reservation_items as ri', 'ri.reservation_items_id', '=', 'details.reservation_items_id')
                 ->join('items as items', 'items.item_id', '=', 'ri.item_id')
                 ->where('details.reservation_id', $reservationId)
+                ->when(is_array($onlyItemIds), function ($query) use ($onlyItemIds) {
+                    $query->whereIn('items.item_id', $onlyItemIds === [] ? [0] : $onlyItemIds);
+                })
                 ->select(['items.item_id', DB::raw('SUM(GREATEST(details.quantity, 1)) as qty')])
                 ->groupBy('items.item_id')
                 ->get();
@@ -927,6 +1140,10 @@ class ApprovalController extends Controller
                 ->filter(fn ($roomId) => !is_null($roomId))
                 ->map(fn ($roomId) => (int) $roomId)
                 ->unique()
+                ->when(is_array($onlyRoomIds), function ($roomIds) use ($onlyRoomIds) {
+                    return $roomIds->intersect($onlyRoomIds);
+                })
+                ->values()
                 ->all();
 
             if (!empty($roomIds)) {
@@ -940,7 +1157,7 @@ class ApprovalController extends Controller
         }
     }
 
-    private function applyReservationDamageToMaintenance(Reservation $reservation): void
+    private function applyReservationDamageToMaintenance(Reservation $reservation, ?array $damageSelection = null): void
     {
         if (!Schema::hasTable('reservation_details')) {
             return;
@@ -959,6 +1176,13 @@ class ApprovalController extends Controller
                 ];
             })
             ->filter(fn ($row) => $row['item_id'] > 0)
+            ->filter(function ($row) use ($damageSelection) {
+                if (!is_array($damageSelection)) {
+                    return true;
+                }
+
+                return in_array($row['item_id'], $damageSelection['items'] ?? [], true);
+            })
             ->values()
             ->all();
 
@@ -1016,6 +1240,10 @@ class ApprovalController extends Controller
                 ->map(fn ($roomId) => (int) $roomId)
                 ->all();
 
+            if (is_array($damageSelection)) {
+                $roomIds = array_values(array_intersect($roomIds, $damageSelection['rooms'] ?? []));
+            }
+
             if (!empty($roomIds)) {
                 DB::table('rooms')
                     ->whereIn('room_id', $roomIds)
@@ -1058,7 +1286,7 @@ class ApprovalController extends Controller
         }
     }
 
-    private function createDamageReportsForReservation(Reservation $reservation): void
+    private function createDamageReportsForReservation(Reservation $reservation, ?string $proofImageUrl = null, ?array $damageSelection = null): void
     {
         if (!Schema::hasTable('reports')) {
             return;
@@ -1075,11 +1303,17 @@ class ApprovalController extends Controller
         if ($hasGeneratedAtColumn) {
             $reportBase['generated_at'] = $now;
         }
+        if (is_string($proofImageUrl) && $proofImageUrl !== '' && Schema::hasColumn('reports', 'proof_image_url')) {
+            $reportBase['proof_image_url'] = $proofImageUrl;
+        }
 
         $itemIds = DB::table('reservation_details as details')
             ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
             ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
             ->where('details.reservation_id', $reservation->reservation_id)
+            ->when(is_array($damageSelection), function ($query) use ($damageSelection) {
+                $query->whereIn('items.item_id', ($damageSelection['items'] ?? []) === [] ? [0] : $damageSelection['items']);
+            })
             ->whereNotNull('items.item_id')
             ->distinct()
             ->pluck('items.item_id')
@@ -1087,14 +1321,33 @@ class ApprovalController extends Controller
             ->map(fn ($itemId) => (int) $itemId)
             ->all();
 
+        $itemNames = $itemIds === []
+            ? collect()
+            : DB::table('items')->whereIn('item_id', $itemIds)->pluck('item_name', 'item_id');
+
         foreach ($itemIds as $itemId) {
-            DB::table('reports')->insert(array_merge($reportBase, ['item_id' => $itemId, 'room_id' => null]));
+            $itemName = trim((string) ($itemNames[$itemId] ?? 'Item'));
+            $reportRow = array_merge($reportBase, [
+                'item_id' => $itemId,
+                'room_id' => null,
+                'report_info' => mb_substr(sprintf('Reservation #%s: %s marked damaged by Physical Facilities.', $reservation->reservation_id, $itemName), 0, 255),
+            ]);
+            if (Schema::hasColumn('reports', 'reservation_id')) {
+                $reportRow['reservation_id'] = (int) $reservation->reservation_id;
+            }
+            if (Schema::hasColumn('reports', 'description')) {
+                $reportRow['description'] = $itemName.' was marked damaged.';
+            }
+            DB::table('reports')->insert($reportRow);
         }
 
         $roomIds = DB::table('reservation_details as details')
             ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
             ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
             ->where('details.reservation_id', $reservation->reservation_id)
+            ->when(is_array($damageSelection), function ($query) use ($damageSelection) {
+                $query->whereIn('rooms.room_id', ($damageSelection['rooms'] ?? []) === [] ? [0] : $damageSelection['rooms']);
+            })
             ->whereNotNull('rooms.room_id')
             ->distinct()
             ->pluck('rooms.room_id')
@@ -1102,11 +1355,27 @@ class ApprovalController extends Controller
             ->map(fn ($roomId) => (int) $roomId)
             ->all();
 
+        $roomNumbers = $roomIds === []
+            ? collect()
+            : DB::table('rooms')->whereIn('room_id', $roomIds)->pluck('room_number', 'room_id');
+
         foreach ($roomIds as $roomId) {
-            DB::table('reports')->insert(array_merge($reportBase, ['item_id' => null, 'room_id' => $roomId]));
+            $roomLabel = 'Room '.trim((string) ($roomNumbers[$roomId] ?? $roomId));
+            $reportRow = array_merge($reportBase, [
+                'item_id' => null,
+                'room_id' => $roomId,
+                'report_info' => mb_substr(sprintf('Reservation #%s: %s marked damaged by Physical Facilities.', $reservation->reservation_id, $roomLabel), 0, 255),
+            ]);
+            if (Schema::hasColumn('reports', 'reservation_id')) {
+                $reportRow['reservation_id'] = (int) $reservation->reservation_id;
+            }
+            if (Schema::hasColumn('reports', 'description')) {
+                $reportRow['description'] = $roomLabel.' was marked damaged.';
+            }
+            DB::table('reports')->insert($reportRow);
         }
 
-        if (empty($itemIds) && empty($roomIds)) {
+        if ($damageSelection === null && empty($itemIds) && empty($roomIds)) {
             DB::table('reports')->insert(array_merge($reportBase, ['item_id' => null, 'room_id' => null]));
         }
     }
@@ -1228,9 +1497,12 @@ class ApprovalController extends Controller
                 continue;
             }
 
-            $approvals = ReservationApprovalDeduper::collapseByOfficeId(
-                $approvalsByReservation->get($reservationId) ?? collect()
-            );
+            $approvalRows = $approvalsByReservation->get($reservationId) ?? collect();
+            if ($approvalRows->isEmpty()) {
+                continue;
+            }
+
+            $approvals = ReservationApprovalDeduper::collapseByOfficeId($approvalRows);
 
             foreach ($actionSequence as $officeId) {
                 $officeId = (int) $officeId;
@@ -1242,6 +1514,9 @@ class ApprovalController extends Controller
                 }
 
                 if ($status !== 'approved' || is_null($approval?->approved_at)) {
+                    if (\App\Services\FacultyApprovalService::blocksOffice($reservationId, $officeId)) {
+                        continue 2;
+                    }
                     $actionableOfficeIds[$reservationId] = (int) $officeId;
                     continue 2;
                 }
@@ -1673,7 +1948,7 @@ class ApprovalController extends Controller
 
         return DB::table('users')
             ->where('office_id', $pfOfficeId)
-            ->whereRaw('LOWER(role) = ?', ['admin'])
+            ->whereRaw('LOWER(role) IN (?, ?, ?)', ['admin', 'pf_admin', 'pfo'])
             ->value('user_id');
     }
 
@@ -1745,26 +2020,117 @@ class ApprovalController extends Controller
             (string) $approval->status,
             $approval->approved_by_user_id ? (int) $approval->approved_by_user_id : null,
             $approval->approved_at,
+            $approval->approved_by_role ?? null,
+            (bool) ($approval->on_behalf_of_program_chair ?? false),
         );
     }
 
-    private function upsertApprovalHistory(int $approvalId, int $reservationId, int $officeId, string $status, ?int $approvedByUserId, $approvedAt): void
+    /**
+     * @return array{allowed: bool, on_behalf: bool, code: string}|\Illuminate\Http\JsonResponse
+     */
+    private function decisionForActor($user, ReservationApproval $approval): array|\Illuminate\Http\JsonResponse
+    {
+        $stage = ProgramChairStageService::authorize($user, $approval);
+
+        if (\App\Services\FacultyApprovalService::blocksOffice((int) $approval->reservation_id, (int) $approval->office_id)) {
+            return response()->json(['error' => 'This request is waiting for faculty approval.'], 422);
+        }
+
+        if ($stage['code'] === 'already_decided') {
+            return response()->json(['error' => 'This request was already decided.'], 422);
+        }
+
+        if ($stage['code'] !== 'not_program_chair_stage') {
+            if (!$stage['allowed']) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+        } elseif ((int) $approval->office_id !== (int) $user->office_id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        if (
+            !$user->isPhysicalFacilitiesAdmin()
+            && !$this->isOfficeNextPendingApprover((int) $approval->reservation_id, (int) $approval->office_id)
+        ) {
+            return response()->json(['error' => 'This request is waiting for a previous office approval.'], 422);
+        }
+
+        if (!ReservationApprovalWorkflowService::userCanActOnApproval($user, $approval)) {
+            return response()->json(['error' => 'This request is waiting for the item owner who registered the borrowed equipment.'], 403);
+        }
+
+        return [
+            'allowed' => true,
+            'on_behalf' => (bool) $stage['on_behalf'],
+            'code' => $stage['code'],
+        ];
+    }
+
+    private function saveApprovalDecision(ReservationApproval $approval, array $updatePayload): ?\Illuminate\Http\JsonResponse
+    {
+        if (!Schema::hasColumn('reservation_approvals', 'approved_by_role')) {
+            unset($updatePayload['approved_by_role'], $updatePayload['on_behalf_of_program_chair']);
+        }
+
+        $blocked = false;
+
+        DB::transaction(function () use ($approval, $updatePayload, &$blocked): void {
+            $locked = ReservationApproval::query()
+                ->where('approval_id', $approval->approval_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$locked || $locked->approved_at !== null) {
+                $blocked = true;
+
+                return;
+            }
+
+            $payload = $updatePayload;
+            foreach (['on_behalf_of_program_chair', 'dean_required'] as $booleanColumn) {
+                if (array_key_exists($booleanColumn, $payload)) {
+                    $payload[$booleanColumn] = DB::raw($payload[$booleanColumn] ? 'true' : 'false');
+                }
+            }
+            $payload['updated_at'] = now();
+            DB::table('reservation_approvals')
+                ->where('approval_id', $locked->approval_id)
+                ->update($payload);
+            $fresh = ReservationApproval::query()->find($locked->approval_id);
+            $approval->setRawAttributes($fresh->getAttributes(), true);
+        });
+
+        if ($blocked) {
+            return response()->json(['error' => 'This request was already decided.'], 422);
+        }
+
+        return null;
+    }
+
+    private function upsertApprovalHistory(int $approvalId, int $reservationId, int $officeId, string $status, ?int $approvedByUserId, $approvedAt, ?string $approvedByRole = null, bool $onBehalfOfProgramChair = false): void
     {
         if (!Schema::hasTable('reservation_approval_histories')) {
             return;
         }
 
+        $values = [
+            'reservation_id' => $reservationId,
+            'office_id' => $officeId,
+            'approved_by_user_id' => $approvedByUserId,
+            'status' => $status,
+            'approved_at' => $approvedAt,
+            'updated_at' => now(),
+            'created_at' => now(),
+        ];
+
+        if (Schema::hasColumn('reservation_approval_histories', 'approved_by_role')) {
+            $values['approved_by_role'] = $approvedByRole;
+            $values['on_behalf_of_program_chair'] = DB::raw($onBehalfOfProgramChair ? 'true' : 'false');
+        }
+
         DB::table('reservation_approval_histories')->updateOrInsert(
             ['approval_id' => $approvalId],
-            [
-                'reservation_id' => $reservationId,
-                'office_id' => $officeId,
-                'approved_by_user_id' => $approvedByUserId,
-                'status' => $status,
-                'approved_at' => $approvedAt,
-                'updated_at' => now(),
-                'created_at' => now(),
-            ]
+            $values
         );
     }
 
@@ -1839,7 +2205,7 @@ class ApprovalController extends Controller
 
         // Cheap insert-if-missing so the bell is not empty while requests are waiting.
         // Runs after optional heavy sync so wiped-but-still-actionable rows come back.
-        $this->seedApprovalNotificationsForUser($user);
+        $this->seedApprovalNotificationsForUser($user, $request->boolean('force'));
 
         $limit = min(max((int) $request->query('limit', 20), 1), 50);
         $userId = (int) $user->user_id;
@@ -1906,7 +2272,7 @@ class ApprovalController extends Controller
         });
     }
 
-    private function seedApprovalNotificationsForUser(\App\Models\User $user): void
+    private function seedApprovalNotificationsForUser(\App\Models\User $user, bool $force = false): void
     {
         if (!$user->isOfficeApprover()) {
             return;
@@ -1919,7 +2285,7 @@ class ApprovalController extends Controller
 
         $seedCacheKey = 'notification_seed.user.' . $userId;
         $inboxIsEmpty = !Notification::where('user_id', $userId)->exists();
-        if (!$inboxIsEmpty && Cache::has($seedCacheKey)) {
+        if (!$force && !$inboxIsEmpty && Cache::has($seedCacheKey)) {
             return;
         }
 
@@ -1982,6 +2348,10 @@ class ApprovalController extends Controller
      */
     private function getActionableReservationIdsForApprover(\App\Models\User $user): array
     {
+        if ($user->isDean()) {
+            return $this->actionableReservationIdsForDean($user);
+        }
+
         $officeId = (int) $user->office_id;
         if ($officeId <= 0) {
             return [];
@@ -2100,50 +2470,75 @@ class ApprovalController extends Controller
     }
 
     /**
-     * PF Home "Pending Final Approvals" plus open PF approval rows.
-     * Uses TRIM/case-insensitive status so "Pending Approval" matches the dashboard count.
+     * A dean covers every program office in their school, not the office stored on their account.
+     * Any other user with the same dean role covers that same set.
+     *
+     * @return array<int, int>
+     */
+    private function actionableReservationIdsForDean(\App\Models\User $user): array
+    {
+        $coveredOfficeIds = ProgramChairStageService::programOfficeIdsForDean((string) $user->role);
+        $ownOfficeId = (int) ($user->office_id ?? 0);
+        if ($ownOfficeId > 0) {
+            $coveredOfficeIds[] = $ownOfficeId;
+        }
+        $coveredOfficeIds = array_values(array_unique(array_filter(
+            array_map('intval', $coveredOfficeIds),
+            static fn (int $officeId): bool => $officeId > 0
+        )));
+
+        if ($coveredOfficeIds === []) {
+            return [];
+        }
+
+        $query = ReservationApproval::query()
+            ->join('reservations', 'reservations.reservation_id', '=', 'reservation_approvals.reservation_id')
+            ->whereIn('reservation_approvals.office_id', $coveredOfficeIds)
+            ->whereNull('reservation_approvals.approved_at');
+        \App\Support\OpenReservationScope::apply($query, 'reservations.overall_status');
+
+        $candidateReservationIds = $query
+            ->orderByDesc('reservations.created_at')
+            ->limit(80)
+            ->pluck('reservation_approvals.reservation_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($candidateReservationIds === []) {
+            return [];
+        }
+
+        $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($candidateReservationIds);
+        $coveredLookup = array_flip($coveredOfficeIds);
+        $actionableReservationIds = [];
+        foreach ($actionableOfficeIds as $reservationId => $actionableOfficeId) {
+            if (isset($coveredLookup[(int) $actionableOfficeId])) {
+                $actionableReservationIds[] = (int) $reservationId;
+            }
+        }
+
+        $actionableReservationIds = array_values(array_unique($actionableReservationIds));
+
+        return $actionableReservationIds;
+    }
+
+    /**
+     * Reservations that are Physical Facilities' turn to approve.
+     * Earlier offices still show on the home list and do not create a PF alert.
      *
      * @return array<int, int>
      */
     private function pendingFinalReservationIdsForPhysicalFacilities(int $pfOfficeId, int $limit): array
     {
-        $awaitingIds = Reservation::query()
+        return Reservation::query()
             ->whereRaw("LOWER(TRIM(COALESCE(overall_status, ''))) = ?", ['awaiting_physical_facilities'])
             ->orderByDesc('created_at')
             ->limit($limit)
             ->pluck('reservation_id')
             ->map(fn ($id) => (int) $id)
             ->all();
-
-        $pendingApprovalIds = [];
-        if ($pfOfficeId > 0) {
-            $query = ReservationApproval::query()
-                ->join('reservations', 'reservations.reservation_id', '=', 'reservation_approvals.reservation_id')
-                ->where('reservation_approvals.office_id', $pfOfficeId)
-                ->whereNull('reservation_approvals.approved_at')
-                ->whereRaw("LOWER(TRIM(COALESCE(reservations.overall_status, ''))) IN (?, ?, ?)", [
-                    'awaiting_physical_facilities',
-                    'pending approval',
-                    'pending_office_approvals',
-                ]);
-
-            \App\Support\OpenReservationScope::apply($query, 'reservations.overall_status');
-
-            $pendingApprovalIds = $query
-                ->orderByDesc('reservations.created_at')
-                ->limit($limit)
-                ->pluck('reservation_approvals.reservation_id')
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values()
-                ->all();
-        }
-
-        return array_values(array_unique(array_slice(
-            array_merge($awaitingIds, $pendingApprovalIds),
-            0,
-            $limit
-        )));
     }
 
     private function formatNotificationTime(mixed $createdAt): string
@@ -2297,10 +2692,20 @@ class ApprovalController extends Controller
         $closedStatuses = array_map('strval', \App\Support\OpenReservationScope::CLOSED_STATUSES);
         $openIds = [];
         $staleIds = [];
+        $approvalCountsForPrune = DB::table('reservation_approvals')
+            ->whereIn('reservation_id', $relatedIds)
+            ->select('reservation_id', DB::raw('count(*) as approval_count'))
+            ->groupBy('reservation_id')
+            ->pluck('approval_count', 'reservation_id');
 
         foreach ($relatedIds as $reservationId) {
             $reservation = $reservations->get($reservationId);
             if (!$reservation) {
+                $staleIds[] = $reservationId;
+                continue;
+            }
+
+            if ((int) ($approvalCountsForPrune[$reservationId] ?? 0) === 0) {
                 $staleIds[] = $reservationId;
                 continue;
             }
@@ -2345,6 +2750,13 @@ class ApprovalController extends Controller
             }
 
             $isItemOwner = ItemOwnerService::isItemOwnerUser($user);
+            $isDean = $user->isDean();
+            $deanCoveredOffices = $isDean
+                ? array_flip(array_filter(array_merge(
+                    ProgramChairStageService::programOfficeIdsForDean((string) $user->role),
+                    $officeId > 0 ? [$officeId] : []
+                )))
+                : [];
 
             foreach ($openIds as $reservationId) {
                 $currentOfficeId = isset($actionableOfficeIds[$reservationId])
@@ -2361,6 +2773,8 @@ class ApprovalController extends Controller
                     $keep = $currentOfficeId !== null
                         && $currentOfficeId === $officeId
                         && ItemOwnerService::itemOwnerHasPendingApproval($user, $reservationId);
+                } elseif ($isDean) {
+                    $keep = $currentOfficeId !== null && isset($deanCoveredOffices[$currentOfficeId]);
                 } else {
                     $keep = $currentOfficeId !== null && $currentOfficeId === $officeId;
                 }
@@ -2611,9 +3025,7 @@ class ApprovalController extends Controller
             return [];
         }
 
-        return DB::table('users')
-            ->where('office_id', $officeId)
-            ->whereRaw('LOWER(role) IN (?, ?, ?)', ['admin', 'pc_admin', 'pf_admin'])
+        return ProgramChairStageService::recipientsForOffice($officeId, 0)
             ->pluck('user_id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -2627,6 +3039,15 @@ class ApprovalController extends Controller
 
         if ($reservation && (int) $reservation->user_id === (int) $user->user_id) {
             return true;
+        }
+
+        if ($user->isDean()) {
+            $officeIds = ProgramChairStageService::programOfficeIdsForDean((string) $user->role);
+
+            return ReservationApproval::query()
+                ->where('reservation_id', $reservationId)
+                ->whereIn('office_id', $officeIds !== [] ? $officeIds : [-1])
+                ->exists();
         }
 
         $officeId = (int) ($user->office_id ?? 0);
@@ -2651,7 +3072,7 @@ class ApprovalController extends Controller
             ], 403);
         }
 
-        $reservation = Reservation::with(['user'])->findOrFail($reservationId);
+        $reservation = Reservation::with(['user.academicProgram'])->findOrFail($reservationId);
 
         if (!$this->userCanViewReservation($user, (int) $reservationId, $reservation)) {
             return response()->json([
@@ -2682,6 +3103,7 @@ class ApprovalController extends Controller
         $proofOfConsentUrls = $this->parseProofOfConsentUrls($rawProofOfConsent);
         $proofOfConsentUrl = $proofOfConsentUrls[0] ?? '';
         $requesterType = $this->requesterTypeLabel($requester);
+        $requesterProgram = trim((string) ($requester?->academicProgram?->name ?? ''));
         $attachmentHeading = $requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent';
 
         $resourceRows = DB::table('reservation_details as details')
@@ -2735,6 +3157,7 @@ class ApprovalController extends Controller
             'requester_email' => (string) ($requester?->email ?? 'N/A'),
             'requester_phone' => (string) ($requester?->phone_number ?? $requester?->contact_number ?? 'N/A'),
             'requester_type' => $requesterType,
+            'requester_program' => $requesterProgram !== '' ? $requesterProgram : 'N/A',
             'requested_date' => $reservation->created_at
                 ? $reservation->created_at->format('M d, Y h:i A')
                 : 'N/A',
