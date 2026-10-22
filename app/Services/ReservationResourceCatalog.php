@@ -8,30 +8,16 @@ use Illuminate\Support\Facades\DB;
 class ReservationResourceCatalog
 {
     /**
-     * The mobile app saves one reservation row per room or item in a single submit.
-     * Rows from that submit share a user, activity name, and a short create time.
-     */
-    public const SUBMISSION_WINDOW_SECONDS = 90;
-
-    /**
      * Every room and equipment row linked to these reservations.
-     * A room's date is the reservation it was saved on. Rooms saved in one submit
-     * are listed together even when each one has its own reservation id.
+     * Institutional events store each room's own date on institutional_event_venues.
+     * Older reservations keep the single schedule on the reservation row.
      *
      * @param  array<int, int>  $reservationIds
      * @return array<int, array<string, mixed>>
      */
     public static function forReservations(array $reservationIds): array
     {
-        $originalIds = array_values(array_unique(array_filter(array_map('intval', $reservationIds))));
-        $members = self::submissionMembers($originalIds);
-        $reservationIds = [];
-        foreach ($members as $group) {
-            foreach ($group as $memberId) {
-                $reservationIds[$memberId] = $memberId;
-            }
-        }
-        $reservationIds = array_values($reservationIds);
+        $reservationIds = array_values(array_unique(array_filter(array_map('intval', $reservationIds))));
         $summaries = [];
         foreach ($reservationIds as $reservationId) {
             $summaries[$reservationId] = self::emptySummary();
@@ -71,9 +57,32 @@ class ReservationResourceCatalog
 
         $seenRoomLinks = [];
         $seenItemLinks = [];
+        $coveredRoomIds = [];
+
+        if (self::institutionalTablesExist()) {
+            self::appendInstitutionalResources(
+                $reservationIds,
+                $summaries,
+                $seenItemLinks,
+                $coveredRoomIds,
+            );
+        }
 
         foreach ($detailRows as $row) {
             $reservationId = (int) $row->reservation_id;
+            $roomId = (int) ($row->room_id ?? 0);
+            if ($roomId > 0 && isset($coveredRoomIds[$reservationId][$roomId])) {
+                if (!empty($row->reservation_rooms_id)) {
+                    $seenRoomLinks[$reservationId][(int) $row->reservation_rooms_id] = true;
+                }
+                continue;
+            }
+
+            $itemLinkId = (int) ($row->reservation_items_id ?? 0);
+            if ($itemLinkId > 0 && isset($seenItemLinks[$reservationId][$itemLinkId])) {
+                continue;
+            }
+
             $resource = self::resourceFromDetail($row);
             if ($resource === null) {
                 continue;
@@ -100,6 +109,7 @@ class ReservationResourceCatalog
                 'reservations.Date_of_Activity',
                 'reservations.Start_of_activity',
                 'reservations.End_of_Activity',
+                'rooms.room_id',
                 'rooms.room_number',
                 'rooms.room_type',
                 'rooms.maintenance_status as room_maintenance',
@@ -109,7 +119,7 @@ class ReservationResourceCatalog
         foreach ($linkedRooms as $row) {
             $reservationId = (int) $row->reservation_id;
             $linkId = (int) $row->reservation_rooms_id;
-            if (isset($seenRoomLinks[$reservationId][$linkId])) {
+            if (isset($seenRoomLinks[$reservationId][$linkId]) || isset($coveredRoomIds[$reservationId][(int) ($row->room_id ?? 0)])) {
                 continue;
             }
 
@@ -161,90 +171,18 @@ class ReservationResourceCatalog
             );
         }
 
-        $loaded = [];
         foreach ($summaries as $reservationId => $summary) {
-            $loaded[$reservationId] = $summary['resources'];
+            $resources = $summary['resources'];
+            usort($resources, function (array $left, array $right): int {
+                return strcmp(
+                    ($left['date_key'] ?? '').($left['start_time'] ?? '').($left['name'] ?? ''),
+                    ($right['date_key'] ?? '').($right['start_time'] ?? '').($right['name'] ?? ''),
+                );
+            });
+            $summaries[$reservationId] = self::finalize($resources);
         }
 
-        $result = [];
-        foreach ($originalIds as $reservationId) {
-            $group = $members[$reservationId] ?? [$reservationId];
-            $resources = [];
-            foreach ($group as $memberId) {
-                foreach ($loaded[$memberId] ?? [] as $resource) {
-                    $resources[] = $resource;
-                }
-            }
-
-            $merged = self::finalize(self::combineResources($resources));
-            $merged['reservation_ids'] = array_values(array_unique(array_map('intval', $group)));
-            sort($merged['reservation_ids']);
-            $result[$reservationId] = $merged;
-        }
-
-        return $result;
-    }
-
-    /**
-     * Reservation ids saved in the same submit as this one, including itself.
-     *
-     * @return list<int>
-     */
-    public static function submissionIds(int $reservationId): array
-    {
-        $members = self::submissionMembers([$reservationId]);
-
-        return $members[$reservationId] ?? [$reservationId];
-    }
-
-    /**
-     * @param  list<object|array<string, mixed>>  $rows
-     * @return list<list<int>>
-     */
-    public static function clusterRows(array $rows): array
-    {
-        usort($rows, function (object|array $left, object|array $right): int {
-            $byUser = self::rowInt($left, 'user_id') <=> self::rowInt($right, 'user_id');
-            if ($byUser !== 0) {
-                return $byUser;
-            }
-
-            $byActivity = strcmp(self::rowActivity($left), self::rowActivity($right));
-            if ($byActivity !== 0) {
-                return $byActivity;
-            }
-
-            return strcmp(self::rowCreated($left), self::rowCreated($right));
-        });
-
-        $clusters = [];
-        $current = [];
-        $anchor = null;
-
-        foreach ($rows as $row) {
-            $id = self::rowInt($row, 'reservation_id');
-            if ($id <= 0) {
-                continue;
-            }
-
-            if ($anchor !== null && self::sameSubmission($anchor, $row)) {
-                $current[] = $id;
-                continue;
-            }
-
-            if ($current !== []) {
-                $clusters[] = $current;
-            }
-
-            $current = [$id];
-            $anchor = $row;
-        }
-
-        if ($current !== []) {
-            $clusters[] = $current;
-        }
-
-        return $clusters;
+        return $summaries;
     }
 
     /**
@@ -439,133 +377,114 @@ class ReservationResourceCatalog
         return $value === true || $value === 1 || $value === '1' || $value === 't' || $value === 'true';
     }
 
+    private static function institutionalTablesExist(): bool
+    {
+        $found = DB::table('information_schema.tables')
+            ->where('table_schema', 'public')
+            ->whereIn('table_name', [
+                'institutional_event_venues',
+                'institutional_event_equipment',
+            ])
+            ->count();
+
+        return (int) $found === 2;
+    }
+
     /**
      * @param  list<int>  $reservationIds
-     * @return array<int, list<int>>
+     * @param  array<int, array<string, mixed>>  $summaries
+     * @param  array<int, array<int, true>>  $seenItemLinks
+     * @param  array<int, array<int, true>>  $coveredRoomIds
      */
-    private static function submissionMembers(array $reservationIds): array
-    {
-        $map = [];
-        foreach ($reservationIds as $reservationId) {
-            $map[$reservationId] = [$reservationId];
-        }
-
-        if ($reservationIds === []) {
-            return $map;
-        }
-
-        $seeds = DB::table('reservations')
-            ->whereIn('reservation_id', $reservationIds)
-            ->get(['reservation_id', 'user_id', 'activity_name', 'created_at']);
-
-        if ($seeds->isEmpty()) {
-            return $map;
-        }
-
-        $earliest = null;
-        $latest = null;
-        foreach ($seeds as $seed) {
-            $created = strtotime((string) $seed->created_at);
-            if ($created === false) {
-                continue;
-            }
-
-            $earliest = $earliest === null ? $created : min($earliest, $created);
-            $latest = $latest === null ? $created : max($latest, $created);
-        }
-
-        if ($earliest === null || $latest === null) {
-            return $map;
-        }
-
-        $userIds = $seeds->pluck('user_id')->filter(fn ($id) => $id !== null && $id !== '')->unique()->values()->all();
-        $candidates = DB::table('reservations')
-            ->whereIn('user_id', $userIds !== [] ? $userIds : [-1])
-            ->where('created_at', '>=', date('Y-m-d H:i:s', $earliest - self::SUBMISSION_WINDOW_SECONDS))
-            ->where('created_at', '<=', date('Y-m-d H:i:s', $latest + self::SUBMISSION_WINDOW_SECONDS))
-            ->get(['reservation_id', 'user_id', 'activity_name', 'created_at']);
-
-        $byId = [];
-        foreach (self::clusterRows($candidates->all()) as $cluster) {
-            foreach ($cluster as $memberId) {
-                $byId[$memberId] = $cluster;
-            }
-        }
-
-        foreach ($reservationIds as $reservationId) {
-            $map[$reservationId] = $byId[$reservationId] ?? [$reservationId];
-        }
-
-        return $map;
-    }
-
-    /**
-     * Identical lines from a split submit become one line. Different rooms and dates stay separate.
-     *
-     * @param  list<array<string, mixed>>  $resources
-     * @return list<array<string, mixed>>
-     */
-    private static function combineResources(array $resources): array
-    {
-        $combined = [];
-        foreach ($resources as $resource) {
-            $key = implode('|', [
-                (string) ($resource['type'] ?? ''),
-                mb_strtolower(trim((string) ($resource['name'] ?? ''))),
-                (string) ($resource['date_key'] ?? ''),
-                (string) ($resource['start_time'] ?? ''),
-                (string) ($resource['end_time'] ?? ''),
-                mb_strtolower(trim((string) ($resource['location'] ?? ''))),
+    private static function appendInstitutionalResources(
+        array $reservationIds,
+        array &$summaries,
+        array &$seenItemLinks,
+        array &$coveredRoomIds,
+    ): void {
+        $venues = DB::table('institutional_event_venues as venues')
+            ->join('rooms as rooms', 'rooms.room_id', '=', 'venues.room_id')
+            ->whereIn('venues.reservation_id', $reservationIds)
+            ->where('venues.status', 'included')
+            ->orderBy('venues.start_time')
+            ->orderBy('venues.event_venue_id')
+            ->get([
+                'venues.event_venue_id',
+                'venues.reservation_id',
+                'venues.room_id',
+                'venues.activity_date',
+                'venues.start_time',
+                'venues.end_time',
+                'rooms.room_number',
+                'rooms.room_type',
+                'rooms.maintenance_status as room_maintenance',
+                'rooms.availability_status as room_available',
             ]);
 
-            if (!isset($combined[$key])) {
-                $combined[$key] = $resource;
+        $venueRooms = [];
+        foreach ($venues as $venue) {
+            $reservationId = (int) $venue->reservation_id;
+            $roomId = (int) $venue->room_id;
+            $coveredRoomIds[$reservationId][$roomId] = true;
+            $venueRooms[(int) $venue->event_venue_id] = self::roomName((string) $venue->room_number);
+            $summaries[$reservationId]['resources'][] = self::makeResource(
+                'room',
+                self::roomName((string) $venue->room_number),
+                trim((string) ($venue->room_type ?? '')),
+                1,
+                $venue->activity_date,
+                $venue->start_time,
+                $venue->end_time,
+                self::statusLabel($venue->room_maintenance, $venue->room_available),
+            );
+        }
+
+        $equipmentRows = DB::table('institutional_event_equipment as equipment')
+            ->join('institutional_event_venues as venues', 'venues.event_venue_id', '=', 'equipment.event_venue_id')
+            ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'equipment.reservation_items_id')
+            ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
+            ->leftJoin('reservation_details as details', 'details.reservation_items_id', '=', 'equipment.reservation_items_id')
+            ->whereIn('equipment.reservation_id', $reservationIds)
+            ->where('equipment.status', 'included')
+            ->where('venues.status', 'included')
+            ->orderBy('venues.start_time')
+            ->orderBy('equipment.event_equipment_id')
+            ->get([
+                'equipment.event_equipment_id',
+                'equipment.reservation_id',
+                'equipment.reservation_items_id',
+                'equipment.event_venue_id',
+                'details.quantity',
+                'venues.activity_date',
+                'venues.start_time',
+                'venues.end_time',
+                'items.item_name',
+                'items.maintenance_status as item_maintenance',
+                'items.availability_status as item_available',
+            ]);
+
+        $seenEquipment = [];
+        foreach ($equipmentRows as $row) {
+            $equipmentId = (int) $row->event_equipment_id;
+            if (isset($seenEquipment[$equipmentId])) {
                 continue;
             }
+            $seenEquipment[$equipmentId] = true;
 
-            $combined[$key]['quantity'] = (int) ($combined[$key]['quantity'] ?? 1) + (int) ($resource['quantity'] ?? 1);
+            $reservationId = (int) $row->reservation_id;
+            $itemLinkId = (int) $row->reservation_items_id;
+            $seenItemLinks[$reservationId][$itemLinkId] = true;
+            $name = trim((string) ($row->item_name ?? ''));
+            $summaries[$reservationId]['resources'][] = self::makeResource(
+                'item',
+                $name !== '' ? $name : 'Equipment',
+                $venueRooms[(int) $row->event_venue_id] ?? '',
+                max(1, (int) ($row->quantity ?? 1)),
+                $row->activity_date,
+                $row->start_time,
+                $row->end_time,
+                self::statusLabel($row->item_maintenance, $row->item_available),
+            );
         }
-
-        return array_values($combined);
-    }
-
-    private static function sameSubmission(object|array $anchor, object|array $row): bool
-    {
-        if (self::rowInt($anchor, 'user_id') !== self::rowInt($row, 'user_id')) {
-            return false;
-        }
-
-        if (self::rowActivity($anchor) !== self::rowActivity($row)) {
-            return false;
-        }
-
-        $start = strtotime(self::rowCreated($anchor));
-        $created = strtotime(self::rowCreated($row));
-        if ($start === false || $created === false) {
-            return false;
-        }
-
-        return abs($created - $start) <= self::SUBMISSION_WINDOW_SECONDS;
-    }
-
-    private static function rowInt(object|array $row, string $key): int
-    {
-        $value = is_array($row) ? ($row[$key] ?? 0) : ($row->{$key} ?? 0);
-
-        return (int) $value;
-    }
-
-    private static function rowActivity(object|array $row): string
-    {
-        $value = is_array($row) ? ($row['activity_name'] ?? '') : ($row->activity_name ?? '');
-
-        return mb_strtolower(trim((string) $value));
-    }
-
-    private static function rowCreated(object|array $row): string
-    {
-        $value = is_array($row) ? ($row['created_at'] ?? '') : ($row->created_at ?? '');
-
-        return trim((string) $value);
     }
 }

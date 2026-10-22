@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Notification;
 use App\Models\Office;
 use App\Models\Reservation;
+use App\Models\User;
 use App\Services\ProgramChairStageService;
 use App\Services\ReservationApprovalNotifier;
 use App\Services\ProgramChairOfficeResolver;
@@ -64,8 +65,8 @@ class ApprovalController extends Controller
     public function index()
     {
         $user = Auth::user();
-        
-        if (!$user->isOfficeApprover()) {
+
+        if (!$user instanceof User || !$user->isOfficeApprover()) {
             return redirect('/home')->with('error', 'Unauthorized access.');
         }
 
@@ -173,12 +174,12 @@ class ApprovalController extends Controller
         ]);
     }
 
-    public function approve($approvalId)
+    public function approve(int|string $approvalId)
     {
         try {
             $user = Auth::user();
 
-            if (!$user->isOfficeApprover()) {
+            if (!$user instanceof User || !$user->isOfficeApprover()) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
 
@@ -219,19 +220,14 @@ class ApprovalController extends Controller
 
             // Return immediately. Notify / status updates run after the response so the
             // Approve button does not sit on Hostinger for minutes.
-            $reservationIds = array_values(array_unique(array_merge(
-                [(int) $approval->reservation_id],
-                $this->decideSubmissionSiblings($user, $approval, $updatePayload)
-            )));
+            $reservationId = (int) $approval->reservation_id;
             $fromOfficeId = (int) $approval->office_id;
             $actorUserId = (int) $user->user_id;
-            dispatch(function () use ($reservationIds, $fromOfficeId, $actorUserId, $isItemOwnerApprover) {
+            dispatch(function () use ($reservationId, $fromOfficeId, $actorUserId, $isItemOwnerApprover) {
                 try {
                     /** @var self $self */
                     $self = app(self::class);
-                    foreach ($reservationIds as $reservationId) {
-                        $self->runApprovedSideEffects($reservationId, $fromOfficeId, $actorUserId, $isItemOwnerApprover);
-                    }
+                    $self->runApprovedSideEffects($reservationId, $fromOfficeId, $actorUserId, $isItemOwnerApprover);
                 } catch (Throwable $throwable) {
                     report($throwable);
                 }
@@ -251,12 +247,12 @@ class ApprovalController extends Controller
         }
     }
 
-    public function reject($approvalId)
+    public function reject(int|string $approvalId)
     {
         try {
             $user = Auth::user();
 
-            if (!$user->isOfficeApprover()) {
+            if (!$user instanceof User || !$user->isOfficeApprover()) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
 
@@ -296,17 +292,12 @@ class ApprovalController extends Controller
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.rejected');
             Cache::forget('notification_unread_count.user.' . (int) $user->user_id);
 
-            $reservationIds = array_values(array_unique(array_merge(
-                [(int) $approval->reservation_id],
-                $this->decideSubmissionSiblings($user, $approval, $updatePayload)
-            )));
-            dispatch(function () use ($reservationIds) {
+            $reservationId = (int) $approval->reservation_id;
+            dispatch(function () use ($reservationId) {
                 try {
                     /** @var self $self */
                     $self = app(self::class);
-                    foreach ($reservationIds as $reservationId) {
-                        $self->runRejectedSideEffects($reservationId);
-                    }
+                    $self->runRejectedSideEffects($reservationId);
                 } catch (Throwable $throwable) {
                     report($throwable);
                 }
@@ -417,22 +408,22 @@ class ApprovalController extends Controller
         return !$earlierPending;
     }
 
-    public function finalApproveReservation($reservationId)
+    public function finalApproveReservation(int|string $reservationId)
     {
         return $this->finalizePhysicalFacilitiesDecision($reservationId, 'approved');
     }
 
-    public function finalRejectReservation($reservationId)
+    public function finalRejectReservation(int|string $reservationId)
     {
         return $this->finalizePhysicalFacilitiesDecision($reservationId, 'rejected');
     }
 
-    public function finalReturnReservation($reservationId)
+    public function finalReturnReservation(int|string $reservationId)
     {
         return $this->finalizePhysicalFacilitiesDecision($reservationId, 'returned');
     }
 
-    public function finalDamagedReservation(Request $request, $reservationId)
+    public function finalDamagedReservation(Request $request, int|string $reservationId)
     {
         $proofImageUrl = null;
         $damageSelection = $this->damageSelectionFromRequest($request, (int) $reservationId);
@@ -617,12 +608,12 @@ class ApprovalController extends Controller
         return $proofUrl ?? null;
     }
 
-    private function finalizePhysicalFacilitiesDecision($reservationId, string $status, ?string $proofImageUrl = null, ?array $damageSelection = null)
+    private function finalizePhysicalFacilitiesDecision(int|string $reservationId, string $status, ?string $proofImageUrl = null, ?array $damageSelection = null)
     {
         try {
             $user = Auth::user();
 
-            if (!$user || !$user->isPhysicalFacilitiesAdmin()) {
+            if (!$user instanceof User || !$user->isPhysicalFacilitiesAdmin()) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
 
@@ -764,12 +755,12 @@ class ApprovalController extends Controller
     /**
      * Allow a user to cancel their own reservation request
      */
-    public function cancelReservation($reservationId)
+    public function cancelReservation(int|string $reservationId)
     {
         try {
             $user = Auth::user();
-            
-            if (!$user) {
+
+            if (!$user instanceof User) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
 
@@ -881,7 +872,7 @@ class ApprovalController extends Controller
         $this->createApprovalNotifications($reservation, $nextActionableOfficeId, $nextActionableOfficeId, $pfOfficeId);
     }
 
-    private function updateReservationStatus($reservationId, ?Reservation $reservation = null)
+    private function updateReservationStatus(int|string $reservationId, ?Reservation $reservation = null)
     {
         $reservation = $reservation ?? Reservation::findOrFail($reservationId);
         $approvals = ReservationApproval::where('reservation_id', $reservationId)->get();
@@ -2024,52 +2015,6 @@ class ApprovalController extends Controller
         return $this->officeIdByDepartmentNameCache;
     }
 
-    /**
-     * One submit can be stored as several reservation ids. Approving the row
-     * shown in the queue also decides the other rooms and items from that submit
-     * when this office still has them pending.
-     *
-     * @return list<int>
-     */
-    private function decideSubmissionSiblings($user, ReservationApproval $approval, array $updatePayload): array
-    {
-        $ids = array_values(array_filter(
-            ReservationResourceCatalog::submissionIds((int) $approval->reservation_id),
-            fn (int $id) => $id !== (int) $approval->reservation_id
-        ));
-
-        if ($ids === []) {
-            return [];
-        }
-
-        $siblings = ReservationApproval::query()
-            ->whereIn('reservation_id', $ids)
-            ->where('office_id', (int) $approval->office_id)
-            ->whereNull('approved_at')
-            ->get();
-
-        $decided = [];
-        foreach ($siblings as $sibling) {
-            $decision = $this->decisionForActor($user, $sibling);
-            if ($decision instanceof \Illuminate\Http\JsonResponse) {
-                continue;
-            }
-
-            $payload = $updatePayload;
-            $payload['on_behalf_of_program_chair'] = $decision['on_behalf'];
-            $blocked = $this->saveApprovalDecision($sibling, $payload);
-            if ($blocked instanceof \Illuminate\Http\JsonResponse) {
-                continue;
-            }
-
-            $this->recordApprovalHistory($sibling);
-            $this->forgetActionableOfficeCache((int) $sibling->reservation_id);
-            $decided[] = (int) $sibling->reservation_id;
-        }
-
-        return $decided;
-    }
-
     private function recordApprovalHistory(ReservationApproval $approval): void
     {
         if (is_null($approval->approved_at)) {
@@ -2091,7 +2036,7 @@ class ApprovalController extends Controller
     /**
      * @return array{allowed: bool, on_behalf: bool, code: string}|\Illuminate\Http\JsonResponse
      */
-    private function decisionForActor($user, ReservationApproval $approval): array|\Illuminate\Http\JsonResponse
+    private function decisionForActor(User $user, ReservationApproval $approval): array|\Illuminate\Http\JsonResponse
     {
         $stage = ProgramChairStageService::authorize($user, $approval);
 
@@ -2170,7 +2115,7 @@ class ApprovalController extends Controller
         return null;
     }
 
-    private function upsertApprovalHistory(int $approvalId, int $reservationId, int $officeId, string $status, ?int $approvedByUserId, $approvedAt, ?string $approvedByRole = null, bool $onBehalfOfProgramChair = false): void
+    private function upsertApprovalHistory(int $approvalId, int $reservationId, int $officeId, string $status, ?int $approvedByUserId, \DateTimeInterface|null $approvedAt, ?string $approvedByRole = null, bool $onBehalfOfProgramChair = false): void
     {
         if (!Schema::hasTable('reservation_approval_histories')) {
             return;
@@ -2259,6 +2204,12 @@ class ApprovalController extends Controller
     public function getNotifications(\Illuminate\Http\Request $request)
     {
         $user = Auth::user();
+        if (!$user instanceof User) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
 
         $this->pruneStaleApprovalNotificationsForUser($user);
 
@@ -2312,6 +2263,13 @@ class ApprovalController extends Controller
     public function getNotificationUnreadCount()
     {
         $user = Auth::user();
+        if (!$user instanceof User) {
+            return response()->json([
+                'success' => false,
+                'unread_count' => 0,
+            ], 403);
+        }
+
         $this->pruneStaleApprovalNotificationsForUser($user);
 
         return response()->json([
@@ -2926,9 +2884,15 @@ class ApprovalController extends Controller
         }
     }
 
-    public function markNotificationAsRead($notificationId)
+    public function markNotificationAsRead(int|string $notificationId)
     {
         $user = Auth::user();
+        if (!$user instanceof User) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
 
         DB::table('notifications')
             ->where('user_id', (int) $user->user_id)
@@ -3124,11 +3088,11 @@ class ApprovalController extends Controller
             ->exists();
     }
 
-    public function getReservationDetails($reservationId)
+    public function getReservationDetails(int|string $reservationId)
     {
         $user = Auth::user();
 
-        if (!$user->isOfficeApprover()) {
+        if (!$user instanceof User || !$user->isOfficeApprover()) {
             return response()->json([
                 'success' => false,
                 'message' => 'You do not have permission to view this reservation.',
@@ -3267,7 +3231,7 @@ class ApprovalController extends Controller
         return array_values(array_unique($urls));
     }
 
-    private function requesterTypeLabel($requester): string
+    private function requesterTypeLabel(?User $requester): string
     {
         if (!$requester) {
             return 'Unknown';
@@ -3291,7 +3255,7 @@ class ApprovalController extends Controller
         };
     }
 
-    private function formatReservationScheduleLabel($eventAt, $eventEndAt): string
+    private function formatReservationScheduleLabel(?\DateTimeInterface $eventAt, ?\DateTimeInterface $eventEndAt): string
     {
         if (!$eventAt) {
             return 'N/A';
