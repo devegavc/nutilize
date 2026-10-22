@@ -202,6 +202,62 @@ class ProgramChairStageService
             ->all();
     }
 
+    /**
+     * Mobile saves a program chair's institutional request on the dean office
+     * with approval_stage = dean. That office takes the program-chair step when
+     * the program office itself has no approval row.
+     *
+     * @param  list<int>  $officeIds
+     * @return list<int>
+     */
+    public static function applyDeanStageOffice(int $reservationId, array $officeIds, ?int $programOfficeId): array
+    {
+        $deanOfficeId = self::deanStageOfficeId($reservationId);
+        if ($deanOfficeId === null) {
+            return array_values($officeIds);
+        }
+
+        $programHasRow = $programOfficeId !== null && DB::table('reservation_approvals')
+            ->where('reservation_id', $reservationId)
+            ->where('office_id', $programOfficeId)
+            ->exists();
+
+        $next = [];
+        $replaced = false;
+        foreach ($officeIds as $officeId) {
+            $officeId = (int) $officeId;
+            if (!$programHasRow && $programOfficeId !== null && $officeId === $programOfficeId) {
+                $officeId = $deanOfficeId;
+                $replaced = true;
+            }
+            if ($officeId <= 0 || in_array($officeId, $next, true)) {
+                continue;
+            }
+            $next[] = $officeId;
+        }
+
+        if (!$replaced && !in_array($deanOfficeId, $next, true)) {
+            array_unshift($next, $deanOfficeId);
+        }
+
+        return $next;
+    }
+
+    public static function deanStageOfficeId(int $reservationId): ?int
+    {
+        if ($reservationId <= 0 || !Schema::hasColumn('reservation_approvals', 'approval_stage')) {
+            return null;
+        }
+
+        $officeId = DB::table('reservation_approvals')
+            ->where('reservation_id', $reservationId)
+            ->whereRaw("LOWER(COALESCE(approval_stage, '')) = 'dean'")
+            ->orderBy('approval_id')
+            ->value('office_id');
+
+        return $officeId ? (int) $officeId : null;
+    }
+
     public static function userStaffsOffice(User $user, int $officeId, string $departmentName, string $shortCode): bool
     {
         if ((int) $user->office_id !== $officeId) {

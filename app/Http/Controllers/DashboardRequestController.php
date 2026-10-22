@@ -754,7 +754,11 @@ class DashboardRequestController extends Controller
             $deduped[] = $officeId;
         }
 
-        return $deduped;
+        return ProgramChairStageService::applyDeanStageOffice(
+            $reservationId,
+            $deduped,
+            $pcOfficeId !== null ? (int) $pcOfficeId : null,
+        );
     }
 
     /**

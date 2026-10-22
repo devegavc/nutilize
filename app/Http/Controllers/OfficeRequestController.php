@@ -293,6 +293,13 @@ class OfficeRequestController extends Controller
     private function buildDeanOfficeHomeData(User $user): array
     {
         $officeIds = ProgramChairStageService::programOfficeIdsForDean((string) $user->role);
+        $ownOfficeId = (int) $user->office_id;
+        if ($ownOfficeId > 0 && !in_array($ownOfficeId, $officeIds, true)) {
+            $shortCode = strtoupper(trim((string) DB::table('offices')->where('office_id', $ownOfficeId)->value('short_code')));
+            if ($shortCode !== '' && strcasecmp($shortCode, (string) $user->role) === 0) {
+                $officeIds[] = $ownOfficeId;
+            }
+        }
         $pendingColumns = ['approval_id', 'reservation_id', 'office_id'];
         if (ProgramChairStageService::hasDeanRequiredColumn()) {
             $pendingColumns[] = 'dean_required';
@@ -335,7 +342,8 @@ class OfficeRequestController extends Controller
         $this->attachResourceSummaries($requests);
 
         $requests->each(function (ReservationApproval $approval) {
-            $required = (bool) ($approval->dean_required ?? false);
+            $stage = strtolower((string) ($approval->approval_stage ?? ''));
+            $required = (bool) ($approval->dean_required ?? false) || $stage === 'dean';
             $approval->dean_queue_label = $required
                 ? 'Program Chair submitted this request. Your approval is required.'
                 : 'You may approve on behalf of the program chair.';
@@ -743,7 +751,11 @@ class OfficeRequestController extends Controller
             $deduped[] = $officeId;
         }
 
-        return $deduped;
+        return ProgramChairStageService::applyDeanStageOffice(
+            $reservationId,
+            $deduped,
+            $pcOfficeId !== null ? (int) $pcOfficeId : null,
+        );
     }
 
     private function getOfficeIdsByShortCode(): array
