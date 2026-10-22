@@ -1808,7 +1808,7 @@ body {
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.28);
-  max-width: 860px;
+  max-width: min(1040px, calc(100vw - 32px));
   width: 100%;
   max-height: 88vh;
   overflow: hidden;
@@ -2626,4 +2626,136 @@ body.office-app .maintenance-grid {
 .reservation-approval-steps li span {
   color: #38479c;
   font-weight: 700;
+}
+
+.reservation-details-body .reservation-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 22px;
+}
+
+.reservation-details-body .info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.venue-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.venue-card {
+  border: 1px solid #d7e0f7;
+  border-left: 4px solid #38479c;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fbfcff;
+}
+
+.venue-card-unassigned {
+  border-left-color: #e0b000;
+}
+
+.venue-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.venue-card-heading h4,
+.venue-card-subheading {
+  margin: 0;
+  color: #243274;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.venue-card-subheading {
+  margin: 14px 0 8px;
+  font-size: 0.84rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.venue-card-type,
+.venue-card-schedule,
+.venue-card-equipment p {
+  margin: 4px 0 0;
+  color: #3d4d86;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.venue-card-equipment p {
+  margin-top: 8px;
+  font-weight: 700;
+  color: #243274;
+}
+
+.venue-equipment-list {
+  list-style: disc;
+  margin: 6px 0 0;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.venue-equipment-list li {
+  color: #243a6b;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.venue-equipment-list li strong {
+  color: #1b2b6a;
+}
+
+.reservation-approval-steps li {
+  align-items: center;
+}
+
+.reservation-approval-order {
+  width: 1.4rem;
+  color: #5b6cb3;
+  font-weight: 700;
+}
+
+.reservation-approval-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reservation-approval-history li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid #e6ebf5;
+  border-radius: 10px;
+  font-size: 0.84rem;
+}
+
+.reservation-status-pill.status-waiting {
+  background: #fff4de;
+  color: #9a6700;
+}
+
+@media (max-width: 700px) {
+  .reservation-details-body .reservation-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reservation-details-content {
+    max-width: calc(100vw - 20px);
+  }
 }

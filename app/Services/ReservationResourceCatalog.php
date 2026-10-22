@@ -83,19 +83,16 @@ class ReservationResourceCatalog
                 continue;
             }
 
-            $resource = self::resourceFromDetail($row);
-            if ($resource === null) {
-                continue;
-            }
+            foreach (self::resourcesFromDetail($row) as $resource) {
+                if ($resource['type'] === 'room' && !empty($row->reservation_rooms_id)) {
+                    $seenRoomLinks[$reservationId][(int) $row->reservation_rooms_id] = true;
+                }
+                if ($resource['type'] === 'item' && !empty($row->reservation_items_id)) {
+                    $seenItemLinks[$reservationId][(int) $row->reservation_items_id] = true;
+                }
 
-            if ($resource['type'] === 'room' && !empty($row->reservation_rooms_id)) {
-                $seenRoomLinks[$reservationId][(int) $row->reservation_rooms_id] = true;
+                $summaries[$reservationId]['resources'][] = $resource;
             }
-            if ($resource['type'] === 'item' && !empty($row->reservation_items_id)) {
-                $seenItemLinks[$reservationId][(int) $row->reservation_items_id] = true;
-            }
-
-            $summaries[$reservationId]['resources'][] = $resource;
         }
 
         $linkedRooms = DB::table('reservation_rooms as reservationRooms')
@@ -123,15 +120,19 @@ class ReservationResourceCatalog
                 continue;
             }
 
+            $roomType = trim((string) ($row->room_type ?? ''));
             $summaries[$reservationId]['resources'][] = self::makeResource(
                 'room',
                 self::roomName($row->room_number),
-                trim((string) ($row->room_type ?? '')),
+                $roomType,
                 1,
                 $row->Date_of_Activity,
                 $row->Start_of_activity,
                 $row->End_of_Activity,
                 self::statusLabel($row->room_maintenance, $row->room_available),
+                null,
+                $roomType,
+                'room-link:'.$linkId,
             );
         }
 
@@ -229,6 +230,8 @@ class ReservationResourceCatalog
         $scheduleCount = count(array_filter($dateKeys));
         $distinctDates = count(array_unique(array_filter($dateKeys)));
 
+        $grouped = self::groupResources($resources);
+
         return [
             'resources' => $resources,
             'rooms' => $rooms,
@@ -239,7 +242,121 @@ class ReservationResourceCatalog
             'distinct_dates' => $distinctDates,
             'date_label' => self::dateLabel($dateKeys, $scheduleCount),
             'multiple_schedules' => $distinctDates > 1,
+            'venue_groups' => $grouped['venue_groups'],
+            'unassigned_equipment' => $grouped['unassigned_equipment'],
         ];
+    }
+
+    /**
+     * Rooms stay separate per venue. Equipment joins a room only through event_venue_id
+     * or a legacy detail row that records both the room and the item.
+     *
+     * @param  list<array<string, mixed>>  $resources
+     * @return array{venue_groups: list<array<string, mixed>>, unassigned_equipment: list<array<string, mixed>>}
+     */
+    public static function groupResources(array $resources): array
+    {
+        $groups = [];
+        $order = [];
+
+        foreach ($resources as $index => $resource) {
+            if (!is_array($resource) || ($resource['type'] ?? '') !== 'room') {
+                continue;
+            }
+
+            $key = self::roomGroupKey($resource, (int) $index);
+            if (isset($groups[$key])) {
+                continue;
+            }
+
+            $roomType = trim((string) ($resource['room_type'] ?? ''));
+            if ($roomType === '') {
+                $roomType = trim((string) ($resource['location'] ?? ''));
+            }
+
+            $venueId = (int) ($resource['venue_id'] ?? 0);
+            $groups[$key] = [
+                'venue_id' => $venueId > 0 ? $venueId : null,
+                'name' => (string) ($resource['name'] ?? 'Room'),
+                'room_type' => $roomType,
+                'date' => (string) ($resource['date'] ?? 'N/A'),
+                'start_time' => (string) ($resource['start_time'] ?? 'N/A'),
+                'end_time' => (string) ($resource['end_time'] ?? 'N/A'),
+                'status' => $resource['status'] ?? null,
+                'equipment' => [],
+            ];
+            $order[] = $key;
+        }
+
+        $unassigned = [];
+        foreach ($resources as $resource) {
+            if (!is_array($resource) || ($resource['type'] ?? '') !== 'item') {
+                continue;
+            }
+
+            $item = [
+                'name' => (string) ($resource['name'] ?? 'Equipment'),
+                'quantity' => max(1, (int) ($resource['quantity'] ?? 1)),
+                'status' => $resource['status'] ?? null,
+                'date' => (string) ($resource['date'] ?? ''),
+                'start_time' => (string) ($resource['start_time'] ?? ''),
+                'end_time' => (string) ($resource['end_time'] ?? ''),
+            ];
+            $key = self::equipmentGroupKey($resource);
+            if ($key !== null && isset($groups[$key])) {
+                $groups[$key]['equipment'][] = $item;
+                continue;
+            }
+
+            $unassigned[] = $item;
+        }
+
+        $venueGroups = [];
+        foreach ($order as $key) {
+            $venueGroups[] = $groups[$key];
+        }
+
+        return [
+            'venue_groups' => $venueGroups,
+            'unassigned_equipment' => $unassigned,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $resource
+     */
+    private static function roomGroupKey(array $resource, int $index): string
+    {
+        $venueId = (int) ($resource['venue_id'] ?? 0);
+        if ($venueId > 0) {
+            return 'venue:'.$venueId;
+        }
+
+        $linkKey = trim((string) ($resource['link_key'] ?? ''));
+        if ($linkKey !== '') {
+            return $linkKey;
+        }
+
+        return 'room-row:'.$index;
+    }
+
+    /**
+     * @param  array<string, mixed>  $resource
+     */
+    private static function equipmentGroupKey(array $resource): ?string
+    {
+        if (empty($resource['associated'])) {
+            return null;
+        }
+
+        $venueId = (int) ($resource['venue_id'] ?? 0);
+        if ($venueId > 0) {
+            return 'venue:'.$venueId;
+        }
+
+        $linkKey = trim((string) ($resource['link_key'] ?? ''));
+
+        return $linkKey !== '' ? $linkKey : null;
     }
 
     /**
@@ -251,40 +368,59 @@ class ReservationResourceCatalog
     }
 
     /**
-     * @return array<string, mixed>|null
+     * A legacy detail associates equipment with a room only when that same row
+     * stores both reservation_rooms_id and reservation_items_id.
+     *
+     * @return list<array<string, mixed>>
      */
-    private static function resourceFromDetail(object $row): ?array
+    private static function resourcesFromDetail(object $row): array
     {
+        $resources = [];
         $roomNumber = trim((string) ($row->room_number ?? ''));
-        if ($roomNumber !== '') {
-            return self::makeResource(
+        $itemName = trim((string) ($row->item_name ?? ''));
+        $hasRoom = $roomNumber !== '';
+        $hasItem = $row->reservation_items_id !== null || $itemName !== '';
+        $linkKey = !empty($row->reservation_rooms_id)
+            ? 'room-link:'.(int) $row->reservation_rooms_id
+            : null;
+        $roomType = trim((string) ($row->room_type ?? ''));
+
+        if ($hasRoom) {
+            $resources[] = self::makeResource(
                 'room',
                 self::roomName($roomNumber),
-                trim((string) ($row->room_type ?? '')),
-                max(1, (int) ($row->quantity ?? 1)),
+                $roomType,
+                1,
                 $row->Date_of_Activity,
                 $row->Start_of_activity,
                 $row->End_of_Activity,
                 self::statusLabel($row->room_maintenance, $row->room_available),
+                null,
+                $roomType,
+                $linkKey,
             );
         }
 
-        if ($row->reservation_items_id === null && trim((string) ($row->item_name ?? '')) === '') {
-            return null;
+        if (!$hasItem || ($itemName === '' && $row->reservation_items_id === null)) {
+            return $resources;
         }
 
-        $name = trim((string) ($row->item_name ?? ''));
-
-        return self::makeResource(
+        $resources[] = self::makeResource(
             'item',
-            $name !== '' ? $name : 'Equipment',
-            '',
+            $itemName !== '' ? $itemName : 'Equipment',
+            $hasRoom ? self::roomName($roomNumber) : '',
             max(1, (int) ($row->quantity ?? 1)),
             $row->Date_of_Activity,
             $row->Start_of_activity,
             $row->End_of_Activity,
             self::statusLabel($row->item_maintenance, $row->item_available),
+            null,
+            null,
+            $hasRoom ? $linkKey : null,
+            $hasRoom && $row->reservation_items_id !== null && $linkKey !== null,
         );
+
+        return $resources;
     }
 
     /**
@@ -299,6 +435,10 @@ class ReservationResourceCatalog
         mixed $startsAt,
         mixed $endsAt,
         ?string $status,
+        ?int $venueId = null,
+        ?string $roomType = null,
+        ?string $linkKey = null,
+        bool $associated = false,
     ): array {
         $start = self::moment($startsAt) ?? self::moment($dateOfActivity);
         $end = self::moment($endsAt);
@@ -324,6 +464,10 @@ class ReservationResourceCatalog
             'end_time' => $endLabel,
             'schedule' => $schedule,
             'status' => $status,
+            'venue_id' => ($venueId ?? 0) > 0 ? $venueId : null,
+            'room_type' => trim((string) $roomType),
+            'link_key' => trim((string) $linkKey),
+            'associated' => $associated,
         ];
     }
 
@@ -426,16 +570,21 @@ class ReservationResourceCatalog
             $reservationId = (int) $venue->reservation_id;
             $roomId = (int) $venue->room_id;
             $coveredRoomIds[$reservationId][$roomId] = true;
-            $venueRooms[(int) $venue->event_venue_id] = self::roomName((string) $venue->room_number);
+            $venueId = (int) $venue->event_venue_id;
+            $roomType = trim((string) ($venue->room_type ?? ''));
+            $venueRooms[$venueId] = self::roomName((string) $venue->room_number);
             $summaries[$reservationId]['resources'][] = self::makeResource(
                 'room',
                 self::roomName((string) $venue->room_number),
-                trim((string) ($venue->room_type ?? '')),
+                $roomType,
                 1,
                 $venue->activity_date,
                 $venue->start_time,
                 $venue->end_time,
                 self::statusLabel($venue->room_maintenance, $venue->room_available),
+                $venueId,
+                $roomType,
+                'venue:'.$venueId,
             );
         }
 
@@ -473,17 +622,22 @@ class ReservationResourceCatalog
 
             $reservationId = (int) $row->reservation_id;
             $itemLinkId = (int) $row->reservation_items_id;
+            $venueId = (int) $row->event_venue_id;
             $seenItemLinks[$reservationId][$itemLinkId] = true;
             $name = trim((string) ($row->item_name ?? ''));
             $summaries[$reservationId]['resources'][] = self::makeResource(
                 'item',
                 $name !== '' ? $name : 'Equipment',
-                $venueRooms[(int) $row->event_venue_id] ?? '',
+                $venueRooms[$venueId] ?? '',
                 max(1, (int) ($row->quantity ?? 1)),
                 $row->activity_date,
                 $row->start_time,
                 $row->end_time,
                 self::statusLabel($row->item_maintenance, $row->item_available),
+                $venueId > 0 ? $venueId : null,
+                null,
+                $venueId > 0 ? 'venue:'.$venueId : null,
+                $venueId > 0,
             );
         }
     }

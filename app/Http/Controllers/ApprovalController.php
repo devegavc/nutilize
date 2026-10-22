@@ -3176,6 +3176,8 @@ class ApprovalController extends Controller
             'proof_of_consent_urls' => $proofOfConsentUrls,
             'attachment_heading' => $attachmentHeading,
             'resources' => $resources,
+            'venue_groups' => $resourceSummary['venue_groups'] ?? [],
+            'unassigned_equipment' => $resourceSummary['unassigned_equipment'] ?? [],
             'rooms' => $resourceSummary['rooms'] ?? [],
             'room_count' => (int) ($resourceSummary['room_count'] ?? 0),
             'item_count' => (int) ($resourceSummary['item_count'] ?? 0),
@@ -3194,7 +3196,7 @@ class ApprovalController extends Controller
     /**
      * Existing approval rows for display. This does not decide who may act.
      *
-     * @return array{current_office: ?string, current_status: ?string, steps: list<array{office: string, status: string, decided: bool}>}
+     * @return array{current_office: ?string, current_status: ?string, steps: list<array<string, mixed>>}
      */
     private function reservationApprovalSummary(int $reservationId): array
     {
@@ -3216,12 +3218,20 @@ class ApprovalController extends Controller
             if ($status === '') {
                 $status = 'Pending';
             }
+            $note = trim((string) ($row->rejection_reason ?? ''));
+            $role = trim((string) ($row->approved_by_role ?? ''));
+            $decidedAt = $row->approved_at instanceof \DateTimeInterface
+                ? $row->approved_at->format('M d, Y h:i A')
+                : null;
             $steps[] = [
                 'office' => $officeName,
                 'status' => $status,
-                'decided' => $row->approved_at !== null,
+                'decided' => $decidedAt !== null,
+                'decided_at' => $decidedAt,
+                'role' => $role !== '' ? $role : null,
+                'note' => $note !== '' ? $note : null,
             ];
-            if ($currentOffice === null && $row->approved_at === null) {
+            if ($currentOffice === null && $decidedAt === null) {
                 $currentOffice = $officeName;
                 $currentStatus = $status;
             }

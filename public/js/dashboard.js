@@ -1407,98 +1407,100 @@ if (reportTableBody instanceof HTMLElement) {
 }
 
 function showReservationDetailsModal(reservation, options = {}) {
-  const resources = Array.isArray(reservation.resources) && reservation.resources.length
-    ? reservation.resources
-    : (Array.isArray(reservation.items) ? reservation.items.map((item) => ({
-      label: item.name || item.label || 'Resource',
-      quantity: item.quantity || 1,
-      unit: item.unit || '',
-      type: 'item',
-    })) : []);
-
-  const rooms = resources.filter((resource) => resource.type === 'room');
-  const equipment = resources.filter((resource) => resource.type !== 'room');
-  const resourceGroup = (title, entries) => {
-    if (!entries.length) {
-      return '';
-    }
-
-    const items = entries.map((resource) => {
-      const location = resource.location
-        ? `<span class="reservation-resource-location">${escapeReservationDetailsHtml(resource.location)}</span>`
-        : '';
-      const quantity = resource.type === 'item'
-        ? `<span>Quantity: ${escapeReservationDetailsHtml(resource.quantity || 1)}</span>`
-        : '';
-      const status = resource.status
-        ? `<span class="reservation-resource-status">${escapeReservationDetailsHtml(resource.status)}</span>`
-        : '';
-      const start = resource.start_time && resource.start_time !== 'N/A' ? resource.start_time : '';
-      const end = resource.end_time && resource.end_time !== 'N/A' ? resource.end_time : '';
-      const time = [start, end].filter(Boolean).join('–');
-
-      return `
-        <li>
-          <strong>${escapeReservationDetailsHtml(resource.name || resource.label || 'Resource')}</strong>
-          ${location}
-          <span>${escapeReservationDetailsHtml(resource.date || 'N/A')}</span>
-          ${time ? `<span>${escapeReservationDetailsHtml(time)}</span>` : ''}
-          ${quantity}
-          ${status}
-        </li>
-      `;
-    }).join('');
+  const scheduleText = (entry) => {
+    const start = entry.start_time && entry.start_time !== 'N/A' ? entry.start_time : '';
+    const end = entry.end_time && entry.end_time !== 'N/A' ? entry.end_time : '';
+    const time = [start, end].filter(Boolean).join(' – ');
+    return [entry.date && entry.date !== 'N/A' ? entry.date : '', time].filter(Boolean).join(' · ');
+  };
+  const equipmentList = (items, includeSchedule) => items.map((item) => `
+    <li>
+      <strong>${escapeReservationDetailsHtml(item.name || 'Equipment')}</strong>
+      <span> — Quantity: ${escapeReservationDetailsHtml(item.quantity || 1)}</span>
+      ${item.status ? `<span class="reservation-resource-status"> · ${escapeReservationDetailsHtml(item.status)}</span>` : ''}
+      ${includeSchedule && scheduleText(item) ? `<span> · ${escapeReservationDetailsHtml(scheduleText(item))}</span>` : ''}
+    </li>
+  `).join('');
+  const grouped = Array.isArray(reservation.venue_groups) ? reservation.venue_groups : [];
+  const unassigned = Array.isArray(reservation.unassigned_equipment) ? reservation.unassigned_equipment : [];
+  const roomCards = grouped.map((room) => {
+    const equipment = Array.isArray(room.equipment) ? room.equipment : [];
+    const status = room.status
+      ? `<span class="reservation-status-pill">${escapeReservationDetailsHtml(room.status)}</span>`
+      : '';
 
     return `
-      <div class="reservation-resource-group">
-        <h4>${escapeReservationDetailsHtml(title)} (${entries.length})</h4>
-        <ol class="reservation-resource-entries">${items}</ol>
-      </div>
-    `;
-  };
-  const equipmentGroups = [];
-  equipment.forEach((resource) => {
-    const place = resource.location || 'No assigned room';
-    const when = resource.schedule || [resource.date, [resource.start_time, resource.end_time].filter((value) => value && value !== 'N/A').join('–')].filter(Boolean).join(' · ');
-    const key = `${place}|${when}`;
-    let group = equipmentGroups.find((entry) => entry.key === key);
-    if (!group) {
-      group = { key, place, when, items: [] };
-      equipmentGroups.push(group);
-    }
-    group.items.push(resource);
-  });
-  const equipmentMarkup = equipmentGroups.length
-    ? equipmentGroups.map((group) => `
-        <div class="reservation-equipment-group">
-          <h4>${escapeReservationDetailsHtml(group.place)}${group.when ? ` · ${escapeReservationDetailsHtml(group.when)}` : ''}</h4>
-          <ol class="reservation-resource-entries">
-            ${group.items.map((resource) => `
-              <li>
-                <strong>${escapeReservationDetailsHtml(resource.name || resource.label || 'Equipment')}</strong>
-                <span>Quantity: ${escapeReservationDetailsHtml(resource.quantity || 1)}</span>
-                ${resource.status ? `<span class="reservation-resource-status">${escapeReservationDetailsHtml(resource.status)}</span>` : ''}
-              </li>
-            `).join('')}
-          </ol>
+      <article class="venue-card">
+        <div class="venue-card-heading">
+          <h4>${escapeReservationDetailsHtml(room.name || 'Room')}</h4>
+          ${status}
         </div>
-      `).join('')
-    : '<p class="reservation-empty-note">No equipment listed for this request.</p>';
+        <p class="venue-card-type">${escapeReservationDetailsHtml(room.room_type || 'Room')}</p>
+        <p class="venue-card-schedule">${escapeReservationDetailsHtml(room.date || 'Date not listed')}</p>
+        <p class="venue-card-schedule">${escapeReservationDetailsHtml([room.start_time, room.end_time].filter((value) => value && value !== 'N/A').join(' – ') || 'Time not listed')}</p>
+        <div class="venue-card-equipment">
+          <p>Requested Equipment</p>
+          ${equipment.length
+            ? `<ul class="venue-equipment-list">${equipmentList(equipment, false)}</ul>`
+            : '<p class="reservation-empty-note">No equipment requested</p>'}
+        </div>
+      </article>
+    `;
+  }).join('');
+  const unassignedMarkup = unassigned.length
+    ? `
+      <article class="venue-card venue-card-unassigned">
+        <div class="venue-card-heading">
+          <h4>Equipment Without Assigned Room</h4>
+        </div>
+        <ul class="venue-equipment-list">${equipmentList(unassigned, true)}</ul>
+      </article>
+    `
+    : '';
+  const facilitiesMarkup = roomCards || unassignedMarkup
+    ? `${roomCards}${unassignedMarkup}`
+    : '<p class="reservation-empty-note">No rooms or equipment are listed for this request.</p>';
   const approvalSummary = reservation.approval_summary && typeof reservation.approval_summary === 'object'
     ? reservation.approval_summary
     : {};
   const approvalSteps = Array.isArray(approvalSummary.steps) ? approvalSummary.steps : [];
+  const approvalStatusClass = (status) => String(status || 'pending').toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  const historySteps = approvalSteps.filter((step) => step.decided);
   const approvalMarkup = approvalSteps.length
     ? `
-      <p class="reservation-approval-current">Current stage: ${escapeReservationDetailsHtml(approvalSummary.current_office || 'Completed')}${approvalSummary.current_status ? ` · ${escapeReservationDetailsHtml(approvalSummary.current_status)}` : ''}</p>
+      <div class="reservation-info-grid">
+        <div class="info-row">
+          <strong>Current Approval Status</strong>
+          <span>${escapeReservationDetailsHtml(approvalSummary.current_status || 'Completed')}</span>
+        </div>
+        <div class="info-row">
+          <strong>Current Approving Office</strong>
+          <span>${escapeReservationDetailsHtml(approvalSummary.current_office || 'No office is waiting')}</span>
+        </div>
+      </div>
+      <h4 class="venue-card-subheading">Approval Sequence</h4>
       <ol class="reservation-approval-steps">
-        ${approvalSteps.map((step) => `
+        ${approvalSteps.map((step, index) => `
           <li>
+            <span class="reservation-approval-order">${index + 1}</span>
             <strong>${escapeReservationDetailsHtml(step.office || 'Office')}</strong>
-            <span>${escapeReservationDetailsHtml(step.status || 'Pending')}</span>
+            <span class="reservation-status-pill status-${escapeReservationDetailsHtml(approvalStatusClass(step.status))}">${escapeReservationDetailsHtml(step.status || 'Pending')}</span>
           </li>
         `).join('')}
       </ol>
+      <h4 class="venue-card-subheading">Approval History</h4>
+      ${historySteps.length
+        ? `<ul class="reservation-approval-history">
+            ${historySteps.map((step) => `
+              <li>
+                <strong>${escapeReservationDetailsHtml(step.office || 'Office')}</strong>
+                <span>${escapeReservationDetailsHtml(step.status || 'Decided')}${step.decided_at ? ` · ${escapeReservationDetailsHtml(step.decided_at)}` : ''}</span>
+                ${step.role ? `<span>${escapeReservationDetailsHtml(step.role)}</span>` : ''}
+                ${step.note ? `<span>${escapeReservationDetailsHtml(step.note)}</span>` : ''}
+              </li>
+            `).join('')}
+          </ul>`
+        : '<p class="reservation-empty-note">No approval decisions have been recorded yet.</p>'}
     `
     : '<p class="reservation-empty-note">No approval steps are recorded for this request.</p>';
 
@@ -1522,12 +1524,6 @@ function showReservationDetailsModal(reservation, options = {}) {
   const reservationCode = reservation.reservation_code
     || (reservation.id ? `NU-${String(reservation.id).padStart(6, '0')}` : 'Reservation');
   const requesterType = String(reservation.requester_type || '').trim() || 'Unknown';
-  const scheduleLabel = reservation.event_schedule
-    || [
-      reservation.event_date || reservation.start_date,
-      reservation.event_time || reservation.start_time,
-    ].filter(Boolean).join(' · ')
-    || 'N/A';
 
   const canAct = Boolean(options.canAct && options.approvalId);
   const actionFooter = canAct
@@ -1569,23 +1565,23 @@ function showReservationDetailsModal(reservation, options = {}) {
                 <span>${escapeReservationDetailsHtml(reservation.id ? `#${reservation.id}` : reservationCode)}</span>
               </div>
               <div class="info-row">
-                <strong>Requester</strong>
+                <strong>Requested By</strong>
                 <span>${escapeReservationDetailsHtml(reservation.requester || 'Unknown')} · ${escapeReservationDetailsHtml(requesterType)}</span>
               </div>
               <div class="info-row">
-                <strong>Academic program</strong>
+                <strong>Academic Program</strong>
                 <span>${escapeReservationDetailsHtml(reservation.requester_program || 'N/A')}</span>
               </div>
               <div class="info-row">
-                <strong>Activity</strong>
+                <strong>Activity Name</strong>
                 <span>${escapeReservationDetailsHtml(reservation.activity_name || 'N/A')}</span>
               </div>
               <div class="info-row">
-                <strong>Date submitted</strong>
+                <strong>Date Submitted</strong>
                 <span>${escapeReservationDetailsHtml(reservation.requested_date || 'N/A')}</span>
               </div>
               <div class="info-row">
-                <strong>Status</strong>
+                <strong>Overall Reservation Status</strong>
                 <span>${escapeReservationDetailsHtml(statusLabel)}</span>
               </div>
               <div class="info-row">
@@ -1601,22 +1597,15 @@ function showReservationDetailsModal(reservation, options = {}) {
           </section>
           <section class="reservation-details-panel reservation-resources-panel">
             <div class="reservation-panel-heading">
-              <h3>Reserved Facilities</h3>
+              <h3>Reserved Facilities & Equipment</h3>
             </div>
-            <div class="reservation-resource-list">${rooms.length ? resourceGroup('Rooms', rooms) : '<p class="reservation-empty-note">No rooms listed for this request.</p>'}</div>
-          </section>
-          <section class="reservation-details-panel reservation-resources-panel">
-            <div class="reservation-panel-heading">
-              <h3>Reserved Equipment</h3>
-            </div>
-            <div class="reservation-resource-list">${equipmentMarkup}</div>
+            <div class="venue-card-list">${facilitiesMarkup}</div>
           </section>
           <section class="reservation-details-panel">
             <div class="reservation-panel-heading">
               <h3>Approval Information</h3>
             </div>
             ${approvalMarkup}
-            ${reservation.multiple_schedules ? '<p class="reservation-empty-note">Each room and item above keeps its own date and time.</p>' : `<p class="reservation-empty-note">${escapeReservationDetailsHtml(scheduleLabel)}</p>`}
           </section>
         </div>
         ${actionFooter}
