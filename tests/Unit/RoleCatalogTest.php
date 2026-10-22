@@ -10,8 +10,21 @@ class RoleCatalogTest extends TestCase
     public function test_each_dean_covers_only_the_programs_in_that_school(): void
     {
         $this->assertSame('Dean_SACE', RoleCatalog::deanForChair('PC_InformationTechnology'));
+        $this->assertSame('Dean_SACE', RoleCatalog::deanForChair('PC_ComputerScience'));
+        $this->assertSame('Dean_SACE', RoleCatalog::deanForChair('PC_Architecture'));
+        $this->assertSame('Dean_SACE', RoleCatalog::deanForChair('PC_CivilEngineering'));
+        $this->assertSame('Dean_SACE', RoleCatalog::deanForChair('PC_ComputerEngineering'));
         $this->assertSame('Dean_SABM', RoleCatalog::deanForChair('PC_Accountancy'));
+        $this->assertSame('Dean_SABM', RoleCatalog::deanForChair('PC_FinancialManagement'));
+        $this->assertSame('Dean_SABM', RoleCatalog::deanForChair('PC_MarketingManagement'));
+        $this->assertSame('Dean_SABM', RoleCatalog::deanForChair('PC_ManagementAccounting'));
+        $this->assertSame('Dean_SABM', RoleCatalog::deanForChair('PC_TourismManagement'));
         $this->assertSame('Dean_SAHS', RoleCatalog::deanForChair('PC_Nursing'));
+        $this->assertSame('Dean_SAHS', RoleCatalog::deanForChair('PC_Psychology'));
+        $this->assertSame('Dean_SAHS', RoleCatalog::deanForChair('PC_MedicalTechnology'));
+        $this->assertNull(RoleCatalog::deanForChair('PC_MultimediaArts'));
+        $this->assertTrue(RoleCatalog::isProgramChairCode('PC_MultimediaArts'));
+        $this->assertContains('PC_MultimediaArts', RoleCatalog::CHAIRS_WITHOUT_DEAN);
         $this->assertNull(RoleCatalog::deanForProgramOffice(
             'BS Information Technology',
             'School of Accountancy, Business and Management'

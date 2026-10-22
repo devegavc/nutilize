@@ -29,9 +29,18 @@ class RoleCatalog
     ];
 
     /** @var array<string, list<string>> */
+    /**
+     * Program Chair roles that exist but have no specified dean.
+     * Do not assign PC_MultimediaArts to a dean until that mapping is confirmed.
+     *
+     * @var list<string>
+     */
+    public const CHAIRS_WITHOUT_DEAN = [
+        'PC_MultimediaArts',
+    ];
+
     public const DEAN_CHAIRS = [
         'Dean_SACE' => [
-            'PC_MultimediaArts',
             'PC_ComputerScience',
             'PC_Architecture',
             'PC_CivilEngineering',

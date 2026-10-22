@@ -55,28 +55,18 @@ class ProgramChairStageService
         );
     }
 
+    public static function requesterIsProgramChair(int $reservationId): bool
+    {
+        return self::requesterChairRole($reservationId) !== null;
+    }
+
     public static function markIfRequesterIsChair(int $reservationId): void
     {
         if ($reservationId <= 0 || !self::hasDeanRequiredColumn()) {
             return;
         }
 
-        $requester = DB::table('reservations')
-            ->join('users', 'users.user_id', '=', 'reservations.user_id')
-            ->where('reservations.reservation_id', $reservationId)
-            ->first(['users.role', 'users.office_id']);
-
-        if (!$requester) {
-            return;
-        }
-
-        $role = (string) $requester->role;
-        $chairRole = RoleCatalog::isProgramChairCode($role) ? $role : null;
-        if ($chairRole === null && strtolower($role) === 'pc_admin') {
-            $department = DB::table('offices')->where('office_id', (int) $requester->office_id)->value('department_name');
-            $chairRole = RoleCatalog::chairCodeForDepartment($department);
-        }
-
+        $chairRole = self::requesterChairRole($reservationId);
         if ($chairRole === null) {
             return;
         }
@@ -107,6 +97,35 @@ class ProgramChairStageService
                 'dean_required' => true,
                 'updated_at' => now(),
             ]);
+    }
+
+    private static function requesterChairRole(int $reservationId): ?string
+    {
+        if ($reservationId <= 0) {
+            return null;
+        }
+
+        $requester = DB::table('reservations')
+            ->join('users', 'users.user_id', '=', 'reservations.user_id')
+            ->where('reservations.reservation_id', $reservationId)
+            ->first(['users.role', 'users.office_id']);
+
+        if (!$requester) {
+            return null;
+        }
+
+        $role = (string) $requester->role;
+        if (RoleCatalog::isProgramChairCode($role)) {
+            return $role;
+        }
+
+        if (strtolower($role) === 'pc_admin') {
+            $department = DB::table('offices')->where('office_id', (int) $requester->office_id)->value('department_name');
+
+            return RoleCatalog::chairCodeForDepartment($department);
+        }
+
+        return null;
     }
 
     /**

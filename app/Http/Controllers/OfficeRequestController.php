@@ -685,6 +685,12 @@ class OfficeRequestController extends Controller
             if (is_null($startOfficeId) || (!is_null($pfOfficeId) && (int) $startOfficeId === (int) $pfOfficeId)) {
                 $startOfficeId = $pcOfficeId;
             }
+
+            // A program chair is the requester, not an approver. Their request starts
+            // at the program office, which only the matching dean may approve.
+            if (!is_null($pcOfficeId) && ProgramChairStageService::requesterIsProgramChair($reservationId)) {
+                $startOfficeId = $pcOfficeId;
+            }
         }
 
         $startIndex = 0;

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Reservation;
 use App\Models\ReservationApproval;
 use App\Services\ProgramChairOfficeResolver;
+use App\Services\ProgramChairStageService;
 use App\Services\ItemOwnerService;
 use App\Services\ReservationApprovalWorkflowService;
 use App\Services\ReservationApprovalDeduper;
@@ -718,6 +719,12 @@ class DashboardRequestController extends Controller
             $startOfficeId = $genEdOfficeId;
         } else {
             if (is_null($startOfficeId) || (!is_null($pfOfficeId) && (int) $startOfficeId === (int) $pfOfficeId)) {
+                $startOfficeId = $pcOfficeId;
+            }
+
+            // A program chair is the requester, not an approver. Their request starts
+            // at the program office, which only the matching dean may approve.
+            if (!is_null($pcOfficeId) && ProgramChairStageService::requesterIsProgramChair($reservationId)) {
                 $startOfficeId = $pcOfficeId;
             }
         }
