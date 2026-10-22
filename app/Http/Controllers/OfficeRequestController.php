@@ -107,7 +107,7 @@ class OfficeRequestController extends Controller
                 ->orderByDesc('created_at')
                 ->limit(self::WORKFLOW_BATCH_LIMIT)
                 ->pluck('reservation_id')
-                ->map(fn ($id) => (int) $id)
+                ->map(fn (mixed $id): int => (int) $id)
                 ->all();
         } elseif ($user->isProgramChairAdmin()) {
             $programReservationIds = FacultyApprovalService::withoutFacultyHold(
@@ -223,7 +223,7 @@ class OfficeRequestController extends Controller
             ->groupBy('reservation_id')
             ->when(
                 ItemOwnerService::isItemOwnerUser($user) && ReservationApprovalWorkflowService::supportsOwnerScopedApprovals(),
-                fn ($query) => $query->groupBy('owner_id'),
+                fn (\Illuminate\Database\Eloquent\Builder $query) => $query->groupBy('owner_id'),
             )
             ->pluck('approval_id')
             ->all();
@@ -314,7 +314,7 @@ class OfficeRequestController extends Controller
             $pending = $pendingQuery->get();
         }
 
-        $reservationIds = $pending->pluck('reservation_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $reservationIds = $pending->pluck('reservation_id')->map(fn (mixed $id): int => (int) $id)->unique()->values()->all();
         $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($reservationIds);
         $actionableReservationIds = [];
 
@@ -334,7 +334,7 @@ class OfficeRequestController extends Controller
 
         $this->attachResourceSummaries($requests);
 
-        $requests->each(function ($approval) {
+        $requests->each(function (ReservationApproval $approval) {
             $required = (bool) ($approval->dean_required ?? false);
             $approval->dean_queue_label = $required
                 ? 'Program Chair submitted this request. Your approval is required.'
@@ -369,11 +369,11 @@ class OfficeRequestController extends Controller
     {
         $reservationIds = $requests
             ->pluck('reservation_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
         $summaries = ReservationResourceCatalog::forReservations($reservationIds);
 
-        $requests->each(function ($approval) use ($summaries) {
+        $requests->each(function (ReservationApproval $approval) use ($summaries) {
             $reservationId = (int) $approval->reservation_id;
             if ($approval->reservation) {
                 $approval->reservation->setAttribute(
@@ -445,7 +445,8 @@ class OfficeRequestController extends Controller
                     'updated_at' => $now,
                 ]);
 
-            if ($userId = (int) (Auth::user()->user_id ?? 0)) {
+            $actor = Auth::user();
+            if ($actor instanceof User && ($userId = (int) $actor->user_id)) {
                 Cache::put(self::workflowSyncCacheKey($userId), true, now()->addMinutes(15));
             }
         });
@@ -562,7 +563,7 @@ class OfficeRequestController extends Controller
             ->whereRaw('LOWER(TRIM(rooms.room_number)) = ?', ['gym'])
             ->distinct()
             ->pluck('details.reservation_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
 
         foreach ($gymIds as $gid) {
@@ -577,7 +578,7 @@ class OfficeRequestController extends Controller
                 ->whereNotNull('items.item_id')
                 ->distinct()
                 ->pluck('details.reservation_id')
-                ->map(fn ($id) => (int) $id)
+                ->map(fn (mixed $id): int => (int) $id)
                 ->all();
 
             foreach ($gymWithItemsIds as $gid) {
@@ -902,7 +903,7 @@ class OfficeRequestController extends Controller
                 ->whereIn('reservation_id', $reservationIds)
                 ->distinct()
                 ->pluck('reservation_id')
-                ->map(fn ($id) => (int) $id)
+                ->map(fn (mixed $id): int => (int) $id)
                 ->all(),
             true
         );
@@ -929,7 +930,7 @@ class OfficeRequestController extends Controller
             ->orderByDesc('reservations.created_at')
             ->limit($limit)
             ->pluck('reservation_approvals.reservation_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -983,7 +984,7 @@ class OfficeRequestController extends Controller
     private function preloadOfficeStageLabels(array $officeIds): void
     {
         $officeIds = array_values(array_unique(array_filter(array_map('intval', $officeIds))));
-        $missing = array_filter($officeIds, fn ($id) => !isset($this->officeStageLabelCache[$id]));
+        $missing = array_filter($officeIds, fn (int $id): bool => !isset($this->officeStageLabelCache[$id]));
 
         if ($missing === []) {
             return;

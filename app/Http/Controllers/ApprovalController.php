@@ -461,14 +461,14 @@ class ApprovalController extends Controller
         }
 
         $itemIds = collect($request->input('damaged_item_ids', []))
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->unique()
             ->values()
             ->all();
         $roomIds = collect($request->input('damaged_room_ids', []))
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
             ->unique()
             ->values()
             ->all();
@@ -497,8 +497,8 @@ class ApprovalController extends Controller
                 ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
                 ->where('details.reservation_id', $reservationId)
                 ->pluck('items.item_id')
-                ->map(fn ($itemId) => (int) $itemId)
-                ->filter(fn ($itemId) => $itemId > 0)
+                ->map(fn (mixed $itemId): int => (int) $itemId)
+                ->filter(fn (int $itemId): bool => $itemId > 0)
                 ->unique()
                 ->values()
                 ->all();
@@ -510,8 +510,8 @@ class ApprovalController extends Controller
                 ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
                 ->where('details.reservation_id', $reservationId)
                 ->pluck('rooms.room_id')
-                ->map(fn ($roomId) => (int) $roomId)
-                ->filter(fn ($roomId) => $roomId > 0)
+                ->map(fn (mixed $roomId): int => (int) $roomId)
+                ->filter(fn (int $roomId): bool => $roomId > 0)
                 ->unique()
                 ->values()
                 ->all();
@@ -878,7 +878,7 @@ class ApprovalController extends Controller
         $approvals = ReservationApproval::where('reservation_id', $reservationId)->get();
         $physicalFacilitiesOfficeId = $this->getPhysicalFacilitiesOfficeId();
 
-        $anyRejected = $approvals->some(fn($a) => $a->status === 'rejected');
+        $anyRejected = $approvals->some(fn(ReservationApproval $a) => $a->status === 'rejected');
 
         if ($anyRejected) {
             // If any office rejected, set overall status to rejected
@@ -888,7 +888,7 @@ class ApprovalController extends Controller
         }
 
         if (is_null($physicalFacilitiesOfficeId)) {
-            $allApproved = $approvals->every(fn($a) => $a->status === 'approved' && !is_null($a->approved_at));
+            $allApproved = $approvals->every(fn(ReservationApproval $a) => $a->status === 'approved' && !is_null($a->approved_at));
 
             if ($allApproved) {
                 $reservation->update(['overall_status' => 'approved']);
@@ -903,7 +903,7 @@ class ApprovalController extends Controller
         $pfApproval = $approvals->firstWhere('office_id', $physicalFacilitiesOfficeId);
         $allNonPfApproved = $approvals
             ->where('office_id', '!=', $physicalFacilitiesOfficeId)
-            ->every(fn($a) => $a->status === 'approved' && !is_null($a->approved_at));
+            ->every(fn(ReservationApproval $a) => $a->status === 'approved' && !is_null($a->approved_at));
 
         if ($pfApproval && $pfApproval->status === 'approved' && $pfApproval->approved_at) {
             $reservation->update(['overall_status' => 'approved']);
@@ -1056,7 +1056,7 @@ class ApprovalController extends Controller
                 ->orderBy('riu.unit_id')
                 ->limit($quantity)
                 ->pluck('riu.unit_id')
-                ->map(fn ($unitId) => (int) $unitId)
+                ->map(fn (mixed $unitId): int => (int) $unitId)
                 ->all();
 
             if (!empty($assignedUnitIds)) {
@@ -1114,7 +1114,7 @@ class ApprovalController extends Controller
                 ->join('reservation_items as ri', 'ri.reservation_items_id', '=', 'details.reservation_items_id')
                 ->join('items as items', 'items.item_id', '=', 'ri.item_id')
                 ->where('details.reservation_id', $reservationId)
-                ->when(is_array($onlyItemIds), function ($query) use ($onlyItemIds) {
+                ->when(is_array($onlyItemIds), function (\Illuminate\Database\Query\Builder $query) use ($onlyItemIds) {
                     $query->whereIn('items.item_id', $onlyItemIds === [] ? [0] : $onlyItemIds);
                 })
                 ->select(['items.item_id', DB::raw('SUM(GREATEST(details.quantity, 1)) as qty')])
@@ -1139,10 +1139,10 @@ class ApprovalController extends Controller
                 ->join('reservation_rooms as rr', 'rr.reservation_rooms_id', '=', 'details.reservation_rooms_id')
                 ->where('details.reservation_id', $reservationId)
                 ->pluck('rr.room_id')
-                ->filter(fn ($roomId) => !is_null($roomId))
-                ->map(fn ($roomId) => (int) $roomId)
+                ->filter(fn (mixed $roomId): bool => !is_null($roomId))
+                ->map(fn (mixed $roomId): int => (int) $roomId)
                 ->unique()
-                ->when(is_array($onlyRoomIds), function ($roomIds) use ($onlyRoomIds) {
+                ->when(is_array($onlyRoomIds), function (\Illuminate\Support\Collection $roomIds) use ($onlyRoomIds) {
                     return $roomIds->intersect($onlyRoomIds);
                 })
                 ->values()
@@ -1171,14 +1171,14 @@ class ApprovalController extends Controller
             ->where('details.reservation_id', $reservation->reservation_id)
             ->select(['items.item_id', 'details.quantity'])
             ->get()
-            ->map(function ($row) {
+            ->map(function (object $row) {
                 return [
                     'item_id' => (int) ($row->item_id ?? 0),
                     'quantity' => max(1, (int) ($row->quantity ?? 1)),
                 ];
             })
-            ->filter(fn ($row) => $row['item_id'] > 0)
-            ->filter(function ($row) use ($damageSelection) {
+            ->filter(fn (array $row): bool => $row['item_id'] > 0)
+            ->filter(function (array $row) use ($damageSelection) {
                 if (!is_array($damageSelection)) {
                     return true;
                 }
@@ -1238,8 +1238,8 @@ class ApprovalController extends Controller
                 ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
                 ->where('details.reservation_id', $reservation->reservation_id)
                 ->pluck('rooms.room_id')
-                ->filter(fn ($roomId) => !is_null($roomId))
-                ->map(fn ($roomId) => (int) $roomId)
+                ->filter(fn (mixed $roomId): bool => !is_null($roomId))
+                ->map(fn (mixed $roomId): int => (int) $roomId)
                 ->all();
 
             if (is_array($damageSelection)) {
@@ -1313,14 +1313,14 @@ class ApprovalController extends Controller
             ->join('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
             ->join('items as items', 'items.item_id', '=', 'reservationItems.item_id')
             ->where('details.reservation_id', $reservation->reservation_id)
-            ->when(is_array($damageSelection), function ($query) use ($damageSelection) {
+            ->when(is_array($damageSelection), function (\Illuminate\Database\Query\Builder $query) use ($damageSelection) {
                 $query->whereIn('items.item_id', ($damageSelection['items'] ?? []) === [] ? [0] : $damageSelection['items']);
             })
             ->whereNotNull('items.item_id')
             ->distinct()
             ->pluck('items.item_id')
-            ->filter(fn ($itemId) => !is_null($itemId))
-            ->map(fn ($itemId) => (int) $itemId)
+            ->filter(fn (mixed $itemId): bool => !is_null($itemId))
+            ->map(fn (mixed $itemId): int => (int) $itemId)
             ->all();
 
         $itemNames = $itemIds === []
@@ -1347,14 +1347,14 @@ class ApprovalController extends Controller
             ->join('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
             ->join('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
             ->where('details.reservation_id', $reservation->reservation_id)
-            ->when(is_array($damageSelection), function ($query) use ($damageSelection) {
+            ->when(is_array($damageSelection), function (\Illuminate\Database\Query\Builder $query) use ($damageSelection) {
                 $query->whereIn('rooms.room_id', ($damageSelection['rooms'] ?? []) === [] ? [0] : $damageSelection['rooms']);
             })
             ->whereNotNull('rooms.room_id')
             ->distinct()
             ->pluck('rooms.room_id')
-            ->filter(fn ($roomId) => !is_null($roomId))
-            ->map(fn ($roomId) => (int) $roomId)
+            ->filter(fn (mixed $roomId): bool => !is_null($roomId))
+            ->map(fn (mixed $roomId): int => (int) $roomId)
             ->all();
 
         $roomNumbers = $roomIds === []
@@ -1557,7 +1557,7 @@ class ApprovalController extends Controller
             ->whereRaw('LOWER(TRIM(rooms.room_number)) = ?', ['gym'])
             ->distinct()
             ->pluck('details.reservation_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
 
         foreach ($gymIds as $gymId) {
@@ -1572,7 +1572,7 @@ class ApprovalController extends Controller
                 ->whereNotNull('items.item_id')
                 ->distinct()
                 ->pluck('details.reservation_id')
-                ->map(fn ($id) => (int) $id)
+                ->map(fn (mixed $id): int => (int) $id)
                 ->all();
 
             foreach ($gymWithItemsIds as $gymId) {
@@ -1970,9 +1970,9 @@ class ApprovalController extends Controller
             return true;
         }
 
-        $anyRejected = $nonPfApprovals->contains(fn($approval) => $approval->status === 'rejected');
+        $anyRejected = $nonPfApprovals->contains(fn(ReservationApproval $approval) => $approval->status === 'rejected');
         $allApproved = $nonPfApprovals->every(
-            fn($approval) => $approval->status === 'approved' && !is_null($approval->approved_at)
+            fn(ReservationApproval $approval) => $approval->status === 'approved' && !is_null($approval->approved_at)
         );
 
         return !$anyRejected && $allApproved;
@@ -2237,7 +2237,7 @@ class ApprovalController extends Controller
                 'read',
                 'created_at',
             ])
-            ->map(function ($notification) {
+            ->map(function (Notification $notification) {
                 return [
                     'id' => $notification->notification_id,
                     'type' => $notification->type,
@@ -2402,7 +2402,7 @@ class ApprovalController extends Controller
             \App\Support\OpenReservationScope::apply($openCandidates);
             $candidateReservationIds = $openCandidates
                 ->pluck('reservation_id')
-                ->map(fn ($id) => (int) $id)
+                ->map(fn (mixed $id): int => (int) $id)
                 ->all();
 
             $actionableOfficeIds = $this->getActionableOfficeIdsForReservations($candidateReservationIds);
@@ -2463,7 +2463,7 @@ class ApprovalController extends Controller
         \App\Support\OpenReservationScope::apply($openCandidates);
         $candidateReservationIds = $openCandidates
             ->pluck('reservation_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
 
         if (empty($candidateReservationIds)) {
@@ -2522,7 +2522,7 @@ class ApprovalController extends Controller
             ->orderByDesc('reservations.created_at')
             ->limit(80)
             ->pluck('reservation_approvals.reservation_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -2558,7 +2558,7 @@ class ApprovalController extends Controller
             ->orderByDesc('created_at')
             ->limit($limit)
             ->pluck('reservation_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
     }
 
@@ -2595,7 +2595,7 @@ class ApprovalController extends Controller
             ->orderByDesc('reservations.created_at')
             ->limit($limit)
             ->pluck('reservation_approvals.reservation_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -2696,7 +2696,7 @@ class ApprovalController extends Controller
             ->whereIn('type', $types)
             ->whereNotNull('related_id')
             ->pluck('related_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -2848,7 +2848,7 @@ class ApprovalController extends Controller
             ->whereIn('type', ['reservation_approval_request', 'reservation_approval_handoff'])
             ->whereRaw('notifications.read = false')
             ->pluck('related_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
 
         $missingReservationIds = array_values(array_diff($actionableReservationIds, $existingReservationIds));
@@ -2928,7 +2928,7 @@ class ApprovalController extends Controller
 
         $pendingApprovals = $pendingApprovalsQuery
             ->pluck('reservation_approvals.reservation_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -2955,7 +2955,7 @@ class ApprovalController extends Controller
             ->whereIn('type', ['reservation_approval_request', 'reservation_approval_handoff'])
             ->whereRaw('notifications.read = false')
             ->pluck('related_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
 
         $missingReservationIds = array_values(array_diff($pendingApprovals, $existingNotifications));
@@ -3035,7 +3035,7 @@ class ApprovalController extends Controller
         $affectedUserIds = (clone $query)
             ->distinct()
             ->pluck('user_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
 
         $query->delete();
@@ -3054,7 +3054,7 @@ class ApprovalController extends Controller
 
         return ProgramChairStageService::recipientsForOffice($officeId, 0)
             ->pluck('user_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
     }
 
@@ -3176,7 +3176,7 @@ class ApprovalController extends Controller
             'room_count' => (int) ($resourceSummary['room_count'] ?? 0),
             'item_count' => (int) ($resourceSummary['item_count'] ?? 0),
             'multiple_schedules' => (bool) ($resourceSummary['multiple_schedules'] ?? false),
-            'items' => array_values(array_filter($resources, fn ($resource) => ($resource['type'] ?? '') === 'item')),
+            'items' => array_values(array_filter($resources, fn (array $resource): bool => ($resource['type'] ?? '') === 'item')),
             // Approvers only need primary student + request details — not the full trail.
             'approvals' => [],
         ];
