@@ -292,14 +292,7 @@ class OfficeRequestController extends Controller
 
     private function buildDeanOfficeHomeData(User $user): array
     {
-        $officeIds = ProgramChairStageService::programOfficeIdsForDean((string) $user->role);
-        $ownOfficeId = (int) $user->office_id;
-        if ($ownOfficeId > 0 && !in_array($ownOfficeId, $officeIds, true)) {
-            $shortCode = strtoupper(trim((string) DB::table('offices')->where('office_id', $ownOfficeId)->value('short_code')));
-            if ($shortCode !== '' && strcasecmp($shortCode, (string) $user->role) === 0) {
-                $officeIds[] = $ownOfficeId;
-            }
-        }
+        $officeIds = ProgramChairStageService::officeIdsForDeanAccount($user);
         $pendingColumns = ['approval_id', 'reservation_id', 'office_id'];
         if (ProgramChairStageService::hasDeanRequiredColumn()) {
             $pendingColumns[] = 'dean_required';

@@ -1456,9 +1456,51 @@ function showReservationDetailsModal(reservation, options = {}) {
       </div>
     `;
   };
-  const resourceMarkup = resources.length
-    ? `${resourceGroup('Reserved Facilities', rooms)}${resourceGroup('Reserved Equipment', equipment)}`
-    : '<p class="reservation-empty-note">No resources listed for this request.</p>';
+  const equipmentGroups = [];
+  equipment.forEach((resource) => {
+    const place = resource.location || 'No assigned room';
+    const when = resource.schedule || [resource.date, [resource.start_time, resource.end_time].filter((value) => value && value !== 'N/A').join('–')].filter(Boolean).join(' · ');
+    const key = `${place}|${when}`;
+    let group = equipmentGroups.find((entry) => entry.key === key);
+    if (!group) {
+      group = { key, place, when, items: [] };
+      equipmentGroups.push(group);
+    }
+    group.items.push(resource);
+  });
+  const equipmentMarkup = equipmentGroups.length
+    ? equipmentGroups.map((group) => `
+        <div class="reservation-equipment-group">
+          <h4>${escapeReservationDetailsHtml(group.place)}${group.when ? ` · ${escapeReservationDetailsHtml(group.when)}` : ''}</h4>
+          <ol class="reservation-resource-entries">
+            ${group.items.map((resource) => `
+              <li>
+                <strong>${escapeReservationDetailsHtml(resource.name || resource.label || 'Equipment')}</strong>
+                <span>Quantity: ${escapeReservationDetailsHtml(resource.quantity || 1)}</span>
+                ${resource.status ? `<span class="reservation-resource-status">${escapeReservationDetailsHtml(resource.status)}</span>` : ''}
+              </li>
+            `).join('')}
+          </ol>
+        </div>
+      `).join('')
+    : '<p class="reservation-empty-note">No equipment listed for this request.</p>';
+  const approvalSummary = reservation.approval_summary && typeof reservation.approval_summary === 'object'
+    ? reservation.approval_summary
+    : {};
+  const approvalSteps = Array.isArray(approvalSummary.steps) ? approvalSummary.steps : [];
+  const approvalMarkup = approvalSteps.length
+    ? `
+      <p class="reservation-approval-current">Current stage: ${escapeReservationDetailsHtml(approvalSummary.current_office || 'Completed')}${approvalSummary.current_status ? ` · ${escapeReservationDetailsHtml(approvalSummary.current_status)}` : ''}</p>
+      <ol class="reservation-approval-steps">
+        ${approvalSteps.map((step) => `
+          <li>
+            <strong>${escapeReservationDetailsHtml(step.office || 'Office')}</strong>
+            <span>${escapeReservationDetailsHtml(step.status || 'Pending')}</span>
+          </li>
+        `).join('')}
+      </ol>
+    `
+    : '<p class="reservation-empty-note">No approval steps are recorded for this request.</p>';
 
   const statusLabel = reservation.status || 'Unknown';
   const statusClass = String(statusLabel).toLowerCase().replace(/[^a-z0-9_-]/g, '-');
@@ -1517,68 +1559,65 @@ function showReservationDetailsModal(reservation, options = {}) {
           </button>
         </div>
         <div class="reservation-details-body">
+          <section class="reservation-details-panel">
+            <div class="reservation-panel-heading">
+              <h3>Reservation Information</h3>
+            </div>
+            <div class="reservation-info-grid">
+              <div class="info-row">
+                <strong>Reservation ID</strong>
+                <span>${escapeReservationDetailsHtml(reservation.id ? `#${reservation.id}` : reservationCode)}</span>
+              </div>
+              <div class="info-row">
+                <strong>Requester</strong>
+                <span>${escapeReservationDetailsHtml(reservation.requester || 'Unknown')} · ${escapeReservationDetailsHtml(requesterType)}</span>
+              </div>
+              <div class="info-row">
+                <strong>Academic program</strong>
+                <span>${escapeReservationDetailsHtml(reservation.requester_program || 'N/A')}</span>
+              </div>
+              <div class="info-row">
+                <strong>Activity</strong>
+                <span>${escapeReservationDetailsHtml(reservation.activity_name || 'N/A')}</span>
+              </div>
+              <div class="info-row">
+                <strong>Date submitted</strong>
+                <span>${escapeReservationDetailsHtml(reservation.requested_date || 'N/A')}</span>
+              </div>
+              <div class="info-row">
+                <strong>Status</strong>
+                <span>${escapeReservationDetailsHtml(statusLabel)}</span>
+              </div>
+              <div class="info-row">
+                <strong>Email</strong>
+                <span>${escapeReservationDetailsHtml(reservation.requester_email || 'N/A')}</span>
+              </div>
+              <div class="info-row">
+                <strong>Phone</strong>
+                <span>${escapeReservationDetailsHtml(reservation.requester_phone || 'N/A')}</span>
+              </div>
+              ${outsiderInfoRow}
+            </div>
+          </section>
           <section class="reservation-details-panel reservation-resources-panel">
             <div class="reservation-panel-heading">
-              <h3>Reserved Facilities and Equipment</h3>
+              <h3>Reserved Facilities</h3>
             </div>
-            <div class="reservation-resource-list">${resourceMarkup}</div>
+            <div class="reservation-resource-list">${rooms.length ? resourceGroup('Rooms', rooms) : '<p class="reservation-empty-note">No rooms listed for this request.</p>'}</div>
           </section>
-          <div class="reservation-details-layout">
-            <section class="reservation-details-panel">
-              <div class="reservation-panel-heading">
-                <h3>Requester</h3>
-              </div>
-              <div class="reservation-info-grid">
-                <div class="info-row">
-                  <strong>Full Name</strong>
-                  <span>${escapeReservationDetailsHtml(reservation.requester || 'Unknown')}</span>
-                </div>
-                <div class="info-row">
-                  <strong>Role</strong>
-                  <span>${escapeReservationDetailsHtml(requesterType)}</span>
-                </div>
-                <div class="info-row">
-                  <strong>Program</strong>
-                  <span>${escapeReservationDetailsHtml(reservation.requester_program || 'N/A')}</span>
-                </div>
-                <div class="info-row">
-                  <strong>Email</strong>
-                  <span>${escapeReservationDetailsHtml(reservation.requester_email || 'N/A')}</span>
-                </div>
-                <div class="info-row">
-                  <strong>Phone</strong>
-                  <span>${escapeReservationDetailsHtml(reservation.requester_phone || 'N/A')}</span>
-                </div>
-                ${outsiderInfoRow}
-              </div>
-
-              <div class="reservation-panel-heading reservation-panel-heading-spaced">
-                <h3>Schedule</h3>
-              </div>
-              <div class="reservation-info-grid">
-                <div class="info-row">
-                  <strong>When</strong>
-                  <span>${escapeReservationDetailsHtml(scheduleLabel)}</span>
-                </div>
-                ${reservation.multiple_schedules ? `
-                <div class="info-row">
-                  <strong>Schedules</strong>
-                  <span>Each room and item is listed above with its own date and time.</span>
-                </div>
-                ` : `
-                <div class="info-row">
-                  <strong>Starts</strong>
-                  <span>${escapeReservationDetailsHtml((reservation.start_date || reservation.event_date || 'N/A') + ' · ' + (reservation.event_time || reservation.start_time || 'N/A'))}</span>
-                </div>
-                <div class="info-row">
-                  <strong>Ends</strong>
-                  <span>${escapeReservationDetailsHtml((reservation.event_end_date || reservation.end_date || 'N/A') + ' · ' + (reservation.event_end_time || reservation.end_time || 'N/A'))}</span>
-                </div>
-                `}
-              </div>
-            </section>
-          </div>
-
+          <section class="reservation-details-panel reservation-resources-panel">
+            <div class="reservation-panel-heading">
+              <h3>Reserved Equipment</h3>
+            </div>
+            <div class="reservation-resource-list">${equipmentMarkup}</div>
+          </section>
+          <section class="reservation-details-panel">
+            <div class="reservation-panel-heading">
+              <h3>Approval Information</h3>
+            </div>
+            ${approvalMarkup}
+            ${reservation.multiple_schedules ? '<p class="reservation-empty-note">Each room and item above keeps its own date and time.</p>' : `<p class="reservation-empty-note">${escapeReservationDetailsHtml(scheduleLabel)}</p>`}
+          </section>
         </div>
         ${actionFooter}
       </div>

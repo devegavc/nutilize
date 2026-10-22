@@ -203,6 +203,27 @@ class ProgramChairStageService
     }
 
     /**
+     * Offices whose approval rows this dean may see. Program offices cover the
+     * older chair-stage rows. The dean's own office covers mobile rows stored
+     * with approval_stage = dean. Viewing those rows is not the same as acting.
+     *
+     * @return list<int>
+     */
+    public static function officeIdsForDeanAccount(User $user): array
+    {
+        $officeIds = self::programOfficeIdsForDean((string) $user->role);
+        $ownOfficeId = (int) $user->office_id;
+        if ($ownOfficeId > 0 && !in_array($ownOfficeId, $officeIds, true)) {
+            $shortCode = strtoupper(trim((string) DB::table('offices')->where('office_id', $ownOfficeId)->value('short_code')));
+            if ($shortCode !== '' && strcasecmp($shortCode, (string) $user->role) === 0) {
+                $officeIds[] = $ownOfficeId;
+            }
+        }
+
+        return array_values(array_unique($officeIds));
+    }
+
+    /**
      * Mobile saves a program chair's institutional request on the dean office
      * with approval_stage = dean. That office takes the program-chair step when
      * the program office itself has no approval row.

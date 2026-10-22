@@ -2588,3 +2588,42 @@ body.office-app .maintenance-grid {
 .reservation-resource-group {
   width: 100%;
 }
+
+.reservation-details-body .reservation-details-panel + .reservation-details-panel {
+  margin-top: 14px;
+}
+
+.reservation-equipment-group + .reservation-equipment-group {
+  margin-top: 12px;
+}
+
+.reservation-equipment-group h4,
+.reservation-approval-current {
+  margin: 0 0 8px;
+  color: #243274;
+  font-size: 0.92rem;
+}
+
+.reservation-approval-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reservation-approval-steps li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid #e6ebf5;
+  font-size: 0.9rem;
+}
+
+.reservation-approval-steps li strong {
+  color: #243274;
+}
+
+.reservation-approval-steps li span {
+  color: #38479c;
+  font-weight: 700;
+}

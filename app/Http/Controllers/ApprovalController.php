@@ -3073,7 +3073,7 @@ class ApprovalController extends Controller
         }
 
         if ($user->isDean()) {
-            $officeIds = ProgramChairStageService::programOfficeIdsForDean((string) $user->role);
+            $officeIds = ProgramChairStageService::officeIdsForDeanAccount($user);
 
             return ReservationApproval::query()
                 ->where('reservation_id', $reservationId)
@@ -3181,7 +3181,7 @@ class ApprovalController extends Controller
             'item_count' => (int) ($resourceSummary['item_count'] ?? 0),
             'multiple_schedules' => (bool) ($resourceSummary['multiple_schedules'] ?? false),
             'items' => array_values(array_filter($resources, fn (array $resource): bool => ($resource['type'] ?? '') === 'item')),
-            // Approvers only need primary student + request details — not the full trail.
+            'approval_summary' => $this->reservationApprovalSummary((int) $reservationId),
             'approvals' => [],
         ];
 
@@ -3189,6 +3189,49 @@ class ApprovalController extends Controller
             'success' => true,
             'reservation' => $reservationData,
         ]);
+    }
+
+    /**
+     * Existing approval rows for display. This does not decide who may act.
+     *
+     * @return array{current_office: ?string, current_status: ?string, steps: list<array{office: string, status: string, decided: bool}>}
+     */
+    private function reservationApprovalSummary(int $reservationId): array
+    {
+        $rows = ReservationApproval::query()
+            ->with('office')
+            ->where('reservation_id', $reservationId)
+            ->orderBy('approval_id')
+            ->get();
+
+        $steps = [];
+        $currentOffice = null;
+        $currentStatus = null;
+        foreach ($rows as $row) {
+            $officeName = trim((string) ($row->office?->department_name ?? ''));
+            if ($officeName === '') {
+                $officeName = 'Office '.(int) $row->office_id;
+            }
+            $status = trim((string) ($row->status ?? 'Pending'));
+            if ($status === '') {
+                $status = 'Pending';
+            }
+            $steps[] = [
+                'office' => $officeName,
+                'status' => $status,
+                'decided' => $row->approved_at !== null,
+            ];
+            if ($currentOffice === null && $row->approved_at === null) {
+                $currentOffice = $officeName;
+                $currentStatus = $status;
+            }
+        }
+
+        return [
+            'current_office' => $currentOffice,
+            'current_status' => $currentStatus,
+            'steps' => $steps,
+        ];
     }
 
     /**
