@@ -1416,13 +1416,48 @@ function showReservationDetailsModal(reservation, options = {}) {
       type: 'item',
     })) : []);
 
+  const rooms = resources.filter((resource) => resource.type === 'room');
+  const equipment = resources.filter((resource) => resource.type !== 'room');
+  const resourceGroup = (title, entries) => {
+    if (!entries.length) {
+      return '';
+    }
+
+    const items = entries.map((resource) => {
+      const location = resource.location
+        ? `<span class="reservation-resource-location">${escapeReservationDetailsHtml(resource.location)}</span>`
+        : '';
+      const quantity = resource.type === 'item'
+        ? `<span>Quantity: ${escapeReservationDetailsHtml(resource.quantity || 1)}</span>`
+        : '';
+      const status = resource.status
+        ? `<span class="reservation-resource-status">${escapeReservationDetailsHtml(resource.status)}</span>`
+        : '';
+      const start = resource.start_time && resource.start_time !== 'N/A' ? resource.start_time : '';
+      const end = resource.end_time && resource.end_time !== 'N/A' ? resource.end_time : '';
+      const time = [start, end].filter(Boolean).join('–');
+
+      return `
+        <li>
+          <strong>${escapeReservationDetailsHtml(resource.name || resource.label || 'Resource')}</strong>
+          ${location}
+          <span>${escapeReservationDetailsHtml(resource.date || 'N/A')}</span>
+          ${time ? `<span>${escapeReservationDetailsHtml(time)}</span>` : ''}
+          ${quantity}
+          ${status}
+        </li>
+      `;
+    }).join('');
+
+    return `
+      <div class="reservation-resource-group">
+        <h4>${escapeReservationDetailsHtml(title)} (${entries.length})</h4>
+        <ol class="reservation-resource-entries">${items}</ol>
+      </div>
+    `;
+  };
   const resourceMarkup = resources.length
-    ? resources.map((resource) => `
-        <div class="reservation-resource-chip ${resource.type === 'room' ? 'is-room' : 'is-item'}">
-          <span class="reservation-resource-label">${escapeReservationDetailsHtml(resource.label || resource.name || 'Resource')}</span>
-          <span class="reservation-resource-qty">×${escapeReservationDetailsHtml(resource.quantity || 1)}${resource.unit ? ` ${escapeReservationDetailsHtml(resource.unit)}` : ''}</span>
-        </div>
-      `).join('')
+    ? `${resourceGroup('Reserved Facilities', rooms)}${resourceGroup('Reserved Equipment', equipment)}`
     : '<p class="reservation-empty-note">No resources listed for this request.</p>';
 
   const statusLabel = reservation.status || 'Unknown';
@@ -1519,21 +1554,28 @@ function showReservationDetailsModal(reservation, options = {}) {
                   <strong>When</strong>
                   <span>${escapeReservationDetailsHtml(scheduleLabel)}</span>
                 </div>
+                ${reservation.multiple_schedules ? `
+                <div class="info-row">
+                  <strong>Schedules</strong>
+                  <span>Each room and item is listed below.</span>
+                </div>
+                ` : `
                 <div class="info-row">
                   <strong>Starts</strong>
-                  <span>${escapeReservationDetailsHtml((reservation.event_date || reservation.start_date || 'N/A') + ' · ' + (reservation.event_time || reservation.start_time || 'N/A'))}</span>
+                  <span>${escapeReservationDetailsHtml((reservation.start_date || reservation.event_date || 'N/A') + ' · ' + (reservation.event_time || reservation.start_time || 'N/A'))}</span>
                 </div>
                 <div class="info-row">
                   <strong>Ends</strong>
                   <span>${escapeReservationDetailsHtml((reservation.event_end_date || reservation.end_date || 'N/A') + ' · ' + (reservation.event_end_time || reservation.end_time || 'N/A'))}</span>
                 </div>
+                `}
               </div>
             </section>
           </div>
 
           <section class="reservation-details-panel reservation-resources-panel">
             <div class="reservation-panel-heading">
-              <h3>Requested Resources</h3>
+              <h3>Reserved Facilities and Equipment</h3>
             </div>
             <div class="reservation-resource-list">${resourceMarkup}</div>
           </section>

@@ -3,6 +3,13 @@
     $status = strtolower(trim((string) ($request->status ?? 'pending')));
     $reservation = $request->reservation;
     $eventDate = optional($reservation?->Start_of_activity ?? $reservation?->Date_of_Activity)->format('M d, Y') ?: 'N/A';
+    $resourceSummary = $reservation?->resource_summary;
+    $roomCount = (int) ($resourceSummary['room_count'] ?? 0);
+    $itemCount = (int) ($resourceSummary['item_count'] ?? 0);
+    $showResourceSummary = $roomCount > 1 || $itemCount > 1 || ($roomCount > 0 && $itemCount > 0);
+    if (!empty($resourceSummary['date_label']) && $resourceSummary['date_label'] !== 'N/A') {
+      $eventDate = $resourceSummary['date_label'];
+    }
     $showWaitingQueueContext = (bool) ($showWaitingQueueContext ?? false);
     $isActionable = !isset($actionableReservationIds)
       || in_array((int) $request->reservation_id, array_map('intval', $actionableReservationIds), true);
@@ -39,7 +46,16 @@
     <td class="office-queue-activity">
       <span class="office-queue-activity-name">{{ $reservation?->activity_name ?? 'N/A' }}</span>
     </td>
-    <td>{{ $eventDate }}</td>
+    <td>
+      <span class="office-queue-event-date">{{ $eventDate }}</span>
+      @if($showResourceSummary)
+        <span class="office-queue-resource-summary">
+          @if($roomCount > 0)Rooms: {{ $roomCount }}@endif
+          @if($roomCount > 0 && $itemCount > 0) · @endif
+          @if($itemCount > 0)Equipment: {{ $itemCount }}@endif
+        </span>
+      @endif
+    </td>
     <td>{{ optional($reservation?->created_at)->format('M d, Y h:i A') }}</td>
     <td>
       <div class="office-queue-status-stack">

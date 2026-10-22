@@ -11,6 +11,7 @@ use App\Services\ProgramChairOfficeResolver;
 use App\Services\ItemOwnerService;
 use App\Services\ItemUnitService;
 use App\Services\ReservationApprovalWorkflowService;
+use App\Services\ReservationResourceCatalog;
 use App\Services\ReservationApprovalDeduper;
 use App\Support\ApprovalClock;
 use App\Models\ReservationApproval;
@@ -3112,46 +3113,13 @@ class ApprovalController extends Controller
         $requesterProgram = trim((string) ($requester?->academicProgram?->name ?? ''));
         $attachmentHeading = $requesterType === 'Teacher' ? 'Attachment' : 'Proof of Consent';
 
-        $resourceRows = DB::table('reservation_details as details')
-            ->leftJoin('reservation_rooms as reservationRooms', 'reservationRooms.reservation_rooms_id', '=', 'details.reservation_rooms_id')
-            ->leftJoin('rooms as rooms', 'rooms.room_id', '=', 'reservationRooms.room_id')
-            ->leftJoin('reservation_items as reservationItems', 'reservationItems.reservation_items_id', '=', 'details.reservation_items_id')
-            ->leftJoin('items as items', 'items.item_id', '=', 'reservationItems.item_id')
-            ->where('details.reservation_id', $reservationId)
-            ->select([
-                'details.quantity',
-                'rooms.room_number',
-                'items.item_name',
-            ])
-            ->get();
-
-        $resources = [];
-        $seenResourceKeys = [];
-
-        foreach ($resourceRows as $row) {
-            $quantity = max(1, (int) ($row->quantity ?? 1));
-            $isRoom = !is_null($row->room_number) && trim((string) $row->room_number) !== '';
-
-            if ($isRoom) {
-                $label = 'Room ' . trim((string) $row->room_number);
-                $type = 'room';
-            } else {
-                $label = trim((string) ($row->item_name ?? '')) !== '' ? (string) $row->item_name : 'Resource';
-                $type = 'item';
-            }
-
-            $key = $type . ':' . strtolower($label);
-            if (isset($seenResourceKeys[$key])) {
-                continue;
-            }
-            $seenResourceKeys[$key] = true;
-
-            $resources[] = [
-                'label' => $label,
-                'quantity' => $quantity,
-                'unit' => '',
-                'type' => $type,
-            ];
+        $resourceSummary = ReservationResourceCatalog::forReservations([(int) $reservationId])[(int) $reservationId]
+            ?? [];
+        $resources = $resourceSummary['resources'] ?? [];
+        if (($resourceSummary['multiple_schedules'] ?? false) && ($resourceSummary['date_label'] ?? '') !== '') {
+            $eventDateLabel = (string) $resourceSummary['date_label'];
+        } else {
+            $eventDateLabel = $eventAt ? $eventAt->format('F j, Y') : 'N/A';
         }
 
         $reservationData = [
@@ -3167,11 +3135,13 @@ class ApprovalController extends Controller
             'requested_date' => $reservation->created_at
                 ? $reservation->created_at->format('M d, Y h:i A')
                 : 'N/A',
-            'event_date' => $eventAt ? $eventAt->format('M d, Y') : 'N/A',
+            'event_date' => $eventDateLabel,
             'event_time' => $eventAt ? $eventAt->format('g:i A') : 'N/A',
             'event_end_date' => $eventEndAt ? $eventEndAt->format('M d, Y') : ($eventAt ? $eventAt->format('M d, Y') : 'N/A'),
             'event_end_time' => $eventEndAt ? $eventEndAt->format('g:i A') : 'N/A',
-            'event_schedule' => $this->formatReservationScheduleLabel($eventAt, $eventEndAt),
+            'event_schedule' => ($resourceSummary['multiple_schedules'] ?? false)
+                ? (string) ($resourceSummary['date_label'] ?? $this->formatReservationScheduleLabel($eventAt, $eventEndAt))
+                : $this->formatReservationScheduleLabel($eventAt, $eventEndAt),
             'start_date' => $eventAt ? $eventAt->format('M d, Y') : 'N/A',
             'end_date' => $eventEndAt ? $eventEndAt->format('M d, Y') : ($eventAt ? $eventAt->format('M d, Y') : 'N/A'),
             'start_time' => $eventAt ? $eventAt->format('g:i A') : 'N/A',
@@ -3182,6 +3152,10 @@ class ApprovalController extends Controller
             'proof_of_consent_urls' => $proofOfConsentUrls,
             'attachment_heading' => $attachmentHeading,
             'resources' => $resources,
+            'rooms' => $resourceSummary['rooms'] ?? [],
+            'room_count' => (int) ($resourceSummary['room_count'] ?? 0),
+            'item_count' => (int) ($resourceSummary['item_count'] ?? 0),
+            'multiple_schedules' => (bool) ($resourceSummary['multiple_schedules'] ?? false),
             'items' => array_values(array_filter($resources, fn ($resource) => ($resource['type'] ?? '') === 'item')),
             // Approvers only need primary student + request details — not the full trail.
             'approvals' => [],

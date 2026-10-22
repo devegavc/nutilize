@@ -11,6 +11,7 @@ use App\Services\ProgramChairStageService;
 use App\Support\RoleCatalog;
 use App\Services\ItemOwnerService;
 use App\Services\ReservationApprovalWorkflowService;
+use App\Services\ReservationResourceCatalog;
 use App\Services\ReservationApprovalDeduper;
 use App\Support\HeavySyncGate;
 use App\Support\OpenReservationScope;
@@ -232,6 +233,7 @@ class OfficeRequestController extends Controller
             ->orderByDesc('created_at');
 
         $requests = $requestsQuery->get();
+        $this->attachResourceSummaries($requests);
 
         $waitingOnByReservation = [];
         $showWaitingQueueContext = $user->isProgramChairAdmin();
@@ -329,6 +331,8 @@ class OfficeRequestController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        $this->attachResourceSummaries($requests);
+
         $requests->each(function ($approval) {
             $required = (bool) ($approval->dean_required ?? false);
             $approval->dean_queue_label = $required
@@ -358,6 +362,25 @@ class OfficeRequestController extends Controller
             'authUser' => $user,
             'officeName' => RoleCatalog::label((string) $user->role),
         ];
+    }
+
+    private function attachResourceSummaries($requests): void
+    {
+        $reservationIds = $requests
+            ->pluck('reservation_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $summaries = ReservationResourceCatalog::forReservations($reservationIds);
+
+        $requests->each(function ($approval) use ($summaries) {
+            $reservationId = (int) $approval->reservation_id;
+            if ($approval->reservation) {
+                $approval->reservation->setAttribute(
+                    'resource_summary',
+                    $summaries[$reservationId] ?? null
+                );
+            }
+        });
     }
 
     private function cachedOfficeDecisionCount(int $officeId, string $status): int

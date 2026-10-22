@@ -1,4 +1,4 @@
-@import url("./dashboard.css?v=20261020-hide-consent");
+@import url("./dashboard.css?v=20261022-reservation-resources");
 
 :root {
 	--office-panel-bg: linear-gradient(180deg, #f4f6ff 0%, #e8ebf8 100%);
@@ -2657,4 +2657,17 @@ body.office-app .office-request-history-table .badge {
 	.office-history-filters {
 		grid-template-columns: 1fr;
 	}
+}
+
+.office-queue-event-date,
+.office-queue-resource-summary {
+	display: block;
+}
+
+.office-queue-resource-summary {
+	margin-top: 4px;
+	color: #38479c;
+	font-size: 0.78rem;
+	font-weight: 700;
+	line-height: 1.3;
 }
