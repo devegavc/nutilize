@@ -3,10 +3,11 @@
     $status = strtolower(trim((string) ($request->status ?? 'pending')));
     $reservation = $request->reservation;
     $eventDate = optional($reservation?->Start_of_activity ?? $reservation?->Date_of_Activity)->format('M d, Y') ?: 'N/A';
-    $resourceSummary = $reservation?->resource_summary;
+    $resourceSummary = is_array($reservation?->resource_summary) ? $reservation->resource_summary : [];
     $roomCount = (int) ($resourceSummary['room_count'] ?? 0);
     $itemCount = (int) ($resourceSummary['item_count'] ?? 0);
-    $showResourceSummary = $roomCount > 1 || $itemCount > 1 || ($roomCount > 0 && $itemCount > 0);
+    $resourceLines = is_array($resourceSummary['resources'] ?? null) ? $resourceSummary['resources'] : [];
+    $linkedReservationIds = is_array($resourceSummary['reservation_ids'] ?? null) ? $resourceSummary['reservation_ids'] : [];
     if (!empty($resourceSummary['date_label']) && $resourceSummary['date_label'] !== 'N/A') {
       $eventDate = $resourceSummary['date_label'];
     }
@@ -38,7 +39,12 @@
     }
   @endphp
   <tr class="{{ $hasOutsideParticipants ? 'office-queue-has-outsider' : '' }}" data-request-date="{{ $eventDate !== 'N/A' ? $eventDate : '' }}" data-outside-participants="{{ $hasOutsideParticipants ? '1' : '0' }}">
-    <td>#{{ $request->reservation_id }}</td>
+    <td>
+      <span class="office-queue-event-date">#{{ $request->reservation_id }}</span>
+      @if(count($linkedReservationIds) > 1)
+        <span class="office-queue-resource-summary">{{ count($linkedReservationIds) }} schedules, one request</span>
+      @endif
+    </td>
     <td class="office-queue-requester">
       <span class="office-queue-requester-name">{{ $reservation?->user?->full_name ?? $reservation?->user?->username ?? 'Unknown' }}</span>
       <span class="office-queue-program">{{ $reservation?->user?->academicProgram?->name ?: 'No program' }}</span>
@@ -48,12 +54,31 @@
     </td>
     <td>
       <span class="office-queue-event-date">{{ $eventDate }}</span>
-      @if($showResourceSummary)
+      @if($roomCount > 0 || $itemCount > 0)
         <span class="office-queue-resource-summary">
           @if($roomCount > 0)Rooms: {{ $roomCount }}@endif
           @if($roomCount > 0 && $itemCount > 0) · @endif
           @if($itemCount > 0)Equipment: {{ $itemCount }}@endif
         </span>
+      @endif
+      @if($resourceLines !== [])
+        <ul class="office-queue-resource-lines">
+          @foreach($resourceLines as $resource)
+            <li>
+              {{ $resource['name'] ?? $resource['label'] ?? 'Resource' }}
+              @if(!empty($resource['location']))
+                · {{ $resource['location'] }}
+              @endif
+              @if(($resource['type'] ?? '') === 'item')
+                · Qty {{ (int) ($resource['quantity'] ?? 1) }}
+              @endif
+              · {{ $resource['date'] ?? 'N/A' }}
+              @if(!empty($resource['start_time']) && $resource['start_time'] !== 'N/A')
+                · {{ $resource['start_time'] }}@if(!empty($resource['end_time']) && $resource['end_time'] !== 'N/A')–{{ $resource['end_time'] }}@endif
+              @endif
+            </li>
+          @endforeach
+        </ul>
       @endif
     </td>
     <td>{{ optional($reservation?->created_at)->format('M d, Y h:i A') }}</td>

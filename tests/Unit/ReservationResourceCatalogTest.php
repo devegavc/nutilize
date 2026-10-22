@@ -35,4 +35,23 @@ class ReservationResourceCatalogTest extends TestCase
             ReservationResourceCatalog::dateLabel(['2026-12-22', '2027-01-03'], 2)
         );
     }
+
+    public function test_rooms_saved_in_one_submit_stay_one_request(): void
+    {
+        $clusters = ReservationResourceCatalog::clusterRows([
+            ['reservation_id' => 5, 'user_id' => 9, 'activity_name' => 'Class', 'created_at' => '2026-10-25 08:00:04'],
+            ['reservation_id' => 1, 'user_id' => 9, 'activity_name' => 'class', 'created_at' => '2026-10-25 08:00:00'],
+            ['reservation_id' => 2, 'user_id' => 9, 'activity_name' => 'Class', 'created_at' => '2026-10-25 08:00:01'],
+            ['reservation_id' => 8, 'user_id' => 9, 'activity_name' => 'Other', 'created_at' => '2026-10-25 08:00:01'],
+            ['reservation_id' => 3, 'user_id' => 4, 'activity_name' => 'Class', 'created_at' => '2026-10-25 08:00:01'],
+            ['reservation_id' => 6, 'user_id' => 9, 'activity_name' => 'Class', 'created_at' => '2026-10-25 08:05:00'],
+        ]);
+
+        $this->assertSame([
+            [3],
+            [1, 2, 5],
+            [6],
+            [8],
+        ], $clusters);
+    }
 }

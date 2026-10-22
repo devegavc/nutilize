@@ -219,14 +219,19 @@ class ApprovalController extends Controller
 
             // Return immediately. Notify / status updates run after the response so the
             // Approve button does not sit on Hostinger for minutes.
-            $reservationId = (int) $approval->reservation_id;
+            $reservationIds = array_values(array_unique(array_merge(
+                [(int) $approval->reservation_id],
+                $this->decideSubmissionSiblings($user, $approval, $updatePayload)
+            )));
             $fromOfficeId = (int) $approval->office_id;
             $actorUserId = (int) $user->user_id;
-            dispatch(function () use ($reservationId, $fromOfficeId, $actorUserId, $isItemOwnerApprover) {
+            dispatch(function () use ($reservationIds, $fromOfficeId, $actorUserId, $isItemOwnerApprover) {
                 try {
                     /** @var self $self */
                     $self = app(self::class);
-                    $self->runApprovedSideEffects($reservationId, $fromOfficeId, $actorUserId, $isItemOwnerApprover);
+                    foreach ($reservationIds as $reservationId) {
+                        $self->runApprovedSideEffects($reservationId, $fromOfficeId, $actorUserId, $isItemOwnerApprover);
+                    }
                 } catch (Throwable $throwable) {
                     report($throwable);
                 }
@@ -291,12 +296,17 @@ class ApprovalController extends Controller
             Cache::forget('office.decision_count.' . (int) $approval->office_id . '.rejected');
             Cache::forget('notification_unread_count.user.' . (int) $user->user_id);
 
-            $reservationId = (int) $approval->reservation_id;
-            dispatch(function () use ($reservationId) {
+            $reservationIds = array_values(array_unique(array_merge(
+                [(int) $approval->reservation_id],
+                $this->decideSubmissionSiblings($user, $approval, $updatePayload)
+            )));
+            dispatch(function () use ($reservationIds) {
                 try {
                     /** @var self $self */
                     $self = app(self::class);
-                    $self->runRejectedSideEffects($reservationId);
+                    foreach ($reservationIds as $reservationId) {
+                        $self->runRejectedSideEffects($reservationId);
+                    }
                 } catch (Throwable $throwable) {
                     report($throwable);
                 }
@@ -2012,6 +2022,52 @@ class ApprovalController extends Controller
         $this->officeIdByDepartmentNameCache = $map;
 
         return $this->officeIdByDepartmentNameCache;
+    }
+
+    /**
+     * One submit can be stored as several reservation ids. Approving the row
+     * shown in the queue also decides the other rooms and items from that submit
+     * when this office still has them pending.
+     *
+     * @return list<int>
+     */
+    private function decideSubmissionSiblings($user, ReservationApproval $approval, array $updatePayload): array
+    {
+        $ids = array_values(array_filter(
+            ReservationResourceCatalog::submissionIds((int) $approval->reservation_id),
+            fn (int $id) => $id !== (int) $approval->reservation_id
+        ));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $siblings = ReservationApproval::query()
+            ->whereIn('reservation_id', $ids)
+            ->where('office_id', (int) $approval->office_id)
+            ->whereNull('approved_at')
+            ->get();
+
+        $decided = [];
+        foreach ($siblings as $sibling) {
+            $decision = $this->decisionForActor($user, $sibling);
+            if ($decision instanceof \Illuminate\Http\JsonResponse) {
+                continue;
+            }
+
+            $payload = $updatePayload;
+            $payload['on_behalf_of_program_chair'] = $decision['on_behalf'];
+            $blocked = $this->saveApprovalDecision($sibling, $payload);
+            if ($blocked instanceof \Illuminate\Http\JsonResponse) {
+                continue;
+            }
+
+            $this->recordApprovalHistory($sibling);
+            $this->forgetActionableOfficeCache((int) $sibling->reservation_id);
+            $decided[] = (int) $sibling->reservation_id;
+        }
+
+        return $decided;
     }
 
     private function recordApprovalHistory(ReservationApproval $approval): void

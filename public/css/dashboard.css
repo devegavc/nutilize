@@ -1923,6 +1923,8 @@ body {
 .reservation-details-body {
   padding: 16px 22px 20px;
   overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .reservation-details-layout {
@@ -2573,4 +2575,16 @@ body.office-app .maintenance-grid {
 .reservation-resource-status {
   color: #5b6cb3;
   font-weight: 600;
+}
+
+.reservation-details-body .reservation-resource-list {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  width: 100%;
+}
+
+.reservation-resource-group {
+  width: 100%;
 }

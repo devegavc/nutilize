@@ -233,7 +233,7 @@ class OfficeRequestController extends Controller
             ->orderByDesc('created_at');
 
         $requests = $requestsQuery->get();
-        $this->attachResourceSummaries($requests);
+        $this->attachResourceSummaries($requests, $actionableReservationIds);
 
         $waitingOnByReservation = [];
         $showWaitingQueueContext = $user->isProgramChairAdmin();
@@ -278,10 +278,10 @@ class OfficeRequestController extends Controller
             'actionableReservationIds' => $actionableReservationIds,
             'waitingOnByReservation' => $waitingOnByReservation,
             'showWaitingQueueContext' => $showWaitingQueueContext,
-            'totalRequests' => count($actionableReservationIds),
-            'pendingRequests' => $showWaitingQueueContext
-                ? $requests->count()
-                : count($actionableReservationIds),
+            'totalRequests' => $requests->filter(
+                fn ($approval) => in_array((int) $approval->reservation_id, $actionableReservationIds, true)
+            )->count(),
+            'pendingRequests' => $requests->count(),
             'approvedRequests' => $this->cachedOfficeDecisionCount((int) $user->office_id, 'approved'),
             'rejectedRequests' => $this->cachedOfficeDecisionCount((int) $user->office_id, 'rejected'),
             'authUser' => $user,
@@ -331,7 +331,7 @@ class OfficeRequestController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $this->attachResourceSummaries($requests);
+        $this->attachResourceSummaries($requests, $actionableReservationIds);
 
         $requests->each(function ($approval) {
             $required = (bool) ($approval->dean_required ?? false);
@@ -349,8 +349,8 @@ class OfficeRequestController extends Controller
             'actionableReservationIds' => $actionableReservationIds,
             'waitingOnByReservation' => [],
             'showWaitingQueueContext' => false,
-            'totalRequests' => count($actionableReservationIds),
-            'pendingRequests' => count($actionableReservationIds),
+            'totalRequests' => $requests->count(),
+            'pendingRequests' => $requests->count(),
             'approvedRequests' => ReservationApproval::query()
                 ->where('approved_by_user_id', (int) $user->user_id)
                 ->where('status', 'approved')
@@ -364,13 +364,14 @@ class OfficeRequestController extends Controller
         ];
     }
 
-    private function attachResourceSummaries($requests): void
+    private function attachResourceSummaries($requests, array $actionableReservationIds = []): void
     {
         $reservationIds = $requests
             ->pluck('reservation_id')
             ->map(fn ($id) => (int) $id)
             ->all();
         $summaries = ReservationResourceCatalog::forReservations($reservationIds);
+        $actionable = array_fill_keys(array_map('intval', $actionableReservationIds), true);
 
         $requests->each(function ($approval) use ($summaries) {
             $reservationId = (int) $approval->reservation_id;
@@ -381,6 +382,55 @@ class OfficeRequestController extends Controller
                 );
             }
         });
+
+        $grouped = [];
+        foreach ($requests as $approval) {
+            $summary = $summaries[(int) $approval->reservation_id] ?? null;
+            $ids = $summary['reservation_ids'] ?? [(int) $approval->reservation_id];
+            $ids = array_values(array_unique(array_map('intval', $ids)));
+            sort($ids);
+            $grouped[implode('-', $ids)][] = $approval;
+        }
+
+        $hide = [];
+        foreach ($grouped as $rows) {
+            $reservationIdsInGroup = array_values(array_unique(array_map(
+                fn ($row) => (int) $row->reservation_id,
+                $rows
+            )));
+            if (count($reservationIdsInGroup) < 2) {
+                continue;
+            }
+
+            $keep = $rows[0];
+            foreach ($rows as $row) {
+                $rowIsActionable = isset($actionable[(int) $row->reservation_id]);
+                $keepIsActionable = isset($actionable[(int) $keep->reservation_id]);
+                if ($rowIsActionable && !$keepIsActionable) {
+                    $keep = $row;
+                    continue;
+                }
+
+                if ($rowIsActionable === $keepIsActionable && (int) $row->reservation_id < (int) $keep->reservation_id) {
+                    $keep = $row;
+                }
+            }
+
+            foreach ($rows as $row) {
+                if ((int) $row->reservation_id !== (int) $keep->reservation_id) {
+                    $hide[] = (int) $row->approval_id;
+                }
+            }
+        }
+
+        if ($hide === []) {
+            return;
+        }
+
+        $visible = $requests->reject(
+            fn ($approval) => in_array((int) $approval->approval_id, $hide, true)
+        )->values();
+        $requests->splice(0, $requests->count(), $visible->all());
     }
 
     private function cachedOfficeDecisionCount(int $officeId, string $status): int

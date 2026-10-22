@@ -1517,6 +1517,12 @@ function showReservationDetailsModal(reservation, options = {}) {
           </button>
         </div>
         <div class="reservation-details-body">
+          <section class="reservation-details-panel reservation-resources-panel">
+            <div class="reservation-panel-heading">
+              <h3>Reserved Facilities and Equipment</h3>
+            </div>
+            <div class="reservation-resource-list">${resourceMarkup}</div>
+          </section>
           <div class="reservation-details-layout">
             <section class="reservation-details-panel">
               <div class="reservation-panel-heading">
@@ -1557,7 +1563,7 @@ function showReservationDetailsModal(reservation, options = {}) {
                 ${reservation.multiple_schedules ? `
                 <div class="info-row">
                   <strong>Schedules</strong>
-                  <span>Each room and item is listed below.</span>
+                  <span>Each room and item is listed above with its own date and time.</span>
                 </div>
                 ` : `
                 <div class="info-row">
@@ -1573,12 +1579,6 @@ function showReservationDetailsModal(reservation, options = {}) {
             </section>
           </div>
 
-          <section class="reservation-details-panel reservation-resources-panel">
-            <div class="reservation-panel-heading">
-              <h3>Reserved Facilities and Equipment</h3>
-            </div>
-            <div class="reservation-resource-list">${resourceMarkup}</div>
-          </section>
         </div>
         ${actionFooter}
       </div>
