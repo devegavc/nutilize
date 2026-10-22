@@ -7159,3 +7159,267 @@ body.page-insights .insight-mom-head {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Analytics presentation: shared filter controls, spacing, and type. */
+body.page-insights .analytics-content-card {
+  padding-bottom: 24px;
+}
+
+body.page-insights .insights-header-top {
+  align-items: center;
+  min-height: 88px;
+  padding: 18px 24px;
+  gap: 16px 20px;
+}
+
+body.page-insights .insights-header-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px 12px;
+  margin-left: auto;
+}
+
+body.page-insights .insights-month-jump,
+body.page-insights .insights-header-top .insights-compare-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 44px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+}
+
+body.page-insights .insights-month-jump label,
+body.page-insights .insights-header-top .insights-compare-label {
+  margin: 0;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+body.page-insights .insights-month-jump select,
+body.page-insights .insights-header-top .insights-compare-picker select {
+  height: 34px;
+  min-width: 4.6rem;
+  margin: 0;
+  padding: 0 1.7rem 0 0.7rem;
+  border: 1px solid #d5def3;
+  border-radius: 8px;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2332438c' d='M1.4.8 6 5.4 10.6.8 12 2.2 6 8 0 2.2z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+  background-size: 10px 7px;
+  color: #243274;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+  appearance: none;
+}
+
+body.page-insights .insights-month-jump select:focus-visible,
+body.page-insights .insights-header-top .insights-compare-picker select:focus-visible,
+body.page-insights .insight-kpi:focus-visible {
+  outline: 3px solid #fbd117;
+  outline-offset: 2px;
+}
+
+body.page-insights .insight-charts-row,
+body.page-insights .insight-kpi-strip,
+body.page-insights .insight-how-it-works,
+body.page-insights .analytics-top-row,
+body.page-insights .insight-activity-section,
+body.page-insights .insight-split {
+  padding-left: 24px;
+  padding-right: 24px;
+  padding-top: 20px;
+}
+
+body.page-insights .insight-section {
+  margin: 20px 24px 0;
+}
+
+body.page-insights .insight-charts-row {
+  gap: 16px;
+  align-items: stretch;
+}
+
+body.page-insights .insight-charts-row > .insight-panel,
+body.page-insights .analytics-chart-card,
+body.page-insights .analytics-category-card,
+body.page-insights .analytics-kpi-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 18px 18px;
+}
+
+body.page-insights .insight-chart-frame,
+body.page-insights .insight-mom-frame,
+body.page-insights .insight-trend-frame {
+  flex: 1 1 auto;
+  height: 250px;
+  min-height: 230px;
+  margin-top: 8px;
+}
+
+body.page-insights .insight-card-title,
+body.page-insights .insight-head h2,
+body.page-insights .analytics-grid-head h2,
+body.page-insights .insight-how-it-works h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+body.page-insights .insight-panel-hint,
+body.page-insights .analytics-grid-head p,
+body.page-insights .insight-how-it-works ol {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: #4d5888;
+}
+
+body.page-insights .insight-kpi-strip {
+  gap: 14px;
+}
+
+body.page-insights .insight-kpi {
+  align-items: center;
+  min-height: 104px;
+  padding: 16px;
+}
+
+body.page-insights .insight-kpi strong {
+  font-size: 1.7rem;
+  line-height: 1.1;
+}
+
+body.page-insights .insight-kpi-hint {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+body.page-insights .analytics-top-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(220px, 0.72fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+body.page-insights .analytics-kpi-card {
+  width: auto;
+  min-width: 0;
+}
+
+body.page-insights .analytics-kpi-card span {
+  font-size: 0.74rem;
+}
+
+body.page-insights .analytics-kpi-card strong {
+  font-size: 1.55rem;
+}
+
+body.page-insights .analytics-category-name,
+body.page-insights .borrowed-share-name,
+body.page-insights .restock-item-name,
+body.page-insights .top-borrower-name {
+  overflow-wrap: anywhere;
+}
+
+body.page-insights .insight-section .table-wrap,
+body.page-insights .insight-split .table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0 16px 16px;
+}
+
+body.page-insights .analytics-table {
+  min-width: 640px;
+}
+
+body.page-insights .analytics-table thead th {
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+body.page-insights .analytics-table tbody td {
+  padding: 12px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+body.page-insights .analytics-table tbody tr:nth-child(even) {
+  background: rgba(56, 71, 156, 0.04);
+}
+
+body.page-insights .analytics-grid-head {
+  padding: 16px 18px 12px;
+}
+
+@media (max-width: 1100px) {
+  body.page-insights .insights-header-top {
+    align-items: flex-start;
+  }
+
+  body.page-insights .insights-header-filters {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  body.page-insights .analytics-top-row,
+  body.page-insights .insight-charts-row {
+    grid-template-columns: 1fr;
+  }
+
+  body.page-insights .analytics-kpi-card {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  body.page-insights .insights-header-top,
+  body.page-insights .insight-charts-row,
+  body.page-insights .insight-kpi-strip,
+  body.page-insights .insight-how-it-works,
+  body.page-insights .analytics-top-row,
+  body.page-insights .insight-activity-section,
+  body.page-insights .insight-split {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  body.page-insights .insight-section {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+
+  body.page-insights .insights-month-jump,
+  body.page-insights .insights-header-top .insights-compare-picker {
+    width: 100%;
+  }
+
+  body.page-insights .insight-kpi-strip,
+  body.page-insights .analytics-kpi-card {
+    grid-template-columns: 1fr;
+  }
+
+  body.page-insights .insight-kpi {
+    min-height: 0;
+  }
+}

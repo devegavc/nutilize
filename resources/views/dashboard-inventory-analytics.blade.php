@@ -53,18 +53,38 @@
             $selectedYear = (int) $selectedYear;
             $selectedMonthNum = (int) $selectedMonthNum;
           @endphp
-          <div class="insights-month-jump" aria-label="Jump to month">
-            <label for="analytics-month-select">Jump to</label>
-            <select id="analytics-month-select" aria-label="Select month">
-              @foreach ([1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'] as $monthNumber => $monthName)
-                <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonthNum === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
-              @endforeach
-            </select>
-            <select id="analytics-year-select" aria-label="Select year">
-              @for ($year = $selectedYear - 3; $year <= $selectedYear + 1; $year++)
-                <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
-              @endfor
-            </select>
+          @php
+            [$compareYear, $compareMonthNum] = explode('-', $compareMonthKey);
+            $compareYear = (int) $compareYear;
+            $compareMonthNum = (int) $compareMonthNum;
+          @endphp
+          <div class="insights-header-filters">
+            <div class="insights-month-jump" aria-label="Jump to month">
+              <label for="analytics-month-select">Jump to</label>
+              <select id="analytics-month-select" aria-label="Select month">
+                @foreach ([1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'] as $monthNumber => $monthName)
+                  <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonthNum === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
+                @endforeach
+              </select>
+              <select id="analytics-year-select" aria-label="Select year">
+                @for ($year = $selectedYear - 3; $year <= $selectedYear + 1; $year++)
+                  <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
+                @endfor
+              </select>
+            </div>
+            <div class="insights-compare-picker" aria-label="Select month to compare with">
+              <span class="insights-compare-label">Compare with</span>
+              <select id="analytics-compare-month" aria-label="Compare month">
+                @foreach ([1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'] as $monthNumber => $monthName)
+                  <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $compareMonthNum === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
+                @endforeach
+              </select>
+              <select id="analytics-compare-year" aria-label="Compare year">
+                @for ($year = $compareYear - 3; $year <= $compareYear + 1; $year++)
+                  <option value="{{ $year }}" {{ $compareYear === $year ? 'selected' : '' }}>{{ $year }}</option>
+                @endfor
+              </select>
+            </div>
           </div>
         </div>
 
@@ -75,25 +95,6 @@
               <div>
                 <h2 class="insight-card-title">Comparing Months</h2>
                 <p class="insight-panel-hint">{{ $monthComparison['currentLabel'] }} vs {{ $monthComparison['compareLabel'] }}</p>
-              </div>
-
-              @php
-                [$compareYear, $compareMonthNum] = explode('-', $compareMonthKey);
-                $compareYear = (int) $compareYear;
-                $compareMonthNum = (int) $compareMonthNum;
-              @endphp
-              <div class="insights-compare-picker" aria-label="Select month to compare with">
-                <span class="insights-compare-label">Compare with</span>
-                <select id="analytics-compare-month" aria-label="Compare month">
-                  @foreach ([1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'] as $monthNumber => $monthName)
-                    <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $compareMonthNum === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
-                  @endforeach
-                </select>
-                <select id="analytics-compare-year" aria-label="Compare year">
-                  @for ($year = $compareYear - 3; $year <= $compareYear + 1; $year++)
-                    <option value="{{ $year }}" {{ $compareYear === $year ? 'selected' : '' }}>{{ $year }}</option>
-                  @endfor
-                </select>
               </div>
             </div>
             <div class="insight-chart-frame insight-mom-frame">
