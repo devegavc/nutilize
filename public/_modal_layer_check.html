@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modal layer check</title>
+  <style>
+    .reservation-details-modal { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; }
+    .reservation-details-overlay { position: absolute; inset: 0; background: rgba(17, 24, 39, 0.62); }
+    .reservation-details-content { position: relative; width: min(860px, calc(100vw - 32px)); background: #fff; padding: 24px; }
+    .other-modal { position: fixed; inset: 0; z-index: 1250; display: none; }
+    .office-action-confirm-modal { position: fixed; inset: 0; z-index: 1100; display: none; }
+    .office-action-confirm-modal.is-above-details { z-index: 4200; }
+    .office-action-confirm-modal.is-open { display: grid; place-items: center; padding: 18px; }
+    .office-action-confirm-overlay { position: absolute; inset: 0; background: rgba(22, 27, 39, 0.46); }
+    .office-action-confirm-modal.is-above-details .office-action-confirm-card { z-index: 1; }
+    .office-action-confirm-card { position: relative; width: min(500px, 90vw); background: #fff; padding: 16px; }
+  </style>
+</head>
+<body>
+  <div class="other-modal" id="other-modal"></div>
+  <div class="reservation-details-modal" id="details">
+    <div class="reservation-details-overlay"></div>
+    <div class="reservation-details-content">
+      <button type="button" class="reservation-details-close" id="details-close">Close</button>
+      <button type="button" id="details-approve">Approve</button>
+    </div>
+  </div>
+  <div class="office-action-confirm-modal" id="office-action-confirm-modal" aria-hidden="true">
+    <div class="office-action-confirm-overlay" data-close-office-action-confirm="true"></div>
+    <article class="office-action-confirm-card" id="confirm-card">
+      <button type="button" id="confirm-cancel">Cancel</button>
+      <button type="button" id="confirm-submit">Approve</button>
+    </article>
+  </div>
+  <pre id="result"></pre>
+  <script>
+    const details = document.getElementById('details');
+    const confirmModal = document.getElementById('office-action-confirm-modal');
+    const card = document.getElementById('confirm-card');
+    const other = document.getElementById('other-modal');
+    const result = [];
+    const record = (name, ok, extra = '') => result.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra ? ' ' + extra : ''}`);
+
+    document.body.appendChild(confirmModal);
+    confirmModal.classList.add('is-open', 'is-above-details');
+    details.inert = true;
+
+    const confirmZ = Number.parseInt(getComputedStyle(confirmModal).zIndex, 10);
+    const detailsZ = Number.parseInt(getComputedStyle(details).zIndex, 10);
+    const otherZ = Number.parseInt(getComputedStyle(other).zIndex, 10);
+    const cardBox = card.getBoundingClientRect();
+    const center = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    const corner = document.elementFromPoint(8, 8);
+    record('confirm-above-details', confirmZ > detailsZ, `confirm=${confirmZ} details=${detailsZ}`);
+    record('other-modal-unchanged', otherZ === 1250, `other=${otherZ}`);
+    record('card-centered', Math.abs((cardBox.left + cardBox.right) / 2 - window.innerWidth / 2) < 2);
+    record('card-on-top-at-center', card.contains(center) || center === card, center ? center.id || center.className : 'none');
+    record('corner-is-confirm-overlay', corner && corner.classList.contains('office-action-confirm-overlay'), corner ? corner.className : 'none');
+    record('details-inert', details.inert === true);
+    record('card-inside-viewport', cardBox.left >= 0 && cardBox.right <= window.innerWidth + 1 && cardBox.width <= window.innerWidth);
+
+    let detailsClosed = false;
+    document.getElementById('details-close').addEventListener('click', () => { detailsClosed = true; details.remove(); });
+    document.getElementById('confirm-cancel').click();
+    confirmModal.classList.remove('is-open', 'is-above-details');
+    details.inert = false;
+    record('cancel-keeps-details', document.body.contains(details) && !detailsClosed);
+    record('cancel-closes-confirm', !confirmModal.classList.contains('is-open'));
+
+    confirmModal.classList.add('is-open', 'is-above-details');
+    details.inert = true;
+    let escapedDetails = false;
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !confirmModal.classList.contains('is-open')) escapedDetails = true;
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && confirmModal.classList.contains('is-open')) {
+        event.preventDefault();
+        event.stopPropagation();
+        confirmModal.classList.remove('is-open', 'is-above-details');
+        details.inert = false;
+      }
+    }, true);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    record('escape-returns-to-details', document.body.contains(details) && !confirmModal.classList.contains('is-open') && !escapedDetails);
+
+    confirmModal.classList.add('is-open', 'is-above-details');
+    let actionStarted = false;
+    document.getElementById('confirm-submit').addEventListener('click', () => {
+      confirmModal.classList.remove('is-open', 'is-above-details');
+      details.inert = false;
+      actionStarted = true;
+    });
+    document.getElementById('confirm-submit').click();
+    record('confirm-starts-action-and-keeps-details', actionStarted && document.body.contains(details));
+
+    document.getElementById('result').textContent = result.join('\n');
+  </script>
+</body>
+</html>

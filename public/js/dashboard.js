@@ -1616,8 +1616,13 @@ function showReservationDetailsModal(reservation, options = {}) {
   const closeBtn = modal.querySelector('.reservation-details-close');
   const overlay = modal.querySelector('.reservation-details-overlay');
 
+  const confirmationIsOpen = () => {
+    const confirmModal = document.getElementById('office-action-confirm-modal');
+    return confirmModal instanceof HTMLElement && confirmModal.classList.contains('is-open');
+  };
+
   const onModalKeydown = (event) => {
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && !confirmationIsOpen()) {
       closeModal();
     }
   };
@@ -1629,7 +1634,7 @@ function showReservationDetailsModal(reservation, options = {}) {
 
   closeBtn.addEventListener('click', closeModal);
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
+    if (e.target === overlay && !confirmationIsOpen()) {
       closeModal();
     }
   });

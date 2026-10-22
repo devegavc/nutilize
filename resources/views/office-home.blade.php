@@ -379,13 +379,22 @@
         }
       };
 
+      const setReservationDetailsHeld = (held) => {
+        document.querySelectorAll('.reservation-details-modal').forEach((node) => {
+          if (node instanceof HTMLElement) {
+            node.inert = held;
+          }
+        });
+      };
+
       const closeActionConfirmModal = () => {
         if (!(actionConfirmModal instanceof HTMLElement)) {
           return;
         }
 
-        actionConfirmModal.classList.remove('is-open');
+        actionConfirmModal.classList.remove('is-open', 'is-above-details');
         actionConfirmModal.setAttribute('aria-hidden', 'true');
+        setReservationDetailsHeld(false);
       };
 
       const syncRejectReasonSubmitState = () => {
@@ -437,17 +446,35 @@
 
         syncRejectReasonSubmitState();
 
+        const aboveDetails = document.querySelector('.reservation-details-modal') instanceof HTMLElement;
+        if (aboveDetails) {
+          document.body.appendChild(actionConfirmModal);
+        }
+
+        actionConfirmModal.classList.toggle('is-above-details', aboveDetails);
         actionConfirmModal.classList.add('is-open');
         actionConfirmModal.setAttribute('aria-hidden', 'false');
 
         if (!isApprove && actionConfirmReason instanceof HTMLTextAreaElement) {
           actionConfirmReason.focus();
+        } else if (aboveDetails) {
+          actionConfirmCancel.focus();
+        }
+
+        if (aboveDetails) {
+          setReservationDetailsHeld(true);
         }
 
         const handleCancel = () => {
           teardown();
           closeActionConfirmModal();
           resolve({ confirmed: false, reason: '' });
+          if (aboveDetails) {
+            const returnFocus = document.querySelector('.reservation-details-modal .reservation-details-close');
+            if (returnFocus instanceof HTMLElement) {
+              returnFocus.focus();
+            }
+          }
         };
 
         const handleSubmit = () => {
@@ -481,7 +508,32 @@
 
         const handleKeydown = (event) => {
           if (event.key === 'Escape') {
+            if (aboveDetails) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
             handleCancel();
+            return;
+          }
+
+          if (!aboveDetails || event.key !== 'Tab' || !(actionConfirmCard instanceof HTMLElement)) {
+            return;
+          }
+
+          const focusable = Array.from(actionConfirmCard.querySelectorAll('button, textarea, input, a[href]'))
+            .filter((node) => node instanceof HTMLElement && !node.disabled && node.offsetParent !== null);
+          if (focusable.length === 0) {
+            return;
+          }
+
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
           }
         };
 
@@ -489,7 +541,7 @@
           actionConfirmCancel.removeEventListener('click', handleCancel);
           actionConfirmSubmit.removeEventListener('click', handleSubmit);
           actionConfirmModal.removeEventListener('click', handleBackdrop);
-          document.removeEventListener('keydown', handleKeydown);
+          document.removeEventListener('keydown', handleKeydown, aboveDetails);
           if (actionConfirmReason instanceof HTMLTextAreaElement) {
             actionConfirmReason.removeEventListener('input', handleReasonInput);
           }
@@ -498,7 +550,7 @@
         actionConfirmCancel.addEventListener('click', handleCancel);
         actionConfirmSubmit.addEventListener('click', handleSubmit);
         actionConfirmModal.addEventListener('click', handleBackdrop);
-        document.addEventListener('keydown', handleKeydown);
+        document.addEventListener('keydown', handleKeydown, aboveDetails);
         if (actionConfirmReason instanceof HTMLTextAreaElement) {
           actionConfirmReason.addEventListener('input', handleReasonInput);
         }
@@ -897,6 +949,10 @@
       display: none;
     }
 
+    .office-action-confirm-modal.is-above-details {
+      z-index: 4200;
+    }
+
     .office-action-confirm-modal.is-open {
       display: grid;
       place-items: center;
@@ -908,6 +964,10 @@
       inset: 0;
       background: rgba(22, 27, 39, 0.46);
       backdrop-filter: blur(1px);
+    }
+
+    .office-action-confirm-modal.is-above-details .office-action-confirm-card {
+      z-index: 1;
     }
 
     .office-action-confirm-card {
