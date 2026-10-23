@@ -76,7 +76,12 @@
   <div id="equipment-demand-results" hidden>
     <p id="equipment-demand-period-note" class="equipment-demand-note"></p>
 
-    <section class="insight-kpi-strip equipment-demand-kpis" aria-label="Equipment demand summary">
+    <div class="equipment-demand-part-head">
+      <h2 class="insight-card-title">Descriptive</h2>
+      <p class="equipment-demand-note">What already happened: approved reservations, equipment types, returns, and the most reserved item.</p>
+    </div>
+
+    <section class="insight-kpi-strip equipment-demand-kpis" aria-label="Descriptive equipment demand summary">
       <div class="insight-kpi equipment-demand-kpi">
         <span class="insight-kpi-icon"><i class="bi bi-calendar2-check-fill"></i></span>
         <div class="insight-kpi-body">

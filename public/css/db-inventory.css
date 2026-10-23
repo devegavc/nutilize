@@ -8361,6 +8361,14 @@ body.page-insights .priority-pill.unavailable {
   padding: 18px 18px 16px;
 }
 
+.equipment-demand-panel .equipment-demand-part-head {
+  margin: 4px 0 10px;
+}
+
+.equipment-demand-panel .equipment-demand-part-head .insight-card-title {
+  margin: 0 0 2px;
+}
+
 .equipment-demand-panel .insight-kpi-strip {
   padding-left: 0;
   padding-right: 0;
