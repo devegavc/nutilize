@@ -46,7 +46,7 @@
     <section class="workspace-grid">
       @include('partials.dashboard-navbar')
 
-      <section class="content-card facilities-content-card">
+      <section class="content-card facilities-content-card table-page-fill">
         <h1 class="section-title">EQUIPMENT INVENTORY</h1>
 
         <section class="facilities-filter-row equipment-filter-row">

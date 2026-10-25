@@ -9436,3 +9436,36 @@ body.page-insights .insight-kpi-strip[data-analytics-panel="rooms"] {
     padding: 16px;
   }
 }
+
+/* Facilities, Equipment, and Maintenance tables fill the sidebar height
+   when short, and grow with the rows when the table is longer. */
+.workspace-grid > .content-card.table-page-fill {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  max-height: none;
+  min-height: calc(100vh - var(--top-header-height) - var(--dashboard-top-gap) - var(--dashboard-bottom-gap));
+}
+
+.table-page-fill > .section-title,
+.table-page-fill > .facilities-filter-row,
+.table-page-fill > .maintenance-filter-row {
+  flex: 0 0 auto;
+}
+
+.table-page-fill > .inventory-grid {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.table-page-fill > .inventory-grid > .table-wrap {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+}
+
+.table-page-fill .inventory-table {
+  height: auto;
+}

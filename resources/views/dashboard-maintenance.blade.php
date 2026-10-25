@@ -43,7 +43,7 @@
     <section class="workspace-grid">
       @include('partials.dashboard-navbar')
 
-      <section class="content-card maintenance-content-card pf-maintenance-page">
+      <section class="content-card maintenance-content-card pf-maintenance-page table-page-fill">
         <h1 class="section-title">MAINTENANCE DASHBOARD</h1>
 
         <section class="maintenance-filter-row">
