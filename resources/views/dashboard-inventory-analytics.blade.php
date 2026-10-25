@@ -55,24 +55,6 @@
         <div class="dashboard-page-header-top insights-header-top">
           <div class="insights-header-copy">
             <h1 class="section-title">ANALYTICS</h1>
-            <div class="insights-view-switch" role="tablist" aria-label="Analytics report">
-              <button
-                type="button"
-                class="insights-view-tab"
-                role="tab"
-                id="analytics-view-equipment"
-                data-analytics-view="equipment"
-                aria-selected="true"
-              >Equipment</button>
-              <button
-                type="button"
-                class="insights-view-tab"
-                role="tab"
-                id="analytics-view-rooms"
-                data-analytics-view="rooms"
-                aria-selected="false"
-              >Rooms</button>
-            </div>
           </div>
 
           @php
@@ -92,6 +74,24 @@
                 <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
               @endfor
             </select>
+          </div>
+          <div class="insights-view-switch" role="tablist" aria-label="Analytics report">
+            <button
+              type="button"
+              class="insights-view-tab"
+              role="tab"
+              id="analytics-view-equipment"
+              data-analytics-view="equipment"
+              aria-selected="true"
+            >Equipment</button>
+            <button
+              type="button"
+              class="insights-view-tab"
+              role="tab"
+              id="analytics-view-rooms"
+              data-analytics-view="rooms"
+              aria-selected="false"
+            >Rooms</button>
           </div>
         </div>
 
