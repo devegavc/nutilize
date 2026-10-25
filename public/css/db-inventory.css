@@ -9268,3 +9268,162 @@ body.page-insights .insight-kpi-strip[data-analytics-panel="rooms"] .insight-kpi
     justify-content: flex-start;
   }
 }
+
+/* Analytics layout spacing. These rules follow every earlier insights override. */
+body.page-insights .analytics-content-card > .dashboard-page-header-top.insights-header-top {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 12px 24px;
+  padding: 18px 24px;
+  box-sizing: border-box;
+}
+
+body.page-insights .analytics-content-card > .insights-header-top > .insights-header-copy {
+  display: flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}
+
+body.page-insights .analytics-content-card > .insights-header-top > .insights-view-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  margin: 0 0 0 auto;
+}
+
+body.page-insights.analytics-view-rooms .analytics-content-card > .insights-header-top > .insights-month-jump {
+  margin-left: 24px;
+}
+
+body.page-insights .equipment-demand-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+}
+
+body.page-insights #equipment-demand-results {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+body.page-insights .equipment-demand-block {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+body.page-insights .equipment-demand-panel .equipment-demand-part-head,
+body.page-insights .equipment-demand-panel .equipment-demand-section.inventory-grid,
+body.page-insights .equipment-demand-panel .equipment-demand-chart-panel,
+body.page-insights .equipment-demand-panel .equipment-demand-insights,
+body.page-insights .equipment-demand-panel .insight-kpi-strip {
+  margin: 0;
+}
+
+body.page-insights .equipment-demand-part-head .insight-card-title {
+  margin: 0 0 12px;
+}
+
+body.page-insights .equipment-demand-part-head .equipment-demand-note {
+  margin: 0;
+}
+
+body.page-insights .equipment-demand-kpis.insight-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16px;
+  padding: 0;
+}
+
+body.page-insights .equipment-demand-kpi.insight-kpi {
+  height: 100%;
+  min-height: 132px;
+  align-items: center;
+  padding: 22px;
+  gap: 16px;
+}
+
+body.page-insights .equipment-demand-kpi strong {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+body.page-insights #equipment-summary-top {
+  white-space: normal;
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+body.page-insights .equipment-demand-section .insight-head p,
+body.page-insights .equipment-demand-chart-head .insight-panel-hint {
+  margin: 12px 0 0;
+}
+
+body.page-insights .equipment-demand-section .analytics-grid-head {
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+body.page-insights .equipment-demand-section .table-wrap {
+  margin-top: 16px;
+  padding: 0;
+}
+
+body.page-insights .equipment-demand-chart-panel #equipment-weekly-unit {
+  margin: 16px 0 0;
+}
+
+body.page-insights .equipment-demand-chart-panel .equipment-weekly-frame {
+  margin-top: 16px;
+}
+
+body.page-insights .analytics-content-card > .insight-charts-row,
+body.page-insights .analytics-content-card > .insight-kpi-strip,
+body.page-insights .analytics-content-card > .analytics-top-row,
+body.page-insights .analytics-content-card > .insight-split,
+body.page-insights .analytics-content-card > .insight-section {
+  margin-top: 24px;
+  margin-bottom: 0;
+}
+
+body.page-insights .insight-kpi-strip[data-analytics-panel="rooms"] {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  body.page-insights .equipment-demand-kpis.insight-kpi-strip,
+  body.page-insights .insight-kpi-strip[data-analytics-panel="rooms"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  body.page-insights .analytics-content-card > .insights-header-top > .insights-header-copy {
+    flex: 1 1 100%;
+  }
+
+  body.page-insights .analytics-content-card > .insights-header-top > .insights-view-switch {
+    margin-left: auto;
+  }
+
+  body.page-insights .equipment-demand-kpis.insight-kpi-strip,
+  body.page-insights .insight-kpi-strip[data-analytics-panel="rooms"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body.page-insights .equipment-demand-panel {
+    padding: 16px;
+  }
+}

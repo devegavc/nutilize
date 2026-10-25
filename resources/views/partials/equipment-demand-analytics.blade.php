@@ -76,6 +76,7 @@
   <div id="equipment-demand-results" hidden>
     <p id="equipment-demand-period-note" class="equipment-demand-note"></p>
 
+    <div class="equipment-demand-block">
     <div class="equipment-demand-part-head">
       <h2 class="insight-card-title">Descriptive</h2>
       <p class="equipment-demand-note">What already happened: approved reservations, equipment types, returns, and the most reserved item.</p>
@@ -115,6 +116,7 @@
         </div>
       </div>
     </section>
+    </div>
 
     <section class="inventory-grid analytics-table-grid insight-section equipment-demand-section">
       <div class="inventory-grid-head analytics-grid-head insight-head">
