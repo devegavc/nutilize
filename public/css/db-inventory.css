@@ -9102,8 +9102,7 @@ body.page-insights .insights-view-tab:focus-visible {
 }
 
 /* Analytics spacing refinement. Scoped to this page. */
-body.page-insights:not(.analytics-view-rooms) .insights-view-switch,
-body.page-insights.analytics-view-rooms .insights-month-jump {
+body.page-insights .analytics-content-card > .insights-header-top > .insights-view-switch {
   margin-left: auto;
 }
 
@@ -9252,9 +9251,8 @@ body.page-insights .insight-kpi-strip[data-analytics-panel="rooms"] .insight-kpi
     flex: 1 1 100%;
   }
 
-  body.page-insights:not(.analytics-view-rooms) .insights-view-switch,
-  body.page-insights.analytics-view-rooms .insights-month-jump {
-    margin-left: 0;
+  body.page-insights .analytics-content-card > .insights-header-top > .insights-view-switch {
+    margin-left: auto;
   }
 
   body.page-insights .equipment-demand-kpis.insight-kpi-strip,
@@ -9296,8 +9294,19 @@ body.page-insights .analytics-content-card > .insights-header-top > .insights-vi
   margin: 0 0 0 auto;
 }
 
-body.page-insights.analytics-view-rooms .analytics-content-card > .insights-header-top > .insights-month-jump {
-  margin-left: 24px;
+body.page-insights .rooms-analytics-filters {
+  margin: 24px 24px 0;
+  box-sizing: border-box;
+  justify-content: flex-start;
+}
+
+body.page-insights .rooms-analytics-filters .insights-month-jump {
+  margin: 0;
+  color: #39457f;
+}
+
+body.page-insights .rooms-analytics-filters .insights-month-jump label {
+  color: #39457f;
 }
 
 body.page-insights .equipment-demand-panel {

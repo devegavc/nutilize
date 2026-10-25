@@ -56,25 +56,6 @@
           <div class="insights-header-copy">
             <h1 class="section-title">ANALYTICS</h1>
           </div>
-
-          @php
-            [$selectedYear, $selectedMonthNum] = explode('-', $monthKey);
-            $selectedYear = (int) $selectedYear;
-            $selectedMonthNum = (int) $selectedMonthNum;
-          @endphp
-          <div class="insights-month-jump" data-analytics-panel="rooms" aria-label="Jump to month">
-            <label for="analytics-month-select">Jump to</label>
-            <select id="analytics-month-select" aria-label="Select month">
-              @foreach ([1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'] as $monthNumber => $monthName)
-                <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonthNum === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
-              @endforeach
-            </select>
-            <select id="analytics-year-select" aria-label="Select year">
-              @for ($year = $selectedYear - 3; $year <= $selectedYear + 1; $year++)
-                <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
-              @endfor
-            </select>
-          </div>
           <div class="insights-view-switch" role="tablist" aria-label="Analytics report">
             <button
               type="button"
@@ -396,6 +377,26 @@
         @include('partials.equipment-demand-analytics')
 
         {{-- Rooms stay month-scoped. Equipment demand is loaded separately. --}}
+        @php
+          [$selectedYear, $selectedMonthNum] = explode('-', $monthKey);
+          $selectedYear = (int) $selectedYear;
+          $selectedMonthNum = (int) $selectedMonthNum;
+        @endphp
+        <div class="rooms-analytics-filters equipment-demand-toolbar" data-analytics-panel="rooms">
+          <div class="insights-month-jump equipment-demand-filters" aria-label="Jump to month">
+            <label for="analytics-month-select">Jump to</label>
+            <select id="analytics-month-select" aria-label="Select month">
+              @foreach ([1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'] as $monthNumber => $monthName)
+                <option value="{{ str_pad((string) $monthNumber, 2, '0', STR_PAD_LEFT) }}" {{ $selectedMonthNum === $monthNumber ? 'selected' : '' }}>{{ $monthName }}</option>
+              @endforeach
+            </select>
+            <select id="analytics-year-select" aria-label="Select year">
+              @for ($year = $selectedYear - 3; $year <= $selectedYear + 1; $year++)
+                <option value="{{ $year }}" {{ $selectedYear === $year ? 'selected' : '' }}>{{ $year }}</option>
+              @endfor
+            </select>
+          </div>
+        </div>
         <section class="insight-charts-row" data-analytics-panel="rooms">
           <article class="insight-panel insight-mom-chart-panel">
             <div class="insight-mom-head">
