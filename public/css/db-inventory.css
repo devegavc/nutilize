@@ -6046,6 +6046,43 @@ body.insight-filtering .insight-kpi:not(.is-active) {
   align-self: flex-start;
 }
 
+.user-management-card .registration-allowance-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.user-management-card .registration-allowance-filters a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid #cad4ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #24357f;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.user-management-card .registration-allowance-filters a span {
+  color: #6b769c;
+  font-weight: 700;
+}
+
+.user-management-card .registration-allowance-filters a.is-active {
+  border-color: #38479c;
+  background: #38479c;
+  color: #fff;
+}
+
+.user-management-card .registration-allowance-filters a.is-active span {
+  color: #fff;
+}
+
 .user-management-card .registration-allowance-search {
   display: flex;
   align-items: center;

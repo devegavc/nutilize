@@ -56,7 +56,11 @@ class DashboardUserController extends Controller
             ];
         }
 
-        $allowances = RegistrationAllowanceService::page($request->query('allowance_q'));
+        $allowanceStatus = (string) $request->query('allowance_status', 'all');
+        if (!in_array($allowanceStatus, ['registered', 'unregistered'], true)) {
+            $allowanceStatus = 'all';
+        }
+        $allowances = RegistrationAllowanceService::page($request->query('allowance_q'), $allowanceStatus);
         $emails = $allowances->getCollection()->pluck('email')->filter()->values()->all();
         $registeredEmails = $emails === []
             ? collect()
@@ -75,6 +79,8 @@ class DashboardUserController extends Controller
             'roleOffices' => $roleOffices,
             'allowances' => $allowances,
             'allowanceSearch' => trim((string) $request->query('allowance_q', '')),
+            'allowanceStatus' => $allowanceStatus,
+            'allowanceCounts' => RegistrationAllowanceService::counts(),
             'allowanceRegistered' => $registeredEmails,
         ]);
     }

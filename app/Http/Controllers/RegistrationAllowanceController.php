@@ -18,7 +18,7 @@ class RegistrationAllowanceController extends Controller
 {
     public function exportRegistered()
     {
-        $allowances = RegistrationAllowance::query()->orderBy('email')->get(['email']);
+        $allowances = RegistrationAllowance::query()->orderBy('email')->get(['email', 'role']);
         $emails = $allowances->pluck('email')->all();
         $users = collect();
         if ($emails !== []) {
@@ -28,20 +28,20 @@ class RegistrationAllowanceController extends Controller
                 ->keyBy(fn (User $user): string => RegistrationAllowanceService::normalizeEmail((string) $user->email));
         }
 
-        $rows = [['Email', 'Name', 'Username']];
+        $rows = [['Email', 'Role', 'Account', 'Name', 'Username']];
         foreach ($allowances as $allowance) {
             $user = $users->get($allowance->email);
-            if (!$user instanceof User) {
-                continue;
-            }
+            $registered = $user instanceof User;
             $rows[] = [
                 (string) $allowance->email,
-                $user->displayName(),
-                (string) $user->username,
+                RegistrationAllowanceService::roleLabel($allowance->role),
+                $registered ? 'Registered' : 'Not registered',
+                $registered ? $user->displayName() : '',
+                $registered ? (string) $user->username : '',
             ];
         }
 
-        $filename = 'registered-emails-'.now()->format('Y-m-d').'.xlsx';
+        $filename = 'registration-emails-'.now()->format('Y-m-d').'.xlsx';
 
         return response(SimpleXlsx::binary($rows), 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -178,8 +178,12 @@ class RegistrationAllowanceController extends Controller
         $query = [];
         $search = trim((string) $request->input('allowance_q', ''));
         $page = (int) $request->input('allowance_page', 0);
+        $status = (string) $request->input('allowance_status', '');
         if ($search !== '') {
             $query['allowance_q'] = $search;
+        }
+        if (in_array($status, ['registered', 'unregistered'], true)) {
+            $query['allowance_status'] = $status;
         }
         if ($page > 1) {
             $query['allowance_page'] = (string) $page;

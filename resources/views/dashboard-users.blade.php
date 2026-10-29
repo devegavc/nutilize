@@ -193,7 +193,7 @@
               <p>A person can create an account only when their email is on this list. The role you choose is applied automatically when they register.</p>
             </div>
             <div class="registration-allowance-tools">
-              <a class="users-download-btn" href="{{ route('dashboard.registration-allowances.export') }}"><i class="bi bi-download" aria-hidden="true"></i> Download registered</a>
+              <a class="users-download-btn" href="{{ route('dashboard.registration-allowances.export') }}"><i class="bi bi-download" aria-hidden="true"></i> Download list</a>
               <span class="registration-allowance-count">{{ $allowances->total() }} {{ $allowances->total() === 1 ? 'email' : 'emails' }}</span>
             </div>
           </header>
@@ -206,6 +206,9 @@
               @endif
               @if($allowances->currentPage() > 1)
                 <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
+              @endif
+              @if($allowanceStatus !== 'all')
+                <input type="hidden" name="allowance_status" value="{{ $allowanceStatus }}" />
               @endif
               <span class="registration-allowance-kicker"><i class="bi bi-file-earmark-spreadsheet"></i> Upload a list</span>
               <p>Use a CSV or Excel file with a column named Email.</p>
@@ -225,6 +228,9 @@
               @if($allowances->currentPage() > 1)
                 <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
               @endif
+              @if($allowanceStatus !== 'all')
+                <input type="hidden" name="allowance_status" value="{{ $allowanceStatus }}" />
+              @endif
               <label class="registration-allowance-kicker" for="allowance-email"><i class="bi bi-person-plus"></i> Add one email</label>
               <p>Choose the role now. It is saved on the account when this person registers.</p>
               <select id="allowance-role" name="role" required>
@@ -242,13 +248,32 @@
             </form>
           </div>
 
+          <nav class="registration-allowance-filters" aria-label="Registration status">
+            @foreach([
+              'all' => 'All',
+              'registered' => 'Registered',
+              'unregistered' => 'Unregistered',
+            ] as $status => $label)
+              <a
+                class="{{ $allowanceStatus === $status ? 'is-active' : '' }}"
+                href="{{ route('dashboard.users', array_filter([
+                  'allowance_q' => $allowanceSearch !== '' ? $allowanceSearch : null,
+                  'allowance_status' => $status === 'all' ? null : $status,
+                ])) }}"
+              >{{ $label }} <span>{{ $allowanceCounts[$status] }}</span></a>
+            @endforeach
+          </nav>
+
           <form class="registration-allowance-search" method="GET" action="{{ route('dashboard.users') }}">
             <label class="visually-hidden" for="allowance-search">Find an email</label>
             <i class="bi bi-search" aria-hidden="true"></i>
             <input id="allowance-search" type="search" name="allowance_q" value="{{ $allowanceSearch }}" placeholder="Search the registration list" />
+            @if($allowanceStatus !== 'all')
+              <input type="hidden" name="allowance_status" value="{{ $allowanceStatus }}" />
+            @endif
             <button class="users-reset-btn" type="submit">Search</button>
             @if($allowanceSearch !== '')
-              <a class="users-reset-btn" href="{{ route('dashboard.users') }}">Clear</a>
+              <a class="users-reset-btn" href="{{ route('dashboard.users', $allowanceStatus === 'all' ? [] : ['allowance_status' => $allowanceStatus]) }}">Clear</a>
             @endif
           </form>
 
@@ -267,7 +292,7 @@
                   @php $hasAccount = $allowanceRegistered->contains($allowance->email); @endphp
                   <tr>
                     <td class="registration-allowance-email">{{ $allowance->email }}</td>
-                    <td>{{ $allowance->role === 'item_owner' ? 'Item Owner' : \App\Support\RoleCatalog::label((string) ($allowance->role ?: \App\Support\RoleCatalog::STUDENT)) }}</td>
+                    <td>{{ \App\Services\RegistrationAllowanceService::roleLabel($allowance->role) }}</td>
                     <td>
                       <span class="registration-allowance-status {{ $hasAccount ? 'is-registered' : 'is-waiting' }}">
                         {{ $hasAccount ? 'Registered' : 'Not registered' }}
@@ -284,6 +309,9 @@
                           @if($allowances->currentPage() > 1)
                             <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
                           @endif
+                          @if($allowanceStatus !== 'all')
+                            <input type="hidden" name="allowance_status" value="{{ $allowanceStatus }}" />
+                          @endif
                           <button type="submit">Remove</button>
                         </form>
                       @endif
@@ -294,8 +322,8 @@
                     <td colspan="4">
                       <div class="registration-allowance-empty">
                         <i class="bi bi-inbox" aria-hidden="true"></i>
-                        <strong>{{ $allowanceSearch !== '' ? 'No matching email' : 'No emails yet' }}</strong>
-                        <span>{{ $allowanceSearch !== '' ? 'Try another search.' : 'Upload a file or add the first address.' }}</span>
+                        <strong>{{ $allowanceSearch !== '' ? 'No matching email' : ($allowanceStatus === 'registered' ? 'No registered emails' : ($allowanceStatus === 'unregistered' ? 'No unregistered emails' : 'No emails yet')) }}</strong>
+                        <span>{{ $allowanceSearch !== '' ? 'Try another search.' : ($allowanceStatus === 'all' ? 'Upload a file or add the first address.' : 'Nothing is in this category.') }}</span>
                       </div>
                     </td>
                   </tr>

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\EmailSpreadsheet;
 use App\Support\RoleCatalog;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
@@ -216,15 +217,63 @@ class RegistrationAllowanceService
         $allowance->delete();
     }
 
-    public static function page(?string $search): LengthAwarePaginator
+    public static function roleLabel(?string $role): string
+    {
+        if ($role === 'item_owner') {
+            return 'Item Owner';
+        }
+
+        try {
+            return RoleCatalog::label(self::storedRole($role));
+        } catch (InvalidArgumentException) {
+            return trim((string) $role) !== '' ? (string) $role : RoleCatalog::STUDENT;
+        }
+    }
+
+    /**
+     * @return array{all: int, registered: int, unregistered: int}
+     */
+    public static function counts(): array
+    {
+        $total = RegistrationAllowance::query()->count();
+        $registered = self::registeredQuery(RegistrationAllowance::query())->count();
+
+        return [
+            'all' => $total,
+            'registered' => $registered,
+            'unregistered' => max(0, $total - $registered),
+        ];
+    }
+
+    public static function page(?string $search, string $status = 'all'): LengthAwarePaginator
     {
         $term = self::normalizeEmail((string) $search);
+        $status = in_array($status, ['registered', 'unregistered'], true) ? $status : 'all';
 
-        return RegistrationAllowance::query()
-            ->when($term !== '', fn ($query) => $query->where('email', 'like', '%'.$term.'%'))
+        $query = RegistrationAllowance::query()
+            ->when($term !== '', fn ($query) => $query->where('email', 'like', '%'.$term.'%'));
+
+        if ($status === 'registered') {
+            self::registeredQuery($query);
+        } elseif ($status === 'unregistered') {
+            self::registeredQuery($query, false);
+        }
+
+        return $query
             ->orderBy('email')
             ->paginate(25, ['*'], 'allowance_page')
             ->withQueryString();
+    }
+
+    private static function registeredQuery(Builder $query, bool $registered = true): Builder
+    {
+        $method = $registered ? 'whereExists' : 'whereNotExists';
+
+        return $query->{$method}(function ($accounts): void {
+            $accounts->selectRaw('1')
+                ->from('users')
+                ->whereRaw('LOWER(users.email) = registration_allowances.email');
+        });
     }
 
     /**
