@@ -72,17 +72,24 @@ class DashboardUserController extends Controller
                 ->pluck('email')
                 ->map(fn ($email) => RegistrationAllowanceService::normalizeEmail((string) $email));
 
-        return view('dashboard-users', [
-            'users' => $users,
-            'offices' => $offices,
-            'itemOwnerOfficeId' => $itemOwnerOfficeId,
-            'roleOffices' => $roleOffices,
+        $allowanceView = [
             'allowances' => $allowances,
             'allowanceSearch' => trim((string) $request->query('allowance_q', '')),
             'allowanceStatus' => $allowanceStatus,
             'allowanceCounts' => RegistrationAllowanceService::counts(),
             'allowanceRegistered' => $registeredEmails,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('partials.registration-allowance-list', $allowanceView);
+        }
+
+        return view('dashboard-users', array_merge([
+            'users' => $users,
+            'offices' => $offices,
+            'itemOwnerOfficeId' => $itemOwnerOfficeId,
+            'roleOffices' => $roleOffices,
+        ], $allowanceView));
     }
 
     public function exportRegisteredUsers()
