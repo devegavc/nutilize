@@ -5991,10 +5991,10 @@ body.insight-filtering .insight-kpi:not(.is-active) {
   line-height: 1.4;
 }
 
-.user-management-card .registration-allowance-card input[type="email"] {
+.user-management-card .registration-allowance-card input[type="email"],
+.user-management-card .registration-allowance-card select {
   width: 100%;
   min-height: 38px;
-  margin-top: auto;
   border: 1px solid #cad4ee;
   border-radius: 10px;
   background: #fbfcff;
@@ -6004,7 +6004,8 @@ body.insight-filtering .insight-kpi:not(.is-active) {
   font-size: 0.84rem;
 }
 
-.user-management-card .registration-allowance-card input[type="email"]:focus {
+.user-management-card .registration-allowance-card input[type="email"]:focus,
+.user-management-card .registration-allowance-card select:focus {
   outline: none;
   border-color: rgba(56, 71, 156, 0.56);
   box-shadow: 0 0 0 2px rgba(56, 71, 156, 0.14);

@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\RegistrationAllowance;
 use App\Models\User;
 use App\Services\RegistrationAllowanceService;
+use App\Support\RoleCatalog;
 use App\Support\SimpleXlsx;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
@@ -51,23 +53,44 @@ class RegistrationAllowanceController extends Controller
     {
         $data = $request->validate([
             'email' => ['required', 'string', 'email', 'max:100'],
+            'role' => ['required', 'string', Rule::in(RoleCatalog::assignableValues())],
         ]);
 
         $normalized = RegistrationAllowanceService::normalizeEmail($data['email']);
         $existed = RegistrationAllowance::query()->where('email', $normalized)->exists();
+        $hasAccount = RegistrationAllowanceService::accountExists($normalized);
 
         try {
-            RegistrationAllowanceService::addEmail($normalized, Auth::id() ? (int) Auth::id() : null);
+            RegistrationAllowanceService::addEmail(
+                $normalized,
+                Auth::id() ? (int) Auth::id() : null,
+                $data['role']
+            );
         } catch (InvalidArgumentException $exception) {
             throw ValidationException::withMessages([
-                'email' => $exception->getMessage(),
+                'role' => $exception->getMessage(),
             ]);
         }
 
+        if ($existed && $hasAccount) {
+            return $this->notice(
+                $request,
+                'used',
+                'This email already has an account.',
+                $normalized
+            );
+        }
+
+        $roleLabel = $data['role'] === 'item_owner'
+            ? 'Item Owner'
+            : RoleCatalog::label(RegistrationAllowanceService::storedRole($data['role']));
+
         return $this->notice(
             $request,
-            $existed ? 'used' : 'added',
-            $existed ? 'It is already on the registration list.' : 'That person can now register.',
+            'added',
+            $existed
+                ? 'The role for that email was updated. It will be applied when they register.'
+                : 'That person can now register as '.$roleLabel.'.',
             $normalized
         );
     }

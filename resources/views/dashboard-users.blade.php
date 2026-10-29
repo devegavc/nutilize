@@ -190,7 +190,7 @@
             <span class="registration-allowance-icon" aria-hidden="true"><i class="bi bi-envelope-check-fill"></i></span>
             <div>
               <h2>Emails allowed to register</h2>
-              <p>A person can create an account only when their email is on this list. A later upload adds new addresses and leaves the ones already listed.</p>
+              <p>A person can create an account only when their email is on this list. The role you choose is applied automatically when they register.</p>
             </div>
             <div class="registration-allowance-tools">
               <a class="users-download-btn" href="{{ route('dashboard.registration-allowances.export') }}"><i class="bi bi-download" aria-hidden="true"></i> Download registered</a>
@@ -226,8 +226,18 @@
                 <input type="hidden" name="allowance_page" value="{{ $allowances->currentPage() }}" />
               @endif
               <label class="registration-allowance-kicker" for="allowance-email"><i class="bi bi-person-plus"></i> Add one email</label>
-              <p>For a new student or a transfer who is not in the file.</p>
-              <input id="allowance-email" type="email" name="email" maxlength="100" placeholder="name@students.nu-lipa.edu.ph" required />
+              <p>Choose the role now. It is saved on the account when this person registers.</p>
+              <select id="allowance-role" name="role" required>
+                <option value="" disabled {{ old('role') ? '' : 'selected' }}>Choose a role</option>
+                @foreach(\App\Support\RoleCatalog::groupedAssignable() as $group => $options)
+                  <optgroup label="{{ $group }}">
+                    @foreach($options as $code => $label)
+                      <option value="{{ $code }}" @selected(old('role') === $code)>{{ $label }}</option>
+                    @endforeach
+                  </optgroup>
+                @endforeach
+              </select>
+              <input id="allowance-email" type="email" name="email" maxlength="100" placeholder="name@students.nu-lipa.edu.ph" value="{{ old('email') }}" required />
               <button class="facilities-add-btn" type="submit">Add email</button>
             </form>
           </div>
@@ -247,6 +257,7 @@
               <thead>
                 <tr>
                   <th>Email</th>
+                  <th>Role</th>
                   <th>Account</th>
                   <th></th>
                 </tr>
@@ -256,6 +267,7 @@
                   @php $hasAccount = $allowanceRegistered->contains($allowance->email); @endphp
                   <tr>
                     <td class="registration-allowance-email">{{ $allowance->email }}</td>
+                    <td>{{ $allowance->role === 'item_owner' ? 'Item Owner' : \App\Support\RoleCatalog::label((string) ($allowance->role ?: \App\Support\RoleCatalog::STUDENT)) }}</td>
                     <td>
                       <span class="registration-allowance-status {{ $hasAccount ? 'is-registered' : 'is-waiting' }}">
                         {{ $hasAccount ? 'Registered' : 'Not registered' }}
@@ -279,7 +291,7 @@
                   </tr>
                 @empty
                   <tr>
-                    <td colspan="3">
+                    <td colspan="4">
                       <div class="registration-allowance-empty">
                         <i class="bi bi-inbox" aria-hidden="true"></i>
                         <strong>{{ $allowanceSearch !== '' ? 'No matching email' : 'No emails yet' }}</strong>

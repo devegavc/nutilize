@@ -9,6 +9,7 @@ class RegistrationAllowance extends Model
 {
     protected $fillable = [
         'email',
+        'role',
         'added_by',
     ];
 

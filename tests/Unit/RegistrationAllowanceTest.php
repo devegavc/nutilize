@@ -62,6 +62,15 @@ class RegistrationAllowanceTest extends TestCase
         );
     }
 
+    public function test_stored_role_keeps_the_admin_choice(): void
+    {
+        $this->assertSame('Student', RegistrationAllowanceService::storedRole(null));
+        $this->assertSame('Student', RegistrationAllowanceService::storedRole('user'));
+        $this->assertSame('Faculty', RegistrationAllowanceService::storedRole('faculty'));
+        $this->assertSame('PC_InformationTechnology', RegistrationAllowanceService::storedRole('PC_InformationTechnology'));
+        $this->assertSame('item_owner', RegistrationAllowanceService::storedRole('item_owner'));
+    }
+
     public function test_normalize_email_is_lowercase_and_trimmed(): void
     {
         $this->assertSame('ada@school.edu', RegistrationAllowanceService::normalizeEmail('  Ada@School.edu  '));

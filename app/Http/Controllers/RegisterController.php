@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AcademicProgram;
+use App\Models\RegistrationAllowance;
 use App\Models\User;
 use App\Services\RegistrationAllowanceService;
 use Illuminate\Http\RedirectResponse;
@@ -66,6 +67,20 @@ class RegisterController extends Controller
                 ->withInput($request->except('password', 'password_confirmation'));
         }
 
+        $allowance = RegistrationAllowance::query()
+            ->where('email', RegistrationAllowanceService::normalizeEmail($validated['email']))
+            ->first();
+
+        try {
+            $assignment = RegistrationAllowanceService::accountAssignment($allowance?->role);
+        } catch (\InvalidArgumentException $exception) {
+            return back()
+                ->withErrors([
+                    'email' => $exception->getMessage(),
+                ])
+                ->withInput($request->except('password', 'password_confirmation'));
+        }
+
         $middleInitial = isset($validated['middle_initial']) && $validated['middle_initial'] !== ''
             ? strtoupper($validated['middle_initial']).'.'
             : null;
@@ -87,7 +102,8 @@ class RegisterController extends Controller
         $user->username = $validated['username'];
         $user->email = $validated['email'];
         $user->password = Hash::make($validated['password']);
-        $user->role = 'user';
+        $user->role = $assignment['role'];
+        $user->office_id = $assignment['office_id'];
         $user->program_id = (int) $validated['program_id'];
         $user->is_active = true;
         $user->status_changed_at = now();

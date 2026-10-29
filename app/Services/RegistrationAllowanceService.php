@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\Office;
 use App\Models\RegistrationAllowance;
 use App\Models\User;
 use App\Support\EmailSpreadsheet;
+use App\Support\RoleCatalog;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -36,22 +38,98 @@ class RegistrationAllowanceService
             ->exists();
     }
 
-    public static function addEmail(string $email, ?int $addedBy = null): RegistrationAllowance
+    public static function addEmail(string $email, ?int $addedBy = null, ?string $role = null): RegistrationAllowance
     {
         $normalized = self::normalizeEmail($email);
         if (!self::validEmail($normalized)) {
             throw new InvalidArgumentException('Enter a valid email address.');
         }
 
+        $storedRole = self::storedRole($role);
+        self::assertRoleCanBeAssigned($storedRole);
+
         $existing = RegistrationAllowance::query()->where('email', $normalized)->first();
         if ($existing instanceof RegistrationAllowance) {
+            if (!self::accountExists($normalized)) {
+                $existing->role = $storedRole;
+                $existing->save();
+            }
+
             return $existing;
         }
 
         return RegistrationAllowance::query()->create([
             'email' => $normalized,
+            'role' => $storedRole,
             'added_by' => $addedBy ?? (Auth::id() ? (int) Auth::id() : null),
         ]);
+    }
+
+    public static function storedRole(?string $role): string
+    {
+        $role = trim((string) $role);
+        if ($role === '' || strcasecmp($role, RoleCatalog::STUDENT) === 0 || strcasecmp($role, 'user') === 0) {
+            return RoleCatalog::STUDENT;
+        }
+
+        if ($role === 'item_owner') {
+            return 'item_owner';
+        }
+
+        $canonical = RoleCatalog::canonicalCode($role);
+        if ($canonical === null) {
+            throw new InvalidArgumentException('Choose a valid role.');
+        }
+
+        return $canonical;
+    }
+
+    /**
+     * @return array{role: string, office_id: int|null}
+     */
+    public static function accountAssignment(?string $storedRole): array
+    {
+        $storedRole = self::storedRole($storedRole);
+        if ($storedRole === 'item_owner') {
+            return [
+                'role' => 'admin',
+                'office_id' => self::officeIdForStoredRole($storedRole),
+            ];
+        }
+
+        return [
+            'role' => $storedRole,
+            'office_id' => self::officeIdForStoredRole($storedRole),
+        ];
+    }
+
+    public static function officeIdForStoredRole(string $storedRole): ?int
+    {
+        if ($storedRole === 'item_owner') {
+            $officeId = ItemOwnerService::itemOwnerOfficeId();
+            if ($officeId === null) {
+                throw new InvalidArgumentException('The Item Owner office is not configured.');
+            }
+
+            return (int) $officeId;
+        }
+
+        $linked = RoleCatalog::linkedOffice($storedRole);
+        if (($linked['kind'] ?? 'unknown') === 'none') {
+            return null;
+        }
+
+        $officeId = self::officeIdForLink($linked);
+        if ($officeId === null) {
+            throw new InvalidArgumentException('No office is configured for this role.');
+        }
+
+        return $officeId;
+    }
+
+    public static function assertRoleCanBeAssigned(string $storedRole): void
+    {
+        self::officeIdForStoredRole($storedRole);
     }
 
     /**
@@ -95,6 +173,7 @@ class RegistrationAllowanceService
 
             RegistrationAllowance::query()->create([
                 'email' => $normalized,
+                'role' => RoleCatalog::STUDENT,
                 'added_by' => $addedBy,
             ]);
             $added++;
@@ -146,6 +225,34 @@ class RegistrationAllowanceService
             ->orderBy('email')
             ->paginate(25, ['*'], 'allowance_page')
             ->withQueryString();
+    }
+
+    /**
+     * @param  array{kind?: string, department_name?: string, short_code?: string}  $linked
+     */
+    private static function officeIdForLink(array $linked): ?int
+    {
+        $offices = Office::query()->get(['office_id', 'department_name', 'short_code']);
+
+        if (($linked['kind'] ?? '') === 'department') {
+            $name = strtolower(trim((string) ($linked['department_name'] ?? '')));
+            $office = $offices->first(
+                fn (Office $office): bool => strtolower(trim((string) $office->department_name)) === $name
+            );
+
+            return $office instanceof Office ? (int) $office->office_id : null;
+        }
+
+        if (($linked['kind'] ?? '') === 'short_code') {
+            $short = strtoupper(trim((string) ($linked['short_code'] ?? '')));
+            $office = $offices->first(
+                fn (Office $office): bool => strtoupper(trim((string) $office->short_code)) === $short
+            );
+
+            return $office instanceof Office ? (int) $office->office_id : null;
+        }
+
+        return null;
     }
 
     private static function validEmail(string $email): bool
